@@ -389,7 +389,7 @@ describe("Sidebar menus and pinned ordering", () => {
 	});
 
 	it("right-click on a session row opens the 6-item session menu", async () => {
-		installMockOmp(LIST);
+		const omp = installMockOmp(LIST);
 		seedStores();
 		await mount(<Sidebar />);
 
@@ -407,6 +407,12 @@ describe("Sidebar menus and pinned ordering", () => {
 			).toBe(true);
 		}
 		expect(labels).toHaveLength(6);
+
+		const pinItem = [...document.body.querySelectorAll('[role="menu"] button')].find(button =>
+			(button.textContent ?? "").includes("Pin to top"),
+		);
+		await fire(pinItem as Element, "onClick");
+		expect(omp.rpc.setSessionPinned).toHaveBeenCalledWith("/work/alpha/one.jsonl", true);
 	});
 
 	it("rename and delete stay enabled for idle tasks while another task runs", async () => {

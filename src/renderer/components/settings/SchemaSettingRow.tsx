@@ -230,8 +230,10 @@ function SchemaSettingRow({
 		// Structured editors for the common shapes; JSON stays the fallback.
 		const stringArray =
 			entry.type === "array" && Array.isArray(value) && (value as unknown[]).every(item => typeof item === "string");
+		const nestedRecord = entry.path === "images.urls.options" || entry.path === "images.urls.credentials";
 		const flatRecord =
 			entry.type === "record" &&
+			!nestedRecord &&
 			value !== null &&
 			typeof value === "object" &&
 			!Array.isArray(value) &&

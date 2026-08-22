@@ -11,12 +11,13 @@ import { create } from "zustand";
 export interface PendingPlanProposal {
 	planFilePath: string;
 	title?: string;
+	suggestedFileName?: string;
 	planContent: string;
-	/** Approval choices advertised on the frame: "execute" | "compact" | "keep_context" | "refine". */
+	/** Approval choices advertised on the frame, including GUI save-only review. */
 	options: string[];
 }
 
-export type PlanApprovalOption = "execute" | "compact" | "keep_context";
+export type PlanApprovalOption = "execute" | "compact" | "keep_context" | "save";
 export type PlanApprovalSubmitState = { kind: "approve"; option?: PlanApprovalOption } | { kind: "refine" | "dismiss" };
 
 export interface PlanApprovalSnapshot {

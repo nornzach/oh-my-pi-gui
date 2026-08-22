@@ -16,7 +16,7 @@
  * self-subscribing — mount once in App.
  */
 
-import { ClipboardList, History, ListCollapse, Play, Send } from "lucide-react";
+import { ClipboardList, History, ListCollapse, Play, Save, Send } from "lucide-react";
 import type { ReactNode } from "react";
 import { usePlanApproval } from "../../hooks/use-plan-approval";
 import { basename } from "../../lib/format";
@@ -39,6 +39,8 @@ interface PlanApprovalResult {
 	approved: boolean;
 	dispatched: boolean;
 	reason?: string;
+	savedPath?: string;
+	freshSessionStarted?: boolean;
 }
 
 const APPROVE_CHOICES: Record<PlanApprovalOption, { labelKey: string; hintKey: string; icon: ReactNode }> = {
@@ -57,13 +59,18 @@ const APPROVE_CHOICES: Record<PlanApprovalOption, { labelKey: string; hintKey: s
 		hintKey: "planApproval.approve.keepContext.hint",
 		icon: <History size={12} />,
 	},
+	save: {
+		labelKey: "planApproval.approve.save.label",
+		hintKey: "planApproval.approve.save.hint",
+		icon: <Save size={12} />,
+	},
 };
 
 /** Approve buttons from the advertised options; falls back to execute when none are recognizable. */
 function approveOptionsOf(options: string[]): PlanApprovalOption[] {
 	const known = options.filter(
 		(option): option is PlanApprovalOption =>
-			option === "execute" || option === "compact" || option === "keep_context",
+			option === "execute" || option === "compact" || option === "keep_context" || option === "save",
 	);
 	return known.length > 0 ? known : ["execute"];
 }
@@ -87,11 +94,21 @@ export function PlanApprovalDialog() {
 		const originTabId = useTabsStore.getState().activeTabId;
 		const originSessionId = useSessionStore.getState().sessionId;
 		const trimmed = feedback.trim();
+		const savePath =
+			kind === "approve" && option === "save"
+				? await window.omp.system.showSaveDialog(
+						`${useSessionStore.getState().cwd}/${target.suggestedFileName ?? basename(target.planFilePath)}`,
+						[{ name: "Markdown", extensions: ["md"] }],
+					)
+				: undefined;
+		if (option === "save" && !savePath) return;
 		setSubmitting(kind === "approve" ? { kind, option } : { kind });
 		try {
 			const response =
 				kind === "approve"
-					? await window.omp.rpc.planApproval(true, option)
+					? option === "save"
+						? await window.omp.rpc.planApproval(true, option, undefined, savePath ?? undefined)
+						: await window.omp.rpc.planApproval(true, option)
 					: kind === "refine"
 						? await window.omp.rpc.planApproval(false, undefined, trimmed)
 						: await window.omp.rpc.planApproval(false);
@@ -101,6 +118,20 @@ export function PlanApprovalDialog() {
 				return;
 			}
 			const result = response.data as PlanApprovalResult | null | undefined;
+			if (option === "save" && result?.savedPath) {
+				settleTabPlanApproval(originTabId, originSessionId, target, { clear: true, exitPlanMode: true });
+				toast({
+					variant: result.freshSessionStarted === false ? "warning" : "success",
+					message:
+						result.freshSessionStarted === false
+							? t("planApproval.savedWithoutFresh", {
+									path: result.savedPath,
+									reason: result.reason ?? t("common.unknownError"),
+								})
+							: t("planApproval.saved", { path: result.savedPath }),
+				});
+				return;
+			}
 			if (result && !result.dispatched) {
 				if (kind === "approve") {
 					// Approval stands but nothing was dispatched (e.g. compaction

@@ -20,6 +20,7 @@ export function usePlanApproval(): void {
 				usePlanApprovalStore.getState().showProposal({
 					planFilePath: event.planFilePath,
 					title: event.title,
+					suggestedFileName: event.suggestedFileName,
 					planContent: event.planContent,
 					options: event.options,
 				});

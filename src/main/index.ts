@@ -328,6 +328,8 @@ app.whenReady().then(() => {
 		statsClient,
 		logWatcher,
 		windowManager,
+		benchmarkBinaryPath: bundledOmp,
+		benchmarkEnv: async () => ({ ...process.env, ...(await shellSpawnEnv()), ...(await resolveProxyEnvForSpawn()) }),
 		spawnWindow,
 	});
 

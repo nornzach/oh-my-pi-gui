@@ -118,6 +118,9 @@ export const IPC_COMMANDS = {
 	SESSIONS_SEARCH: "sessions:search",
 	/** Fetch stats endpoint */
 	STATS_FETCH: "stats:fetch",
+	/** Run/cancel an isolated bundled `omp bench --json` process. */
+	BENCH_RUN: "bench:run",
+	BENCH_ABORT: "bench:abort",
 	/** Open external URL */
 	SYSTEM_OPEN_EXTERNAL: "system:open-external",
 	/** Open a file path in the system editor (relative resolves against the workspace) */
@@ -266,6 +269,54 @@ export interface MenuActionPayload {
 
 /** Run-progress state pushed by the renderer (terminal.showProgress): dock badge + window progress bar. */
 export type RunProgressState = "working" | "waiting" | "idle";
+
+export type IpcBenchmarkProfile = "mix" | "chat" | "prefill" | "generation";
+
+export interface IpcBenchmarkRunOptions {
+	models: string[];
+	profile: IpcBenchmarkProfile;
+	runs: number;
+	parallel: number;
+	maxTokens?: number;
+}
+
+export interface IpcBenchmarkMetricStats {
+	mean: number;
+	min: number;
+	p50: number;
+	p95: number;
+	max: number;
+}
+
+export interface IpcBenchmarkStats {
+	ttftMs: IpcBenchmarkMetricStats;
+	durationMs: IpcBenchmarkMetricStats;
+	tokensPerSecond: IpcBenchmarkMetricStats;
+	generationTps: IpcBenchmarkMetricStats;
+	prefillTps: IpcBenchmarkMetricStats;
+	inputTokens: number;
+	outputTokens: number;
+	cost: number;
+}
+
+export interface IpcBenchmarkModelReport {
+	selector: string;
+	model: string;
+	stats: IpcBenchmarkStats | null;
+	byChallenge: Partial<Record<Exclude<IpcBenchmarkProfile, "mix">, IpcBenchmarkStats>>;
+	results: Array<{ ok: boolean; error?: string }>;
+}
+
+export interface IpcBenchmarkSummary {
+	runs: number;
+	profile?: IpcBenchmarkProfile;
+	models: IpcBenchmarkModelReport[];
+	failures: number;
+}
+
+export type IpcBenchmarkRunResult =
+	| { success: true; summary: IpcBenchmarkSummary; exitCode: number | null; stderr?: string }
+	| { success: false; error: string; stderr?: string };
 
 /** Compact snapshot the renderer pushes to main to build the tray menu. */
 export interface TrayState {
@@ -787,7 +838,7 @@ export interface OmpApi {
 		getActiveTools(): Promise<RpcResponse>;
 		setPrewalk(enabled: boolean): Promise<RpcResponse>;
 		fresh(): Promise<RpcResponse>;
-		shakeContext(mode: "elide" | "images"): Promise<RpcResponse>;
+		shakeContext(mode: "elide" | "images" | "thinking"): Promise<RpcResponse>;
 		reloadPlugins(): Promise<RpcResponse>;
 		setForceTool(payload: { tool: string } | { clear: true }): Promise<RpcResponse>;
 		getForceTool(): Promise<RpcResponse>;
@@ -854,6 +905,7 @@ export interface OmpApi {
 		bash(command: string, excluded?: boolean): Promise<RpcResponse>;
 		abortBash(): Promise<RpcResponse>;
 		getSessionStats(): Promise<RpcResponse>;
+		setSessionPinned(sessionId: string, pinned: boolean): Promise<RpcResponse>;
 		exportHtml(outputPath?: string): Promise<RpcResponse>;
 		getBranchMessages(): Promise<RpcResponse>;
 		getLastAssistantText(): Promise<RpcResponse>;
@@ -918,8 +970,9 @@ export interface OmpApi {
 		getTranscript(): Promise<RpcResponse>;
 		planApproval(
 			approved: boolean,
-			option?: "execute" | "compact" | "keep_context",
+			option?: "execute" | "compact" | "keep_context" | "save",
 			feedback?: string,
+			savePath?: string,
 		): Promise<RpcResponse>;
 		getVibeMode(): Promise<RpcResponse>;
 		setVibeMode(enabled: boolean): Promise<RpcResponse>;
@@ -1030,11 +1083,15 @@ export interface OmpApi {
 	stats: {
 		fetch(path: string, params?: Record<string, string>): Promise<unknown>;
 	};
+	bench: {
+		run(options: IpcBenchmarkRunOptions): Promise<IpcBenchmarkRunResult>;
+		abort(): Promise<boolean>;
+	};
 	system: {
 		openExternal(url: string): Promise<void>;
 		/** Open a file in the system editor; relative paths resolve against the workspace. */
 		openPath(path: string): Promise<IpcOpenPathResult>;
-		showSaveDialog(defaultPath?: string): Promise<string | null>;
+		showSaveDialog(defaultPath?: string, filters?: { name: string; extensions: string[] }[]): Promise<string | null>;
 		showOpenDialog(
 			filters?: { name: string; extensions: string[] }[],
 			options?: { directory?: boolean },

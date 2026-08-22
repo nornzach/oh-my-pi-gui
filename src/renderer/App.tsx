@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import type { MenuAction, MenuActionPayload, RunProgressState } from "../shared/ipc-types";
 import { ChatStream } from "./components/chat/ChatStream";
+import { WorkspaceDock } from "./components/chat/dock/WorkspaceDock";
 import { ToastStack } from "./components/common";
 import { ActiveToolsDialog } from "./components/dialogs/ActiveToolsDialog";
 import { BranchPickerDialog } from "./components/dialogs/BranchPickerDialog";
@@ -71,6 +72,9 @@ const StatsDashboard = lazy(() =>
 	import("./components/stats/StatsDashboard").then(m => ({ default: m.StatsDashboard })),
 );
 const ModelCompare = lazy(() => import("./components/settings/ModelCompare").then(m => ({ default: m.ModelCompare })));
+const BenchmarkDialog = lazy(() =>
+	import("./components/dialogs/BenchmarkDialog").then(m => ({ default: m.BenchmarkDialog })),
+);
 const ExtensionsPanel = lazy(() =>
 	import("./components/panels/ExtensionsPanel").then(m => ({ default: m.ExtensionsPanel })),
 );
@@ -115,6 +119,8 @@ export function App() {
 	const closeStatsDashboard = useUiStore(s => s.closeStatsDashboard);
 	const modelCompareOpen = useUiStore(s => s.modelCompareOpen);
 	const closeModelCompare = useUiStore(s => s.closeModelCompare);
+	const benchmarkOpen = useUiStore(s => s.benchmarkOpen);
+	const closeBenchmark = useUiStore(s => s.closeBenchmark);
 	const extensionsOpen = useUiStore(s => s.extensionsOpen);
 	const extensionsTab = useUiStore(s => s.extensionsTab);
 	const closeExtensions = useUiStore(s => s.closeExtensions);
@@ -440,6 +446,7 @@ export function App() {
 				ui.modelPickerOpen ||
 				ui.settingsOpen ||
 				ui.statsDashboardOpen ||
+				ui.benchmarkOpen ||
 				ui.sessionPickerOpen ||
 				ui.branchPickerOpen ||
 				ui.hotkeysOpen;
@@ -590,8 +597,17 @@ export function App() {
 				<TabBar />
 				<SidecarBanner />
 				<UpdateBanner />
-				<ChatStream />
-				<InputArea key={activeTabId ?? "no-tab"} />
+				<div className="flex min-h-0 flex-1 flex-col">
+					<div className="relative flex min-h-0 flex-1 flex-col">
+						<ChatStream />
+						<div className="omp-composer-region relative shrink-0 bg-transparent pt-2">
+							<div className="omp-composer-shell relative w-full">
+								<WorkspaceDock key={activeTabId ?? "no-tab"} />
+							</div>
+						</div>
+					</div>
+					<InputArea key={activeTabId ?? "no-tab"} />
+				</div>
 			</main>
 
 			{panelVisible && <PanelContainer />}
@@ -627,6 +643,7 @@ export function App() {
 				<ProvidersWindow />
 				<ModelRolesWindow />
 				<ModelCompare open={modelCompareOpen} onClose={closeModelCompare} />
+				<BenchmarkDialog open={benchmarkOpen} onClose={closeBenchmark} />
 				<ExtensionsPanel open={extensionsOpen} onClose={closeExtensions} initialTab={extensionsTab} />
 				<InventoryPanel open={inventoryOpen} onClose={closeInventory} initialTab={inventoryTab} />
 				<ModesPanel open={modesOpen} onClose={closeModes} initialTab={modesTab} />

@@ -1114,8 +1114,14 @@ export function Sidebar() {
 										: t("sidebar.menu.pin"),
 									icon: pinnedSessions.includes(sessionMenu.session.path) ? PinOff : Pin,
 									onSelect: () => {
+										const pinned = !pinnedSessions.includes(sessionMenu.session.path);
 										useSidebarPrefs.getState().toggleSessionPin(sessionMenu.session.path);
 										setSessionMenu(null);
+										void window.omp.rpc.setSessionPinned(sessionMenu.session.id, pinned).then(response => {
+											if (!response.success) {
+												toast({ variant: "warning", message: t("sidebar.pinSyncFailed") });
+											}
+										});
 									},
 								},
 								{

@@ -194,6 +194,32 @@ describe("GUI settings visibility", () => {
 		expect(html).not.toContain('value="soft"');
 		expect(html).not.toContain("<input");
 	});
+
+	it("keeps empty image broker maps on the nested JSON editor", () => {
+		const options = entry({
+			path: "images.urls.options",
+			type: "record",
+			value: {},
+			default: {},
+			tab: "model",
+			group: "Vision",
+		});
+		const html = renderToStaticMarkup(
+			<I18nProvider>
+				<SchemaTabContent
+					entries={[options]}
+					groups={["Vision"]}
+					onCommitted={() => {}}
+					tabId="model"
+					values={{ "images.urls.options": {} }}
+				/>
+			</I18nProvider>,
+		);
+
+		expect(html).toContain("<textarea");
+		expect(html).toContain("{}");
+		expect(html).not.toContain("<input");
+	});
 });
 
 describe("SchemaTabContent zh translations", () => {

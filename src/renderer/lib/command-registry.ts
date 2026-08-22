@@ -97,6 +97,7 @@ export interface CommandRegistryContext {
 	openSessionTree: () => void;
 	openSessionInfo: () => void;
 	openModelCompare: () => void;
+	openBenchmark: () => void;
 	openHandoffDialog: () => void;
 	openExtensions: (tab?: "hooks" | "mcp" | "commands") => void;
 	openInventory: (tab?: "plugins" | "marketplaces" | "templates" | "memory") => void;
@@ -617,6 +618,14 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		aliases: ["compare"],
 		affordance: { kind: "window", open: ctx.openModelCompare },
 	});
+	add({
+		name: "benchmark",
+		label: t("cmd.benchmark"),
+		description: t("cmd.benchmark.desc"),
+		category: "model",
+		aliases: ["bench", "performance"],
+		affordance: { kind: "window", open: ctx.openBenchmark },
+	});
 
 	// ═══════════════════════════════════════════════════════════════════
 	// CONTEXT
@@ -655,6 +664,12 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 					label: t("cmd.shake.images"),
 					category: "extensions",
 					affordance: { kind: "action", run: () => shakeContextFromGui("images") },
+				},
+				{
+					name: "shake thinking",
+					label: t("cmd.shake.thinking"),
+					category: "extensions",
+					affordance: { kind: "action", run: () => shakeContextFromGui("thinking") },
 				},
 			],
 		},
@@ -1372,10 +1387,12 @@ function prefillQueueShorthand(): void {
 	window.dispatchEvent(new CustomEvent("omp:fill-composer", { detail: { text: "-> " } }));
 }
 
-/** /shake elide|images: confirm, then drop heavy context via shake_context RPC;
+/** /shake elide|images|thinking: confirm, then drop context via shake_context RPC;
  *  the toast carries the agent's removed summary. */
-async function shakeContextFromGui(mode: "elide" | "images"): Promise<void> {
-	if (!window.confirm(translate(mode === "images" ? "shake.confirmImages" : "shake.confirmElide"))) return;
+async function shakeContextFromGui(mode: "elide" | "images" | "thinking"): Promise<void> {
+	const confirmKey =
+		mode === "images" ? "shake.confirmImages" : mode === "thinking" ? "shake.confirmThinking" : "shake.confirmElide";
+	if (!window.confirm(translate(confirmKey))) return;
 	const response = await window.omp.rpc.shakeContext(mode);
 	if (!response.success) {
 		toast({ variant: "error", title: translate("cmd.shake"), message: response.error });
@@ -1593,6 +1610,7 @@ export function buildCurrentCommandMenu(availableCommands: AvailableCommand[]): 
 		openSessionTree: ui.openSessionTree,
 		openSessionInfo: ui.openSessionInfo,
 		openModelCompare: ui.openModelCompare,
+		openBenchmark: ui.openBenchmark,
 		openHandoffDialog,
 		openExtensions: ui.openExtensions,
 		openInventory: ui.openInventory,

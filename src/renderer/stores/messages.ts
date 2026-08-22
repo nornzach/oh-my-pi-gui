@@ -152,8 +152,17 @@ function mergeRunMessages(current: AgentMessage[], run: AgentMessage[]): AgentMe
 			break;
 		}
 	}
-	if (overlap === run.length) return current;
-	return [...current, ...run.slice(overlap)];
+	const merged = [...current];
+	let changed = overlap < run.length;
+	for (let index = 0; index < overlap; index++) {
+		const currentIndex = current.length - overlap + index;
+		const entryId = run[index]?.entryId;
+		if (!entryId || merged[currentIndex]?.entryId === entryId) continue;
+		merged[currentIndex] = { ...merged[currentIndex], entryId };
+		changed = true;
+	}
+	if (overlap < run.length) merged.push(...run.slice(overlap));
+	return changed ? merged : current;
 }
 
 export const useMessagesStore = create<MessagesStore>()((set, get) => ({

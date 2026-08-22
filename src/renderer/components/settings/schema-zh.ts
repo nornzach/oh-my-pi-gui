@@ -176,6 +176,22 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 		label: "为纯文本模型描述图片",
 		description: "当图片附加到不支持视觉的模型时，将其保存到 local:// 下，并注入来自视觉模型的描述，而不是丢弃",
 	},
+	"images.urls.enabled": {
+		label: "以 URL 发送图片",
+		description: "通过配置的后端发布图片，并向可抓取 URL 的提供商发送短链接；全部后端失败时自动回退为内联图片",
+	},
+	"images.urls.backends": { label: "图片 URL 后端", description: "发布图片时按顺序尝试的目标" },
+	"images.urls.options": { label: "图片 URL 后端选项", description: "各发布后端使用的 JSON 选项" },
+	"images.urls.credentials": { label: "图片 URL 后端凭据", description: "各发布后端使用的凭据；界面会隐藏其值" },
+	"images.urls.command": { label: "图片上传命令", description: "command 后端使用的 argv 模板" },
+	"images.urls.publicBaseUrl": { label: "图片公共 URL", description: "代理图片服务的外部可访问基础 URL" },
+	"images.urls.ttlHours": {
+		label: "图片 URL 有效期",
+		description: "图片链接的有效小时数；0 表示 broker 运行期间持续有效",
+	},
+	"images.urls.bindHost": { label: "图片服务监听地址", description: "图片 blob 服务监听的主机地址" },
+	"images.urls.sshTarget": { label: "图片 SSH 目标", description: "建立 SSH 反向转发的 user@host 目标" },
+	"images.urls.sshRemotePort": { label: "图片 SSH 远端端口", description: "SSH 反向转发使用的远端监听端口" },
 	defaultThinkingLevel: { label: "思考等级", description: "支持思考的模型的推理深度" },
 	hideThinkingBlock: { label: "隐藏思考块", description: "在助手回复中隐藏思考块" },
 	proseOnlyThinking: { label: "仅散文思考", description: "从思考摘要中省略代码块，并以省略号替代" },
@@ -563,6 +579,10 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 	"edit.enforceSeenLines": {
 		label: "强制执行已见行守卫",
 		description: "拒绝锚定在先前读取/搜索从未完整展示过的行上的编辑",
+	},
+	"edit.blackbox.enabled": {
+		label: "记录编辑解析回归",
+		description: "编辑导致 AST 解析失败时，将修改前后源码及调用信息追加到本地诊断日志",
 	},
 	readLineNumbers: { label: "行号", description: "默认在读取工具输出前添加行号" },
 	"read.defaultLimit": { label: "默认读取行数", description: "Agent 调用 read 且不指定行数上限时默认返回的行数" },

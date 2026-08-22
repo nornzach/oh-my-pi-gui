@@ -26,6 +26,7 @@ interface UiStore {
 	modelRolesOpen: boolean;
 	statsDashboardOpen: boolean;
 	modelCompareOpen: boolean;
+	benchmarkOpen: boolean;
 	extensionsOpen: boolean;
 	extensionsTab: "hooks" | "mcp" | "commands";
 	inventoryOpen: boolean;
@@ -110,6 +111,8 @@ interface UiStore {
 	closeStatsDashboard: () => void;
 	openModelCompare: () => void;
 	closeModelCompare: () => void;
+	openBenchmark: () => void;
+	closeBenchmark: () => void;
 	openExtensions: (tab?: "hooks" | "mcp" | "commands") => void;
 	closeExtensions: () => void;
 	openInventory: (tab?: "plugins" | "marketplaces" | "templates" | "memory") => void;
@@ -262,6 +265,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	modelCompareOpen: false,
 	openModelCompare: () => set({ modelCompareOpen: true }),
 	closeModelCompare: () => set({ modelCompareOpen: false }),
+	benchmarkOpen: false,
+	openBenchmark: () => set({ benchmarkOpen: true }),
+	closeBenchmark: () => set({ benchmarkOpen: false }),
 	extensionsOpen: false,
 	extensionsTab: "hooks" as const,
 	inventoryOpen: false,

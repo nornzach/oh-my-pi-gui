@@ -39,6 +39,7 @@ const ctx: CommandRegistryContext = {
 	openSessionTree: () => {},
 	openSessionInfo: () => {},
 	openModelCompare: () => {},
+	openBenchmark: () => {},
 	openHandoffDialog: () => {},
 	openExtensions: () => {},
 	openInventory: () => {},

@@ -360,144 +360,148 @@ export function ChatStream() {
 	// no separate fetch here (that would double-download the transcript).
 
 	return (
-		<div className="omp-transcript-editorial relative min-h-0 flex-1 bg-transparent">
-			<div
-				ref={parentRef}
-				aria-label={t("chat.transcript.label")}
-				onScroll={handleScroll}
-				onWheel={handleWheel}
-				onTouchMove={releaseTailPin}
-				onPointerDown={handleScrollPointerDown}
-				onKeyDown={handleScrollKeyDown}
-				tabIndex={0}
-				className="omp-transcript-scroll h-full overflow-y-auto overscroll-contain"
-			>
-				{switchPending && (
-					<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px overflow-hidden">
-						<div className="omp-indeterminate-progress h-full bg-[var(--omp-accent)]" />
-					</div>
-				)}
-				{status === "starting" && rows.length === 0 && !switchPending && (
-					<div className="flex justify-center py-3">
-						<Loader2 size={16} className="animate-spin text-[var(--omp-muted)]" />
-					</div>
-				)}
-				{status !== "starting" && rows.length === 0 && !isStreaming && !switchPending && (
-					<div className="omp-empty-canvas flex min-h-full flex-col justify-center pb-20">
-						<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--omp-btn-primary-bg)] text-[var(--omp-btn-primary-text)]">
-							<PiLogo size={22} />
-						</div>
-						<h1 className="font-display text-[30px] font-semibold leading-tight tracking-[-0.025em] text-[var(--omp-text)]">
-							{isChat ? t("chat.empty.title.chat") : t("chat.empty.title")}
-						</h1>
-						<p className="mt-2 max-w-2xl text-omp-xl leading-relaxed text-[var(--omp-muted)]">
-							{isChat ? t("chat.empty.subtitle.chat") : t("chat.empty.subtitle")}
-						</p>
-						<div className="omp-starter-grid mt-8 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
-							{starters.map(({ icon: Icon, title, prompt }) => (
-								<button
-									key={title}
-									type="button"
-									onClick={() =>
-										window.dispatchEvent(new CustomEvent("omp:fill-composer", { detail: { text: prompt } }))
-									}
-									className="omp-starter-card omp-lift group flex min-h-20 items-start gap-3 rounded-2xl border border-[var(--omp-border)] p-4 text-left shadow-[var(--omp-shadow-sm)] hover:border-[var(--omp-border-accent)] hover:bg-[var(--omp-bg-secondary)]"
-								>
-									<span className="omp-starter-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--omp-selected-bg)] text-[var(--omp-accent)]">
-										<Icon size={17} />
-									</span>
-									<span>
-										<span className="block text-omp-lg font-semibold text-[var(--omp-text)]">{title}</span>
-										<span className="mt-1 block text-omp-lg leading-snug text-[var(--omp-muted)]">
-											{prompt}
-										</span>
-									</span>
-								</button>
-							))}
-						</div>
-					</div>
-				)}
+		<>
+			<div className="omp-transcript-editorial relative min-h-0 flex-1 bg-transparent">
 				<div
-					className="omp-transcript-canvas"
-					style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}
+					ref={parentRef}
+					aria-label={t("chat.transcript.label")}
+					onScroll={handleScroll}
+					onWheel={handleWheel}
+					onTouchMove={releaseTailPin}
+					onPointerDown={handleScrollPointerDown}
+					onKeyDown={handleScrollKeyDown}
+					tabIndex={0}
+					className="omp-transcript-scroll h-full overflow-y-auto overscroll-contain"
 				>
-					{virtualizer.getVirtualItems().map(item => {
-						const row = rows[item.index];
-						if (!row) return null;
-						const rowKey = rowKeys[item.index] ?? String(item.key);
-						return (
-							<div
-								key={item.key}
-								data-index={item.index}
-								data-transcript-kind={row.kind}
-								ref={virtualizer.measureElement}
-								style={{
-									position: "absolute",
-									top: 0,
-									left: 0,
-									width: "100%",
-									transform: `translateY(${item.start}px)`,
-								}}
-							>
-								<div className="omp-transcript-row w-full">
-									<TimelineMarker
-										seed={timelineMarkers[item.index] ?? null}
-										runningIndicator={row.kind === "process" ? "dot" : "spinner"}
-									/>
-									{row.kind === "message" ? (
-										<MessageBubble message={row.message} runningIndicator="dot" />
-									) : row.kind === "readGroup" ? (
-										<ReadGroupCard entries={row.entries} runningIndicator="dot" usage={row.usage} />
-									) : row.kind === "process" ? (
-										<ProcessGroup
-											expanded={expandedProcessKeys.has(rowKey)}
-											onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
-											row={row}
-										/>
-									) : row.kind === "streaming" ? (
-										<StreamingRows
-											expanded={expandedProcessKeys.has(rowKey)}
-											onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
-										/>
-									) : row.kind === "queued" ? (
-										<QueuedMessageBubble item={row.item} lane={row.lane} />
-									) : row.kind === "todoSnapshot" ? (
-										<TodoSnapshotCard entry={row.entry} />
-									) : row.kind === "expander" ? (
-										<button
-											type="button"
-											onClick={() => setPreCompactionOpen(true)}
-											className="omp-history-expander omp-pressable ml-(--omp-editorial-inset) mr-(--omp-editorial-edge) my-2 flex items-center gap-2 rounded-lg border border-[var(--omp-border)] px-3 py-1.5 text-omp-sm font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-text)]"
-										>
-											{t("chat.compaction.showEarlier", { count: row.count })}
-										</button>
-									) : (
-										<TurnStatusRow />
-									)}
-								</div>
+					{switchPending && (
+						<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px overflow-hidden">
+							<div className="omp-indeterminate-progress h-full bg-[var(--omp-accent)]" />
+						</div>
+					)}
+					{status === "starting" && rows.length === 0 && !switchPending && (
+						<div className="flex justify-center py-3">
+							<Loader2 size={16} className="animate-spin text-[var(--omp-muted)]" />
+						</div>
+					)}
+					{status !== "starting" && rows.length === 0 && !isStreaming && !switchPending && (
+						<div className="omp-empty-canvas flex min-h-full flex-col justify-center pb-20">
+							<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--omp-btn-primary-bg)] text-[var(--omp-btn-primary-text)]">
+								<PiLogo size={22} />
 							</div>
-						);
-					})}
+							<h1 className="font-display text-[30px] font-semibold leading-tight tracking-[-0.025em] text-[var(--omp-text)]">
+								{isChat ? t("chat.empty.title.chat") : t("chat.empty.title")}
+							</h1>
+							<p className="mt-2 max-w-2xl text-omp-xl leading-relaxed text-[var(--omp-muted)]">
+								{isChat ? t("chat.empty.subtitle.chat") : t("chat.empty.subtitle")}
+							</p>
+							<div className="omp-starter-grid mt-8 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+								{starters.map(({ icon: Icon, title, prompt }) => (
+									<button
+										key={title}
+										type="button"
+										onClick={() =>
+											window.dispatchEvent(
+												new CustomEvent("omp:fill-composer", { detail: { text: prompt } }),
+											)
+										}
+										className="omp-starter-card omp-lift group flex min-h-20 items-start gap-3 rounded-2xl border border-[var(--omp-border)] p-4 text-left shadow-[var(--omp-shadow-sm)] hover:border-[var(--omp-border-accent)] hover:bg-[var(--omp-bg-secondary)]"
+									>
+										<span className="omp-starter-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--omp-selected-bg)] text-[var(--omp-accent)]">
+											<Icon size={17} />
+										</span>
+										<span>
+											<span className="block text-omp-lg font-semibold text-[var(--omp-text)]">{title}</span>
+											<span className="mt-1 block text-omp-lg leading-snug text-[var(--omp-muted)]">
+												{prompt}
+											</span>
+										</span>
+									</button>
+								))}
+							</div>
+						</div>
+					)}
+					<div
+						className="omp-transcript-canvas"
+						style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}
+					>
+						{virtualizer.getVirtualItems().map(item => {
+							const row = rows[item.index];
+							if (!row) return null;
+							const rowKey = rowKeys[item.index] ?? String(item.key);
+							return (
+								<div
+									key={item.key}
+									data-index={item.index}
+									data-transcript-kind={row.kind}
+									ref={virtualizer.measureElement}
+									style={{
+										position: "absolute",
+										top: 0,
+										left: 0,
+										width: "100%",
+										transform: `translateY(${item.start}px)`,
+									}}
+								>
+									<div className="omp-transcript-row w-full">
+										<TimelineMarker
+											seed={timelineMarkers[item.index] ?? null}
+											runningIndicator={row.kind === "process" ? "dot" : "spinner"}
+										/>
+										{row.kind === "message" ? (
+											<MessageBubble message={row.message} runningIndicator="dot" />
+										) : row.kind === "readGroup" ? (
+											<ReadGroupCard entries={row.entries} runningIndicator="dot" usage={row.usage} />
+										) : row.kind === "process" ? (
+											<ProcessGroup
+												expanded={expandedProcessKeys.has(rowKey)}
+												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
+												row={row}
+											/>
+										) : row.kind === "streaming" ? (
+											<StreamingRows
+												expanded={expandedProcessKeys.has(rowKey)}
+												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
+											/>
+										) : row.kind === "queued" ? (
+											<QueuedMessageBubble item={row.item} lane={row.lane} />
+										) : row.kind === "todoSnapshot" ? (
+											<TodoSnapshotCard entry={row.entry} />
+										) : row.kind === "expander" ? (
+											<button
+												type="button"
+												onClick={() => setPreCompactionOpen(true)}
+												className="omp-history-expander omp-pressable ml-(--omp-editorial-inset) mr-(--omp-editorial-edge) my-2 flex items-center gap-2 rounded-lg border border-[var(--omp-border)] px-3 py-1.5 text-omp-sm font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-text)]"
+											>
+												{t("chat.compaction.showEarlier", { count: row.count })}
+											</button>
+										) : (
+											<TurnStatusRow />
+										)}
+									</div>
+								</div>
+							);
+						})}
+					</div>
 				</div>
+				<button
+					type="button"
+					onClick={jumpToLatest}
+					aria-label={t("chat.jumpToLatest")}
+					className={cx(
+						"absolute bottom-5 left-1/2 flex h-9 -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] px-4 text-omp-md font-medium text-[var(--omp-text)] shadow-[var(--omp-shadow-md)] transition-all hover:bg-[var(--omp-selected-bg)]",
+						pinned ? "pointer-events-none translate-y-12 opacity-0" : "translate-y-0 opacity-100",
+					)}
+				>
+					<ArrowDown size={14} />
+					{t("chat.jumpToLatest")}
+				</button>
 			</div>
 			<ConversationNavigator
 				activeIndex={activeConversationIndex}
 				anchors={conversationAnchors}
 				onNavigate={jumpToConversation}
 			/>
-			<button
-				type="button"
-				onClick={jumpToLatest}
-				aria-label={t("chat.jumpToLatest")}
-				className={cx(
-					"absolute bottom-5 left-1/2 flex h-9 -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] px-4 text-omp-md font-medium text-[var(--omp-text)] shadow-[var(--omp-shadow-md)] transition-all hover:bg-[var(--omp-selected-bg)]",
-					pinned ? "pointer-events-none translate-y-12 opacity-0" : "translate-y-0 opacity-100",
-				)}
-			>
-				<ArrowDown size={14} />
-				{t("chat.jumpToLatest")}
-			</button>
-		</div>
+		</>
 	);
 }
 

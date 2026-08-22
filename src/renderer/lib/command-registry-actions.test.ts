@@ -1,6 +1,6 @@
 /**
  * Wiring tests for the one-shot action nativization: /prewalk (toggle),
- * /fresh, /shake elide|images, /reload-plugins, /queue (composer prefill) and
+ * /fresh, /shake elide|images|thinking, /reload-plugins, /queue (composer prefill) and
  * /force (dialog picker) must drive their RPC/native affordance — never
  * inject "/cmd" prompt text — and surface the result as a toast or dialog.
  * Exercises buildCommandMenu directly with a mocked window.omp.rpc.
@@ -39,6 +39,7 @@ const baseCtx: CommandRegistryContext = {
 	openSessionTree: () => {},
 	openSessionInfo: () => {},
 	openModelCompare: () => {},
+	openBenchmark: () => {},
 	openHandoffDialog: () => {},
 	openExtensions: () => {},
 	openInventory: () => {},
@@ -145,6 +146,14 @@ describe("one-shot action wiring", () => {
 		if (affordance.kind !== "action") throw new Error("expected action");
 		await affordance.run();
 		expect(rpc.shakeContext).not.toHaveBeenCalled();
+	});
+
+	it("shake thinking uses the structured context RPC", async () => {
+		const affordance = wired("shake thinking");
+		if (affordance.kind !== "action") throw new Error("expected action");
+		await affordance.run();
+		expect(rpc.shakeContext).toHaveBeenCalledWith("thinking");
+		expect(lastToast()?.variant).toBe("success");
 	});
 
 	it("fresh calls the fresh RPC and toasts success", async () => {

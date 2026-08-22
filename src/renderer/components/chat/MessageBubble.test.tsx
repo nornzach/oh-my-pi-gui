@@ -301,16 +301,16 @@ describe("MessageBubble noise filtering", () => {
 		expect(html).toContain("py-3");
 	});
 
-	it("offers branch-from-here only on user entries accepted by the branch RPC", () => {
+	it("offers branch-to-new-tab on user and assistant messages even before legacy ids are resolved", () => {
 		const user: AgentMessage = {
 			role: "user",
-			id: "user-entry",
+			entryId: "user-entry",
 			content: [{ type: "text", text: "branch point" }],
 			timestamp: at,
 		};
 		const assistant: AgentMessage = {
 			role: "assistant",
-			id: "assistant-entry",
+			entryId: "assistant-entry",
 			content: [{ type: "text", text: "answer" }],
 			timestamp: at,
 		};
@@ -321,8 +321,9 @@ describe("MessageBubble noise filtering", () => {
 				</I18nProvider>,
 			);
 
-		expect(render(user)).toContain("Branch conversation from here");
-		expect(render(assistant)).not.toContain("Branch conversation from here");
+		expect(render(user)).toContain("Branch to a new tab from here");
+		expect(render(assistant)).toContain("Branch to a new tab from here");
+		expect(render({ ...assistant, entryId: undefined })).toContain("Branch to a new tab from here");
 	});
 
 	it("uses compact chrome for expanded process details containing reasoning and tools", () => {

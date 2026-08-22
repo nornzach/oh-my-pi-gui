@@ -132,6 +132,7 @@ export function CommandPalette() {
 	const openSessionTree = useUiStore(state => state.openSessionTree);
 	const openSessionInfo = useUiStore(state => state.openSessionInfo);
 	const openModelCompare = useUiStore(state => state.openModelCompare);
+	const openBenchmark = useUiStore(state => state.openBenchmark);
 	const openExtensions = useUiStore(state => state.openExtensions);
 	const openInventory = useUiStore(state => state.openInventory);
 	const openThemePicker = useUiStore(state => state.openThemePicker);
@@ -269,6 +270,7 @@ export function CommandPalette() {
 				openSessionTree,
 				openSessionInfo,
 				openModelCompare,
+				openBenchmark,
 				openHandoffDialog,
 				forkSession: forkSessionFromGui,
 				hydrateSession,
@@ -333,6 +335,7 @@ export function CommandPalette() {
 			openProviderConfig,
 			focusDockCard,
 			openModelCompare,
+			openBenchmark,
 			openAgentHub,
 			openPrCenter,
 			openHotkeys,

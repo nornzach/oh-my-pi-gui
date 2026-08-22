@@ -6,10 +6,11 @@ import { AnsiText, hasAnsi } from "../../lib/ansi";
 import { copyText, cx, formatClock, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
-import { branchSessionFromEntry, isRenderableMessageText } from "../../lib/messages";
+import { forkSessionFromMessageInNewTab, isRenderableMessageText } from "../../lib/messages";
 import { PREVIEW_SCROLL_LG } from "../../lib/preview";
 import { toast } from "../../stores/toast";
 import { toolEntryKey } from "../../stores/tools";
+import { useUiStore } from "../../stores/ui";
 import { editArgumentSummary } from "../tools/edit-args";
 import { type RunningIndicator, ToolCard } from "../tools/ToolCard";
 import { CustomMessageCard, isCustomMessageCardType } from "./CustomMessageCard";
@@ -22,14 +23,6 @@ export interface MessageBubbleProps {
 	compact?: boolean;
 	/** The timeline or process group can own the one animated running state. */
 	runningIndicator?: RunningIndicator;
-}
-
-function messageEntryId(message: AgentMessage): string | undefined {
-	for (const key of ["id", "entryId", "uuid"]) {
-		const v = message[key];
-		if (typeof v === "string" && v) return v;
-	}
-	return undefined;
 }
 
 function toolSummary(toolName: string, input: Record<string, unknown>): string {
@@ -260,6 +253,7 @@ export const MessageBubble = memo(function MessageBubble({
 	const t = useT();
 	const [copied, setCopied] = useState(false);
 	const [branching, setBranching] = useState(false);
+	const switchPending = useUiStore(state => state.switchPending !== null);
 	if (message.role === "bashExecution" || message.role === "pythonExecution") {
 		return <ExecutionBubble message={message} />;
 	}
@@ -282,8 +276,8 @@ export const MessageBubble = memo(function MessageBubble({
 			? [{ type: "text", text: message.content }]
 			: [];
 	const isUser = message.role === "user";
+	const isAssistant = message.role === "assistant";
 	const isSteering = Boolean(message.steering);
-	const entryId = messageEntryId(message);
 	const timestamp = formatClock(message.timestamp);
 	const customLabel =
 		message.role === "custom" || message.role === "hookMessage"
@@ -303,15 +297,13 @@ export const MessageBubble = memo(function MessageBubble({
 	};
 
 	const handleBranch = async () => {
-		if (!entryId || branching) return;
+		if (branching || switchPending) return;
 		setBranching(true);
 		try {
-			const result = await branchSessionFromEntry(entryId);
-			if (result === "cancelled") {
-				toast({ variant: "info", message: t("branchPicker.cancelled") });
-			}
+			const result = await forkSessionFromMessageInNewTab(message);
+			if (result === "saved") toast({ variant: "warning", message: t("chat.branchSaved") });
 		} catch (cause) {
-			toast({ variant: "error", title: t("branchPicker.failed"), message: String(cause) });
+			toast({ variant: "error", title: t("sessionTree.forkFailed"), message: String(cause) });
 		} finally {
 			setBranching(false);
 		}
@@ -358,17 +350,16 @@ export const MessageBubble = memo(function MessageBubble({
 						>
 							{copied ? <Check size={13} className="text-[var(--omp-success)]" /> : <Copy size={13} />}
 						</button>
-						{entryId && (
-							<button
-								type="button"
-								onClick={() => void handleBranch()}
-								disabled={branching}
-								title={t("chat.branchFromHere")}
-								className="omp-pressable flex h-7 w-7 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-wait disabled:opacity-50"
-							>
-								<GitBranch size={13} />
-							</button>
-						)}
+						<button
+							type="button"
+							onClick={() => void handleBranch()}
+							disabled={branching || switchPending}
+							aria-label={t("chat.branchFromHere")}
+							title={t("chat.branchFromHere")}
+							className="omp-pressable flex h-7 w-7 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-wait disabled:opacity-50"
+						>
+							<GitBranch size={13} />
+						</button>
 					</div>
 				</div>
 			</div>
@@ -445,7 +436,7 @@ export const MessageBubble = memo(function MessageBubble({
 				)}
 				<UsageRow message={message} />
 				{!compactChrome && (
-					<div className="mt-2 flex items-center gap-1.5 text-omp-xs tabular-nums text-[var(--omp-dim)] opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+					<div className="mt-2 flex items-center gap-1.5 text-omp-xs tabular-nums text-[var(--omp-dim)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
 						{timestamp && <span className="font-mono">{timestamp}</span>}
 						<button
 							type="button"
@@ -455,6 +446,18 @@ export const MessageBubble = memo(function MessageBubble({
 						>
 							{copied ? <Check size={13} className="text-[var(--omp-success)]" /> : <Copy size={13} />}
 						</button>
+						{isAssistant && (
+							<button
+								type="button"
+								onClick={() => void handleBranch()}
+								disabled={branching || switchPending}
+								aria-label={t("chat.branchFromHere")}
+								title={t("chat.branchFromHere")}
+								className="omp-pressable flex h-7 w-7 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-wait disabled:opacity-50"
+							>
+								<GitBranch size={13} />
+							</button>
+						)}
 					</div>
 				)}
 			</div>

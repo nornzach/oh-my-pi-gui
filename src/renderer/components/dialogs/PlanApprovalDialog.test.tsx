@@ -49,21 +49,35 @@ function failure(error: string): RpcResponse {
 	return { type: "response", command: "plan_approval", success: false, error };
 }
 
-type PlanApprovalFn = (approved: boolean, option?: string, feedback?: string) => Promise<RpcResponse>;
+type PlanApprovalFn = (
+	approved: boolean,
+	option?: string,
+	feedback?: string,
+	savePath?: string,
+) => Promise<RpcResponse>;
+type SaveDialogFn = (
+	defaultPath?: string,
+	filters?: { name: string; extensions: string[] }[],
+) => Promise<string | null>;
 type BatchListener = (events: AgentSessionEvent[]) => void;
 
 let batchListener: BatchListener | null = null;
 
-function installMockOmp(planApproval: Mock<PlanApprovalFn>): void {
+function installMockOmp(
+	planApproval: Mock<PlanApprovalFn>,
+	showSaveDialog: Mock<SaveDialogFn> = vi.fn(async () => "/work/auth-refactor.md"),
+): void {
 	batchListener = null;
 	const ompWindow = window as unknown as {
 		omp: {
 			rpc: { planApproval: Mock<PlanApprovalFn> };
 			events: { onBatch: (callback: BatchListener) => () => void };
+			system: { showSaveDialog: Mock<SaveDialogFn> };
 		};
 	};
 	ompWindow.omp = {
 		rpc: { planApproval },
+		system: { showSaveDialog },
 		events: {
 			onBatch: callback => {
 				batchListener = callback;
@@ -80,8 +94,9 @@ function proposal(content: string, overrides: Partial<Extract<AgentSessionEvent,
 		type: "plan_proposal",
 		planFilePath: "/session/plans/2026-08-03-auth-refactor.md",
 		title: "Auth refactor",
+		suggestedFileName: "AUTH_REFACTOR_PLAN.md",
 		planContent: content,
-		options: ["execute", "compact", "keep_context", "refine"],
+		options: ["execute", "compact", "keep_context", "save", "refine"],
 		...overrides,
 	} satisfies AgentSessionEvent;
 }
@@ -181,6 +196,7 @@ describe("PlanApprovalDialog", () => {
 		expect(buttonWithText("Approve and execute")).toBeDefined();
 		expect(buttonWithText("Approve and compact")).toBeDefined();
 		expect(buttonWithText("Keep context")).toBeDefined();
+		expect(buttonWithText("Save plan")).toBeDefined();
 		expect(buttonWithText("Refine plan")).toBeDefined();
 		expect(buttonWithText("Dismiss")).toBeDefined();
 
@@ -193,6 +209,59 @@ describe("PlanApprovalDialog", () => {
 		expect(usePlanApprovalStore.getState().pending).toBeNull();
 		expect(document.querySelector("[role='dialog']")).toBeNull();
 		expect(useToastStore.getState().toasts.some(t => t.variant === "success")).toBe(true);
+	});
+
+	it("saves the plan to the host-selected Markdown path without dispatching execution", async () => {
+		const planApproval = vi.fn<PlanApprovalFn>(async () =>
+			success({
+				approved: true,
+				dispatched: false,
+				reason: "saved",
+				savedPath: "/work/auth-refactor.md",
+				freshSessionStarted: true,
+			}),
+		);
+		const showSaveDialog = vi.fn<SaveDialogFn>(async () => "/work/auth-refactor.md");
+		installMockOmp(planApproval, showSaveDialog);
+		await mount(<PlanApprovalDialog />);
+		await emit([proposal("# Plan")]);
+
+		const save = buttonWithText("Save plan");
+		if (!save) throw new Error("missing save button");
+		await act(async () => click(save));
+		await flush();
+
+		expect(showSaveDialog).toHaveBeenCalledWith(expect.stringContaining("AUTH_REFACTOR_PLAN.md"), [
+			{ name: "Markdown", extensions: ["md"] },
+		]);
+		expect(planApproval).toHaveBeenCalledWith(true, "save", undefined, "/work/auth-refactor.md");
+		expect(usePlanApprovalStore.getState().pending).toBeNull();
+		expect(useToastStore.getState().toasts.at(-1)?.message).toContain("/work/auth-refactor.md");
+		expect(useToastStore.getState().toasts.at(-1)?.variant).toBe("success");
+	});
+
+	it("closes with a warning when the plan saved but the fresh session was cancelled", async () => {
+		const planApproval = vi.fn<PlanApprovalFn>(async () =>
+			success({
+				approved: true,
+				dispatched: false,
+				reason: "saved; new session cancelled",
+				savedPath: "/work/auth-refactor.md",
+				freshSessionStarted: false,
+			}),
+		);
+		installMockOmp(planApproval);
+		await mount(<PlanApprovalDialog />);
+		await emit([proposal("# Plan")]);
+
+		const save = buttonWithText("Save plan");
+		if (!save) throw new Error("missing save button");
+		await act(async () => click(save));
+		await flush();
+
+		expect(usePlanApprovalStore.getState().pending).toBeNull();
+		expect(useToastStore.getState().toasts.at(-1)).toMatchObject({ variant: "warning" });
+		expect(useToastStore.getState().toasts.at(-1)?.message).toContain("new session cancelled");
 	});
 
 	it("maps keep_context to planApproval(true, 'keep_context')", async () => {

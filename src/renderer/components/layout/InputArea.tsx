@@ -35,7 +35,6 @@ import { useSettingsStore } from "../../stores/settings";
 import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { WorkspaceDock } from "../chat/dock/WorkspaceDock";
 import { ApprovalControl } from "./ApprovalControl";
 import { ComposerModes } from "./ComposerModes";
 import { ContextUsagePopover } from "./ContextUsagePopover";
@@ -647,7 +646,7 @@ export function InputArea() {
 	const modeTitle = isStreaming ? t("input.streamingTitle", { mode: steeringMode }) : t("input.sendPrompt");
 
 	return (
-		<div className="omp-composer-region relative shrink-0 bg-transparent pb-1 pt-2">
+		<div className="omp-composer-region relative shrink-0 bg-transparent pb-1">
 			<div className="omp-composer-shell relative w-full">
 				{queueBody !== undefined && (
 					<div
@@ -713,11 +712,8 @@ export function InputArea() {
 					</div>
 				)}
 
-				<WorkspaceDock />
-
-				{/* Anchoring context for the completion/history overlays: they must
-				    sit above the input box, not above the whole shell (the dock
-				    lives in the same shell and would otherwise push them up). */}
+				{/* Anchoring context for completion/history overlays: they sit directly
+				    above the input box instead of the surrounding composer region. */}
 				<div className="relative">
 					{menu && (
 						<div className="absolute bottom-full left-0 z-10 mb-2 max-h-[60vh] w-[420px] max-w-full overflow-y-auto rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-1 shadow-[var(--omp-shadow-lg)]">
@@ -798,6 +794,9 @@ export function InputArea() {
 							)}
 							<textarea
 								ref={textareaRef}
+								autoCapitalize="sentences"
+								autoCorrect="on"
+								spellCheck
 								value={text}
 								onChange={event => {
 									useInputHistoryStore.getState().resetNav();

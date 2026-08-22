@@ -5,9 +5,11 @@
 
 import * as fs from "node:original-fs";
 import { join } from "node:path";
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, Menu, shell } from "electron";
 import Store from "electron-store";
 import type { RunProgressState, SessionKind } from "../shared/ipc-types";
+import { editableContextMenuTemplate } from "./editable-context-menu";
+import { getMainLanguage, mainT } from "./i18n";
 import {
 	type ApplicationResourceIdentity,
 	applicationResourcesChanged,
@@ -94,8 +96,17 @@ export class WindowManager {
 				contextIsolation: true,
 				nodeIntegration: false,
 				sandbox: true,
+				spellcheck: true,
 				preload: join(__dirname, "../preload/index.cjs"),
 			},
+		});
+
+		win.webContents.on("context-menu", (_event, params) => {
+			const template = editableContextMenuTemplate(params, mainT("menu.addToDictionary", getMainLanguage()), {
+				replaceMisspelling: suggestion => win.webContents.replaceMisspelling(suggestion),
+				addToDictionary: word => win.webContents.session.addWordToSpellCheckerDictionary(word),
+			});
+			if (template.length > 0) Menu.buildFromTemplate(template).popup({ window: win });
 		});
 
 		if (saved.isMaximized) {

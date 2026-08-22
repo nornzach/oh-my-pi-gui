@@ -51,6 +51,7 @@ interface TestElement {
 	textContent: string | null;
 	remove(): void;
 	dispatchEvent(event: object): boolean;
+	getAttribute(name: string): string | null;
 }
 
 const ok = (data?: unknown) => ({ type: "response" as const, command: "x", success: true as const, data });
@@ -206,6 +207,18 @@ afterEach(async () => {
 });
 
 describe("InputArea queue shorthand submit", () => {
+	it("enables the platform spellcheck and autocorrect pipeline", async () => {
+		await mount();
+		const textarea = findTextarea();
+		const propsKey = Object.getOwnPropertyNames(textarea).find(key => key.startsWith("__reactProps$"));
+		const props = propsKey
+			? ((textarea as unknown as Record<string, unknown>)[propsKey] as Record<string, unknown>)
+			: undefined;
+		expect(props?.spellCheck).toBe(true);
+		expect(props?.autoCorrect).toBe("on");
+		expect(props?.autoCapitalize).toBe("sentences");
+	});
+
 	it("routes `-> text` to followUp with the prefix stripped while streaming", async () => {
 		await mount();
 		await typeInto(findTextarea(), "-> ord alpha");

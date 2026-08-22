@@ -9,6 +9,8 @@ import Store from "electron-store";
 import type {
 	CustomProviderInput,
 	FsTreeEntry,
+	IpcBenchmarkRunOptions,
+	IpcBenchmarkRunResult,
 	IpcCloseTabPayload,
 	IpcExtensionUiRespondPayload,
 	IpcFsListPayload,
@@ -39,6 +41,7 @@ import type {
 } from "../shared/ipc-types";
 import { IPC_COMMANDS, IPC_EVENTS, type RunProgressState, type TrayState } from "../shared/ipc-types";
 import type { RpcCommand, RpcSessionState } from "../shared/rpc-types";
+import { BenchmarkRunner } from "./benchmark-runner";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { openInExternalEditor } from "./editor";
 import { mainT } from "./i18n";
@@ -61,6 +64,8 @@ export interface IpcDeps {
 	statsClient: StatsClient;
 	logWatcher: LogWatcher;
 	windowManager: WindowManager;
+	benchmarkBinaryPath: string | null;
+	benchmarkEnv: () => Promise<NodeJS.ProcessEnv>;
 	/** Spawn a window with its own sidecar (index.ts's pool-backed helper). */
 	spawnWindow: SpawnWindow;
 }
@@ -333,6 +338,7 @@ function aggregateProgress(states: RunProgressState[]): RunProgressState {
 }
 
 export function registerIpcHandlers(deps: IpcDeps): void {
+	const benchmarkRunners = new Map<number, BenchmarkRunner>();
 	const { sidecarPool, sessionIndex, statsClient, logWatcher, windowManager } = deps;
 	const prefsStore = new Store<PrefsSchema>({ name: "prefs" });
 
@@ -341,6 +347,8 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	windowManager.onWindowClosed = record => {
 		trayStates.delete(record.id);
 		progressStates.delete(record.id);
+		benchmarkRunners.get(record.id)?.abort();
+		benchmarkRunners.delete(record.id);
 	};
 
 	// Sidecar → owning-window event forwarding (events/status/extensionUi/
@@ -699,6 +707,25 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		}
 	});
 
+	ipcMain.handle(
+		IPC_COMMANDS.BENCH_RUN,
+		async (event, options: IpcBenchmarkRunOptions): Promise<IpcBenchmarkRunResult> => {
+			const binaryPath = deps.benchmarkBinaryPath;
+			const cwd = cwdFor(deps, event);
+			if (!binaryPath) return { success: false, error: "Bundled omp is unavailable" };
+			if (!cwd) return { success: false, error: "No active workspace" };
+			const senderId = event.sender.id;
+			const runner = benchmarkRunners.get(senderId) ?? new BenchmarkRunner();
+			benchmarkRunners.set(senderId, runner);
+			try {
+				return await runner.run(binaryPath, cwd, options, await deps.benchmarkEnv());
+			} finally {
+				if (!runner.running) benchmarkRunners.delete(senderId);
+			}
+		},
+	);
+	ipcMain.handle(IPC_COMMANDS.BENCH_ABORT, event => benchmarkRunners.get(event.sender.id)?.abort() ?? false);
+
 	// System
 	ipcMain.handle(IPC_COMMANDS.SYSTEM_OPEN_EXTERNAL, async (_event, url: string) => {
 		if (typeof url === "string" && (url.startsWith("https://") || url.startsWith("http://"))) {
@@ -735,15 +762,18 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		return { ok: true, resolvedPath: resolved };
 	});
 
-	ipcMain.handle(IPC_COMMANDS.SYSTEM_SAVE_DIALOG, async (event, defaultPath?: string) => {
-		const win = BrowserWindow.fromWebContents(event.sender);
-		if (!win) return null;
-		const result = await dialog.showSaveDialog(win, {
-			defaultPath: defaultPath ?? "session.html",
-			filters: [{ name: "HTML", extensions: ["html"] }],
-		});
-		return result.canceled ? null : (result.filePath ?? null);
-	});
+	ipcMain.handle(
+		IPC_COMMANDS.SYSTEM_SAVE_DIALOG,
+		async (event, defaultPath?: string, filters?: { name: string; extensions: string[] }[]) => {
+			const win = BrowserWindow.fromWebContents(event.sender);
+			if (!win) return null;
+			const result = await dialog.showSaveDialog(win, {
+				defaultPath: defaultPath ?? "session.html",
+				filters: filters ?? [{ name: "HTML", extensions: ["html"] }],
+			});
+			return result.canceled ? null : (result.filePath ?? null);
+		},
+	);
 
 	ipcMain.handle(
 		IPC_COMMANDS.SYSTEM_OPEN_DIALOG,

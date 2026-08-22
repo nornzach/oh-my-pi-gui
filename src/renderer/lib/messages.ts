@@ -1,8 +1,16 @@
-import type { AgentMessage, ImageContent, RpcResponse } from "../../shared/rpc-types";
+import type {
+	AgentMessage,
+	ImageContent,
+	RpcResponse,
+	RpcSessionTreeNode,
+	RpcSessionTreeResult,
+} from "../../shared/rpc-types";
 import { hydrateSession, resetRetryPending } from "../hooks/use-rpc-events";
 import { useMessagesStore } from "../stores/messages";
 import { useSessionStore } from "../stores/session";
+import { useTabsStore } from "../stores/tabs";
 import { toast } from "../stores/toast";
+import { useUiStore } from "../stores/ui";
 import { translate } from "./i18n";
 
 /**
@@ -28,6 +36,11 @@ export function messageText(message: AgentMessage): string {
 		.map(part => (part.type === "text" ? part.text : ""))
 		.join("\n")
 		.trim();
+}
+
+function messagePreview(message: AgentMessage): string {
+	const text = messageText(message).replace(/\s+/g, " ").trim();
+	return text.length > 200 ? `${text.slice(0, 199)}…` : text;
 }
 
 /**
@@ -75,6 +88,70 @@ export async function branchSessionFromEntry(entryId: string): Promise<"branched
 	}
 	await hydrateSession();
 	return "branched";
+}
+
+/** Copy the tree path through one message into an independent session and open it in a new tab. */
+export async function forkSessionFromEntryInNewTab(
+	entryId: string,
+	sourceTabId = useTabsStore.getState().activeTabId,
+): Promise<"opened" | "saved"> {
+	const tabs = useTabsStore.getState();
+	if (!sourceTabId || tabs.activeTabId !== sourceTabId || useUiStore.getState().switchPending !== null) {
+		throw new Error("The active session changed while preparing the branch");
+	}
+	const sourceTab = tabs.tabs.find(tab => tab.id === sourceTabId);
+	if (!sourceTab) throw new Error("The source session is no longer open");
+	const response = await window.omp.rpc.forkFrom(entryId);
+	if (!response.success) throw new Error(response.error);
+	const data = response.data as { sessionPath?: string } | undefined;
+	if (!data?.sessionPath) throw new Error("fork_from did not return a session path");
+	if (useTabsStore.getState().activeTabId !== sourceTabId || useUiStore.getState().switchPending !== null) {
+		return "saved";
+	}
+	const tabId = await useTabsStore.getState().openTab({
+		cwd: sourceTab.cwd,
+		sessionPath: data.sessionPath,
+		kind: sourceTab.kind,
+	});
+	return tabId ? "opened" : "saved";
+}
+
+/** Resolve legacy transcript messages through the active OMP session tree, then fork them. */
+export async function forkSessionFromMessageInNewTab(message: AgentMessage): Promise<"opened" | "saved"> {
+	const sourceTabId = useTabsStore.getState().activeTabId;
+	if (!sourceTabId || useUiStore.getState().switchPending !== null) {
+		throw new Error("The active session changed while preparing the branch");
+	}
+	let entryId = message.entryId;
+	if (!entryId) {
+		const response = await window.omp.rpc.getSessionTree();
+		if (!response.success) throw new Error(response.error);
+		const data = response.data as RpcSessionTreeResult | undefined;
+		const timestamp =
+			typeof message.timestamp === "number" ? message.timestamp : Date.parse(message.timestamp ?? "") || 0;
+		const candidates = (data?.tree ?? []).filter(
+			(node: RpcSessionTreeNode) => node.onActiveBranch && node.role === message.role,
+		);
+		const timestampMatches = timestamp === 0 ? [] : candidates.filter(node => node.timestamp === timestamp);
+		if (timestampMatches.length === 1) entryId = timestampMatches[0]?.entryId;
+		const preview = messagePreview(message);
+		const previewMatches = candidates.filter(node => node.textPreview === preview);
+		if (!entryId && previewMatches.length === 1) entryId = previewMatches[0]?.entryId;
+		if (!entryId && previewMatches.length > 1) {
+			const transcript = useMessagesStore.getState().messages;
+			const targetIndex = transcript.indexOf(message);
+			if (targetIndex >= 0) {
+				let occurrence = 0;
+				for (let index = 0; index < targetIndex; index++) {
+					const candidate = transcript[index];
+					if (candidate?.role === message.role && messagePreview(candidate) === preview) occurrence++;
+				}
+				entryId = previewMatches[occurrence]?.entryId;
+			}
+		}
+	}
+	if (!entryId) throw new Error("Could not locate this message in the active session tree");
+	return forkSessionFromEntryInNewTab(entryId, sourceTabId);
 }
 
 /** One queued steer/follow-up message pulled back by the dequeue RPC. */

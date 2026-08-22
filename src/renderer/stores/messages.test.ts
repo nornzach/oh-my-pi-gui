@@ -49,6 +49,30 @@ describe("messages streaming snapshots", () => {
 });
 
 describe("agent-end delivery dedupe", () => {
+	it("adds persisted tree ids to live user and assistant messages without reopening the tab", () => {
+		const user: AgentMessage = { role: "user", content: "question", timestamp: 5 };
+		const assistant: AgentMessage = { role: "assistant", content: "answer", timestamp: 6 };
+		useMessagesStore.getState().applyEvents([
+			{ type: "message_end", message: user },
+			{ type: "message_end", message: assistant },
+		]);
+
+		useMessagesStore.getState().applyEvents([
+			{
+				type: "agent_end",
+				messages: [
+					{ ...user, entryId: "user-entry" },
+					{ ...assistant, entryId: "assistant-entry" },
+				],
+			},
+		]);
+
+		expect(useMessagesStore.getState().messages).toMatchObject([
+			{ role: "user", entryId: "user-entry" },
+			{ role: "assistant", entryId: "assistant-entry" },
+		]);
+	});
+
 	it("does not append a maintenance-rewritten copy of an already delivered tool result", () => {
 		const original: AgentMessage = {
 			role: "toolResult",

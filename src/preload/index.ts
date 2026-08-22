@@ -9,6 +9,8 @@ import type {
 	CustomProviderView,
 	DeepLinkPayload,
 	IpcActiveTabEnvelope,
+	IpcBenchmarkRunOptions,
+	IpcBenchmarkRunResult,
 	IpcFsListResult,
 	IpcFsReadImageResult,
 	IpcFsReadPlanPayload,
@@ -157,7 +159,7 @@ const api: OmpApi = {
 		getActiveTools: () => rpcCommand({ type: "get_active_tools" }),
 		setPrewalk: (enabled: boolean) => rpcCommand({ type: "set_prewalk", enabled }),
 		fresh: () => rpcCommand({ type: "fresh" }),
-		shakeContext: (mode: "elide" | "images") => rpcCommand({ type: "shake_context", mode }),
+		shakeContext: (mode: "elide" | "images" | "thinking") => rpcCommand({ type: "shake_context", mode }),
 		reloadPlugins: () => rpcCommand({ type: "reload_plugins" }),
 		setForceTool: (payload: { tool: string } | { clear: true }) => rpcCommand({ type: "set_force_tool", ...payload }),
 		getForceTool: () => rpcCommand({ type: "get_force_tool" }),
@@ -234,6 +236,8 @@ const api: OmpApi = {
 		bash: (command: string, excluded?: boolean) => rpcCommand({ type: "bash", command, excluded }),
 		abortBash: () => rpcCommand({ type: "abort_bash" }),
 		getSessionStats: () => rpcCommand({ type: "get_session_stats" }),
+		setSessionPinned: (sessionId: string, pinned: boolean) =>
+			rpcCommand({ type: "set_session_pinned", sessionId, pinned }),
 		exportHtml: (outputPath?: string) => rpcCommand({ type: "export_html", outputPath }),
 		getBranchMessages: () => rpcCommand({ type: "get_branch_messages" }),
 		getLastAssistantText: () => rpcCommand({ type: "get_last_assistant_text" }),
@@ -298,8 +302,12 @@ const api: OmpApi = {
 		getThemes: () => rpcCommand({ type: "get_themes" }),
 		getThemeColors: (name: string) => rpcCommand({ type: "get_theme_colors", name }),
 		getTranscript: () => rpcCommand({ type: "get_transcript" }),
-		planApproval: (approved: boolean, option?: "execute" | "compact" | "keep_context", feedback?: string) =>
-			rpcCommand({ type: "plan_approval", approved, option, feedback }),
+		planApproval: (
+			approved: boolean,
+			option?: "execute" | "compact" | "keep_context" | "save",
+			feedback?: string,
+			savePath?: string,
+		) => rpcCommand({ type: "plan_approval", approved, option, feedback, savePath }),
 		getVibeMode: () => rpcCommand({ type: "get_vibe_mode" }),
 		setVibeMode: (enabled: boolean) => rpcCommand({ type: "set_vibe_mode", enabled }),
 		getGoal: () => rpcCommand({ type: "get_goal" }),
@@ -443,10 +451,17 @@ const api: OmpApi = {
 			ipcRenderer.invoke(IPC_COMMANDS.STATS_FETCH, { path, params }),
 	},
 
+	bench: {
+		run: (options: IpcBenchmarkRunOptions) =>
+			ipcRenderer.invoke(IPC_COMMANDS.BENCH_RUN, options) as Promise<IpcBenchmarkRunResult>,
+		abort: () => ipcRenderer.invoke(IPC_COMMANDS.BENCH_ABORT) as Promise<boolean>,
+	},
+
 	system: {
 		openExternal: (url: string) => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_OPEN_EXTERNAL, url),
 		openPath: (path: string) => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_OPEN_PATH, path) as Promise<IpcOpenPathResult>,
-		showSaveDialog: (defaultPath?: string) => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_SAVE_DIALOG, defaultPath),
+		showSaveDialog: (defaultPath?: string, filters?: { name: string; extensions: string[] }[]) =>
+			ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_SAVE_DIALOG, defaultPath, filters),
 		showOpenDialog: (filters?: { name: string; extensions: string[] }[], options?: { directory?: boolean }) =>
 			ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_OPEN_DIALOG, filters, options),
 		clipboardRead: () => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_CLIPBOARD_READ),

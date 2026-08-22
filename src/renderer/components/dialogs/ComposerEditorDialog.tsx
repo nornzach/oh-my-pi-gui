@@ -80,6 +80,7 @@ export function ComposerEditorDialog() {
 				keymap.of([...defaultKeymap, ...historyKeymap]),
 				markdown(),
 				EditorView.lineWrapping,
+				EditorView.contentAttributes.of({ spellcheck: "true", autocorrect: "on", autocapitalize: "sentences" }),
 				EditorView.theme({
 					"&": {
 						backgroundColor: "var(--omp-code-bg)",

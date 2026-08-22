@@ -6,6 +6,7 @@ export type MainLanguage = "en" | "zh";
 type MainTextKey =
 	| "dialog.openProject"
 	| "menu.about"
+	| "menu.addToDictionary"
 	| "menu.documentation"
 	| "menu.edit"
 	| "menu.exportHtml"
@@ -32,6 +33,7 @@ type MainTextKey =
 const TEXT: Record<MainTextKey, Record<MainLanguage, string>> = {
 	"dialog.openProject": { en: "Open project", zh: "打开项目" },
 	"menu.about": { en: "About omp", zh: "关于 omp" },
+	"menu.addToDictionary": { en: "Add to dictionary", zh: "添加到词典" },
 	"menu.documentation": { en: "Documentation", zh: "文档" },
 	"menu.edit": { en: "Edit", zh: "编辑" },
 	"menu.exportHtml": { en: "Export HTML", zh: "导出 HTML" },

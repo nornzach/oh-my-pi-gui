@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Branch to a new tab**: user and assistant message footers can copy the conversation through that exact turn into an independent session and open it in the current window without changing the source session.
+- **Plan save-only review**: plan approval suggests a topic filename, saves the reviewed Markdown, exits plan mode, and reports when a fresh session is cancelled or fails instead of claiming success.
+- **Context cleanup and image publishing controls**: `/shake thinking` removes reasoning history, while Settings exposes usable nested JSON configuration for the complete image URL broker with masked credentials.
+- **Native writing assistance**: the composer and expanded editor enable platform spelling, autocorrect, sentence capitalization, and native replacement suggestions.
+- **Shared session pins**: pinning a GUI session keeps the bundled agent's pinned-session list in sync without losing concurrent updates from other windows or the CLI.
+- **Model benchmark**: run the bundled omp TTFT, prefill, and decode benchmark from a native GUI results table.
+
+### Fixed
+
+- **Independent conversation navigation**: expanding task or agent docks no longer compresses the left-side turn navigator or extends it behind the composer.
+
 ## [0.9.0] - 2026-08-22
 
 ### Changed

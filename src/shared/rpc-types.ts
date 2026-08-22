@@ -100,13 +100,14 @@ export type RpcCommand =
 	| { id?: string; type: "get_active_tools" }
 	| { id?: string; type: "share_session" }
 	| { id?: string; type: "get_jobs" }
+	| { id?: string; type: "set_session_pinned"; sessionId: string; pinned: boolean }
 
 	// One-shot session actions (TUI /prewalk /fresh /shake /reload-plugins
 	// /force parity). set_force_tool takes exactly one of `tool` or
 	// `clear: true`; fresh is refused with code "busy" while streaming.
 	| { id?: string; type: "set_prewalk"; enabled: boolean }
 	| { id?: string; type: "fresh" }
-	| { id?: string; type: "shake_context"; mode: "elide" | "images" }
+	| { id?: string; type: "shake_context"; mode: "elide" | "images" | "thinking" }
 	| { id?: string; type: "reload_plugins" }
 	| { id?: string; type: "set_force_tool"; tool?: string; clear?: boolean }
 	| { id?: string; type: "get_force_tool" }
@@ -121,8 +122,9 @@ export type RpcCommand =
 			id?: string;
 			type: "plan_approval";
 			approved: boolean;
-			option?: "execute" | "compact" | "keep_context";
+			option?: "execute" | "compact" | "keep_context" | "save";
 			feedback?: string;
+			savePath?: string;
 	  }
 
 	// Modes
@@ -1391,6 +1393,8 @@ export interface TodoTask {
 // ============================================================================
 
 export interface AgentMessage {
+	/** Persisted OMP session-tree node id, present on user/assistant transcript messages. */
+	entryId?: string;
 	role:
 		| "user"
 		| "assistant"
@@ -1847,7 +1851,14 @@ export type AgentSessionEvent =
 			resolved?: string;
 	  }
 	| { type: "goal_updated"; goal: unknown; state?: unknown }
-	| { type: "plan_proposal"; planFilePath: string; title?: string; planContent: string; options: string[] }
+	| {
+			type: "plan_proposal";
+			planFilePath: string;
+			title?: string;
+			suggestedFileName?: string;
+			planContent: string;
+			options: string[];
+	  }
 	| { type: "loop_mode_update"; state: RpcLoopModeState }
 	// Authoritative queue snapshot after every queue mutation (enqueue,
 	// drain/consume, remove, move, clear, dequeue restore). The queue store
