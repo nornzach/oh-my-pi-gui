@@ -76,10 +76,10 @@ The omp TUI is powerful, but some things are easier with a visual interface. omp
 
 ### Install
 
-Current release: [**v0.9.0**](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.0)
+Current release: [**v0.9.1**](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.1)
 
-- **Apple Silicon (M1/M2/M3/M4):** `omp-0.9.0-arm64.dmg`
-- **Intel:** `omp-0.9.0.dmg`
+- **Apple Silicon (M1/M2/M3/M4):** `omp-0.9.1-arm64.dmg`
+- **Intel:** `omp-0.9.1.dmg`
 
 Open the `.dmg` and drag **omp** into **Applications**. The build is ad-hoc signed but not notarized, so on first launch macOS may block it: **right-click → Open** (or *System Settings → Privacy & Security → Open Anyway*).
 
@@ -230,10 +230,10 @@ omp TUI 很强大,但有些事情用可视化界面更方便。omp GUI 不替代
 
 ### 安装
 
-当前版本：[**v0.9.0**](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.0)
+当前版本：[**v0.9.1**](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.1)
 
-- **Apple Silicon（M1/M2/M3/M4）：** `omp-0.9.0-arm64.dmg`
-- **Intel：** `omp-0.9.0.dmg`
+- **Apple Silicon（M1/M2/M3/M4）：** `omp-0.9.1-arm64.dmg`
+- **Intel：** `omp-0.9.1.dmg`
 
 打开 `.dmg`,把 **omp** 拖进 **应用程序**。当前构建采用 ad-hoc 签名但未经 Apple 公证,首次打开 macOS 可能拦截:**右键 → 打开**(或 *系统设置 → 隐私与安全性 → 仍要打开*)。
 

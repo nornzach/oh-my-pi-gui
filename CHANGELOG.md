@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-23
+
 ### Added
 
 - **Branch to a new tab**: user and assistant message footers can copy the conversation through that exact turn into an independent session and open it in the current window without changing the source session.
@@ -10,6 +12,10 @@
 - **Native writing assistance**: the composer and expanded editor enable platform spelling, autocorrect, sentence capitalization, and native replacement suggestions.
 - **Shared session pins**: pinning a GUI session keeps the bundled agent's pinned-session list in sync without losing concurrent updates from other windows or the CLI.
 - **Model benchmark**: run the bundled omp TTFT, prefill, and decode benchmark from a native GUI results table.
+
+### Changed
+
+- **Bundled agent upgraded to omp 18.0.0**: packaged sidecars now include the current upstream runtime plus RPC plan-save, thinking-only context shake, entry-id branching, and race-safe shared session pins from monorepo commit `d9e6bdaa2d`.
 
 ### Fixed
 
