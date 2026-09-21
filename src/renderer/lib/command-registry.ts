@@ -514,8 +514,9 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		affordance: { kind: "window", open: ctx.openSessionTree },
 	});
 	add({
-		name: "drop",
-		label: t("cmd.drop"),
+		name: "delete",
+		aliases: ["drop"],
+		label: t("cmd.delete"),
 		description: t("cmd.drop.desc"),
 		category: "session",
 		affordance: { kind: "action", run: dropSessionFromGui },

@@ -1712,13 +1712,19 @@ export interface PlanModeState {
 // Model Roles
 // ============================================================================
 
-export interface ModelRoleEntry {
+export interface ModelRoleCandidate {
+	provider: string;
 	id: string;
 	name: string;
-	tag: string;
-	color: string;
+	kind: "chat" | "tiny" | "image" | "tts" | "stt" | "search" | "judge";
+}
+
+export interface ModelRoleEntry extends ModelRoleMetadata {
+	/** Configured selector, not necessarily a catalog model id. */
 	model?: string;
 	source: string;
+	/** Backend-filtered eligible models; never shared with the chat picker. */
+	candidates: ModelRoleCandidate[];
 }
 
 export interface ModelRolesResult {
@@ -1728,9 +1734,10 @@ export interface ModelRolesResult {
 export interface ModelRoleMetadata {
 	id: string;
 	name: string;
-	tag: string;
-	color: string;
+	tag?: string;
+	color?: string;
 	hidden?: boolean;
+	section: "chat" | "kind";
 }
 
 export interface ModelRoleMetadataResult {

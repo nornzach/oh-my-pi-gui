@@ -1,15 +1,10 @@
-import { useTabRpc } from "../../lib/tab-rpc";
-/**
- * Model Roles window: configure per-role model assignments.
- * Each role (default, smol, slow, vision, plan, designer, commit, tiny, task, advisor)
- * can be assigned a specific model via a dropdown picker.
- */
+/** Model role assignments and eligible candidates are owned by the backend. */
 
 import { RefreshCw, Tag } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ModelInfo, ModelRoleEntry, ModelRoleMetadata, ModelRolesResult } from "../../../shared/rpc-types";
+import type { ModelRoleCandidate, ModelRoleEntry, ModelRolesResult } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
-import { useModelStore } from "../../stores/model";
+import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
@@ -21,48 +16,58 @@ const COLOR_MAP: Record<string, string> = {
 	accent: "var(--omp-accent)",
 	error: "var(--omp-error)",
 	info: "var(--omp-link)",
+	muted: "var(--omp-muted)",
+	dim: "var(--omp-dim)",
 	default: "var(--omp-muted)",
 };
 
 function RoleRow({
 	role,
-	metadata,
-	availableModels,
 	onChange,
 	busy,
 	t,
 }: {
 	role: ModelRoleEntry;
-	metadata?: ModelRoleMetadata;
-	availableModels: Array<{ provider: string; id: string }>;
 	onChange: (role: string, modelId: string | null) => void;
 	busy: boolean;
 	t: (k: string, p?: Record<string, string | number>) => string;
 }) {
-	const color = COLOR_MAP[role.color] ?? COLOR_MAP.default;
-	const displayName = metadata?.name ?? role.name;
-	const displayTag = metadata?.tag ?? role.tag;
+	const color = COLOR_MAP[role.color ?? "default"] ?? COLOR_MAP.default;
+	const candidates = role.candidates ?? [];
+	const groups = new Map<ModelRoleCandidate["kind"], ModelRoleCandidate[]>();
+	for (const candidate of candidates) {
+		const group = groups.get(candidate.kind) ?? [];
+		group.push(candidate);
+		groups.set(candidate.kind, group);
+	}
+	const savedOnly = role.model && !candidates.some(m => `${m.provider}/${m.id}` === role.model);
 
 	return (
 		<div className="flex items-center gap-3 rounded-lg border border-[var(--omp-border-muted)] px-3 py-2.5">
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<div className="flex items-center gap-2">
 					<Tag size={12} style={{ color }} />
-					<span className="text-omp-lg font-medium text-[var(--omp-text)]">{displayName}</span>
-					<span
-						className="rounded px-1.5 py-px text-omp-xxs font-bold tracking-wider"
-						style={{ backgroundColor: `${color}20`, color }}
-					>
-						{displayTag}
-					</span>
+					<span className="text-omp-lg font-medium text-[var(--omp-text)]">{role.name}</span>
+					{role.tag && (
+						<span
+							className="rounded px-1.5 py-px text-omp-xxs font-bold tracking-wider"
+							style={{ backgroundColor: `${color}20`, color }}
+						>
+							{role.tag}
+						</span>
+					)}
 				</div>
 				<span className="text-omp-xs text-[var(--omp-dim)]">
 					{t("modelRoles.source", { source: role.source })}
 					{role.model && <span className="ml-2">→ {role.model}</span>}
 				</span>
+				{candidates.length === 0 && (
+					<span className="text-omp-xs text-[var(--omp-dim)]">{t("modelRoles.noCandidates")}</span>
+				)}
 			</div>
 			<select
-				className="h-7 min-w-[180px] rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-input-bg)] px-2 text-omp-sm text-[var(--omp-text)] focus:border-[var(--omp-border-accent)] focus:outline-none"
+				aria-label={t("modelRoles.select", { role: role.name })}
+				className="h-7 min-w-[180px] max-w-[50%] rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-input-bg)] px-2 text-omp-sm text-[var(--omp-text)] focus:border-[var(--omp-border-accent)] focus:outline-none"
 				value={role.model ?? ""}
 				disabled={busy}
 				onChange={e => {
@@ -71,10 +76,15 @@ function RoleRow({
 				}}
 			>
 				<option value="">{t("modelRoles.default")}</option>
-				{availableModels.map(m => (
-					<option key={`${m.provider}/${m.id}`} value={`${m.provider}/${m.id}`}>
-						{m.provider}/{m.id}
-					</option>
+				{savedOnly && <option value={role.model}>{t("modelRoles.savedSelector", { model: role.model! })}</option>}
+				{[...groups].map(([kind, models]) => (
+					<optgroup key={kind} label={t(`modelRoles.kind.${kind}`)}>
+						{models.map(m => (
+							<option key={`${m.provider}/${m.id}`} value={`${m.provider}/${m.id}`}>
+								{m.name} — {m.provider}/{m.id}
+							</option>
+						))}
+					</optgroup>
 				))}
 			</select>
 		</div>
@@ -87,11 +97,8 @@ export function ModelRolesWindow() {
 	const close = useUiStore(s => s.closeModelRoles);
 	const t = useT();
 	const sidecarReady = useSessionStore(s => s.status) === "ready";
-	const availableModels = useModelStore(s => s.availableModels);
-	const setAvailableModels = useModelStore(s => s.setAvailableModels);
 
 	const [roles, setRoles] = useState<ModelRoleEntry[]>([]);
-	const [metadata, setMetadata] = useState<ModelRoleMetadata[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [busyRole, setBusyRole] = useState<string | null>(null);
 
@@ -102,49 +109,28 @@ export function ModelRolesWindow() {
 			return;
 		}
 		try {
-			// Fetch available models too: the role dropdowns read them from the
-			// model store, which is otherwise populated only when the ModelPicker
-			// opens — leaving every dropdown empty on a fresh launch.
-			const [rolesRes, metaRes, modelsRes] = await Promise.all([
-				tabRpc.getModelRoles(),
-				tabRpc.getModelRoleMetadata(),
-				tabRpc.getAvailableModels(),
-			]);
-			if (rolesRes.success) setRoles((rolesRes.data as ModelRolesResult).roles);
-			if (metaRes.success) setMetadata((metaRes.data as { roles: ModelRoleMetadata[] }).roles);
-			if (modelsRes.success) {
-				// get_available_models payload: { models?: ModelInfo[] }.
-				const modelsData = modelsRes.data as { models?: ModelInfo[] } | undefined;
-				setAvailableModels(modelsData?.models ?? []);
-			}
+			// The backend owns role metadata and the eligible candidate pool per
+			// role; get_model_roles returns everything the window renders.
+			const res = await tabRpc.getModelRoles();
+			if (res.success) setRoles((res.data as ModelRolesResult).roles);
 		} catch (cause) {
 			toast({ variant: "error", title: t("modelRoles.failed"), message: String(cause) });
 		} finally {
 			setLoading(false);
 		}
-	}, [
-		sidecarReady,
-		setAvailableModels,
-		t,
-		tabRpc.getModelRoles,
-		tabRpc.getModelRoleMetadata,
-		tabRpc.getAvailableModels,
-	]);
+	}, [sidecarReady, t, tabRpc.getModelRoles]);
 
 	useEffect(() => {
 		if (open) void load();
 	}, [open, load]);
 
-	const metaById = useMemo(() => {
-		const map = new Map<string, ModelRoleMetadata>();
-		for (const m of metadata) map.set(m.id, m);
-		return map;
-	}, [metadata]);
-
-	const modelOptions = useMemo(
-		() => availableModels.map(m => ({ provider: m.provider, id: m.id })),
-		[availableModels],
-	);
+	const sections = useMemo(() => {
+		const visible = roles.filter(role => !role.hidden);
+		return [
+			{ key: "chat" as const, roles: visible.filter(role => role.section === "chat") },
+			{ key: "kind" as const, roles: visible.filter(role => role.section !== "chat") },
+		].filter(section => section.roles.length > 0);
+	}, [roles]);
 
 	const handleChange = async (role: string, modelId: string | null) => {
 		setBusyRole(role);
@@ -190,23 +176,18 @@ export function ModelRolesWindow() {
 					</div>
 				)}
 
-				{roles.length > 0 && (
-					<div className="flex flex-col gap-2">
-						{roles.map(role => (
-							<RoleRow
-								key={role.id}
-								role={role}
-								metadata={metaById.get(role.id)}
-								availableModels={modelOptions}
-								onChange={handleChange}
-								busy={busyRole === role.id}
-								t={t}
-							/>
+				{sections.map(section => (
+					<div key={section.key} className="flex flex-col gap-2">
+						<span className="text-omp-xs font-semibold uppercase tracking-wider text-[var(--omp-dim)]">
+							{t(`modelRoles.section.${section.key}`)}
+						</span>
+						{section.roles.map(role => (
+							<RoleRow key={role.id} role={role} onChange={handleChange} busy={busyRole === role.id} t={t} />
 						))}
 					</div>
-				)}
+				))}
 
-				{!loading && roles.length === 0 && (
+				{!loading && sections.length === 0 && (
 					<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-dim)]">
 						{t("modelRoles.empty")}
 					</div>

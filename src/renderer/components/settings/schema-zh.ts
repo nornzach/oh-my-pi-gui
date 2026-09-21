@@ -1482,4 +1482,119 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 		description: "每个提供商的搜索传输硬超时；超时后 web_search 会尝试下一个回退项，单位为秒（最大 300）",
 	},
 	"searxng.safesearch": { label: "SearXNG 安全搜索" },
+	// ── omp 18.2.x 上游新增设置 ─────────────────────────────────────────────
+	"advisor.maxNotesPerUpdate": {
+		label: "Advisor 每次更新最大笔记数",
+		description: "Advisor 单次更新允许写入的笔记上限；较低值更严格、可防刷屏。",
+	},
+	"browser.freezeOnTurnEnd": {
+		label: "回合结束时冻结浏览器标签",
+		description: "回合结束时冻结由 OMP 管理的浏览器标签，避免后台标签继续活动。",
+	},
+	"browser.idleCloseSec": {
+		label: "浏览器空闲关闭超时",
+		description: "空闲多久后关闭由 OMP 启动的浏览器（秒）；0 表示从不关闭。",
+	},
+	"collab.autoStart": {
+		label: "协作自动启动",
+		description: "off 仅在执行 /collab 时共享；view 自动托管并由注册表分发只读链接。",
+	},
+	"compaction.experimentalContextManagement": {
+		label: "基于笔记的上下文窗口（实验性）",
+		description: "实验性压缩策略：用笔记支撑上下文窗口，可能改变压缩与召回行为。",
+	},
+	"composer.recallClearedDrafts": {
+		label: "召回已清空的草稿",
+		description: "清空输入框后仍可在历史中召回该草稿。",
+	},
+	"composer.shape": {
+		label: "输入框形态",
+		description: "输入编辑器与状态行的视觉布局。",
+	},
+	"composer.tokenRate": {
+		label: "生成速率显示",
+		description: "在工作行显示平滑的每秒 token 生成速率，并在回合之间保持可见。",
+	},
+	"display.pinnedAgents": {
+		label: "固定代理列表",
+		description: "off 隐藏固定跳转列表；collapsed 折叠显示少量行并提供展开器。",
+	},
+	"display.showTurnTime": {
+		label: "显示回合耗时",
+		description: "在助手消息的用量行显示从提示到产出的总耗时（含工具调用）。",
+	},
+	"find.enabled": {
+		label: "Find（语义搜索）",
+		description: "启用语义工作区搜索工具，让代理用自然语言定位行为与符号；行为类查找优先于 grep/glob。",
+	},
+	"loop.conditionTimeoutMs": {
+		label: "循环条件超时（毫秒）",
+		description: "loop 条件求值的超时；0 表示不限时。",
+	},
+	"plan.autosave": {
+		label: "自动保存计划",
+		description: "计划模式完成时自动把已批准的计划保存到磁盘。",
+	},
+	"plan.autosaveDir": {
+		label: "自动保存目录",
+		description: "计划自动保存的目标目录；留空使用默认位置。",
+	},
+	"spelling.autocomplete": {
+		label: "单词自动补全（macOS）",
+		description: "以行内提示显示 macOS 词典补全，按 Tab 接受。",
+	},
+	"spelling.autocorrect": {
+		label: "自动更正（macOS）",
+		description: "对已完成的词应用有把握的 macOS 拼写更正。",
+	},
+	"spelling.typoDetection": {
+		label: "拼写错误检测（macOS）",
+		description: "用当前 macOS 词典标记提示词中的拼写错误。",
+	},
+	"statusLine.contextLine": {
+		label: "上下文响应线",
+		description:
+			"左右段之间的分隔线如何反映上下文占用（仅 box 输入框）：off 为实心强调线；percentage 已用部分着强调色、其余变暗。",
+	},
+	"stream.redactPatterns": {
+		label: "额外脱敏模式",
+		description: "直播屏幕数据发出前额外匹配的脱敏模式。",
+	},
+	"stream.serverUrl": {
+		label: "直播服务器",
+		description: "omp stream 使用的直播服务器地址。",
+	},
+	"task.agentServiceTierOverrides": {
+		label: "子任务服务层级覆盖",
+		description: "按代理/任务覆盖服务层级的键值映射。",
+	},
+	"tools.speculativeExecution.enabled": {
+		label: "实验性推测执行",
+		description: "允许在正常派发前先执行已验证的本地读操作，以降低延迟。",
+	},
+	"tools.speculativeExecution.maxInFlight": {
+		label: "推测执行并发",
+		description: "正常派发前允许并行运行的已验证本地读操作上限。",
+	},
+	"tui.mouse": {
+		label: "鼠标点击聚焦",
+		description: "允许鼠标点击聚焦终端窗格。",
+	},
+	"tui.resizeScrollback": {
+		label: "重排回滚区",
+		description:
+			"终端尺寸稳定后如何刷新回滚区中的转录行：append 在保留历史下方按新宽度重放；rebuild 清空回滚区后重放一份当前宽度转录。",
+	},
+	"tui.titleSpinner": {
+		label: "终端标题旋转符",
+		description: "终端标题中工作态旋转符的字形集。",
+	},
+	"tui.vimMode": {
+		label: "Vim 编辑模式",
+		description: "在输入框启用 Vim 键位编辑。",
+	},
+	"tui.vimModeDisplay": {
+		label: "Vim 模式指示",
+		description: "显示当前 Vim 模式（如 NORMAL / INSERT）。",
+	},
 };

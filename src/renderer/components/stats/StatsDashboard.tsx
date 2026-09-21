@@ -58,6 +58,14 @@ export function StatsDashboard({ open, onClose }: { open: boolean; onClose: () =
 				// The stats:fetch bridge RESOLVES failures as {error, unavailable:true}
 				// instead of rejecting — surface that shape as the failure it is.
 				if (result != null && ("unavailable" in result || result.error)) {
+					// Server still booting: the routes show a loading state and recover on
+					// their own, so the quiet auto-sync on open must not alarm the user.
+					if (result.unavailable) {
+						if (!opts?.quiet) {
+							toast({ variant: "warning", title: t("stats.syncFailed"), message: t("stats.starting") });
+						}
+						return;
+					}
 					toast({
 						variant: "error",
 						title: t("stats.syncFailed"),

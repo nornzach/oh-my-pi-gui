@@ -20,7 +20,15 @@ function provider(partial: Partial<ProviderInfo> & { id: string }): ProviderInfo
 }
 
 function role(partial: Partial<ModelRoleEntry> & { id: string }): ModelRoleEntry {
-	return { name: partial.id, tag: partial.id.toUpperCase(), color: "default", source: "settings", ...partial };
+	return {
+		name: partial.id,
+		tag: partial.id.toUpperCase(),
+		color: "default",
+		source: "settings",
+		section: "chat",
+		candidates: [],
+		...partial,
+	};
 }
 
 function report(partial: Partial<UsageReport> & { provider: string }): UsageReport {

@@ -77,6 +77,12 @@ if (!existsSync(compileBinaryModulePath) || !existsSync(path.join(nativesDir, "s
 	process.exit(1);
 }
 
+const monorepoPackage = (await Bun.file(path.join(repoRoot, "package.json")).json()) as { packageManager: string };
+const bunRequirement = monorepoPackage.packageManager.replace(/^bun@/, "");
+if (!Bun.semver.satisfies(Bun.version, bunRequirement)) {
+	throw new Error(`Building the bundled agent requires Bun ${bunRequirement}; running ${Bun.version}.`);
+}
+
 await runPackageScript(guiRoot, "check:protocol");
 
 // Runtime-selected module: only resolvable inside the monorepo layout proven

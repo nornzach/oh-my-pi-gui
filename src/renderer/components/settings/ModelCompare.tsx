@@ -227,7 +227,7 @@ function AuthBadge({ row, t }: { row: Row; t: TFn }) {
 }
 
 function RoleTag({ role, metadata }: { role: ModelRoleEntry; metadata?: ModelRoleMetadata }) {
-	const color = ROLE_COLORS[metadata?.color ?? role.color] ?? ROLE_COLORS.default;
+	const color = ROLE_COLORS[metadata?.color ?? role.color ?? "default"] ?? ROLE_COLORS.default;
 	return (
 		<span
 			className="rounded px-1.5 py-px text-omp-xxs font-bold tracking-wider whitespace-nowrap"

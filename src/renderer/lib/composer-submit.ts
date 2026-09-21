@@ -21,7 +21,8 @@ export type ComposerSendMode = "prompt" | "steer" | "followUp";
 const SESSION_REPLACING_COMMANDS: Record<string, true> = { new: true, clear: true };
 // The desktop requires a visible preview/start step even when Core exposes a
 // directly executable text command, or command discovery has not completed.
-const GUI_CONFIRMATION_COMMANDS = new Set(["share", "live", "btw"]);
+// `drop` is a GUI alias for `delete`, no longer advertised by Core.
+const GUI_CONFIRMATION_COMMANDS = new Set(["share", "live", "btw", "delete", "drop"]);
 
 export type ComposerSubmit =
 	/** Session-replacing command while busy — draft stays, warning toasted. */

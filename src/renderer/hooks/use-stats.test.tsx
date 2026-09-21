@@ -45,3 +45,41 @@ test("late ranges cannot replace the selected range, failed refresh retains only
 		vi.unstubAllGlobals();
 	}
 });
+
+test("an unavailable stats server keeps the route loading and self-heals once the server is ready", async () => {
+	const { document, window } = parseHTML("<html><body><div id='root'></div></body></html>");
+	let ready = false;
+	const fetch = vi.fn(async () =>
+		ready
+			? { count: 7 }
+			: { error: "The bundled stats server is not ready. Please retry shortly.", unavailable: true },
+	);
+	vi.stubGlobal("document", document);
+	vi.stubGlobal("window", Object.assign(window, { omp: { stats: { fetch } } }));
+	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+	const node = document.getElementById("root")!;
+	const root = createRoot(node);
+	function Probe() {
+		const result = useStats<{ count: number }>("/api/stats/overview", {});
+		return <p>{JSON.stringify(result)}</p>;
+	}
+	try {
+		await act(async () => root.render(<Probe />));
+		// Not ready yet: still loading, never a dead-end error.
+		expect(node.textContent).toContain('"isLoading":true');
+		expect(node.textContent).toContain('"error":null');
+		expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(1);
+
+		// Server comes up; the fast retry must recover without a manual refetch.
+		ready = true;
+		await act(async () => {
+			await new Promise(resolve => setTimeout(resolve, 2600));
+		});
+		expect(node.textContent).toContain('"count":7');
+		expect(node.textContent).toContain('"error":null');
+		expect(node.textContent).toContain('"isLoading":false');
+	} finally {
+		await act(async () => root.unmount());
+		vi.unstubAllGlobals();
+	}
+});

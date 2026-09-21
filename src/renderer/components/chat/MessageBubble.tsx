@@ -1,4 +1,4 @@
-import { Archive, Check, Copy, FileText, GitBranch, Terminal } from "lucide-react";
+import { Archive, Bot, Check, Copy, FileText, GitBranch, Terminal } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useState } from "react";
 import type { AgentMessage, ImageContent, MessageContent, ToolCallContent } from "../../../shared/rpc-types";
@@ -7,6 +7,7 @@ import { copyText, cx, formatClock, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
 import { forkSessionFromMessageInNewTab, isRenderableMessageText } from "../../lib/messages";
+import { extractModelMentions, type ModelMentionChip } from "../../lib/model-mentions";
 import { PREVIEW_SCROLL_LG } from "../../lib/preview";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -305,6 +306,20 @@ export const MessageBubble = memo(function MessageBubble({
 	const isAssistant = message.role === "assistant";
 	const isSteering = Boolean(message.steering);
 	const timestamp = formatClock(message.timestamp);
+	// User delegations (`^provider/model`, persisted as <model …/> tags) render
+	// as atomic chips; the raw tags/selectors are stripped from the body text.
+	// Computed inline (no hook) because this component early-returns above.
+	const userMentions = (() => {
+		if (!isUser) return { chips: [] as ModelMentionChip[], blocks: content };
+		const chips: ModelMentionChip[] = [];
+		const blocks = content.map(block => {
+			if (block.type !== "text") return block;
+			const extracted = extractModelMentions(block.text);
+			chips.push(...extracted.chips);
+			return { ...block, text: extracted.body };
+		});
+		return { chips, blocks };
+	})();
 	const customLabel =
 		message.role === "custom" || message.role === "hookMessage"
 			? (message.customType ?? t("chat.extensionMessage"))
@@ -360,7 +375,23 @@ export const MessageBubble = memo(function MessageBubble({
 									{t("chat.steering")}
 								</div>
 							)}
-							{content.map((block, i) => {
+							{userMentions.chips.length > 0 && (
+								<div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+									{userMentions.chips.map((chip, chipIndex) => (
+										<span
+											key={chipIndex}
+											title={t("chat.delegatedTo", {
+												name: chip.name ?? chip.selector ?? (chip.agent ? `@${chip.agent}` : ""),
+											})}
+											className="inline-flex items-center gap-1 rounded-full border border-[var(--omp-border-muted)] bg-[var(--omp-selected-bg)] px-2 py-0.5 font-mono text-omp-xxs font-medium text-[var(--omp-accent)]"
+										>
+											<Bot size={10} />
+											{chip.name ?? chip.selector ?? (chip.agent ? `@${chip.agent}` : "")}
+										</span>
+									))}
+								</div>
+							)}
+							{userMentions.blocks.map((block, i) => {
 								if (block.type === "text") {
 									return (
 										<div key={i} className="text-omp-xl leading-[1.6] text-[var(--omp-text)]">

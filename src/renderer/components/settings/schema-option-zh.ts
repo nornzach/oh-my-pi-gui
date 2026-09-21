@@ -792,4 +792,26 @@ export const ZH_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
 	unset: "未设置",
 	granted: "已授权",
 	denied: "已拒绝",
+	// ── omp 18.2.x 新增枚举选项 ─────────────────────────────────────────────
+	Braille: "布莱叶点",
+	"Classic sweep (default)": "经典扫动（默认）",
+	Pulse: "脉冲",
+	"Moon filling cycle": "月相填充循环",
+	Dots: "圆点",
+	Line: "线条",
+	Collapsed: "折叠",
+	"Hide the pinned jump list": "隐藏固定跳转列表",
+	"Show a few rows with an expander": "显示少量行并提供展开器",
+	Percentage: "百分比",
+	"Solid accent line, no context feedback": "实心强调线，不反馈上下文",
+	"Used portion in accent color, remainder dimmed": "已用部分着强调色，其余变暗",
+	Append: "追加",
+	"Replay the transcript at the new width below retained history": "在保留历史下方按新宽度重放转录",
+	Rebuild: "重建",
+	"Erase all terminal scrollback, then replay one current-width transcript":
+		"清空全部终端回滚区，再重放一份当前宽度的转录",
+	View: "只读视图",
+	"Share only when /collab is run": "仅在执行 /collab 时共享",
+	"Auto-host; the registry hands out view-only links (omp collab link --view)":
+		"自动托管；注册表分发只读链接（omp collab link --view）",
 };

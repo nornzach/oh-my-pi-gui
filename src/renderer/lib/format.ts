@@ -1,7 +1,7 @@
 /**
  * Formatting + small value-extraction utilities shared by renderer components.
- * No runtime dependencies.
  */
+import { parseAnsi } from "./ansi";
 import { getCurrentLanguage, translate } from "./i18n";
 import { PREVIEW_TEXT_CHARS } from "./preview";
 
@@ -207,6 +207,11 @@ export function shortenPath(path: string): string {
 		display = `${display.slice(0, keep)}…${display.slice(-keep)}`;
 	}
 	return display;
+}
+
+/** Plain tool text: strip terminal controls/links and expand tabs before display. */
+export function sanitizeToolText(text: string): string {
+	return parseAnsi(text).map(segment => segment.text).join("").replace(/\t/g, "    ");
 }
 
 /** First N lines within the shared DOM character ceiling. */

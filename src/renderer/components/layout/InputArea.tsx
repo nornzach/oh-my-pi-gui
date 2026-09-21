@@ -42,7 +42,7 @@ import { ContextUsagePopover } from "./ContextUsagePopover";
 import { HistorySearchOverlay } from "./HistorySearchOverlay";
 import { fileToImage, listMentionFiles, mentionFileCache } from "./input-area-utils";
 import { ThinkingControl } from "./ThinkingControl";
-import { type CompletionItem, type CompletionMenu, useCompletionMenu } from "./use-completion-menu";
+import { applyCompletion, type CompletionItem, type CompletionMenu, useCompletionMenu } from "./use-completion-menu";
 import { useComposerSubmit } from "./use-composer-submit";
 
 type SendMode = "prompt" | "steer" | "followUp";

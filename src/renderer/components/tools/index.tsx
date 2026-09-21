@@ -8,6 +8,7 @@ import { ComputerRenderer } from "./ComputerRenderer";
 import { DebugRenderer } from "./DebugRenderer";
 import { EditRenderer } from "./EditRenderer";
 import { EvalRenderer } from "./EvalRenderer";
+import { FindRenderer } from "./FindRenderer";
 import { GenericRenderer } from "./GenericRenderer";
 import { GithubRenderer } from "./GithubRenderer";
 import { GlobRenderer } from "./GlobRenderer";
@@ -47,6 +48,7 @@ const REGISTRY: Record<string, ComponentType<ToolRendererProps>> = {
 	write: WriteRenderer,
 	bash: BashRenderer,
 	grep: GrepRenderer,
+	find: FindRenderer,
 	glob: GlobRenderer,
 	task: TaskRenderer,
 	todo: TodoRenderer,
