@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-09-21
+
+### Added
+
+- **Bundled agent upgraded to omp 18.2.7**: semantic `find` search, `^model` delegation, configurable specialist model roles, batch evaluation/judgment, and `omp stream` livestreaming in the bundled Core.
+- **Model Roles window** now lists backend-filtered eligible models grouped by kind, split into chat and specialized sections, and hides roles the backend marks hidden.
+- **Delegation chips**: models tagged with `^` in a message render as chips on your message in the transcript.
+- **Chinese labels** for all Core settings and options newly added upstream (find, generation rate, stream, judgment, title spinner, spelling, and more).
+
+### Changed
+
+- The `/drop` session command is now `/delete` in the command menu (the `drop` alias still works).
+
+### Fixed
+
+- **Stats dashboard** no longer shows a dead-end "stats unavailable" error while the bundled stats server finishes its first-time re-index after an upgrade; it now stays in a loading state and recovers on its own.
+
 ## [0.9.6] - 2026-09-14
 
 ### Changed
