@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-09-22
+
+### Added
+
+- **Bilingual feature tour**: refreshed English and Chinese documentation includes 24 matching-language screenshots captured with isolated, synthetic demo data.
+
+### Changed
+
+- **Bundled agent upgraded to omp 18.2.8** with expanded browser automation, buffered cloud transcription, faster credential scanning, and more reliable aborted LSP requests.
+- **Smoother interactions**: streaming Markdown, common dialogs, popovers, hover feedback, and panel entrances stay visually stable as content updates.
+
+### Fixed
+
+- **Model and provider refresh**: switching models, signing in or out, and adding, editing, or removing custom providers update the originating session's model and account views without stale responses undoing newer state.
+- **Live accounting**: context, cost, and cache values refresh during runs; measured context usage remains visible when model capacity is unknown.
+- **Conversation follow**: new output follows the viewport at the bottom without pulling readers out of scrollback, and jump-to-latest reliably resumes following.
+- **Settings and dialogs**: IME-safe keyboard handling, layered Escape behavior, focus recovery, confirmation dialogs, and scrollable layouts make controls more predictable.
+- **Packaged startup and recovery**: bundled configuration dependencies are available at launch, custom-provider writes are atomic, and off-screen saved windows recover to usable bounds.
+- **Statistics resilience**: unexpected list responses no longer crash the statistics view.
+
 ## [0.9.7] - 2026-09-21
 
 ### Added

@@ -21,9 +21,9 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **DMG users do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [Recent improvements](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+[Features](#en-features) · [What's new in 0.9.8](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
 
-> **Current-source showcase, not a release promise.** This feature tour includes source changes made after v0.9.7. Screenshots show the current source; they do not guarantee that a published DMG includes every recent change. [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for downloads and release contents.
+> **v0.9.8 showcase.** The improvements below are included in v0.9.8, with the bundled agent updated to omp 18.2.8. [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -58,12 +58,13 @@ The distinctive part is not just a chat window: it is being able to **separate p
 Model requests still go to the providers you configure. The bundled agent removes the separate runtime install, not the need to configure credentials, project dependencies, external Git/OpenSSH/MCP tools, or optional services. Only connect tools and services you trust.
 
 <a id="en-recent"></a>
-### Recent improvements in source
+### What's new in 0.9.8
 
-These changes are **after the v0.9.7 install baseline**, not a newly announced release:
+v0.9.8 includes these GUI improvements and a bundled agent update:
 
 | In daily use | What has improved |
 |---|---|
+| **Bundled agent** | Updated to **omp 18.2.8**, with expanded browser automation, buffered cloud transcription, improved long-session responsiveness, and a fix for LSP requests hanging during cancellation. |
 | **Switching models and accounts** | Model/provider views refresh after switching, login, and provider create/update/delete operations. |
 | **Watching a run** | Context, cost, and cache values update live; measured context remains visible when capacity is unknown. |
 | **Reading long conversations** | Tail-follow keeps up with new output without pulling you out of scrollback; jump-to-latest returns you to the live end. |
@@ -143,12 +144,12 @@ Search with `⌘K`. Supported commands lead to native controls; pass-through and
 <a id="en-install"></a>
 ### Install & start
 
-**Documented install baseline: [v0.9.7](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.7).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
+**Documented install baseline: [v0.9.8](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.8).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
 
-| Mac | v0.9.7 download |
+| Mac | v0.9.8 download |
 |---|---|
-| Apple Silicon | [omp-0.9.7-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7-arm64.dmg) |
-| Intel | [omp-0.9.7.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7.dmg) |
+| Apple Silicon | [omp-0.9.8-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8-arm64.dmg) |
+| Intel | [omp-0.9.8.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8.dmg) |
 
 Open the DMG and drag **omp** into **Applications**. The build is ad-hoc signed but not notarized. If macOS blocks the first launch, use **right-click → Open**, or **System Settings → Privacy & Security → Open Anyway**, after confirming the download's source.
 
@@ -264,7 +265,7 @@ The capture script renders the actual Electron GUI using a fresh temporary HOME,
 | Symptom | What to check |
 |---|---|
 | macOS blocks the first launch | Confirm the download came from the release page, then right-click → Open or use Privacy & Security → Open Anyway. The baseline build is ad-hoc signed, not notarized. |
-| A screenshot shows something absent from the installed app | The showcase tracks current source, including changes after v0.9.7. Check the installed version and its release notes. |
+| A screenshot shows something absent from the installed app | The showcase covers v0.9.8. Check the installed version and its release notes; earlier releases may not include these improvements. |
 | `Built-in omp not found` | In a source checkout, build the sidecar or supply a compatible prebuilt one. In an installed app, reinstall the correct official DMG; a separate system `omp` will not fix a missing bundle resource. |
 | `build:omp` cannot find the monorepo | Put the GUI checkout at the monorepo's `packages/gui/`, alongside `packages/coding-agent/` and `packages/natives/`. |
 | `replacing stale addon … version sentinel ≠ …` | Informational: the builder detected and replaced a mismatched native addon. |
@@ -298,9 +299,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG 安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [近期改进](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.8 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **这是当前源码展示，不是已发布版本的功能承诺。** 下文包含 v0.9.7 之后的源码改进。截图展示当前源码，不保证已发布 DMG 包含所有近期变化。下载版本及其实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.8 功能展示。** 下文改进均纳入 v0.9.8，内置 Agent 更新至 omp 18.2.8。可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -335,12 +336,13 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 模型请求仍会发送到你配置的 Provider。内置 Agent 省去了单独安装运行时的步骤，但不替你配置凭据、项目依赖、外部 Git/OpenSSH/MCP 工具或可选服务。请只连接你信任的工具与服务。
 
 <a id="zh-recent"></a>
-### 当前源码中的近期改进
+### 0.9.8 更新内容
 
-以下改进发生在 **v0.9.7 安装基线之后**，不代表新版本已经发布：
+v0.9.8 包含以下 GUI 改进与内置 Agent 更新：
 
 | 日常场景 | 改进内容 |
 |---|---|
+| **内置 Agent** | 更新至 **omp 18.2.8**，扩展浏览器自动化、支持缓冲式云端转录，并改进长会话响应速度、修复 LSP 请求取消时可能挂起的问题。 |
 | **切换模型与账号** | 切换、登录及 Provider 新增/修改/删除后，模型与 Provider 视图会刷新。 |
 | **关注运行状态** | 上下文、花费与缓存数值实时更新；容量未知时仍展示已测上下文用量。 |
 | **阅读长对话** | 尾部跟随持续接收新输出，同时保留向上阅读的位置；可通过“跳到最新”回到实时末尾。 |
@@ -420,12 +422,12 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 <a id="zh-install"></a>
 ### 安装与开始使用
 
-**本文安装基线：[v0.9.7](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.7)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+**本文安装基线：[v0.9.8](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.8)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
-| Mac | v0.9.7 下载 |
+| Mac | v0.9.8 下载 |
 |---|---|
-| Apple Silicon | [omp-0.9.7-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7-arm64.dmg) |
-| Intel | [omp-0.9.7.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7.dmg) |
+| Apple Silicon | [omp-0.9.8-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8-arm64.dmg) |
+| Intel | [omp-0.9.8.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8.dmg) |
 
 打开 DMG，把 **omp** 拖入**应用程序**。构建采用 ad-hoc 签名，未经 Apple 公证。如果 macOS 拦截首次启动，请先确认下载来源，再使用**右键 → 打开**，或**系统设置 → 隐私与安全性 → 仍要打开**。
 
@@ -541,7 +543,7 @@ bun scripts/capture-showcase.ts
 | 现象 | 检查方式 |
 |---|---|
 | macOS 拦截首次启动 | 确认来自发布页后，右键 → 打开，或通过隐私与安全性 → 仍要打开。基线版本为 ad-hoc 签名，未经公证。 |
-| 截图中的功能在已安装应用中不存在 | 展示跟随当前源码，包含 v0.9.7 之后的改进；请检查已安装版本及其发布说明。 |
+| 截图中的功能在已安装应用中不存在 | 本展示对应 v0.9.8；请检查已安装版本及其发布说明，较早版本可能不包含这些改进。 |
 | `Built-in omp not found` | 源码检出中需构建或放入兼容 sidecar；已安装应用请重新安装正确的官方 DMG。另装系统 `omp` 无法补齐包内资源。 |
 | `build:omp` 找不到 monorepo | 将 GUI 放在 monorepo 的 `packages/gui/`，与 `packages/coding-agent/`、`packages/natives/` 同级。 |
 | `replacing stale addon … version sentinel ≠ …` | 提示信息：构建器发现并替换了版本不匹配的原生插件。 |
