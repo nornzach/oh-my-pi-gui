@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# An older renderer config wrote its entry here; the repo root is the Pages site's
-# parent directory, so a committed root index.html would replace the landing page live.
+# An older renderer config wrote its entry here. It is a build output, not a source
+# file; the Pages site lives in site/.
 /index.html
 
 # Build output

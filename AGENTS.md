@@ -67,7 +67,7 @@ The GUI runs the agent as a **bundled sidecar** (`resources/omp`, a compiled `Bu
 - Build: `bun run build` (electron-vite → `out/`), then `bun run package:mac:arm64 -- --publish never` (arm64) or `bun run package:mac:x64 -- --publish never` (Intel).
 - Release flow: bump `version` in `package.json`, write the CHANGELOG section, update README install links, commit, tag `vX.Y.Z`, push `main` + tag to `origin`, build both DMGs, smoke-test each mounted DMG (sidecar `ready`, `get_settings` RPC, one settings toggle), then publish the GitHub Release with both DMGs, both ZIPs and the combined `latest-mac.yml` — the built-in updater resolves the matching DMG from that file, so a release without it (or with only one architecture's entries) breaks update checks.
 - Every release's DMGs embed the sidecar compiled from the monorepo — record the monorepo commit in the release notes if it isn't upstream `main`.
-- **The public site is `site/`** (`site/index.html` + `site/assets/`), published by Pages from that directory. Its version string and DMG links are read from the GitHub releases API at page load, so a release needs **no site edit**; the values in the HTML are only the no-JS fallback. Never commit a root `index.html` — it is a stale renderer-entry output and would replace the landing page live.
+- **The public site is `site/`** (`site/index.html` + `site/assets/`). Pages is configured as `build_type=workflow`, so `.github/workflows/pages.yml` is the only publisher: a push to `main` touching `site/**` deploys it. Its version string and DMG links are read from the GitHub releases API at page load, so a release needs **no site edit**; the values in the HTML are only the no-JS fallback.
 
 ## Code Conventions
 

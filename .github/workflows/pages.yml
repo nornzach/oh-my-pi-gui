@@ -1,11 +1,17 @@
-# GitHub Pages deployment — MANUAL FALLBACK ONLY.
-# The site is the committed `site/` tree (site/.nojekyll, no Jekyll), which is also what
-# the legacy push-triggered path publishes.
-# On 2026-08-06 the legacy builder wedged for hours and this Actions path
-# carried the deploys; keep it dispatch-only so the two paths never race.
-name: Deploy Pages (manual fallback)
+# GitHub Pages deployment — the publisher.
+# Pages is set to build_type=workflow, so nothing goes live unless this runs. That is
+# what lets the site live in `site/` instead of the repo root, where an old renderer
+# config wrote its build output.
+# History: on 2026-08-06 the legacy root builder wedged for hours and this path carried
+# the deploys, so it became the primary publisher on 2026-09-22.
+name: Deploy Pages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
