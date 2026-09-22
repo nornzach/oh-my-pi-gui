@@ -4,6 +4,7 @@
 
 export { Badge, type BadgeProps, type BadgeVariant } from "./Badge";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
+export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 export { Input, type InputProps, TextArea, type TextAreaProps } from "./Input";
 export { LangSwitcher, type LangSwitcherProps } from "./LangSwitcher";
 export { Modal, type ModalProps, type ModalSize } from "./Modal";

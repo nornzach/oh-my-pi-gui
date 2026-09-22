@@ -83,6 +83,7 @@ export function useCompletionMenu({
 	// chain (TUI getSuggestions order): slash-arg → github-ref → slash names →
 	// @mention → emoji. First provider with items wins; async providers (emoji
 	// buckets, dynamic arg RPC) resolve through a cancel token + debounce.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `selection` is the caret mirror; the effect reads `el.selectionStart` directly and re-runs on that state change.
 	useEffect(() => {
 		const el = textareaRef.current;
 		if (!el) {
@@ -271,10 +272,18 @@ export function useCompletionMenu({
 			else {
 				apply(null);
 				timer = window.setTimeout(() => {
-					void rpc.getAvailableModels().then(response => {
-						const data = response.success ? (response.data as AvailableModelsResult | undefined) : undefined;
-						showModels(data?.models ?? []);
-					}).catch(() => apply(null));
+					// Forced: a non-forced read is answered by a still-fresh cache row,
+					// which hides the model a just-added provider contributed.
+					void rpc
+						.getAvailableModels(true)
+						.then(response => {
+							if (cancelled) return;
+							const data = response.success ? (response.data as AvailableModelsResult | undefined) : undefined;
+							showModels(data?.models ?? []);
+						})
+						.catch(() => {
+							if (!cancelled) apply(null);
+						});
 				}, 120);
 			}
 			return () => {

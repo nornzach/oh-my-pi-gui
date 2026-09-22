@@ -70,7 +70,7 @@ export function DockCard({ id, icon: Icon, title, badge, actions, children }: Do
 		<section
 			aria-label={title}
 			className={cx(
-				"shrink-0 overflow-clip rounded-[18px] border bg-[color-mix(in_srgb,var(--omp-bg-secondary)_72%,transparent)] transition-shadow duration-300",
+				"omp-fade-up shrink-0 overflow-clip rounded-[18px] border bg-[color-mix(in_srgb,var(--omp-bg-secondary)_72%,transparent)] transition-shadow duration-300",
 				flash
 					? "border-[var(--omp-accent)] shadow-[0_0_0_2px_color-mix(in_srgb,var(--omp-accent)_35%,transparent)]"
 					: "border-[var(--omp-border)]",

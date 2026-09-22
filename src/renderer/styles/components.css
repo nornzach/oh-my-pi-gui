@@ -29,15 +29,11 @@
 	}
 }
 
-/* Stable blocks parse once. Only the unfinished plain-text tail changes each
-   presentation frame, avoiding full-prefix Markdown work and layout churn. */
-.omp-streaming-block {
-	animation: omp-stream-block-settle var(--omp-motion-med) var(--omp-ease-enter) both;
-}
-
 /* Typography MUST match .markdown-body (14.5px/1.7): the tail is promoted
  * into a markdown block at every paragraph boundary, and a size mismatch
- * reads as a visible jump mid-stream. */
+ * reads as a visible jump mid-stream. Promotion must carry no entrance motion
+ * either — those characters were already on screen, so fading them in from
+ * transparent blinks the paragraph out and back. */
 .omp-streaming-tail {
 	min-height: 1.5em;
 	white-space: pre-wrap;
@@ -46,30 +42,19 @@
 	line-height: 1.7;
 }
 
+/* A commit appends one chunk and only flips the class on the previous one, so
+ * revealed text never loses its node mid-motion. Transitions (not animations)
+ * because the stream's commit cadence must be able to interrupt a fade without
+ * restarting it, which is what made the old per-frame re-keyed reveal strobe. */
+.omp-streaming-chunk {
+	transition:
+		opacity var(--omp-motion-fast) var(--omp-ease),
+		filter var(--omp-motion-fast) var(--omp-ease);
+}
+
 .omp-streaming-reveal {
-	animation: omp-stream-tail-reveal var(--omp-motion-fast) var(--omp-ease) both;
-}
-
-@keyframes omp-stream-tail-reveal {
-	from {
-		opacity: 0.8;
-		filter: blur(0.3px);
-	}
-	to {
-		opacity: 1;
-		filter: blur(0);
-	}
-}
-
-@keyframes omp-stream-block-settle {
-	from {
-		opacity: 0;
-		transform: translateY(4px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
+	opacity: 0.8;
+	filter: blur(0.3px);
 }
 
 
@@ -350,6 +335,12 @@
 	}
 	.omp-caret {
 		animation: none;
+	}
+	/* With transitions flattened, the reveal dim would itself strobe at the
+	 * commit cadence: dim for one frame, full for the next. */
+	.omp-streaming-reveal {
+		opacity: 1;
+		filter: none;
 	}
 }
 
@@ -1027,11 +1018,21 @@
 	box-shadow: none;
 }
 
+/* The virtualizer recycles rows through the viewport, so an entrance keyed on
+ * mounting would replay on every scroll. Per-row utilities stay off, and
+ * ChatStream instead marks the rows whose content genuinely arrives. */
 .omp-transcript-editorial .omp-fade-up,
 .omp-transcript-editorial .omp-fade-in {
 	animation: none;
 	opacity: 1;
 	transform: none;
+}
+
+/* Marked once per row key, so this never interrupts itself. The motion is on the
+ * row rather than its virtual slot because the slot is positioned with an inline
+ * transform the animation would overwrite. */
+.omp-transcript-editorial .omp-row-arrive > .omp-transcript-row {
+	animation: omp-fade-up var(--omp-motion-med) var(--omp-ease-enter) both;
 }
 
 

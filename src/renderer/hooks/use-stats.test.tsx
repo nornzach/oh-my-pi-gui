@@ -2,7 +2,7 @@ import { parseHTML } from "linkedom";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, test, vi } from "vitest";
-import { useStats } from "./use-stats";
+import { useStats, useStatsList } from "./use-stats";
 
 test("late ranges cannot replace the selected range, failed refresh retains only its own data, and requests do not overlap", async () => {
 	const { document, window } = parseHTML("<html><body><div id='root'></div></body></html>");
@@ -36,7 +36,9 @@ test("late ranges cannot replace the selected range, failed refresh retains only
 		await act(async () => fast.resolve({ count: 2 }));
 		await act(async () => slow.resolve({ count: 900 }));
 		expect(node.textContent).toContain('"count":2');
-		expect(node.textContent).not.toContain("900");
+		// The discarded payload, not the digits: `updatedAt` is an epoch in
+		// milliseconds and can contain "900" on its own.
+		expect(node.textContent).not.toContain('"count":900');
 		await act(async () => refresh());
 		expect(node.textContent).toContain("offline");
 		expect(node.textContent).toContain('"count":2');
@@ -78,6 +80,31 @@ test("an unavailable stats server keeps the route loading and self-heals once th
 		expect(node.textContent).toContain('"count":7');
 		expect(node.textContent).toContain('"error":null');
 		expect(node.textContent).toContain('"isLoading":false');
+	} finally {
+		await act(async () => root.unmount());
+		vi.unstubAllGlobals();
+	}
+});
+
+test("a list endpoint that replies with a non-array becomes an error state, never rows", async () => {
+	const { document, window } = parseHTML("<html><body><div id='root'></div></body></html>");
+	const fetch = vi.fn(async () => ({}));
+	vi.stubGlobal("document", document);
+	vi.stubGlobal("window", Object.assign(window, { omp: { stats: { fetch } } }));
+	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+	const node = document.getElementById("root")!;
+	const root = createRoot(node);
+	function Probe() {
+		const result = useStatsList<{ timestamp: number }>("/api/stats/errors", { range: "24h" });
+		return <p>{JSON.stringify(result)}</p>;
+	}
+	try {
+		await act(async () => root.render(<Probe />));
+		// Storing `{}` as data makes every row expression in the route throw and the
+		// whole renderer falls back to the crash screen.
+		expect(node.textContent).toContain('"data":null');
+		expect(node.textContent).toContain('"isLoading":false');
+		expect(node.textContent).toContain("/api/stats/errors");
 	} finally {
 		await act(async () => root.unmount());
 		vi.unstubAllGlobals();

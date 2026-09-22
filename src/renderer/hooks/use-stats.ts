@@ -28,7 +28,7 @@ function unavailableError(result: unknown): string | null {
 }
 
 /** One visible query at a time; stale responses never cross a path/range boundary. */
-export function useStats<T>(path: string, params?: Record<string, string>) {
+function useStatsResource<T>(path: string, params: Record<string, string> | undefined, expectList: boolean) {
 	const serializedParams = JSON.stringify(Object.entries(params ?? {}).sort(([a], [b]) => a.localeCompare(b)));
 	const key = `${path}:${serializedParams}`;
 	const [state, setState] = useState<StatsState<T>>({
@@ -75,6 +75,8 @@ export function useStats<T>(path: string, params?: Record<string, string>) {
 				}
 				if (result && typeof result === "object" && "error" in result && typeof result.error === "string")
 					throw new Error(result.error);
+				if (expectList && !Array.isArray(result))
+					throw new Error(`${path} did not return a list (${result === null ? "null" : typeof result})`);
 				unavailableSince = null;
 				if (active) setState({ key, data: result as T, isLoading: false, error: null, updatedAt: Date.now() });
 			} catch (cause) {
@@ -96,9 +98,18 @@ export function useStats<T>(path: string, params?: Record<string, string>) {
 			window.clearInterval(timer);
 			document.removeEventListener("visibilitychange", refreshVisible);
 		};
-	}, [key, path, serializedParams]);
+	}, [expectList, key, path, serializedParams]);
 
 	return state.key === key
 		? { ...state, refetch }
 		: { key, data: null, isLoading: true, error: null, updatedAt: null, refetch };
+}
+
+export function useStats<T>(path: string, params?: Record<string, string>) {
+	return useStatsResource<T>(path, params, false);
+}
+
+/** Endpoints whose contract is a bare JSON array; a wrong-shaped reply is an error state, not rows. */
+export function useStatsList<T>(path: string, params?: Record<string, string>) {
+	return useStatsResource<T[]>(path, params, true);
 }

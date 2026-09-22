@@ -29,6 +29,7 @@ import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
 import { routeToSessionOwner } from "../../hooks/use-session-switch";
 import { cx, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { branchSessionFromEntry } from "../../lib/messages";
 import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
@@ -887,6 +888,7 @@ export function SessionTreeDialog() {
 								className="min-w-0 flex-1 rounded border border-(--omp-input-focus-border) bg-(--omp-input-bg) px-2 py-1 text-xs text-(--omp-text) outline-none"
 								onChange={event => setLabelDraft(event.target.value)}
 								onKeyDown={event => {
+									if (isImeKeyEvent(event)) return;
 									if (event.key === "Enter") {
 										event.preventDefault();
 										void commitLabelEdit();

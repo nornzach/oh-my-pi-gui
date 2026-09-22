@@ -72,6 +72,12 @@ export function ProviderRow({
 }) {
 	const editAction = resolveProviderEditAction(provider, customConfigs);
 	const showEdit = editAction?.kind === "config" || (editAction?.kind === "login" && provider.authenticated);
+	// A key written in models.yml is reinstalled by every catalog reload, so
+	// signing out clears a credential the provider never used: the row would stay
+	// authenticated and the button would look broken. Editing the entry is the
+	// action that actually removes it.
+	const showLogout =
+		provider.authenticated && !customConfigs.some(config => config.id === provider.id && config.hasApiKey);
 	return (
 		<div className="flex items-center gap-3 rounded-lg border border-[var(--omp-border-muted)] px-3 py-2.5">
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -118,7 +124,7 @@ export function ProviderRow({
 						{t("providers.login")}
 					</Button>
 				)}
-				{provider.authenticated && (
+				{showLogout && (
 					<Button
 						size="sm"
 						variant="ghost"
@@ -134,97 +140,72 @@ export function ProviderRow({
 	);
 }
 
-export function ProvidersWindow() {
+export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 	const tabRpc = useTabRpc();
+	const t = useT();
 	const open = useUiStore(s => s.providersOpen);
 	const close = useUiStore(s => s.closeProviders);
 	const openProviderConfig = useUiStore(s => s.openProviderConfig);
 	const providerConfigOpen = useUiStore(s => s.providerConfigOpen);
-	const t = useT();
 	const sidecarReady = useSessionStore(s => s.status) === "ready";
-	const applyCatalogUpdate = useModelStore(s => s.applyCatalogUpdate);
-	const [result, setResult] = useState<ProvidersResult | null>(null);
+	const providers = useModelStore(s => s.providers);
+	const discoveryStates = useModelStore(s => s.discoveryStates);
+	const refreshPending = useModelStore(s => s.catalogRefreshPending);
+	const refreshProviders = useModelStore(s => s.refreshProviders);
 	const [customConfigs, setCustomConfigs] = useState<CustomProviderView[]>([]);
 	const [configError, setConfigError] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [busyProvider, setBusyProvider] = useState<string | null>(null);
 	const requestVersion = useRef(0);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: Changing the task client invalidates the previous task's responses.
-	useEffect(() => {
-		setResult(null);
-		setError(null);
-		return () => {
-			requestVersion.current++;
-		};
-	}, [tabRpc]);
+
+	// The provider list is catalog state, not window state: a `get_providers` read
+	// and a tab-routed `model_catalog_update` push describe the same catalog
+	// generation, so only the store's guard may decide which one wins. What stays
+	// here is what no read carries — the editable models.yml entries — plus this
+	// window's own transient flags.
 	const load = useCallback(
-		async (forceRefresh = false) => {
+		async (forceRefresh = false): Promise<ProvidersResult | undefined> => {
 			const version = ++requestVersion.current;
 			setLoading(true);
 			setError(null);
 			if (!sidecarReady) {
 				setError(t("providers.notConnected"));
 				setLoading(false);
-				return;
+				return undefined;
 			}
 			try {
 				const [providerResult, configsResult] = await Promise.allSettled([
-					tabRpc.getProviders(forceRefresh),
+					refreshProviders(forceRefresh),
 					window.omp.models.listProviders(),
 				]);
-				if (version !== requestVersion.current) return;
+				if (version !== requestVersion.current) return undefined;
 				if (configsResult.status === "fulfilled") {
 					setCustomConfigs(configsResult.value);
 					setConfigError(null);
 				} else {
 					setConfigError(t("providers.configFailed", { details: String(configsResult.reason) }));
 				}
-				if (providerResult.status === "rejected") throw providerResult.reason;
-				if (providerResult.value.success) {
-					const wire = providerResult.value.data as Partial<ProvidersResult>;
-					const data: ProvidersResult = {
-						providers: wire.providers ?? [],
-						models: wire.models ?? [],
-						discoveryStates: wire.discoveryStates ?? [],
-						refreshPending: wire.refreshPending ?? false,
-						generation: wire.generation ?? 0,
-					};
-					setResult(data);
-					applyCatalogUpdate({ type: "model_catalog_update", ...data });
-					const discoveryErrors = providerDiscoveryErrors(
-						data.discoveryStates,
-						t("providers.discoveryUnavailable"),
-					);
-					if (discoveryErrors.length > 0) {
-						setError(t("providers.discoveryFailed", { details: discoveryErrors.join("; ") }));
-					}
-				} else setError(providerResult.value.error);
-			} catch (cause) {
-				if (version === requestVersion.current) setError(String(cause));
+				if (providerResult.status === "rejected") {
+					const cause = providerResult.reason;
+					setError(cause instanceof Error ? cause.message : String(cause));
+				}
+				return providerResult.status === "fulfilled" ? providerResult.value : undefined;
 			} finally {
 				if (version === requestVersion.current) setLoading(false);
 			}
 		},
-		[applyCatalogUpdate, sidecarReady, t, tabRpc.getProviders],
+		[refreshProviders, sidecarReady, t],
 	);
 
+	// A read can be superseded by a tab switch; the store guard replaces the list,
+	// so the flags this window owns have to be released the same way.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: tabRpc is the only signal that the task these responses belong to changed.
 	useEffect(() => {
-		if (!open) return;
-		return window.omp.events.onModelCatalogUpdate(frame => {
-			setResult({
-				providers: frame.providers,
-				models: frame.models,
-				discoveryStates: frame.discoveryStates,
-				refreshPending: frame.refreshPending,
-				generation: frame.generation,
-			});
-			const discoveryErrors = providerDiscoveryErrors(frame.discoveryStates, t("providers.discoveryUnavailable"));
-			setError(
-				discoveryErrors.length > 0 ? t("providers.discoveryFailed", { details: discoveryErrors.join("; ") }) : null,
-			);
-		});
-	}, [open, t]);
+		requestVersion.current++;
+		setLoading(false);
+		setError(null);
+	}, [tabRpc]);
 
 	useEffect(() => {
 		// ProviderConfigDialog is an independent overlay. Reload when it closes so
@@ -232,16 +213,28 @@ export function ProvidersWindow() {
 		if (open && !providerConfigOpen) void load();
 	}, [open, providerConfigOpen, load]);
 
+	useEffect(() => {
+		// `refreshPending` means the sidecar gave up waiting on discovery for this
+		// read. Nothing pushes the answer into a settings window, so keep asking —
+		// each poll is a cheap cache-aware read that reports the flag back.
+		if (!open || !refreshPending) return;
+		const timer = setInterval(() => {
+			void load();
+		}, pollMs);
+		return () => clearInterval(timer);
+	}, [open, refreshPending, load, pollMs]);
+
 	const handleLogin = async (providerId: string) => {
+		const name = providers.find(p => p.id === providerId)?.name ?? providerId;
 		setBusyProvider(providerId);
 		try {
 			const res = await tabRpc.login(providerId);
-			if (res.success) {
-				toast({ variant: "success", message: t("providers.loginSuccess", { provider: providerId }) });
-				await load();
-			} else {
+			if (!res.success) {
 				toast({ variant: "error", title: t("providers.loginFailed"), message: res.error });
+				return;
 			}
+			await load(true);
+			toast({ variant: "success", message: t("providers.loginSuccess", { provider: name }) });
 		} catch (cause) {
 			toast({ variant: "error", title: t("providers.loginFailed"), message: String(cause) });
 		} finally {
@@ -250,14 +243,20 @@ export function ProvidersWindow() {
 	};
 
 	const handleLogout = async (providerId: string) => {
+		const name = providers.find(p => p.id === providerId)?.name ?? providerId;
 		setBusyProvider(providerId);
 		try {
 			const res = await tabRpc.logout(providerId);
-			if (res.success) {
-				toast({ variant: "success", message: t("providers.logoutSuccess", { provider: providerId }) });
-				await load();
-			} else {
+			if (!res.success) {
 				toast({ variant: "error", title: t("providers.logoutFailed"), message: res.error });
+				return;
+			}
+			// Non-forced is answered from a cache row that is still fresh, which is
+			// how a signed-out provider used to keep showing as authenticated.
+			const fresh = await load(true);
+			toast({ variant: "success", message: t("providers.logoutSuccess", { provider: name }) });
+			if (fresh?.providers.some(provider => provider.id === providerId && provider.authenticated)) {
+				toast({ variant: "warning", message: t("providers.logoutKept", { provider: name }) });
 			}
 		} catch (cause) {
 			toast({ variant: "error", title: t("providers.logoutFailed"), message: String(cause) });
@@ -267,23 +266,30 @@ export function ProvidersWindow() {
 	};
 
 	const handleEdit = async (providerId: string) => {
+		setBusyProvider(providerId);
 		try {
-			const provider = result?.providers.find(p => p.id === providerId);
+			const provider = providers.find(p => p.id === providerId);
 			if (!provider) return;
 			const action = resolveProviderEditAction(provider, customConfigs);
 			if (!action) return;
-			if (action.kind === "login") {
-				await handleLogin(providerId);
-			} else if (action.kind === "config") {
+			if (action.kind === "config") {
 				openProviderConfig(action.provider);
+				return;
 			}
+			await handleLogin(providerId);
 		} catch (cause) {
 			toast({ variant: "error", title: t("providers.editFailed"), message: String(cause) });
+		} finally {
+			setBusyProvider(null);
 		}
 	};
 
-	const authenticated = result?.providers.filter(p => p.authenticated) ?? [];
-	const unauthenticated = result?.providers.filter(p => !p.authenticated) ?? [];
+	const authenticated = providers.filter(p => p.authenticated);
+	const unauthenticated = providers.filter(p => !p.authenticated);
+	const discoveryErrors = providerDiscoveryErrors(discoveryStates, t("providers.discoveryUnavailable"));
+	const unlistedConfigs = customConfigs.filter(
+		config => !config.builtin && !providers.some(provider => provider.id === config.id),
+	);
 
 	return (
 		<Modal open={open} onClose={close} title={t("providers.title")} size="lg">
@@ -333,20 +339,26 @@ export function ProvidersWindow() {
 						{error}
 					</div>
 				)}
-				{result?.refreshPending && !error && (
+				{discoveryErrors.length > 0 && (
+					<div className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]">
+						{t("providers.discoveryFailed", { details: discoveryErrors.join("; ") })}
+					</div>
+				)}
+				{refreshPending && (
 					<div
-						className="rounded-md bg-[var(--omp-bg-tertiary)] px-3 py-2 text-omp-md text-[var(--omp-muted)]" // surface-ok: transient discovery status banner
+						className="flex items-center gap-2 rounded-md bg-[var(--omp-bg-tertiary)] px-3 py-2 text-omp-md text-[var(--omp-muted)]" // surface-ok: transient discovery status banner
 					>
+						<Spinner size="sm" />
 						{t("providers.refreshPending")}
 					</div>
 				)}
-				{loading && !result && (
+				{loading && providers.length === 0 && (
 					<div className="flex items-center justify-center py-8">
 						<Spinner />
 					</div>
 				)}
 
-				{result && authenticated.length === 0 && (
+				{!loading && authenticated.length === 0 && (
 					<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-dim)]">
 						{t("providers.noAuth")}
 					</div>
@@ -395,12 +407,19 @@ export function ProvidersWindow() {
 					<div className="mb-1 text-omp-sm font-semibold text-[var(--omp-text)]">{t("providers.customTitle")}</div>
 					<div className="text-omp-xs leading-[1.5] text-[var(--omp-muted)]">
 						{t("providers.customHelp", {
-							file: "~/.omp/models.yml",
+							file: "~/.omp/agent/models.yml",
 							baseUrl: "baseUrl",
 							apiKey: "apiKey",
 							models: "models",
 						})}
 					</div>
+					{/* A provider the session lists no models for is absent from the rows above,
+						which reads as "the add did nothing". Name it and say why. */}
+					{!loading && providers.length > 0 && unlistedConfigs.length > 0 && (
+						<div className="mt-2 text-omp-xs leading-[1.5] text-[var(--omp-warning)]">
+							{t("providers.customWithoutModels", { ids: unlistedConfigs.map(config => config.id).join(", ") })}
+						</div>
+					)}
 				</div>
 			</div>
 		</Modal>

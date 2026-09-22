@@ -159,6 +159,24 @@ export interface KeyEventLike {
 	metaKey: boolean;
 }
 
+/** Anything an Escape handler can claim: React synthetic events and native events alike. */
+interface EscapeCapable {
+	key: string;
+	preventDefault(): void;
+}
+
+/**
+ * Dismiss a transient surface with Escape and claim the keystroke. App.tsx aborts
+ * the active turn on any Escape nobody prevented, so a rename field or dropdown
+ * that closes on Escape must consume it or the running agent dies with it.
+ */
+export function onEscape(event: EscapeCapable, dismiss: () => void): boolean {
+	if (event.key !== "Escape") return false;
+	event.preventDefault();
+	dismiss();
+	return true;
+}
+
 const IGNORED_EVENT_KEYS: Record<string, true> = {
 	Control: true,
 	Shift: true,

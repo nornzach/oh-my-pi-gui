@@ -47,15 +47,30 @@ async function mount(element: ReactElement): Promise<void> {
 	await flush();
 }
 
-async function menuKeyDown(key: string): Promise<void> {
+/** Drive the menu's own keydown and report what the handler claimed. */
+async function menuKeyDown(key: string): Promise<{ prevented: boolean; stopped: boolean }> {
+	const outcome = { prevented: false, stopped: false };
 	const menu = document.body.querySelector('[role="menu"]') as unknown as Record<string, unknown>;
 	const propsKey = Object.getOwnPropertyNames(menu).find(name => name.startsWith("__reactProps$"));
 	const props = propsKey
-		? (menu[propsKey] as { onKeyDown?: (event: { key: string; preventDefault(): void }) => void } | undefined)
+		? (menu[propsKey] as
+				| { onKeyDown?: (event: { key: string; preventDefault(): void; stopPropagation(): void }) => void }
+				| undefined)
 		: undefined;
 	if (!props?.onKeyDown) throw new Error("menu onKeyDown not found");
-	await act(async () => props.onKeyDown?.({ key, preventDefault: () => {} }));
+	await act(async () =>
+		props.onKeyDown?.({
+			key,
+			preventDefault: () => {
+				outcome.prevented = true;
+			},
+			stopPropagation: () => {
+				outcome.stopped = true;
+			},
+		}),
+	);
 	await flush();
+	return outcome;
 }
 
 async function clickItem(label: string): Promise<void> {
@@ -122,16 +137,19 @@ describe("ContextMenu", () => {
 		expect(onA).toHaveBeenCalledTimes(1);
 	});
 
-	it("Escape closes without selecting", async () => {
+	it("Escape closes without selecting, and is claimed so the dialog behind stays open", async () => {
 		const onClose = vi.fn();
 		const onA = vi.fn();
 		await mount(
 			<ContextMenu items={[{ id: "a", label: "Action A", onSelect: onA }]} x={10} y={10} onClose={onClose} />,
 		);
 
-		await menuKeyDown("Escape");
+		const outcome = await menuKeyDown("Escape");
 		expect(onClose).toHaveBeenCalledTimes(1);
 		expect(onA).not.toHaveBeenCalled();
+		// A settings window behind this menu listens for Escape on the same
+		// document; without the claim one press closes both.
+		expect(outcome.stopped).toBe(true);
 	});
 
 	it("stays open through clicks inside and closes on the next outside pointer press", async () => {

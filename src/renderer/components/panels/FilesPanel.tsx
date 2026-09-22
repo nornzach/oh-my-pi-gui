@@ -190,7 +190,7 @@ export function FilesPanel() {
 
 	if (filePreviewPath) {
 		return (
-			<div className="flex h-full flex-col">
+			<div className="omp-slide-in-right flex h-full flex-col">
 				<div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-(--omp-border-muted) px-3 py-2">
 					<button
 						type="button"

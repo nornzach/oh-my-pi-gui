@@ -5,7 +5,7 @@
 
 import * as fs from "node:original-fs";
 import { join } from "node:path";
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, Menu, screen, shell } from "electron";
 import Store from "electron-store";
 import type { RunProgressState, SessionKind } from "../shared/ipc-types";
 import { editableContextMenuTemplate } from "./editable-context-menu";
@@ -16,6 +16,7 @@ import {
 	shouldReloadRenderer,
 } from "./renderer-recovery";
 import { writeRuntimeLog } from "./runtime-log";
+import { type Rect, restoreWithinDisplays } from "./window-bounds";
 
 interface WindowState {
 	x?: number;
@@ -34,6 +35,11 @@ const DEFAULT_WIDTH = 1400;
 const DEFAULT_HEIGHT = 900;
 const MIN_WIDTH = 800;
 const MIN_HEIGHT = 600;
+
+/** Work areas with the primary display first — it is the recentering target. */
+function displayWorkAreas(): Rect[] {
+	return [screen.getPrimaryDisplay().workArea, ...screen.getAllDisplays().map(display => display.workArea)];
+}
 
 export interface WindowRecord {
 	win: BrowserWindow;
@@ -84,11 +90,21 @@ export class WindowManager {
 		const cascade = this.getAllWindows().length;
 		const offset = cascade * 28;
 
+		// A display that has been unplugged since the geometry was saved takes the
+		// title bar with it: the window comes back unreachable.
+		const geometry: { x?: number; y?: number; width: number; height: number } =
+			saved.x === undefined || saved.y === undefined
+				? { width: saved.width, height: saved.height }
+				: restoreWithinDisplays(
+						{ x: saved.x + offset, y: saved.y + offset, width: saved.width, height: saved.height },
+						displayWorkAreas(),
+					);
+
 		const win = new BrowserWindow({
-			x: saved.x !== undefined ? saved.x + offset : undefined,
-			y: saved.y !== undefined ? saved.y + offset : undefined,
-			width: saved.width,
-			height: saved.height,
+			x: geometry.x,
+			y: geometry.y,
+			width: geometry.width,
+			height: geometry.height,
 			minWidth: MIN_WIDTH,
 			minHeight: MIN_HEIGHT,
 			show: false,

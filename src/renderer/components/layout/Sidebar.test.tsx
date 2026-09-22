@@ -705,4 +705,62 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(actions?.className).not.toMatch(/\bw-\d|\bwidth/);
 		expect(row?.querySelector("[data-overflow]")).toBeNull();
 	});
+
+	it("asks before removing a session transcript, and only deletes once confirmed", async () => {
+		const omp = installMockOmp(LIST);
+		seedStores();
+		await mount(<Sidebar />);
+
+		const row = [...document.querySelectorAll(".omp-sidebar-session-row")].find(el =>
+			(el.textContent ?? "").includes("Session /work/alpha/one"),
+		) as unknown as Element;
+		await fire(row.querySelector('[aria-label="Delete session"]') as Element, "onClick");
+
+		// Queued, not executed: the trash click must never reach the hard delete.
+		expect(omp.sessions.delete).not.toHaveBeenCalled();
+		const dialog = document.body.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).toContain("/work/alpha/one");
+		expect(dialog?.textContent).toContain("cannot be undone");
+
+		const buttons = [...(dialog?.querySelectorAll("button") ?? [])];
+		await fire(buttons.find(b => (b.textContent ?? "").trim() === "Cancel") as unknown as Element, "onClick");
+		expect(omp.sessions.delete).not.toHaveBeenCalled();
+		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+
+		await fire(row.querySelector('[aria-label="Delete session"]') as Element, "onClick");
+		const confirm = [...document.body.querySelectorAll('[role="dialog"] button')].find(
+			b => (b.textContent ?? "").trim() === "Delete",
+		) as unknown as Element;
+		await fire(confirm, "onClick");
+		expect(omp.sessions.delete).toHaveBeenCalledWith("/work/alpha/one.jsonl");
+	});
+
+	it("names the whole workspace and its session count before a group delete", async () => {
+		const omp = installMockOmp(LIST);
+		seedStores();
+		await mount(<Sidebar />);
+
+		const header = container.querySelector('[data-workspace-group="/work/alpha"]') as unknown as Element;
+		await fire(header, "onContextMenu");
+		const items = [...document.body.querySelectorAll('[role="menu"] button')];
+		await fire(items.find(b => (b.textContent ?? "").includes("Delete")) as unknown as Element, "onClick");
+
+		expect(omp.sessions.delete).not.toHaveBeenCalled();
+		const dialog = document.body.querySelector('[role="dialog"]');
+		expect(dialog?.textContent).toContain("alpha");
+		expect(dialog?.textContent).toContain("2");
+		expect(dialog?.textContent).toContain("permanently deletes the session files");
+
+		await fire(
+			[...document.body.querySelectorAll('[role="dialog"] button')].find(
+				b => (b.textContent ?? "").trim() === "Delete",
+			) as unknown as Element,
+			"onClick",
+		);
+		// Both alpha sessions, and nothing from the other workspace.
+		expect(omp.sessions.delete.mock.calls.map(call => call[0]).sort()).toEqual([
+			"/work/alpha/one.jsonl",
+			"/work/alpha/two.jsonl",
+		]);
+	});
 });

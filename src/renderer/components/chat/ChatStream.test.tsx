@@ -7,10 +7,15 @@ import {
 	buildHistoryRows,
 	buildTimelineMarkers,
 	buildTranscriptRowKeys,
+	claimRowEntrances,
+	createRowEntranceState,
 	findConversationAnchorIndex,
 	hasStreamingTranscriptContent,
 	isTranscriptAtLiveEdge,
+	LIVE_EDGE_SLACK_PX,
 	mergeTodoSnapshots,
+	ROW_ENTRANCE_TAIL_ROWS,
+	shouldRePinTranscript,
 } from "./ChatStream";
 
 const at = "2026-08-05T04:00:00.000Z";
@@ -259,10 +264,30 @@ describe("streaming transcript visibility", () => {
 });
 
 describe("virtual transcript identity", () => {
-	it("releases tail following after even a nearby one-pixel manual scroll", () => {
+	it("keeps tail following across layout slack and releases on a real scroll-up", () => {
 		expect(isTranscriptAtLiveEdge({ scrollHeight: 1000, scrollTop: 800, clientHeight: 200 })).toBe(true);
-		expect(isTranscriptAtLiveEdge({ scrollHeight: 1000, scrollTop: 799.5, clientHeight: 200 })).toBe(true);
-		expect(isTranscriptAtLiveEdge({ scrollHeight: 1000, scrollTop: 799, clientHeight: 200 })).toBe(false);
+		// Row re-measurement and fractional scrollTop leave a few pixels under the
+		// last row; that gap must not read as "the user scrolled away".
+		expect(isTranscriptAtLiveEdge({ scrollHeight: 1000, scrollTop: 790, clientHeight: 200 })).toBe(true);
+		expect(
+			isTranscriptAtLiveEdge({ scrollHeight: 1000, scrollTop: 800 - LIVE_EDGE_SLACK_PX, clientHeight: 200 }),
+		).toBe(false);
+		expect(isTranscriptAtLiveEdge({ scrollHeight: 1000, scrollTop: 600, clientHeight: 200 })).toBe(false);
+	});
+
+	it("hands the tail back only to a gesture that moved toward it", () => {
+		// A tail-follow write that slips into the same frame as an upward gesture
+		// leaves the viewport at the live edge. Reading that position as intent clears
+		// the gesture latch, so every later append follows and the view the reader just
+		// took is lost for the rest of the run.
+		expect(shouldRePinTranscript(false, true)).toBe(false);
+		expect(shouldRePinTranscript(null, true)).toBe(false);
+		// Dragging or flicking to the very bottom re-engages when the gesture ends,
+		// not from a position the system itself produced.
+		expect(shouldRePinTranscript(true, true)).toBe(true);
+		// Toward the tail is not yet on it.
+		expect(shouldRePinTranscript(true, false)).toBe(false);
+		expect(shouldRePinTranscript(false, false)).toBe(false);
 	});
 
 	it("keeps an empty wire message anchored when a tool call finalizes it", () => {
@@ -423,5 +448,79 @@ describe("mergeTodoSnapshots", () => {
 	it("passes rows through untouched when there are no snapshots", () => {
 		const rows = buildHistoryRows([assistant([{ type: "text", text: "Solo" }])], "full");
 		expect(mergeTodoSnapshots(rows, [])).toEqual(rows);
+	});
+});
+
+describe("transcript row entrances", () => {
+	function claim(
+		latch: ReturnType<typeof createRowEntranceState>,
+		sessionId: string,
+		live: boolean,
+		rowKeys: string[],
+	) {
+		const mounted = rowKeys.map((key, index) => ({ index, key }));
+		return claimRowEntrances(latch, { sessionId, live, rowKeys, mounted });
+	}
+
+	/** A transcript long enough that its tail is a definite place. */
+	function history(count: number): string[] {
+		return Array.from({ length: count }, (_, index) => `r${index}`);
+	}
+
+	it("leaves a restored transcript alone, however it lands", () => {
+		const latch = createRowEntranceState("session-a", []);
+		const restored = history(5);
+		// Opening a session restores a view, not content arriving: no cascade, even
+		// though the row set grew well past its empty baseline.
+		expect(claim(latch, "session-a", false, restored)).toEqual([]);
+		expect(claim(latch, "session-a", true, restored)).toEqual([]);
+	});
+
+	it("claims a row appended at the tail, exactly once", () => {
+		const restored = history(20);
+		const latch = createRowEntranceState("session-a", restored);
+		const next = [...restored, "live"];
+		expect(claim(latch, "session-a", true, next)).toEqual(["live"]);
+		// The same row keeps mounting as the view follows the run: no replay.
+		expect(claim(latch, "session-a", true, next)).toEqual([]);
+	});
+
+	it("claims the reply even when it replaces the waiting row", () => {
+		const restored = [...history(20), "pending"];
+		const latch = createRowEntranceState("session-a", restored);
+		// Sending trades the placeholder for the user row, so the row count never
+		// grows: arrival has to be read from the tail, not from a delta.
+		expect(claim(latch, "session-a", true, [...history(20), "user", "streaming"])).toEqual(["user", "streaming"]);
+	});
+
+	it("does not claim history landing above the tail", () => {
+		const restored = history(20);
+		const latch = createRowEntranceState("session-a", restored);
+		// A page of older rows is fetched while the run is live, so `live` alone
+		// cannot tell them apart from the reply.
+		const older = ["older-1", "older-2"];
+		const next = [...older, ...restored, "live"];
+		const claims = claimRowEntrances(latch, {
+			sessionId: "session-a",
+			live: true,
+			rowKeys: next,
+			mounted: next.map((key, index) => ({ index, key })),
+		});
+		expect(claims).toEqual(["live"]);
+	});
+
+	it("treats a bulk jump as a restore", () => {
+		const latch = createRowEntranceState("session-a", history(2));
+		const page = [...history(2), ...Array.from({ length: ROW_ENTRANCE_TAIL_ROWS + 8 }, (_, i) => `hydrated-${i}`)];
+		expect(claim(latch, "session-a", true, page)).toEqual([]);
+		// The hydrate becomes the baseline: the next live row is the only claim.
+		expect(claim(latch, "session-a", true, [...page, "live"])).toEqual(["live"]);
+	});
+
+	it("rebaselines on a session switch instead of animating the new view", () => {
+		const latch = createRowEntranceState("session-a", history(20));
+		const other = history(30);
+		expect(claim(latch, "session-b", true, other)).toEqual([]);
+		expect(claim(latch, "session-b", true, [...other, "a30"])).toEqual(["a30"]);
 	});
 });

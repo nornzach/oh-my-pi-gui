@@ -44,6 +44,8 @@ export function activeTabCommand(command: RpcCommand, timeoutMs?: number): Promi
 			return rpc.setSetting(command.path, command.value);
 		case "get_available_models":
 			return rpc.getAvailableModels(command.forceRefresh);
+		case "get_providers":
+			return rpc.getProviders(command.forceRefresh);
 		case "set_fast_mode":
 			return rpc.setFastMode(command.enabled);
 		case "set_subagent_subscription":

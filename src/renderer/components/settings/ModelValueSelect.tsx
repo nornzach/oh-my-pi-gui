@@ -1,8 +1,8 @@
 /**
  * Searchable dropdown for string-typed settings whose value references a
  * model or a provider (e.g. providers.webSearchGeminiModel, mnemopi.llmModel).
- * Options are fetched on every open (get_available_models / get_providers),
- * so credential and models.yml changes never leave a process-lifetime cache.
+ * Options are fetched (forced) on every open through the model store, so
+ * credential and models.yml changes never leave a process-lifetime cache.
  * Custom values stay allowed: the current value is pinned when it is not in
  * the fetched list, and the search text can be committed verbatim. Commits go
  * through the caller's setSetting flow.
@@ -10,9 +10,10 @@
 
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ModelInfo, ProvidersResult } from "../../../shared/rpc-types";
+import type { AvailableModelsResult, ProvidersResult } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
-import { type TabRpc, useTabRpc } from "../../lib/tab-rpc";
+import { isImeKeyEvent } from "../../lib/ime";
+import { useModelStore } from "../../stores/model";
 import { Spinner } from "../common";
 
 export type SettingRefKind = "model" | "provider";
@@ -38,13 +39,15 @@ interface SelectOption {
 
 type FetchState = "idle" | "loading" | "error" | "ready";
 
-async function modelOptions(rpc: TabRpc): Promise<SelectOption[]> {
-	const response = await rpc.getAvailableModels();
-	if (!response.success) throw new Error(response.error);
-	const data = response.data as { models?: ModelInfo[] } | undefined;
+/** Both readers force a catalog refresh: a non-forced read is answered by a
+ * still-fresh cache row, which is exactly the stale provider/model list this
+ * dropdown exists to avoid. They read through the model store so the committed
+ * catalog and these options can never disagree. */
+async function modelOptions(read: () => Promise<AvailableModelsResult>): Promise<SelectOption[]> {
+	const { models } = await read();
 	const seen = new Set<string>();
 	const options: SelectOption[] = [];
-	for (const model of data?.models ?? []) {
+	for (const model of models) {
 		const value = `${model.provider}/${model.id}`;
 		if (seen.has(value)) continue;
 		seen.add(value);
@@ -53,13 +56,9 @@ async function modelOptions(rpc: TabRpc): Promise<SelectOption[]> {
 	return options;
 }
 
-async function providerOptions(rpc: TabRpc): Promise<SelectOption[]> {
-	// The sidecar's get_providers command refreshes the registry before deriving
-	// provider visibility and counts, including for an older tab-sidecar snapshot.
-	const response = await rpc.getProviders();
-	if (!response.success) throw new Error(response.error);
-	const data = response.data as ProvidersResult | undefined;
-	return (data?.providers ?? []).map(provider => ({
+async function providerOptions(read: () => Promise<ProvidersResult>): Promise<SelectOption[]> {
+	const { providers } = await read();
+	return providers.map(provider => ({
 		value: provider.id,
 		detail: provider.name,
 		disabled: provider.disabled,
@@ -85,7 +84,8 @@ export interface ModelValueSelectProps {
 
 export function ModelValueSelect({ kind, value, disabled, onCommit, placeholder }: ModelValueSelectProps) {
 	const t = useT();
-	const rpc = useTabRpc();
+	const refreshAvailableModels = useModelStore(state => state.refreshAvailableModels);
+	const refreshProviders = useModelStore(state => state.refreshProviders);
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [options, setOptions] = useState<SelectOption[]>([]);
@@ -101,8 +101,8 @@ export function ModelValueSelect({ kind, value, disabled, onCommit, placeholder 
 		const requestId = ++requestIdRef.current;
 		setFetchState("loading");
 		setFetchError(null);
-		const load = kind === "model" ? modelOptions : providerOptions;
-		return load(rpc)
+		const load = kind === "model" ? modelOptions(refreshAvailableModels) : providerOptions(refreshProviders);
+		return load
 			.then(result => {
 				if (requestIdRef.current !== requestId) return;
 				setOptions(result);
@@ -113,7 +113,7 @@ export function ModelValueSelect({ kind, value, disabled, onCommit, placeholder 
 				setFetchError(cause instanceof Error ? cause.message : String(cause));
 				setFetchState("error");
 			});
-	}, [kind, rpc]);
+	}, [kind, refreshAvailableModels, refreshProviders]);
 
 	// Fetch on every open. A provider/model edit can happen while this settings
 	// row remains mounted, so retaining a previous "ready" result is stale.
@@ -247,6 +247,7 @@ export function ModelValueSelect({ kind, value, disabled, onCommit, placeholder 
 							className="min-w-0 flex-1 bg-transparent text-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 							onChange={event => setQuery(event.target.value)}
 							onKeyDown={event => {
+								if (isImeKeyEvent(event)) return;
 								if (event.key === "Escape") {
 									event.stopPropagation();
 									setOpen(false);

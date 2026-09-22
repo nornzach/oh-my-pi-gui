@@ -2,8 +2,14 @@ import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 
-/** Main-process packages bundled into out/main/index.js so packaged apps need no node_modules. */
-const MAIN_BUNDLED_DEPS = ["chokidar", "electron-store", "electron-updater", "zod"];
+/**
+ * Main-process packages bundled into out/main/index.js so packaged apps need no node_modules.
+ * Anything the main entry imports that is NOT listed here stays a bare `import` in the
+ * bundle, and the installed app only resolves it if electron-builder happened to collect
+ * that package — in this nested checkout bun hoists most deps to the monorepo root, so the
+ * traversal misses them and the app dies at launch with ERR_MODULE_NOT_FOUND.
+ */
+const MAIN_BUNDLED_DEPS = ["chokidar", "electron-store", "electron-updater", "yaml", "zod"];
 
 /**
  * Heavy renderer vendor libs split out of the eager main chunk. Patterns match

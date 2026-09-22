@@ -2,7 +2,7 @@
  * models-config.ts tests: verify enum correctness, merge-preserve semantics,
  * toView/upsert round-trip fidelity.
  */
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -231,6 +231,68 @@ providers:
 				models: [{ id: "fake-model" }],
 			};
 			expect(() => upsertModelsProvider(input)).toThrow("built-in provider");
+		});
+	});
+
+	describe("save integrity", () => {
+		test("a GUI edit leaves hand-written comments and unrelated providers in place", () => {
+			const file = modelsPath();
+			writeFileSync(
+				file,
+				`# Company gateway; ask @platform before changing the base URL.
+providers:
+  # Kept for the legacy eval harness.
+  untouched:
+    api: openai-completions
+    baseUrl: https://legacy.test/v1
+    models:
+      - id: old-model
+  edited:
+    api: openai-completions
+    baseUrl: https://api.test.com/v1
+    models:
+      - id: model-a
+`,
+				"utf8",
+			);
+
+			upsertModelsProvider({
+				id: "edited",
+				api: "openai-completions",
+				baseUrl: "https://api.test.com/v2",
+				models: [{ id: "model-a" }],
+			});
+
+			const text = readFileSync(file, "utf8");
+			expect(text).toContain("ask @platform before changing the base URL");
+			expect(text).toContain("Kept for the legacy eval harness");
+			expect(text).toContain("https://legacy.test/v1");
+			// The edited entry really moved.
+			expect(parse(text).providers.edited.baseUrl).toBe("https://api.test.com/v2");
+		});
+
+		test("a save swaps the file in one step and leaves no partial write behind", () => {
+			upsertModelsProvider({
+				id: "atomic",
+				api: "openai-completions",
+				baseUrl: "https://api.test.com/v1",
+				models: [{ id: "model-a" }],
+			});
+			// The agent live-reloads this path: a leftover temp file (or a second
+			// models file) means the swap was not the single rename it must be.
+			expect(readdirSync(testDir)).toEqual(["models.yml"]);
+		});
+
+		test("a fresh install writes the path the settings window points at", () => {
+			upsertModelsProvider({
+				id: "first",
+				api: "openai-completions",
+				baseUrl: "https://api.test.com/v1",
+				models: [{ id: "model-a" }],
+			});
+			// ProvidersWindow tells the user `~/.omp/agent/models.yml`.
+			expect(modelsPath()).toBe(join(testDir, "models.yml"));
+			expect(existsSync(join(testDir, "models.yaml"))).toBe(false);
 		});
 	});
 

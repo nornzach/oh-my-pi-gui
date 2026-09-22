@@ -7,11 +7,11 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { ModelRoleEntry, ProviderInfo, UsageReport } from "../../../shared/rpc-types";
+import type { ModelInfo, ModelRoleEntry, ProviderInfo, UsageReport } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
-import { buildModelRows, formatCost, ModelCompare, type WireModel } from "./ModelCompare";
+import { buildModelRows, formatCost, ModelCompare } from "./ModelCompare";
 
-function model(partial: Partial<WireModel> & { provider: string; id: string }): WireModel {
+function model(partial: ModelInfo): ModelInfo {
 	return { ...partial };
 }
 
@@ -66,10 +66,10 @@ describe("buildModelRows", () => {
 		expect(rows[1]).toMatchObject({ providerName: "local", authKnown: false, authenticated: false });
 	});
 
-	it("marks auth unknown for every row when get_providers failed entirely", () => {
+	it("marks auth unknown for every row when the catalog generation carried no provider rows", () => {
 		const rows = buildModelRows({
 			models: [model({ provider: "openai", id: "gpt-5" })],
-			providers: null,
+			providers: [],
 			roles: null,
 			usage: null,
 		});
@@ -84,7 +84,7 @@ describe("buildModelRows", () => {
 				model({ provider: "anthropic", id: "claude-opus" }),
 				model({ provider: "openai", id: "claude-opus" }),
 			],
-			providers: null,
+			providers: [],
 			roles: [
 				role({ id: "default", model: "anthropic/claude-opus" }),
 				role({ id: "smol", model: "claude-opus" }), // bare id — must not match
@@ -108,7 +108,7 @@ describe("buildModelRows", () => {
 		];
 		const rows = buildModelRows({
 			models: [model({ provider: "anthropic", id: "a" }), model({ provider: "openai", id: "b" })],
-			providers: null,
+			providers: [],
 			roles: null,
 			usage,
 		});
@@ -130,7 +130,7 @@ describe("buildModelRows", () => {
 				}),
 				model({ provider: "p", id: "bare", name: "bare", contextWindow: null }),
 			],
-			providers: null,
+			providers: [],
 			roles: null,
 			usage: null,
 		});

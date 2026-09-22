@@ -2,6 +2,7 @@ import { parseHTML } from "linkedom";
 import { act, type ReactElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { OVERLAY_EXIT_MS } from "../../hooks/use-overlay-presence";
 import { I18nProvider } from "../../lib/i18n";
 import { ApprovalDialog } from "../dialogs/ApprovalDialog";
 import { Modal } from "./Modal";
@@ -215,5 +216,29 @@ describe("Modal", () => {
 		fullscreen.remove();
 		await pressEscape();
 		expect(onClose).toHaveBeenCalledTimes(1);
+	});
+
+	it("fades out with the content it had while open, then unmounts", async () => {
+		const close = vi.fn();
+		await mount(
+			<Modal onClose={close} open title="Delete group">
+				<span>3 sessions</span>
+			</Modal>,
+		);
+		// The payload that built this body clears on close, so the tree the parent
+		// re-renders is empty. An exit that paints it would flash a blank panel.
+		await render(
+			<Modal onClose={close} open={false} title="Delete group">
+				{null}
+			</Modal>,
+		);
+		const panel = document.querySelector<HTMLElement>(".omp-dialog-panel");
+		expect(panel?.textContent).toContain("3 sessions");
+		expect(panel?.getAttribute("role")).toBe("presentation");
+
+		await act(async () => {
+			await new Promise(resolve => setTimeout(resolve, OVERLAY_EXIT_MS + 20));
+		});
+		expect(document.querySelector(".omp-dialog-panel")).toBeNull();
 	});
 });

@@ -358,6 +358,9 @@ export function useComposerSubmit({
 						}
 					: undefined;
 			if (optimisticMessage) originMessages.getState().appendLiveMessage(optimisticMessage);
+			// Sending owns the live edge: pull the transcript back to the bottom even
+			// when the user had scrolled up through history before pressing Enter.
+			(originSession ?? useSessionStore).getState().pinTranscriptToBottom();
 			setText("");
 			setImages([]);
 			setMenu(null);

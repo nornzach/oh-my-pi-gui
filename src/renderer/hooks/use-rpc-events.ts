@@ -1,8 +1,11 @@
 import {
+	applyModelInfo,
 	applySessionState,
+	applyUsageSnapshot,
 	hydrateLegacySession,
 	hydrateSession,
 	hydrateTabSession,
+	refreshModelState,
 	refreshSessionState,
 	syncGoal,
 	syncLoopMode,
@@ -254,8 +257,11 @@ function goalPatchFromEvent(
  * Subscribes to batched RPC events from the sidecar and dispatches
  * them to the appropriate stores. Call once in App.tsx.
  * Also handles sidecar-ready initialization (get_state, subagent subscription).
+ *
+ * `heartbeatMs` is the liveness-probe cadence; tests shorten it to observe the
+ * idle refresh it also drives.
  */
-export function useRpcEvents(): void {
+export function useRpcEvents(heartbeatMs = 15_000): void {
 	useEffect(() => {
 		const focusedTabId = () => useTabsStore.getState().activeTabId ?? "";
 		let disposed = false;
@@ -448,7 +454,7 @@ export function useRpcEvents(): void {
 							break;
 						}
 						case "model_changed": {
-							void refreshSessionState(tabId);
+							void refreshModelState(tabId);
 							break;
 						}
 						case "notice": {
@@ -533,15 +539,22 @@ export function useRpcEvents(): void {
 					.then(res => {
 						probing = false;
 						if (!acceptsActiveTabEvents() || useTabsStore.getState().activeTabId !== probeTabId) return;
-						if (res.success) useUiStore.getState().clearSidecarError();
-						else useUiStore.getState().setSidecarError(brickMessage);
+						if (!res.success) {
+							useUiStore.getState().setSidecarError(brickMessage);
+							return;
+						}
+						useUiStore.getState().clearSidecarError();
+						// The probe already paid for the tokenised context reading, so let it
+						// keep the usage ring honest: a session that idles between turns never
+						// lands a get_state snapshot any other way.
+						if (res.data != null && probeTabId) applyUsageSnapshot(res.data as RpcSessionState, probeTabId);
 					})
 					.catch(() => {
 						probing = false;
 						if (!acceptsActiveTabEvents() || useTabsStore.getState().activeTabId !== probeTabId) return;
 						useUiStore.getState().setSidecarError(brickMessage);
 					});
-			}, 15_000);
+			}, heartbeatMs);
 		};
 		const stopHeartbeat = () => {
 			if (heartbeat) {
@@ -675,10 +688,13 @@ export function useRpcEvents(): void {
 
 		// Agent config edits (set_setting from any client, slash-command config
 		// changes) push config_update — re-read the thinking-display settings so
-		// ThinkingBlock re-renders with the live hide/prose-only policy.
-		const handleConfig = (_frame: ConfigUpdateFrame, tabId: string) => {
+		// ThinkingBlock re-renders with the live hide/prose-only policy. The frame
+		// also carries the sidecar's live model, which is applied directly: unlike
+		// a get_state round trip it cannot lose a race with the event batch.
+		const handleConfig = (frame: ConfigUpdateFrame, tabId: string) => {
 			if (closedTabFrame(tabId)) return;
 			withSessionRuntime(tabId, () => {
+				applyModelInfo(frame.model, tabId);
 				void useSettingsStore.getState().syncDisplaySettings();
 				void useSettingsStore.getState().syncApproval();
 			});
@@ -771,5 +787,5 @@ export function useRpcEvents(): void {
 			unsubSessionInfo();
 			unsubExtensionError();
 		};
-	}, []);
+	}, [heartbeatMs]);
 }

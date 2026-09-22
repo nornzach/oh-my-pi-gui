@@ -12,6 +12,7 @@ import { EditorView, keymap } from "@codemirror/view";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner } from "../common";
 
@@ -108,6 +109,7 @@ export function ComposerEditorDialog() {
 				EditorView.domEventHandlers({
 					keydown: event => {
 						// ⌘↵ / Ctrl+Enter writes back.
+						if (isImeKeyEvent(event)) return;
 						if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 							event.preventDefault();
 							saveRef.current();

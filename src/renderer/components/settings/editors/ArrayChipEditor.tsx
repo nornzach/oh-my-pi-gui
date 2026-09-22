@@ -12,6 +12,7 @@
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useT } from "../../../lib/i18n";
+import { isImeKeyEvent } from "../../../lib/ime";
 
 export interface ArrayChipEditorProps {
 	values: string[];
@@ -54,6 +55,7 @@ export function ArrayChipEditor({ values, onCommit, disabled, placeholder, order
 	};
 
 	const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+		if (isImeKeyEvent(event)) return;
 		if (event.key === "Enter" || event.key === ",") {
 			event.preventDefault();
 			add(draft);

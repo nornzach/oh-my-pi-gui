@@ -4,6 +4,7 @@ import type { CopyTarget } from "../../../shared/rpc-types";
 import { flattenCopyTargets } from "../../lib/copy-targets";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
@@ -76,6 +77,7 @@ export function CopySelectorDialog() {
 	};
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+		if (isImeKeyEvent(event)) return;
 		if (flat.length === 0) return;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();

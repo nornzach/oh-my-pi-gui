@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useMemo } from "react";
-import { useStats } from "../../hooks/use-stats";
+import { useStatsList } from "../../hooks/use-stats";
 import { compact, formatUsd } from "../../lib/chart";
 import { useT } from "../../lib/i18n";
 import type { StatsRange } from "./StatsDashboard";
@@ -44,7 +44,7 @@ function ShareBar({ fraction }: { fraction: number }) {
 export function ProjectsRoute({ range, refreshKey }: { range: StatsRange; refreshKey: number }) {
 	const t = useT();
 	const params = useMemo(() => ({ range }), [range]);
-	const { data, isLoading, error, refetch } = useStats<FolderRow[]>("/api/stats/folders", params);
+	const { data, isLoading, error, refetch } = useStatsList<FolderRow>("/api/stats/folders", params);
 
 	useEffect(() => {
 		if (refreshKey > 0) refetch();

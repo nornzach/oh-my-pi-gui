@@ -19,6 +19,7 @@ import {
 	groupByCategory,
 } from "../../lib/command-registry";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { retryLastTurn as retryLastTurnShared } from "../../lib/messages";
 import { openHandoffDialog } from "../../stores/fork-handoff";
 import { useModelStore } from "../../stores/model";
@@ -441,6 +442,7 @@ export function CommandPalette() {
 	);
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (isImeKeyEvent(event)) return;
 		switch (event.key) {
 			case "ArrowDown":
 				event.preventDefault();
@@ -559,7 +561,7 @@ export function CommandPalette() {
 
 	return (
 		<div
-			className="omp-dialog-overlay fixed inset-0 z-50 flex items-start justify-center bg-[var(--omp-overlay-bg)] p-4 pt-[12dvh] backdrop-blur-[2px]"
+			className="omp-dialog-overlay omp-fade-in fixed inset-0 z-50 flex items-start justify-center bg-[var(--omp-overlay-bg)] p-4 pt-[12dvh] backdrop-blur-[2px]"
 			onMouseDown={event => {
 				if (event.target === event.currentTarget) close();
 			}}

@@ -8,6 +8,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { GitBranch, Search } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { branchSessionFromEntry } from "../../lib/messages";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
@@ -99,6 +100,7 @@ export function BranchPickerDialog() {
 	};
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (isImeKeyEvent(event)) return;
 		switch (event.key) {
 			case "ArrowDown":
 				event.preventDefault();

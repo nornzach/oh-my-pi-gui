@@ -8,8 +8,9 @@ import { useMessagesStore } from "../../stores/messages";
  * Live tail of the assistant's in-flight reply. The store accumulates
  * text_delta events into `streamingText`. Presentation is aligned to browser
  * frames, then split into immutable Markdown blocks plus a cheap unfinished
- * tail. Completed blocks parse once; the live suffix receives a subtle reveal
- * instead of making the whole growing response re-parse and jump.
+ * tail. Completed blocks parse once; the live suffix reveals as a list of
+ * append-only chunks so text already on screen keeps its node and only
+ * transitions to full opacity, instead of being replaced every commit.
  */
 export function StreamingText() {
 	const streamingText = useMessagesStore(s => s.streamingText);
@@ -17,9 +18,15 @@ export function StreamingText() {
 	const segments = useMemo(() => segmentStreamingMarkdown(frame.text), [frame.text]);
 	if (!streamingText) return null;
 
-	const deltaOffset = Math.max(0, Math.min(segments.tail.length, frame.deltaStart - segments.tailStart));
-	const settledTail = segments.tail.slice(0, deltaOffset);
-	const revealedTail = segments.tail.slice(deltaOffset);
+	const tailEnd = segments.tailStart + segments.tail.length;
+	// Reveal boundaries that still fall inside the unfinished tail. Offsets are
+	// absolute, so a chunk keeps its identity as the tail grows and as earlier
+	// chunks leave for a promoted block.
+	const edges = [
+		segments.tailStart,
+		...frame.frontiers.filter(offset => offset > segments.tailStart && offset < tailEnd),
+		tailEnd,
+	];
 
 	return (
 		<div className="omp-streaming">
@@ -29,12 +36,20 @@ export function StreamingText() {
 				</div>
 			))}
 			<div className="omp-streaming-tail">
-				{settledTail}
-				{revealedTail ? (
-					<span className="omp-streaming-reveal" key={frame.revision}>
-						{revealedTail}
-					</span>
-				) : null}
+				{edges.slice(0, -1).map((start, index) => {
+					const end = edges[index + 1];
+					if (end === undefined || end <= start) return null;
+					return (
+						<span
+							key={start}
+							className={
+								index === edges.length - 2 ? "omp-streaming-chunk omp-streaming-reveal" : "omp-streaming-chunk"
+							}
+						>
+							{frame.text.slice(start, end)}
+						</span>
+					);
+				})}
 				<span aria-hidden className="omp-caret" />
 			</div>
 		</div>

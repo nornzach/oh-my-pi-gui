@@ -28,6 +28,10 @@ export interface SessionStore {
 	eventVersion: number;
 	transcriptView: TranscriptView | null;
 	saveTranscriptView: (view: TranscriptView) => void;
+	/** Bumped when the transcript must snap back to the live edge (the user just
+	 * sent a message). Per-tab stores, so a tab switch can't strand another pane. */
+	transcriptPinNonce: number;
+	pinTranscriptToBottom: () => void;
 	sessionId: string;
 	sessionName: string | null;
 	sessionFile: string | null;
@@ -47,6 +51,11 @@ export interface SessionStore {
 	compactionInfo: { reason: "threshold" | "overflow" | "idle" | "incomplete"; action: string } | null;
 	status: SidecarStatus;
 	contextUsage: ContextUsage | null;
+	/** Bumped every time a get_state snapshot actually carries fresh context
+	 * usage. Cost displays pace their refetch on this instead of on message
+	 * appends, so spend that arrives without a new transcript entry (subagent
+	 * billing, another window on the same session) still gets picked up. */
+	statsPulse: number;
 	messageCount: number;
 	queuedMessageCount: number;
 	planModeEnabled: boolean;
@@ -72,6 +81,7 @@ const initialState = {
 	switchPending: null as { fromId: string; toId: string } | null,
 	eventVersion: 0,
 	transcriptView: null as TranscriptView | null,
+	transcriptPinNonce: 0,
 	sessionId: "",
 	sessionName: null,
 	sessionFile: null,
@@ -83,6 +93,7 @@ const initialState = {
 	compactionInfo: null,
 	status: "starting" as SidecarStatus,
 	contextUsage: null,
+	statsPulse: 0,
 	messageCount: 0,
 	queuedMessageCount: 0,
 	planModeEnabled: false,
@@ -100,6 +111,7 @@ export const createSessionStore = () =>
 		...initialState,
 		setSwitchPending: switchPending => set({ switchPending }),
 		saveTranscriptView: transcriptView => set({ transcriptView }),
+		pinTranscriptToBottom: () => set(state => ({ transcriptPinNonce: state.transcriptPinNonce + 1 })),
 		setFromState: state =>
 			set({
 				sessionId: state.sessionId,

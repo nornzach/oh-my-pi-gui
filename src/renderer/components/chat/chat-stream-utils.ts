@@ -38,13 +38,103 @@ export interface ConversationAnchor {
 
 const CONVERSATION_PREVIEW_LIMIT = 180;
 
-/** True at the live edge, allowing only subpixel browser rounding. */
+/** Slack still counted as "the live edge" when deciding whether to follow the tail.
+ * A single CSS pixel was brittle: row re-measurement, font loading and fractional
+ * scrollTop routinely leave a few pixels under the last row, which read as "the
+ * user scrolled away" and stopped all tail following. */
+export const LIVE_EDGE_SLACK_PX = 24;
+
+/** True at the live edge, within the tail-following slack. */
 export function isTranscriptAtLiveEdge(metrics: {
 	scrollHeight: number;
 	scrollTop: number;
 	clientHeight: number;
 }): boolean {
-	return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight < 1;
+	return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight < LIVE_EDGE_SLACK_PX;
+}
+
+/** Direction of the reader's last viewport gesture: `true` toward the tail, `false`
+ * away from it, `null` when the movement was not attributed to a gesture at all (a
+ * restored view, a scrollbar press, a touch flick). */
+export type GestureTowardTail = boolean | null;
+
+/** Re-engaging the tail is a claim about reader intent, so it takes a gesture toward
+ * the tail rather than a viewport that merely happens to sit there. A tail-follow
+ * write that slips into the same frame as an upward gesture lands at the live edge;
+ * re-pinning from that position clears the gesture latch, every later append then
+ * follows the tail again, and the view the reader just took is lost for the rest of
+ * the run. Unattributed moves stay unpinned — releasing a drag or a flick at the edge
+ * is the gesture that re-engages there. */
+export function shouldRePinTranscript(gestureTowardTail: GestureTowardTail, atLiveEdge: boolean): boolean {
+	return atLiveEdge && gestureTowardTail === true;
+}
+
+/**
+ * How far from the end of the transcript a live commit can hand over rows, and
+ * the largest growth that still reads as one turn. A wider jump is a hydrate or
+ * a page of history arriving.
+ */
+export const ROW_ENTRANCE_TAIL_ROWS = 6;
+
+export interface MountedTranscriptRow {
+	index: number;
+	key: string;
+}
+
+/** Bookkeeping for which rows have already been treated as arriving content. */
+export interface RowEntranceState {
+	sessionId: string | undefined;
+	rowCount: number;
+	seen: Set<string>;
+}
+
+export interface RowEntrancePass {
+	sessionId: string | undefined;
+	/**
+	 * Whether this commit grew the transcript out of a live run. Hydration and
+	 * pagination replace the message list without announcing an arrival, so a
+	 * restored view must never cascade.
+	 */
+	live: boolean;
+	rowKeys: readonly string[];
+	mounted: readonly MountedTranscriptRow[];
+}
+
+export function createRowEntranceState(sessionId: string | undefined, rowKeys: readonly string[]): RowEntranceState {
+	return { sessionId, rowCount: rowKeys.length, seen: new Set(rowKeys) };
+}
+
+/**
+ * Claim the mounted rows whose content just arrived at the tail.
+ *
+ * Rows are recycled through the viewport, so mounting is not an arrival: an
+ * entrance keyed on mount replays on every scroll, which is what made the
+ * transcript's entrance motion unusable. A claim therefore needs a live run, a
+ * row set that moved by one turn's worth at most, a slot at the end of the
+ * transcript, and a key that has never been mounted before.
+ */
+export function claimRowEntrances(state: RowEntranceState, pass: RowEntrancePass): string[] {
+	const { sessionId, live, rowKeys, mounted } = pass;
+	if (state.sessionId !== sessionId) {
+		// Switching sessions restores a view; none of it is content arriving.
+		state.sessionId = sessionId;
+		state.rowCount = rowKeys.length;
+		state.seen = new Set(rowKeys);
+		return [];
+	}
+	const jumped = Math.abs(rowKeys.length - state.rowCount) > ROW_ENTRANCE_TAIL_ROWS;
+	state.rowCount = rowKeys.length;
+	const tailFrom = rowKeys.length - 1 - ROW_ENTRANCE_TAIL_ROWS;
+	const admitting = live && !jumped;
+
+	const claims: string[] = [];
+	for (const row of mounted) {
+		if (state.seen.has(row.key)) continue;
+		state.seen.add(row.key);
+		if (!admitting || row.index < tailFrom) continue;
+		claims.push(row.key);
+	}
+	return claims;
 }
 
 export type HistoryRow =

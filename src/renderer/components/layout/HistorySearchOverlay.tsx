@@ -3,6 +3,7 @@ import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cx, escapeRegExp, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import type { InputHistoryEntry } from "../../stores/input-history";
 import { filterHistory, useInputHistoryStore } from "../../stores/input-history";
 
@@ -59,6 +60,7 @@ export function HistorySearchOverlay({ onSelect, onClose }: HistorySearchOverlay
 	};
 
 	const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+		if (isImeKeyEvent(event)) return;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
 			setIndex(current => Math.min(current + 1, Math.max(0, results.length - 1)));

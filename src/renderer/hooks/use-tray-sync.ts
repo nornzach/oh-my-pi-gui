@@ -8,6 +8,7 @@
 
 import { useEffect } from "react";
 import type { TrayState } from "../../shared/ipc-types";
+import { contextUsageView } from "../lib/context-usage";
 import { basename } from "../lib/format";
 import { useLang } from "../lib/i18n";
 import { useModelStore } from "../stores/model";
@@ -27,6 +28,10 @@ export function useTraySync(): void {
 	const awaitingConfirmation = useAwaitingConfirmation();
 	const status = useSessionStore(s => s.status);
 	const contextUsage = useSessionStore(s => s.contextUsage);
+	// Primitives so the push effect re-runs on a real change, not a new object.
+	const contextView = contextUsageView(contextUsage);
+	const contextPercent = contextUsage && contextView.capacityKnown ? contextView.percent : null;
+	const contextTokens = contextUsage ? contextView.usedTokens : null;
 	const { sessions } = useSessionList("global");
 
 	useEffect(() => {
@@ -54,8 +59,8 @@ export function useTraySync(): void {
 			thinkingLevel: thinkingLevel ?? "off",
 			fastMode,
 			approvalMode,
-			contextPercent: contextUsage?.percent ?? null,
-			contextTokens: contextUsage?.tokens ?? null,
+			contextPercent,
+			contextTokens,
 			workspaces,
 		});
 	}, [
@@ -68,7 +73,8 @@ export function useTraySync(): void {
 		isStreaming,
 		awaitingConfirmation,
 		status,
-		contextUsage,
+		contextPercent,
+		contextTokens,
 		sessions,
 	]);
 }

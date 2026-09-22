@@ -14,6 +14,7 @@ import type { SessionInfo } from "../../../shared/ipc-types";
 import { requestSessionSwitch, switchSessionNow } from "../../hooks/use-session-switch";
 import { basename, cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { mergeContentMatches, rankSessions, type SessionSortMode } from "../../lib/session-search";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
@@ -161,6 +162,7 @@ export function SessionPickerDialog() {
 	};
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (isImeKeyEvent(event)) return;
 		switch (event.key) {
 			case "ArrowDown":
 				event.preventDefault();

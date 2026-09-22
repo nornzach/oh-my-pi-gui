@@ -30,6 +30,8 @@ import { memo, useCallback, useEffect, useState } from "react";
 import type { StoreApi } from "zustand/vanilla";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
+import { onEscape } from "../../lib/keymap";
 import { type QueueLane, type QueueStore, useQueuedMessages, useQueueStore } from "../../stores/queue";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
@@ -193,10 +195,12 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 						className="w-full resize-y rounded-md border border-(--omp-input-focus-border) bg-(--omp-input-bg) px-2 py-1 text-omp-md leading-snug text-(--omp-text) outline-none"
 						onInput={event => setDraft(event.currentTarget.value)}
 						onKeyDown={event => {
-							if (event.key === "Escape") {
+							if (isImeKeyEvent(event)) return;
+							onEscape(event, () => {
 								setDraft(item.text);
 								setEditing(false);
-							} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+							});
+							if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
 								event.preventDefault();
 								saveEdit();
 							}

@@ -10,6 +10,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
+import { isImeKeyEvent } from "../../../lib/ime";
 
 export interface EnumerableOption {
 	value: string;
@@ -102,13 +103,20 @@ export function EnumerableSelect({
 			if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
 		};
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") setOpen(false);
+			if (isImeKeyEvent(e)) return;
+			if (e.key !== "Escape") return;
+			// Only a keypress made inside this popup dismisses it, and capture +
+			// stopPropagation runs the claim before the dialog behind it (registered
+			// earlier on the same node) can take the same Escape.
+			if (!rootRef.current?.contains(e.target as Node)) return;
+			e.stopPropagation();
+			setOpen(false);
 		};
 		document.addEventListener("mousedown", onDown);
-		document.addEventListener("keydown", onKey);
+		document.addEventListener("keydown", onKey, true);
 		return () => {
 			document.removeEventListener("mousedown", onDown);
-			document.removeEventListener("keydown", onKey);
+			document.removeEventListener("keydown", onKey, true);
 		};
 	}, [open]);
 

@@ -211,7 +211,10 @@ export function shortenPath(path: string): string {
 
 /** Plain tool text: strip terminal controls/links and expand tabs before display. */
 export function sanitizeToolText(text: string): string {
-	return parseAnsi(text).map(segment => segment.text).join("").replace(/\t/g, "    ");
+	return parseAnsi(text)
+		.map(segment => segment.text)
+		.join("")
+		.replace(/\t/g, "    ");
 }
 
 /** First N lines within the shared DOM character ceiling. */

@@ -10,6 +10,7 @@ import { Check, Monitor, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import {
 	applyThemeByName,
 	getPersistedThemeSelection,
@@ -94,7 +95,7 @@ export function ThemePickerDialog() {
 	};
 
 	const onKey = (e: React.KeyboardEvent) => {
-		if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+		if (isImeKeyEvent(e)) return;
 		if (e.key === "ArrowDown") {
 			e.preventDefault();
 			setActive(i => Math.min(filtered.length - 1, i + 1));

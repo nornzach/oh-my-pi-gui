@@ -11,6 +11,7 @@
 import { X } from "lucide-react";
 import { useState } from "react";
 import { useT } from "../../../lib/i18n";
+import { isImeKeyEvent } from "../../../lib/ime";
 import { toast } from "../../../stores/toast";
 import { ModelValueSelect } from "../ModelValueSelect";
 
@@ -61,6 +62,7 @@ function LimitInput({
 			onBlur={commit}
 			onChange={event => setDraft(event.target.value)}
 			onKeyDown={event => {
+				if (isImeKeyEvent(event)) return;
 				if (event.key === "Enter") event.currentTarget.blur();
 				if (event.key === "Escape") {
 					setDraft(null);

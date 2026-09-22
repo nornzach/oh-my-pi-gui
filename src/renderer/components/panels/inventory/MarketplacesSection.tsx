@@ -13,6 +13,7 @@ import { Check, ChevronDown, ChevronRight, Plus, RefreshCw, Trash2, X } from "lu
 import { useCallback, useState } from "react";
 import type { RpcMarketplaceInfo, RpcMarketplacePluginInfo } from "../../../../shared/rpc-types";
 import { useT } from "../../../lib/i18n";
+import { isImeKeyEvent } from "../../../lib/ime";
 import {
 	capturePluginActivationOrigin,
 	handlePluginActivation,
@@ -79,6 +80,7 @@ export function AddMarketplaceForm({ onAdded }: { onAdded: () => Promise<void> }
 						setError(null);
 					}}
 					onKeyDown={event => {
+						if (isImeKeyEvent(event)) return;
 						if (event.key === "Enter") void submit();
 					}}
 					placeholder={t("marketplace.sourcePlaceholder")}

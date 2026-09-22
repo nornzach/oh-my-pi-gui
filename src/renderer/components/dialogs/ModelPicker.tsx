@@ -5,25 +5,36 @@ import { useTabRpc } from "../../lib/tab-rpc";
  */
 
 import { Check, Cpu, Search, TriangleAlert } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+	type KeyboardEvent as ReactKeyboardEvent,
+	useCallback,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import type { LoginProvider, ModelInfo } from "../../../shared/rpc-types";
-import { hydrateSession } from "../../hooks/use-rpc-events";
+import { applyModelInfo, hydrateSession } from "../../hooks/use-rpc-events";
 import { formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
+import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Badge, Modal, Spinner } from "../common";
 
 export function ModelPicker() {
 	const tabRpc = useTabRpc();
+	const tabId = useRuntimeTabId();
 	const t = useT();
 	const open = useUiStore(state => state.modelPickerOpen);
 	const close = useUiStore(state => state.closeModelPicker);
 	const availableModels = useModelStore(state => state.availableModels);
 	const current = useModelStore(state => state.model);
-	const setAvailableModels = useModelStore(state => state.setAvailableModels);
+	const refreshAvailableModels = useModelStore(state => state.refreshAvailableModels);
 	// Live session usage: models whose window is smaller render with an
 	// over-context warning and compact-first on pick (TUI markOverContext parity).
 	const contextUsage = useSessionStore(state => state.contextUsage);
@@ -38,55 +49,52 @@ export function ModelPicker() {
 	const listRef = useRef<HTMLDivElement>(null);
 	const listboxId = useId();
 
+	const requestVersion = useRef(0);
+
+	/** Login flows are the picker's own concern, but the model list is shared
+	 * catalog state: it commits through the store's generation guard, so a
+	 * `model_catalog_update` that lands mid-read can never be reverted by this
+	 * response. `forceRefresh` belongs to the retry path, where the user is
+	 * disputing what the list shows. */
+	const load = useCallback(
+		async (forceRefresh: boolean, failedCopy?: string): Promise<void> => {
+			const version = ++requestVersion.current;
+			setLoading(true);
+			setError(null);
+			const [providersResult, modelsResult] = await Promise.allSettled([
+				tabRpc.getLoginProviders(),
+				refreshAvailableModels(forceRefresh),
+			]);
+			if (version !== requestVersion.current) return;
+			setLoading(false);
+			const providersOk = providersResult.status === "fulfilled" && providersResult.value.success;
+			if (providersOk) {
+				const data = providersResult.value.data as { providers?: LoginProvider[] } | undefined;
+				setProviders(data?.providers ?? []);
+				return;
+			}
+			if (modelsResult.status === "fulfilled") return;
+			const reason = (settled: PromiseSettledResult<unknown>): string | null => {
+				if (settled.status === "rejected") {
+					return settled.reason instanceof Error ? settled.reason.message : String(settled.reason);
+				}
+				return (settled.value as { error?: string } | undefined)?.error ?? null;
+			};
+			setError(failedCopy ?? reason(providersResult) ?? reason(modelsResult) ?? t("modelPicker.notResponding"));
+		},
+		[refreshAvailableModels, t, tabRpc],
+	);
+
 	useEffect(() => {
-		if (!open) return;
+		if (!open) return undefined;
 		setQuery("");
-		setLoading(true);
-		setError(null);
 		setActiveIndex(0);
 		requestAnimationFrame(() => inputRef.current?.focus());
-		let cancelled = false;
-		void Promise.allSettled([tabRpc.getLoginProviders(), tabRpc.getAvailableModels()])
-			.then(([providersResult, modelsResult]) => {
-				if (cancelled) return;
-				let gotProviders = false;
-				let gotModels = false;
-				if (providersResult.status === "fulfilled" && providersResult.value.success) {
-					const data = providersResult.value.data as { providers?: LoginProvider[] } | undefined;
-					setProviders(data?.providers ?? []);
-					gotProviders = true;
-				}
-				if (modelsResult.status === "fulfilled" && modelsResult.value.success) {
-					const data = modelsResult.value.data as { models?: ModelInfo[] } | undefined;
-					setAvailableModels(data?.models ?? []);
-					gotModels = true;
-				}
-				if (!gotProviders && !gotModels) {
-					const pErr =
-						providersResult.status === "rejected"
-							? String(providersResult.reason)
-							: !providersResult.value.success
-								? providersResult.value.error
-								: null;
-					const mErr =
-						modelsResult.status === "rejected"
-							? String(modelsResult.reason)
-							: !modelsResult.value.success
-								? modelsResult.value.error
-								: null;
-					setError(pErr ?? mErr ?? t("modelPicker.notResponding"));
-				}
-			})
-			.catch(cause => {
-				if (!cancelled) setError(String(cause));
-			})
-			.finally(() => {
-				if (!cancelled) setLoading(false);
-			});
+		void load(false);
 		return () => {
-			cancelled = true;
+			requestVersion.current++;
 		};
-	}, [open, setAvailableModels, t, tabRpc.getLoginProviders, tabRpc.getAvailableModels]);
+	}, [open, load]);
 
 	const authByProvider = useMemo(() => {
 		const map = new Map<string, LoginProvider>();
@@ -160,6 +168,11 @@ export function ModelPicker() {
 				toast({ variant: "error", title: t("modelPicker.failed"), message: response.error });
 				return;
 			}
+			// The response carries the sidecar's live model. Applying it here covers
+			// the switch that emits no model_changed at all — re-picking the current
+			// model is a server-side no-op, so the event channel can never heal a
+			// stale label.
+			if (tabId) applyModelInfo(response.data, tabId);
 			// Compaction rewrote the transcript — rehydrate so the chat and the
 			// context bar reflect the compacted session, not just the new model.
 			if (overContext) await hydrateSession();
@@ -172,6 +185,7 @@ export function ModelPicker() {
 	};
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+		if (isImeKeyEvent(event)) return;
 		switch (event.key) {
 			case "ArrowDown":
 				event.preventDefault();
@@ -243,27 +257,7 @@ export function ModelPicker() {
 							<button
 								type="button"
 								className="rounded-md border border-[var(--omp-border-muted)] px-3 py-1 text-omp-sm font-medium text-[var(--omp-text)] hover:bg-[var(--omp-selected-bg)]"
-								onClick={() => {
-									setError(null);
-									setLoading(true);
-									void Promise.allSettled([tabRpc.getLoginProviders(), tabRpc.getAvailableModels()])
-										.then(([pr, mr]) => {
-											if (pr.status === "fulfilled" && pr.value.success) {
-												setProviders((pr.value.data as { providers?: LoginProvider[] })?.providers ?? []);
-											}
-											if (mr.status === "fulfilled" && mr.value.success) {
-												setAvailableModels((mr.value.data as { models?: ModelInfo[] })?.models ?? []);
-											}
-											if (
-												(pr.status === "rejected" || !pr.value.success) &&
-												(mr.status === "rejected" || !mr.value.success)
-											) {
-												setError(t("modelPicker.stillNotResponding"));
-											}
-										})
-										.catch(() => setError(t("modelPicker.stillNotRespondingShort")))
-										.finally(() => setLoading(false));
-								}}
+								onClick={() => void load(true, t("modelPicker.stillNotResponding"))}
 							>
 								{t("modelPicker.retry")}
 							</button>

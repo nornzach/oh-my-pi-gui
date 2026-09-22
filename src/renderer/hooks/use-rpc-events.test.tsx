@@ -29,7 +29,7 @@ import { TurnStatusRow } from "../components/chat/ChatStream";
 import { formatClock } from "../lib/format";
 import { I18nProvider } from "../lib/i18n";
 import { type MessagesStore, useMessagesStore } from "../stores/messages";
-import { useModelStore } from "../stores/model";
+import { type ModelStore, useModelStore } from "../stores/model";
 import { type SessionStore, useSessionStore } from "../stores/session";
 import { sessionRuntime, sessionRuntimeStore, setFocusedSessionRuntime } from "../stores/session-runtime-context";
 import { useSettingsStore } from "../stores/settings";
@@ -317,8 +317,8 @@ async function mount(element: ReactElement): Promise<void> {
 }
 
 /** Renders the hook under test with no visible chrome of its own. */
-function RpcEventsProbe() {
-	useRpcEvents();
+function RpcEventsProbe({ heartbeatMs }: { heartbeatMs?: number } = {}) {
+	useRpcEvents(heartbeatMs);
 	return null;
 }
 
@@ -413,6 +413,166 @@ describe("useRpcEvents thinking selection sync", () => {
 
 		expect(useModelStore.getState().thinkingLevel).toBe("xhigh");
 		expect(useModelStore.getState().thinkingConfigured).toBe("auto");
+	});
+});
+
+describe("useRpcEvents model switch sync", () => {
+	it("lands a model switch whose get_state races a trailing event from the same batch", async () => {
+		const { emitTabBatch, commandForTab } = installTabRoutedMockOmp();
+		useTabsStore.setState({
+			tabs: [{ kind: "agent", id: "t-model", cwd: "/alpha", status: "ready", unreadDone: false }],
+			activeTabId: "t-model",
+		});
+		ensureTabRuntime("t-model");
+		setFocusedSessionRuntime("t-model");
+		await mount(<RpcEventsProbe />);
+		await flush();
+
+		const session = sessionRuntimeStore<SessionStore>("t-model", "session")!;
+		const model = sessionRuntimeStore<ModelStore>("t-model", "model")!;
+		session.getState().reset();
+		model.getState().reset();
+		session.setState({ sessionId: "s1", isStreaming: true });
+		model.setState({ model: { provider: "old", id: "m-old" } });
+
+		// Hold get_state open until the batch has been fully reduced, matching the
+		// real 32ms batch where model_changed is followed by the switch's own
+		// thinking_level_changed / tool-reconciliation notice frames.
+		const state = Promise.withResolvers<RpcResponse>();
+		const original = commandForTab.getMockImplementation()!;
+		commandForTab.mockImplementation((tabId, command) =>
+			command.type === "get_state" ? state.promise : original(tabId, command),
+		);
+		await act(async () => {
+			emitTabBatch(
+				[
+					{ type: "model_changed" },
+					{ type: "thinking_level_changed", thinkingLevel: "high" },
+					{ type: "notice", level: "info", message: "vision mounted", source: "vision" },
+				],
+				"t-model",
+			);
+		});
+		state.resolve(
+			success({
+				sessionId: "s1",
+				sessionName: null,
+				sessionFile: null,
+				cwd: "/tmp",
+				model: { provider: "new", id: "m-new" },
+				thinkingLevel: "high",
+				availableThinkingLevels: ["high"],
+				isStreaming: false,
+				isCompacting: false,
+				contextUsage: { tokens: 100, contextWindow: 2000, percent: 5 },
+				messageCount: 0,
+				queuedMessageCount: 0,
+				planModeEnabled: false,
+				todoPhases: [],
+			}),
+		);
+		await flush();
+
+		// The switch itself must survive the event churn that used to invalidate
+		// the whole snapshot, and the new context window comes with it.
+		expect(model.getState().model).toMatchObject({ provider: "new", id: "m-new" });
+		expect(model.getState().thinkingLevel).toBe("high");
+		expect(session.getState().contextUsage).toMatchObject({ contextWindow: 2000 });
+		// A model-scoped refresh owns the model slice only: the mid-run streaming
+		// flag belongs to agent_start/agent_end, not to this snapshot.
+		expect(session.getState().isStreaming).toBe(true);
+	});
+});
+
+function settledState(overrides: Record<string, unknown>): RpcResponse {
+	return success({
+		sessionId: "s1",
+		sessionName: null,
+		sessionFile: null,
+		cwd: "/tmp",
+		isStreaming: false,
+		isCompacting: false,
+		messageCount: 4,
+		queuedMessageCount: 0,
+		planModeEnabled: false,
+		todoPhases: [],
+		...overrides,
+	});
+}
+
+function seedReadyTab(tabId: string) {
+	useTabsStore.setState({
+		tabs: [{ kind: "agent", id: tabId, cwd: "/alpha", status: "ready", unreadDone: false }],
+		activeTabId: tabId,
+	});
+	ensureTabRuntime(tabId);
+	setFocusedSessionRuntime(tabId);
+	const session = sessionRuntimeStore<SessionStore>(tabId, "session")!;
+	session.getState().reset();
+	session.setState({ sessionId: "s1", status: "ready" });
+	return session;
+}
+
+describe("useRpcEvents context usage sync", () => {
+	it("lands the turn's usage reading from a get_state that raced a trailing event", async () => {
+		const { emitTabBatch, commandForTab } = installTabRoutedMockOmp();
+		const session = seedReadyTab("t-usage");
+		session.setState({ contextUsage: { tokens: 40, contextWindow: 2000, percent: 2 } });
+		await mount(<RpcEventsProbe />);
+		// Drain the boot hydration's command chain first: a get_state still in
+		// flight would be caught by the interceptor below and apply the same
+		// snapshot through the unguarded hydrate path, hiding the race.
+		await act(async () => {
+			const { promise, resolve } = Promise.withResolvers<void>();
+			setTimeout(resolve, 60);
+			await promise;
+		});
+		session.setState({ contextUsage: { tokens: 40, contextWindow: 2000, percent: 2 } });
+
+		// Hold get_state open until the batch has been fully reduced: agent_end
+		// queues the refresh, then the notice behind it moves eventVersion.
+		const state = Promise.withResolvers<RpcResponse>();
+		const original = commandForTab.getMockImplementation()!;
+		commandForTab.mockImplementation((id, command) =>
+			command.type === "get_state" ? state.promise : original(id, command),
+		);
+		await act(async () => {
+			emitTabBatch(
+				[{ type: "agent_end" }, { type: "notice", level: "info", message: "task finished", source: "task" }],
+				"t-usage",
+			);
+		});
+		state.resolve(settledState({ contextUsage: { tokens: 1200, contextWindow: 2000, percent: 60 } }));
+		await flush();
+
+		// The trailing event invalidates the snapshot for everything an event
+		// carries — usage has no event carrier, so the turn's reading must land.
+		expect(session.getState().contextUsage).toMatchObject({ tokens: 1200, percent: 60 });
+	});
+
+	it("refreshes the usage ring from the liveness probe while the session idles", async () => {
+		const { emitTabStatus } = installTabRoutedMockOmp();
+		const session = seedReadyTab("t-idle");
+		await mount(<RpcEventsProbe heartbeatMs={25} />);
+		emitTabStatus({ status: "ready", cwd: "/alpha" }, "t-idle");
+		await flush();
+		session.setState({ contextUsage: null });
+
+		const getState = vi
+			.spyOn(window.omp.rpc, "getState")
+			.mockResolvedValue(settledState({ contextUsage: { tokens: 900, contextWindow: 1000, percent: 90 } }));
+		await act(async () => {
+			const { promise, resolve } = Promise.withResolvers<void>();
+			setTimeout(resolve, 80);
+			await promise;
+		});
+
+		// The probe is already paid for (it tokenises the context to answer at
+		// all); a session that only idles between turns had no other way to land
+		// a snapshot, so its ring stayed on the number from the last turn.
+		expect(getState).toHaveBeenCalled();
+		expect(session.getState().contextUsage).toMatchObject({ tokens: 900 });
+		expect(session.getState().statsPulse).toBeGreaterThan(0);
 	});
 });
 

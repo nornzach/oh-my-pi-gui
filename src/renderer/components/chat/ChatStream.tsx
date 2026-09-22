@@ -42,13 +42,18 @@ import {
 	buildHistoryRows,
 	buildTimelineMarkers,
 	buildTranscriptRowKeys,
+	claimRowEntrances,
+	createRowEntranceState,
 	findConversationAnchorIndex,
+	type GestureTowardTail,
 	type HistoryRow,
 	isTranscriptAtLiveEdge,
 	isVisibleTranscriptMessage,
+	type MountedTranscriptRow,
 	mergeTodoSnapshots,
 	messageTimestampMs,
 	type Row,
+	shouldRePinTranscript,
 	type TimelineMarkerSeed,
 } from "./chat-stream-utils";
 import { ExecutionGroup } from "./ExecutionGroup";
@@ -119,6 +124,11 @@ function SessionTranscript() {
 	// transcript; otherwise a session hydrate can mistake its own layout shift
 	// for user intent and strand the view in arbitrary history.
 	const userScrollIntentRef = useRef(!pinned);
+	// Where the reader was looking when they last moved the viewport themselves.
+	const gestureAnchorRef = useRef<{ index: string; offset: number } | null>(null);
+	// And which way they moved it: only a gesture toward the tail may re-engage
+	// following, so a stray tail-follow write cannot masquerade as reader intent.
+	const gestureTowardTailRef = useRef<GestureTowardTail>(null);
 
 	const lastCompactionIndex = displayMessages.findLastIndex(message => message.role === "compactionSummary");
 	const hiddenCount = collapseCompacted && !preCompactionOpen && lastCompactionIndex > 0 ? lastCompactionIndex : 0;
@@ -211,6 +221,7 @@ function SessionTranscript() {
 	]);
 
 	const parentRef = useRef<HTMLDivElement>(null);
+	const canvasRef = useRef<HTMLDivElement>(null);
 	const conversationAnchors = useMemo(() => buildConversationAnchors(rows, rowKeys), [rows, rowKeys]);
 	const tailRowKey = rowKeys.at(-1);
 	const activeConversationIndex = useMemo(
@@ -244,10 +255,12 @@ function SessionTranscript() {
 		initialOffset: restoreView?.scrollOffset ?? 0,
 		initialMeasurementsCache: restoreView?.measurements,
 		getItemKey: index => rowKeys[index] ?? index,
-		// Chat is an end-anchored feed. Keep the live edge stable while measured
-		// row heights replace estimates, and follow newly appended rows only while
-		// the viewport is already at that edge.
-		anchorTo: pinned ? "end" : "start",
+		// The reader's gesture is the only thing that may move the viewport away from
+		// the tail, so the virtualizer never anchors on its own: an end anchor
+		// reconciles on every measurement, and one of those reconciliations landing in
+		// the same frame as a wheel-up drags the reader back to the live edge. Tail
+		// following is the explicit, gesture-vetoed effect below instead.
+		anchorTo: "start",
 		// Appends are followed by the explicit `pinned` effect below. Keeping the
 		// virtualizer's independent append follower enabled made a small manual
 		// scroll-up lose to streaming growth before React could unpin the view.
@@ -298,77 +311,205 @@ function SessionTranscript() {
 		restoredAnchor.current = true;
 	}, [restoreView, rowKeys, virtualizer]);
 
+	// Whether the tail belongs to the follower. An upward gesture is the only thing
+	// that revokes it: `pinned` carries the reader's intent, and the measured edge is
+	// the fallback for a stale unpinned flag from a restored view. Reading only the
+	// measured edge let one frame of lag strand the stream — `scrollToEnd()` targets
+	// the virtualizer's size, which trails a row that is still growing, so the view
+	// fell outside the edge slack and the tail was abandoned for the rest of the run.
+	const followsTail = useCallback(
+		(el: HTMLElement) =>
+			viewRef.current.pinned || (isTranscriptAtLiveEdge(el) && gestureTowardTailRef.current !== false),
+		[],
+	);
+
 	// Follow appended rows and same-count tail replacements (notably the
-	// pending -> streaming transition) while pinned. Measurements and font
-	// loading can move the live edge after the initial scroll has settled.
+	// pending -> streaming transition) while the viewport sits at the live edge.
 	useEffect(() => {
-		if (!pinned || rows.length === 0 || totalSize === 0) return;
+		if (rows.length === 0 || totalSize === 0) return;
 		void sessionId;
 		void tailRowKey;
 		const frame = requestAnimationFrame(() => {
+			const el = parentRef.current;
+			if (!el) return;
+			if (!followsTail(el)) return;
 			// A wheel gesture can arrive before React cleans up this queued frame.
-			if (!userScrollIntentRef.current) virtualizer.scrollToEnd();
+			if (userScrollIntentRef.current) return;
+			virtualizer.scrollToEnd();
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [virtualizer, rows.length, tailRowKey, pinned, sessionId, totalSize]);
+	}, [virtualizer, followsTail, rows.length, tailRowKey, sessionId, totalSize]);
 
+	// Row measurements, fonts and images move the live edge after React has
+	// committed the new rows. Observe the canvas sizer — the scroll container's
+	// own box is `h-full` and never changes when content is appended.
 	useEffect(() => {
-		if (!pinned) return;
 		const el = parentRef.current;
-		if (!el || typeof ResizeObserver === "undefined") return;
+		const canvas = canvasRef.current;
+		if (!el || !canvas || typeof ResizeObserver === "undefined") return;
 		const observer = new ResizeObserver(() => {
 			if (userScrollIntentRef.current) return;
-			if (isTranscriptAtLiveEdge(el)) virtualizer.scrollToEnd();
+			if (followsTail(el)) virtualizer.scrollToEnd();
 		});
-		observer.observe(el);
+		observer.observe(canvas);
 		return () => observer.disconnect();
-	}, [pinned, virtualizer]);
+	}, [virtualizer, followsTail]);
+
+	// Entrance motion for content that genuinely arrives. Marking is imperative and
+	// one-shot per row key so it never replays when the virtualizer recycles a row
+	// back into the viewport, and never resets a fade that is still running.
+	const lastAppended = useMessagesStore(s => s.lastAppended);
+	const liveAppendRef = useRef(lastAppended);
+	const entranceRef = useRef(createRowEntranceState(sessionId, rowKeys));
+	useLayoutEffect(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		const slots = new Map<string, HTMLElement>();
+		const mounted: MountedTranscriptRow[] = [];
+		for (const slot of canvas.querySelectorAll<HTMLElement>("[data-transcript-kind][data-row-key]")) {
+			const key = slot.dataset.rowKey;
+			const index = Number(slot.dataset.index);
+			if (key === undefined || !Number.isFinite(index)) continue;
+			slots.set(key, slot);
+			mounted.push({ index, key });
+		}
+		const claims = claimRowEntrances(entranceRef.current, {
+			sessionId,
+			// `lastAppended` is untouched by hydration and pagination, so a change
+			// here is a message this window has not shown before.
+			live: isStreaming || lastAppended !== liveAppendRef.current,
+			rowKeys,
+			mounted,
+		});
+		liveAppendRef.current = lastAppended;
+		for (const key of claims) slots.get(key)?.classList.add("omp-row-arrive");
+	});
+
+	// The row the reader is looking at, plus how far it sits from the top of the
+	// viewport. Row indices are stable while a transcript streams, so this survives
+	// the virtualizer swapping height estimates for measurements.
+	const readingAnchor = useCallback((el: HTMLElement) => {
+		const top = el.getBoundingClientRect().top;
+		for (const row of el.querySelectorAll<HTMLElement>("[data-index]")) {
+			const box = row.getBoundingClientRect();
+			if (box.bottom > top + 4) return { index: row.dataset.index ?? "", offset: box.top - top };
+		}
+		return null;
+	}, []);
 
 	const handleScroll = useCallback(() => {
 		if (!userScrollIntentRef.current) return;
 		const el = parentRef.current;
 		if (!el) return;
-		const nextPinned = isTranscriptAtLiveEdge(el);
+		const anchor = readingAnchor(el);
+		if (anchor) {
+			const looked = gestureAnchorRef.current;
+			gestureAnchorRef.current = anchor;
+			// Same row, same place in it: the document moved under the reader, which
+			// happens when measurements replace estimates above the viewport. Reading
+			// that as "the reader came back" re-pins a view they just took.
+			if (looked && looked.index === anchor.index && Math.abs(looked.offset - anchor.offset) < 2) return;
+		}
+		const nextPinned = shouldRePinTranscript(gestureTowardTailRef.current, isTranscriptAtLiveEdge(el));
 		setPinned(nextPinned);
-		// Once the user reaches the live edge, subsequent layout growth belongs to
-		// the pinning system again until another explicit scroll gesture.
+		// Reaching the live edge by a tailward gesture hands layout growth back to
+		// the follower until another explicit gesture.
 		if (nextPinned) userScrollIntentRef.current = false;
+	}, [readingAnchor]);
+
+	// Every reader gesture takes the viewport: block the follower, forget the previous
+	// reading anchor, and record which way they moved so only a trip back to the tail
+	// can hand it over again.
+	const beginGesture = useCallback((towardTail: GestureTowardTail) => {
+		userScrollIntentRef.current = true;
+		gestureAnchorRef.current = null;
+		gestureTowardTailRef.current = towardTail;
+	}, []);
+
+	// A gesture can end without ever producing a scroll delta: a downward flick
+	// while already at the bottom, or a scrollbar press that never moves. Since
+	// handleScroll is the only other place the latch clears, an unlatched scroll
+	// would leave the transcript latched forever — `pinned` stays true (so "jump
+	// to latest" never appears) and both follow paths stay blocked.
+	const endScrollGesture = useCallback(() => {
+		const el = parentRef.current;
+		userScrollIntentRef.current = false;
+		gestureAnchorRef.current = null;
+		if (el && isTranscriptAtLiveEdge(el)) setPinned(true);
 	}, []);
 
 	const releaseTailPin = useCallback(() => {
-		userScrollIntentRef.current = true;
+		beginGesture(null);
 		setPinned(false);
-	}, []);
+	}, [beginGesture]);
 
-	const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-		userScrollIntentRef.current = true;
-		if (event.deltaY < 0) setPinned(false);
-	}, []);
-
-	const handleScrollPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-		const right = event.currentTarget.getBoundingClientRect().right;
-		if (event.clientX >= right - 20) {
-			userScrollIntentRef.current = true;
+	const handleWheel = useCallback(
+		(event: React.WheelEvent<HTMLDivElement>) => {
+			if (event.deltaY === 0) return; // A horizontal wheel claims nothing.
+			if (event.deltaY > 0) {
+				// Toward the tail needs no veto: an unpinned follower never moves the view,
+				// and `handleScroll` re-pins once the movement lands. Latching here could
+				// strand the transcript for good — a wheel that stops a few pixels short of
+				// the edge emits no further scroll event to release the latch, so a pinned
+				// view would stop following with nothing for the reader to act on.
+				gestureTowardTailRef.current = true;
+				return;
+			}
+			beginGesture(false);
 			setPinned(false);
-		}
-	}, []);
+		},
+		[beginGesture],
+	);
 
-	const handleScrollKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-		if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) {
-			userScrollIntentRef.current = true;
-			setPinned(false);
-		}
-	}, []);
+	const handleScrollPointerDown = useCallback(
+		(event: React.PointerEvent<HTMLDivElement>) => {
+			const right = event.currentTarget.getBoundingClientRect().right;
+			if (event.clientX >= right - 20) {
+				beginGesture(null);
+				setPinned(false);
+			}
+		},
+		[beginGesture],
+	);
+
+	const handleScrollKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLDivElement>) => {
+			if (["ArrowDown", "PageDown", "End", " "].includes(event.key)) {
+				gestureTowardTailRef.current = true;
+				return;
+			}
+			if (["ArrowUp", "PageUp", "Home"].includes(event.key)) {
+				beginGesture(false);
+				setPinned(false);
+			}
+		},
+		[beginGesture],
+	);
 
 	const jumpToLatest = useCallback(() => {
 		userScrollIntentRef.current = false;
+		gestureAnchorRef.current = null;
+		gestureTowardTailRef.current = true;
 		setPinned(true);
 		virtualizer.scrollToEnd();
 	}, [virtualizer]);
 
+	// A send reclaims the live edge even when the user had scrolled up. Mounted
+	// keyed per tab+session, so seeding from the mount-time value keeps a
+	// historical nonce from yanking a restored mid-transcript view to the bottom.
+	const pinNonce = useSessionStore(s => s.transcriptPinNonce);
+	const lastPinNonce = useRef(pinNonce);
+	useEffect(() => {
+		if (lastPinNonce.current === pinNonce) return;
+		lastPinNonce.current = pinNonce;
+		jumpToLatest();
+	}, [pinNonce, jumpToLatest]);
+
 	const jumpToConversation = useCallback(
 		(rowIndex: number) => {
 			userScrollIntentRef.current = false;
+			gestureAnchorRef.current = null;
+			gestureTowardTailRef.current = null;
 			setPinned(false);
 			virtualizer.scrollToIndex(rowIndex, { align: "start" });
 		},
@@ -396,7 +537,10 @@ function SessionTranscript() {
 					onScroll={handleScroll}
 					onWheel={handleWheel}
 					onTouchMove={releaseTailPin}
+					onTouchEnd={endScrollGesture}
 					onPointerDown={handleScrollPointerDown}
+					onPointerUp={endScrollGesture}
+					onPointerCancel={endScrollGesture}
 					onKeyDown={handleScrollKeyDown}
 					tabIndex={0}
 					className="omp-transcript-scroll h-full overflow-y-auto overscroll-contain"
@@ -449,6 +593,7 @@ function SessionTranscript() {
 						</div>
 					)}
 					<div
+						ref={canvasRef}
 						className="omp-transcript-canvas"
 						style={{ height: totalSize, position: "relative", width: "100%" }}
 					>
@@ -460,6 +605,7 @@ function SessionTranscript() {
 								<div
 									key={item.key}
 									data-index={item.index}
+									data-row-key={rowKey}
 									data-transcript-kind={row.kind}
 									ref={virtualizer.measureElement}
 									style={{
@@ -1037,8 +1183,13 @@ export {
 	buildHistoryRows,
 	buildTimelineMarkers,
 	buildTranscriptRowKeys,
+	claimRowEntrances,
+	createRowEntranceState,
 	findConversationAnchorIndex,
 	hasStreamingTranscriptContent,
 	isTranscriptAtLiveEdge,
+	LIVE_EDGE_SLACK_PX,
 	mergeTodoSnapshots,
+	ROW_ENTRANCE_TAIL_ROWS,
+	shouldRePinTranscript,
 } from "./chat-stream-utils";

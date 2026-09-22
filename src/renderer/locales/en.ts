@@ -290,6 +290,7 @@ export const en: Record<string, string> = {
 	"contextUsage.title": "Context usage",
 	"contextUsage.used": "Context used",
 	"contextUsage.remaining": "Context remaining",
+	"contextUsage.windowUnknown": "Context window unknown",
 	"contextUsage.progress": "Context is {percent}% used",
 	"contextUsage.loading": "Loading breakdown…",
 	"contextUsage.unavailable": "The detailed breakdown is temporarily unavailable.",
@@ -730,10 +731,14 @@ export const en: Record<string, string> = {
 	"providers.editConfig": "Edit Config",
 	"providers.customTitle": "Custom Providers",
 	"providers.customHelp":
-		"Add third-party providers (OpenRouter, Together, local servers, etc.) by editing {file}. Define {baseUrl}, {apiKey}, and {models} per provider. Changes take effect after restarting the session.",
+		"Add third-party providers (OpenRouter, Together, local servers, etc.) by editing {file}. Define {baseUrl}, {apiKey}, and {models} per provider. Changes apply on the next catalog refresh — no session restart needed.",
+	"providers.customWithoutModels":
+		"Configured in models.yml but missing from the list above: {ids}. No usable model was discovered for them yet — check the base URL, API key, or model list.",
 	"providers.loginSuccess": "Logged in to {provider}",
 	"providers.loginFailed": "Login failed",
 	"providers.logoutSuccess": "Logged out of {provider}",
+	"providers.logoutKept":
+		"{provider} is still authenticated: its key is supplied outside the credential store, so signing out cannot remove it.",
 	"providers.logoutFailed": "Logout failed",
 	"providers.edit": "Edit provider",
 	"providers.updateCredentials": "Update credentials for {provider}",
@@ -1762,6 +1767,8 @@ export const en: Record<string, string> = {
 	"contextReport.unavailable": "Context usage is unavailable: no model is selected for this session.",
 	"contextReport.noModel": "No model",
 	"contextReport.usedOf": "{used} / {window} tokens ({percent}% used)",
+	"contextReport.usedWithoutWindow": "{used} tokens used",
+	"contextReport.windowUnknown": "Context window unknown",
 	"contextReport.cat.systemPrompt": "System prompt",
 	"contextReport.cat.systemContext": "System context",
 	"contextReport.cat.systemTools": "Tool schemas",

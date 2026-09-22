@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cx } from "../../lib/format";
+import { isImeKeyEvent } from "../../lib/ime";
 
 export interface ContextMenuItem {
 	/** Stable id for keyboard focus tracking. */
@@ -66,7 +67,7 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
 			if (!menuRef.current?.contains(event.target as globalThis.Node | null)) onCloseRef.current();
 		};
 		const onKey = (event: KeyboardEvent) => {
-			if (event.isComposing || event.keyCode === 229) return;
+			if (isImeKeyEvent(event)) return;
 			// Tab leaves an open menu for background controls while it stays
 			// visible — close instead, per menu-button behavior.
 			if (event.key === "Tab") {
@@ -106,6 +107,9 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
 			onKeyDown={event => {
 				if (event.key === "Escape") {
 					event.preventDefault();
+					// The menu owns this keypress: without stopping it, a dialog behind
+					// the menu takes the same Escape and closes with it.
+					event.stopPropagation();
 					onClose();
 				} else if (event.key === "ArrowDown") {
 					event.preventDefault();
@@ -119,7 +123,7 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
 					if (item && !item.disabled) item.onSelect();
 				}
 			}}
-			className="fixed z-50 min-w-44 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] py-1 shadow-xl"
+			className="omp-pop-in fixed z-50 min-w-44 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] py-1 shadow-xl"
 		>
 			{items.map((item, index) => (
 				<button
@@ -138,7 +142,7 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
 						"flex w-full items-center gap-2 px-3 py-2 text-left text-omp-md hover:bg-[var(--omp-selected-bg)]",
 						item.danger ? "text-[var(--omp-error)]" : "text-[var(--omp-text)]",
 						index === activeIndex && "bg-[var(--omp-selected-bg)]",
-						item.disabled && "cursor-not-allowed opacity-45",
+						item.disabled && "cursor-not-allowed opacity-70",
 					)}
 				>
 					{item.icon && (

@@ -132,12 +132,14 @@ function buildContextMenu(windowManager: WindowManager, state: TrayState | null)
 					: t(lang, "approvalAsk");
 		const fastLabel = `${t(lang, "fastMode")}: ${state.fastMode ? "✓" : "—"}`;
 		template.push({ label: `${fastLabel} · ${t(lang, "approval")}: ${approvalLabel}`, enabled: false });
-		// Usage / token consumption (read-only).
-		if (state.contextPercent !== null) {
+		// Usage / token consumption (read-only). The percent is absent — never 0 —
+		// for a model whose context window Core does not know.
+		if (state.contextPercent !== null || state.contextTokens !== null) {
+			const share = state.contextPercent === null ? "—" : `${Math.round(state.contextPercent)}%`;
 			const tokens =
 				state.contextTokens !== null ? ` · ${formatTokens(state.contextTokens)} ${t(lang, "tokens")}` : "";
 			template.push({
-				label: `${t(lang, "context")}: ${Math.round(state.contextPercent)}%${tokens}`,
+				label: `${t(lang, "context")}: ${share}${tokens}`,
 				enabled: false,
 			});
 		}

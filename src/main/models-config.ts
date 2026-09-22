@@ -13,9 +13,9 @@
  * upserts merge over the existing entry instead of replacing it, so a rich
  * hand-written config never loses data to a GUI edit.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { parse, stringify } from "yaml";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import * as path from "node:path";
+import { type Document, parseDocument } from "yaml";
 import {
 	CUSTOM_MODEL_EFFORTS,
 	CUSTOM_PROVIDER_APIS,
@@ -76,21 +76,52 @@ const THINKING_MODES: ReadonlySet<string> = new Set([
 /** Absolute path to the agent's models file (`models.yml` preferred, `models.yaml` fallback). */
 export function modelsPath(): string {
 	const dir = agentDir();
-	const yml = join(dir, "models.yml");
+	const yml = path.join(dir, "models.yml");
 	if (existsSync(yml)) return yml;
-	return join(dir, "models.yaml");
+	const legacy = path.join(dir, "models.yaml");
+	// A fresh install writes the preferred name; only an existing `models.yaml`
+	// keeps being used.
+	return existsSync(legacy) ? legacy : yml;
 }
 
-interface ModelsFileShape {
-	providers?: Record<string, unknown>;
-	[other: string]: unknown;
+interface ModelsFile {
+	/** The live document: an edit mutates this, and a save writes it back. */
+	doc: Document;
+	providers: Record<string, unknown>;
 }
 
-function readFile(): ModelsFileShape {
+function readModelsFile(): ModelsFile {
 	const file = modelsPath();
-	if (!existsSync(file)) return {};
-	const parsed = parse(readFileSync(file, "utf8"));
-	return parsed && typeof parsed === "object" ? (parsed as ModelsFileShape) : {};
+	if (!existsSync(file)) return { doc: parseDocument(""), providers: {} };
+	const doc = parseDocument(readFileSync(file, "utf8"));
+	const issue = doc.errors[0] ?? doc.warnings[0];
+	if (doc.errors.length > 0) throw new Error(`${file}: ${issue?.message ?? "invalid YAML"}`);
+	const contents = doc.toJS();
+	const providers = contents?.providers;
+	return {
+		doc,
+		providers: typeof providers === "object" && providers !== null ? (providers as Record<string, unknown>) : {},
+	};
+}
+
+let tmpCounter = 0;
+
+/**
+ * Swap the file in one step. The agent watches this path and live-reloads it,
+ * so a truncate-then-write leaves a window where a concurrent read sees an empty
+ * or half-written config — and a crash inside it destroys every provider.
+ */
+function writeModelsFile(doc: Document): void {
+	const file = modelsPath();
+	mkdirSync(path.dirname(file), { recursive: true });
+	const tmp = `${file}.tmp-${process.pid}-${tmpCounter++}`;
+	try {
+		writeFileSync(tmp, String(doc), "utf8");
+		renameSync(tmp, file);
+	} catch (error) {
+		rmSync(tmp, { force: true });
+		throw error;
+	}
 }
 
 function maskApiKey(key: unknown): { hasApiKey: boolean; apiKeyPreview?: string } {
@@ -246,8 +277,7 @@ function toView(id: string, raw: unknown): CustomProviderView & { apiKey?: strin
 
 /** List configured providers (custom + user overrides), apiKey masked. */
 export function listModelsProviders(): CustomProviderView[] {
-	const data = readFile();
-	const providers = data.providers ?? {};
+	const { providers } = readModelsFile();
 	return Object.entries(providers).map(([id, raw]) => {
 		const { apiKey: _secret, ...view } = toView(id, raw);
 		return view;
@@ -304,8 +334,8 @@ export function upsertModelsProvider(input: CustomProviderInput): void {
 	if (BUILTIN_PROVIDERS.has(input.id)) {
 		throw new Error(`"${input.id}" is a built-in provider id; choose a distinct custom id.`);
 	}
-	const data = readFile();
-	const existingRaw = data.providers?.[input.id];
+	const data = readModelsFile();
+	const existingRaw = data.providers[input.id];
 	const existing = toView(input.id, existingRaw);
 	const apiKey = input.apiKey && input.apiKey.trim().length > 0 ? input.apiKey.trim() : existing.apiKey;
 	const entry: Record<string, unknown> =
@@ -330,9 +360,8 @@ export function upsertModelsProvider(input: CustomProviderInput): void {
 	if (Object.keys(compat).length > 0) entry.compat = compat;
 	else delete entry.compat;
 	entry.models = input.models.map(m => mergeModel(entry.models, m));
-	if (!data.providers) data.providers = {};
-	data.providers[input.id] = entry;
-	writeFileSync(modelsPath(), stringify(data), "utf8");
+	data.doc.setIn(["providers", input.id], entry);
+	writeModelsFile(data.doc);
 }
 
 /** Delete a custom provider entry (built-ins cannot be removed here). */
@@ -340,10 +369,10 @@ export function deleteModelsProvider(id: string): void {
 	if (BUILTIN_PROVIDERS.has(id)) {
 		throw new Error(`"${id}" is a built-in provider and cannot be removed from the GUI.`);
 	}
-	const data = readFile();
-	if (!data.providers || !(id in data.providers)) return;
-	delete data.providers[id];
-	writeFileSync(modelsPath(), stringify(data), "utf8");
+	const data = readModelsFile();
+	if (!(id in data.providers)) return;
+	data.doc.deleteIn(["providers", id]);
+	writeModelsFile(data.doc);
 }
 
 /** Protocol options for the add-provider form (ApiSchema in models-config-schema). */

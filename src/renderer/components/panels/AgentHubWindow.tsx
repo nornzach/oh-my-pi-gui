@@ -22,6 +22,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcAgentDefinitionInfo, SubagentSnapshot } from "../../../shared/rpc-types";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { abortActiveTurn } from "../../lib/messages";
 import { useSubagentsStore } from "../../stores/subagents";
 import { toast } from "../../stores/toast";
@@ -255,6 +256,7 @@ const DefinitionRow = memo(function DefinitionRow({
 								onKeyDown={event => {
 									// Enter submits; Escape is owned by the Modal (closes the window),
 									// matching every other GUI dialog's edit-in-place behavior.
+									if (isImeKeyEvent(event)) return;
 									if (event.key === "Enter") submit();
 								}}
 								placeholder={t("agentHub.defs.modelPlaceholder")}
@@ -647,7 +649,7 @@ function AgentTranscriptDrawer({ agent, onClose }: { agent: SubagentSnapshot; on
 	}, [onClose]);
 
 	return (
-		<div className="omp-fade-in absolute inset-0 z-10 flex flex-col bg-(--omp-modal-bg)">
+		<div className="omp-slide-in-right absolute inset-0 z-10 flex flex-col bg-(--omp-modal-bg)">
 			<div className="flex shrink-0 items-center gap-2 border-b border-(--omp-border-muted) px-3 py-2">
 				<button
 					aria-label={t("agentHub.hub.backToHub")}

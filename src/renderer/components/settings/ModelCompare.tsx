@@ -8,6 +8,11 @@ import { useTabRpc } from "../../lib/tab-rpc";
  * the model to a role (set_model_role). Current model + role assignments are
  * highlighted; provider quota from get_usage renders inline per provider.
  *
+ * Catalog note: the model and provider columns come from the per-tab model
+ * store, not a private copy. A `model_catalog_update` push and an opening read
+ * race, and only the store's generation guard can tell which won; roles and
+ * usage are separate feeds and stay local.
+ *
  * Wire note: `get_available_models` serializes full catalog `Model` objects —
  * `cost {input,output,cacheRead,cacheWrite}` ($/1M tokens),
  * `contextWindow` (number|null), `maxTokens` (number|null), `reasoning` — even
@@ -23,7 +28,6 @@ import type {
 	ModelRoleMetadata,
 	ModelRolesResult,
 	ProviderInfo,
-	ProvidersResult,
 	UsageLimit,
 	UsageReport,
 	UsageResult,
@@ -34,24 +38,6 @@ import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { Badge, Button, Modal, ProgressBar, Spinner } from "../common";
-
-// ============================================================================
-// Wire shapes (full catalog Model — superset of ModelInfo, all optional)
-// ============================================================================
-
-interface WireModelCost {
-	input?: number;
-	output?: number;
-	cacheRead?: number;
-	cacheWrite?: number;
-}
-
-export interface WireModel extends ModelInfo {
-	reasoning?: boolean;
-	cost?: WireModelCost;
-	contextWindow?: number | null;
-	maxTokens?: number | null;
-}
 
 // ============================================================================
 // Derived row + helpers
@@ -118,17 +104,19 @@ function cmpNumber(a: number | null, b: number | null, dir: 1 | -1): number {
 }
 
 /**
- * Joins the four RPC feeds into table rows. `providers`/`roles`/`usage` may be
- * null when their call failed — rows still render with degraded auth/role/quota
- * cells rather than dropping models.
+ * Joins the catalog snapshot with the role and usage feeds into table rows.
+ * `roles`/`usage` may be null when their call failed — rows still render with
+ * degraded role/quota cells rather than dropping models. A provider that is
+ * absent from `providers` (or an empty list from a catalog generation that
+ * carried none) renders auth as "?", never as "no auth".
  */
 export function buildModelRows(input: {
-	models: WireModel[];
-	providers: ProviderInfo[] | null;
+	models: ModelInfo[];
+	providers: ProviderInfo[];
 	roles: ModelRoleEntry[] | null;
 	usage: UsageReport[] | null;
 }): Row[] {
-	const providerById = new Map((input.providers ?? []).map(provider => [provider.id, provider]));
+	const providerById = new Map(input.providers.map(provider => [provider.id, provider]));
 	const usageByProvider = new Map((input.usage ?? []).map(report => [report.provider, report]));
 	return input.models.map(model => {
 		const key = `${model.provider}/${model.id}`;
@@ -140,7 +128,7 @@ export function buildModelRows(input: {
 			providerName: provider?.name ?? model.provider,
 			id: model.id,
 			name: typeof model.name === "string" && model.name.length > 0 && model.name !== model.id ? model.name : null,
-			authKnown: input.providers !== null && provider !== undefined,
+			authKnown: provider !== undefined,
 			authenticated: provider?.authenticated ?? false,
 			authKind: provider?.authKind,
 			disabled: provider?.disabled ?? false,
@@ -253,9 +241,10 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 	const t = useT();
 	const sidecarReady = useSessionStore(s => s.status) === "ready";
 	const current = useModelStore(s => s.model);
+	const models = useModelStore(s => s.availableModels);
+	const providers = useModelStore(s => s.providers);
+	const refreshProviders = useModelStore(s => s.refreshProviders);
 
-	const [models, setModels] = useState<WireModel[] | null>(null);
-	const [providers, setProviders] = useState<ProviderInfo[] | null>(null);
 	const [roles, setRoles] = useState<ModelRoleEntry[] | null>(null);
 	const [roleMeta, setRoleMeta] = useState<ModelRoleMetadata[] | null>(null);
 	const [usage, setUsage] = useState<UsageReport[] | null>(null);
@@ -277,34 +266,23 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 			setLoading(false);
 			return;
 		}
-		const [modelsR, providersR, rolesR, metaR, usageR] = await Promise.allSettled([
-			tabRpc.getAvailableModels(),
-			tabRpc.getProviders(),
+		// One forced read for both catalog columns: models and providers must come
+		// from the same generation, and a non-forced one is satisfied by a
+		// still-fresh cache row after a credential or models.yml change.
+		const [catalogR, rolesR, metaR, usageR] = await Promise.allSettled([
+			refreshProviders(true),
 			tabRpc.getModelRoles(),
 			tabRpc.getModelRoleMetadata(),
 			tabRpc.getUsage(),
 		]);
 		const failed: string[] = [];
 
-		if (modelsR.status === "fulfilled" && modelsR.value.success) {
-			const data = modelsR.value.data as { models?: WireModel[] } | undefined;
-			setModels(data?.models ?? []);
-		} else {
-			setModels(null);
+		if (catalogR.status === "rejected") {
 			setFatalError(
-				modelsR.status === "rejected"
-					? String(modelsR.reason)
-					: !modelsR.value.success
-						? modelsR.value.error
-						: t("modelCompare.unknownError"),
+				catalogR.reason instanceof Error
+					? catalogR.reason.message
+					: String(catalogR.reason ?? t("modelCompare.unknownError")),
 			);
-		}
-
-		if (providersR.status === "fulfilled" && providersR.value.success) {
-			setProviders((providersR.value.data as ProvidersResult | undefined)?.providers ?? []);
-		} else {
-			setProviders(null);
-			failed.push("providers");
 		}
 
 		if (rolesR.status === "fulfilled" && rolesR.value.success) {
@@ -329,15 +307,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 
 		setFailedSections(failed);
 		setLoading(false);
-	}, [
-		sidecarReady,
-		t,
-		tabRpc.getModelRoles,
-		tabRpc.getUsage,
-		tabRpc.getProviders,
-		tabRpc.getModelRoleMetadata,
-		tabRpc.getAvailableModels,
-	]);
+	}, [sidecarReady, t, refreshProviders, tabRpc.getModelRoles, tabRpc.getUsage, tabRpc.getModelRoleMetadata]);
 
 	useEffect(() => {
 		if (open) void load();
@@ -356,7 +326,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 	const metaById = useMemo(() => new Map((roleMeta ?? []).map(m => [m.id, m])), [roleMeta]);
 
 	const rows = useMemo<Row[]>(
-		() => (models === null ? [] : buildModelRows({ models, providers, roles, usage })),
+		() => buildModelRows({ models, providers, roles, usage }),
 		[models, providers, roles, usage],
 	);
 
@@ -472,7 +442,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 				</Button>
 			</div>
 		);
-	} else if (models === null) {
+	} else if (loading && models.length === 0) {
 		body = (
 			<div className="flex flex-1 items-center justify-center py-16">
 				<Spinner />

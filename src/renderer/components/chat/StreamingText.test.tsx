@@ -17,6 +17,7 @@ interface TestElement {
 	textContent: string | null;
 	remove: () => void;
 	getAttribute: (name: string) => string | null;
+	setAttribute: (name: string, value: string) => void;
 	querySelector: (selector: string) => TestElement | null;
 	querySelectorAll: (selector: string) => TestElement[];
 }
@@ -90,6 +91,51 @@ describe("StreamingText presentation", () => {
 		await flushFrame();
 		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe("ABC");
 		expect(container.querySelector(".omp-streaming-reveal")?.textContent).toBe("BC");
+	});
+
+	/**
+	 * The reveal is a CSS transition on a chunk that stays mounted. When a commit
+	 * destroyed the previous span instead, text already on screen restarted its
+	 * fade ~25 times a second, which is the strobe readers see while streaming.
+	 */
+	it("keeps an already-revealed chunk mounted as newer text arrives", async () => {
+		await mount("Hel");
+
+		await act(async () => {
+			useMessagesStore.setState({ streamingText: "Hello " });
+		});
+		await flushFrame();
+		const revealed = container.querySelector(".omp-streaming-reveal");
+		expect(revealed?.textContent).toBe("lo ");
+		// Identity probe: survives a re-render of the same node, vanishes if React
+		// tears the node down and mounts a replacement.
+		revealed?.setAttribute("data-probe", "1");
+
+		await act(async () => {
+			useMessagesStore.setState({ streamingText: "Hello wor" });
+		});
+		await flushFrame();
+
+		// Same node, now settled: its fade keeps running from where it was.
+		const held = container.querySelector("[data-probe='1']");
+		expect(held?.textContent).toBe("lo ");
+		expect(held?.getAttribute("class")).not.toContain("omp-streaming-reveal");
+		expect(container.querySelector(".omp-streaming-reveal")?.textContent).toBe("wor");
+		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe("Hello wor");
+	});
+
+	it("bounds the live tail to the last few reveal chunks", async () => {
+		let text = "a";
+		await mount(text);
+		for (let commit = 0; commit < 12; commit++) {
+			text += "bc";
+			await act(async () => {
+				useMessagesStore.setState({ streamingText: text });
+			});
+			await flushFrame();
+		}
+		expect(container.querySelectorAll(".omp-streaming-chunk").length).toBeLessThanOrEqual(7);
+		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe(text);
 	});
 
 	it("parses a completed paragraph once and keeps the unfinished suffix lightweight", async () => {

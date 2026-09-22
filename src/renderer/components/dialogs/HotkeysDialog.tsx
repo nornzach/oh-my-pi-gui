@@ -98,7 +98,7 @@ interface CaptureState {
 }
 
 /** Searchable shortcut reference panel with per-row keybinding remap (B3). */
-export function HotkeysDialog() {
+export function HotkeysDialog({ open }: { open: boolean }) {
 	const t = useT();
 	const close = useUiStore(s => s.closeHotkeys);
 	const overrides = useUiStore(s => s.keymapOverrides);
@@ -107,6 +107,15 @@ export function HotkeysDialog() {
 	const [query, setQuery] = useState("");
 	const [capture, setCapture] = useState<CaptureState | null>(null);
 	const [confirmingResetAll, setConfirmingResetAll] = useState(false);
+
+	// Stays mounted through its exit animation, so every open starts from a clean
+	// filter rather than the previous visit's search, capture or confirm state.
+	useEffect(() => {
+		if (!open) return;
+		setQuery("");
+		setCapture(null);
+		setConfirmingResetAll(false);
+	}, [open]);
 
 	// Capture mode: swallow every key at window-capture phase so nothing leaks
 	// to App's global handler (window bubble) or the modal's own Escape-close
@@ -194,7 +203,7 @@ export function HotkeysDialog() {
 	};
 
 	return (
-		<Modal open onClose={close} title={t("hotkeys.title")}>
+		<Modal onClose={close} open={open} title={t("hotkeys.title")}>
 			<div className="mb-3 flex items-center gap-2">
 				<div className="min-w-0 flex-1">
 					<Input

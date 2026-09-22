@@ -350,17 +350,17 @@ kbd,
 	animation: omp-slide-in-right var(--omp-motion-med) var(--omp-ease-enter) both;
 }
 
-.omp-dialog-overlay {
-	animation: omp-fade-in var(--omp-motion-fast) var(--omp-ease) both;
-}
-
-.omp-dialog-overlay--exit {
+/* The exit half of the enter utilities above. Keyframes alone are not a class:
+ * an overlay that swaps to `omp-scale-out` gets `animation: none` unless the
+ * utility exists, which is why every exit silently snapped instead of fading. */
+.omp-fade-out {
 	animation: omp-fade-out var(--omp-motion-fast) var(--omp-ease) both;
 }
 
-.omp-dialog-panel--exit {
+.omp-scale-out {
 	animation: omp-scale-out var(--omp-motion-fast) var(--omp-ease) both;
 }
+
 @keyframes omp-fade-out {
 	from {
 		opacity: 1;
@@ -379,14 +379,6 @@ kbd,
 		opacity: 0;
 		transform: scale(0.96) translateY(6px);
 	}
-}
-
-.omp-dialog-overlay--exit {
-	animation: omp-fade-out var(--omp-motion-fast) var(--omp-ease) both;
-}
-
-.omp-dialog-panel--exit {
-	animation: omp-scale-out var(--omp-motion-fast) var(--omp-ease) both;
 }
 
 .omp-skeleton {
@@ -466,6 +458,26 @@ kbd,
 
 .omp-pressable:active {
 	opacity: 0.72;
+}
+
+/* Hover, focus and selection color changes were instant on every control that
+   forgot a transition utility — a tab, a menu item, a settings row — which reads
+   as a flicker rather than a response. Covering the interactive elements once
+   beats a `transition-colors` class at thirty callsites, and stays subordinate:
+   a callsite's own `transition-*` utility is a class selector, so it outranks this
+   rule and keeps its own properties and timing. */
+button,
+a[href],
+summary,
+[role="button"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="option"],
+[role="tab"] {
+	transition:
+		background-color var(--omp-motion-fast) var(--omp-ease),
+		border-color var(--omp-motion-fast) var(--omp-ease),
+		color var(--omp-motion-fast) var(--omp-ease);
 }
 
 .omp-color-fade {

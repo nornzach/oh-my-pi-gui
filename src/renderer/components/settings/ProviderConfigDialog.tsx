@@ -102,7 +102,7 @@ interface ProviderFormProps {
 
 function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel }: ProviderFormProps) {
 	const t = useT();
-	const refreshAvailableModels = useModelStore(state => state.refreshAvailableModels);
+	const refreshProviders = useModelStore(state => state.refreshProviders);
 	const nextKey = useRef(1);
 	const readonly = editing?.builtin ?? false;
 
@@ -268,7 +268,7 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 		try {
 			await window.omp.models.upsertProvider(input);
 			try {
-				const catalog = await refreshAvailableModels(true);
+				const catalog = await refreshProviders(true);
 				const discoveryError = catalog.discoveryStates.find(
 					state => state.provider === input.id && state.status === "unavailable",
 				);
@@ -627,7 +627,7 @@ export interface ProviderConfigDialogProps {
 
 export function ProviderConfigDialog({ open, onClose, editProvider = null }: ProviderConfigDialogProps) {
 	const t = useT();
-	const refreshAvailableModels = useModelStore(state => state.refreshAvailableModels);
+	const refreshProviders = useModelStore(state => state.refreshProviders);
 	const [view, setView] = useState<View>({ kind: "list" });
 	const [providers, setProviders] = useState<CustomProviderView[] | null>(null);
 	const [listError, setListError] = useState<string | null>(null);
@@ -668,7 +668,7 @@ export function ProviderConfigDialog({ open, onClose, editProvider = null }: Pro
 		try {
 			await window.omp.models.deleteProvider(pendingDelete.id);
 			try {
-				await refreshAvailableModels(true);
+				await refreshProviders(true);
 			} catch (cause) {
 				toast({
 					variant: "warning",

@@ -996,6 +996,14 @@ export interface ContextUsage {
 	percent: number;
 }
 
+/** Per-million-token rate card, as carried by the catalog model on the wire. */
+export interface ModelCost {
+	input?: number;
+	output?: number;
+	cacheRead?: number;
+	cacheWrite?: number;
+}
+
 export interface ModelInfo {
 	provider: string;
 	id: string;
@@ -1009,6 +1017,9 @@ export interface ModelInfo {
 	/** Present on the wire (get_available_models / get_state carry full Model
 	 * objects) — used by the picker to flag over-context switches. */
 	contextWindow?: number | null;
+	/** Below the catalog these are reported only for models with a rate card. */
+	maxTokens?: number | null;
+	cost?: ModelCost;
 }
 
 export interface RpcSessionState {

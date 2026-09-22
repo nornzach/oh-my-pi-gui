@@ -104,7 +104,10 @@ export function PrDetailPane({ onCreateOpen }: { onCreateOpen: () => void }) {
 	const shownBody = bodyExpanded || !collapsible ? detail.body : bodyLines.slice(0, BODY_COLLAPSE_LINES).join("\n");
 
 	return (
-		<div className="flex flex-col gap-4 p-4">
+		// Keyed on the selection so switching PRs replays the entrance instead of
+		// mutating the previous PR's body in place, and resets the local body
+		// expansion that belongs to the PR being left behind.
+		<div key={selected} className="omp-fade-up flex flex-col gap-4 p-4">
 			{/* Header card */}
 			<div className="flex flex-col gap-2 rounded-lg border border-(--omp-border-muted) bg-transparent p-3">
 				<div className="flex items-start gap-2">

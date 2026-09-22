@@ -3,12 +3,26 @@ import { useEffect, useRef, useState } from "react";
 /** Presentation cadence for growing Markdown/reasoning streams (~25 FPS). */
 export const STREAM_FORMAT_FLUSH_MS = 40;
 
+/**
+ * Reveal starts kept per stream: one commit interval each, well past the
+ * `--omp-motion-fast` transition a chunk fades through. Bounds the live DOM
+ * without ever tearing down a chunk that is still animating.
+ */
+export const STREAM_REVEAL_FRONTIERS = 6;
+
 export interface StreamingTextFrame {
 	text: string;
-	/** Source offset where this frame's newly revealed suffix begins. */
-	deltaStart: number;
-	/** Increments only when visible text advances; useful for one-shot CSS motion. */
-	revision: number;
+	/**
+	 * Source offsets where each of the last few reveals began, oldest first. The
+	 * consumer renders one persistent chunk per interval so text that is already
+	 * on screen never loses its DOM node mid-transition.
+	 */
+	frontiers: number[];
+}
+
+function nextFrontiers(previous: number[], deltaStart: number): number[] {
+	if (previous[previous.length - 1] === deltaStart) return previous;
+	return [...previous, deltaStart].slice(-STREAM_REVEAL_FRONTIERS);
 }
 
 function requestPresentationFrame(callback: FrameRequestCallback): number {
@@ -27,7 +41,7 @@ function cancelPresentationFrame(handle: number): void {
  * to the latest prefix at `intervalMs` cadence without adding timer drift.
  */
 export function useStreamingTextFrame(text: string, intervalMs: number): StreamingTextFrame {
-	const [frame, setFrame] = useState<StreamingTextFrame>({ text, deltaStart: 0, revision: 0 });
+	const [frame, setFrame] = useState<StreamingTextFrame>({ text, frontiers: [0] });
 	const latestRef = useRef(text);
 	const displayedRef = useRef(text);
 	const frameRequestRef = useRef<number | undefined>(undefined);
@@ -49,11 +63,8 @@ export function useStreamingTextFrame(text: string, intervalMs: number): Streami
 			frameRequestRef.current = undefined;
 			const previousLength = displayedRef.current.length;
 			displayedRef.current = text;
-			setFrame(current => ({
-				text,
-				deltaStart: Math.min(previousLength, text.length),
-				revision: current.revision + 1,
-			}));
+			const deltaStart = Math.min(previousLength, text.length);
+			setFrame(() => ({ text, frontiers: [deltaStart] }));
 			return;
 		}
 
@@ -61,7 +72,7 @@ export function useStreamingTextFrame(text: string, intervalMs: number): Streami
 		if (intervalMs <= 0) {
 			const deltaStart = displayedRef.current.length;
 			displayedRef.current = text;
-			setFrame(current => ({ text, deltaStart, revision: current.revision + 1 }));
+			setFrame(current => ({ text, frontiers: nextFrontiers(current.frontiers, deltaStart) }));
 			return;
 		}
 		if (frameRequestRef.current !== undefined) return;
@@ -79,7 +90,10 @@ export function useStreamingTextFrame(text: string, intervalMs: number): Streami
 			const deltaStart = latest.startsWith(displayedRef.current) ? displayedRef.current.length : 0;
 			displayedRef.current = latest;
 			lastCommitRef.current = now;
-			setFrame(current => ({ text: latest, deltaStart, revision: current.revision + 1 }));
+			setFrame(current => ({
+				text: latest,
+				frontiers: deltaStart === 0 ? [0] : nextFrontiers(current.frontiers, deltaStart),
+			}));
 		};
 
 		frameRequestRef.current = requestPresentationFrame(commitOnFrame);

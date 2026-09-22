@@ -37,6 +37,8 @@ import {
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { TodoPhase, TodoTask } from "../../../../shared/rpc-types";
 import { useT } from "../../../lib/i18n";
+import { isImeKeyEvent } from "../../../lib/ime";
+import { onEscape } from "../../../lib/keymap";
 import { type TabRpc, useTabRpc } from "../../../lib/tab-rpc";
 import { toast } from "../../../stores/toast";
 import { type UiTodoPhase, type UiTodoTask, useTodoStore } from "../../../stores/todo";
@@ -141,11 +143,12 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 						onBlur={commit}
 						onChange={event => setDraft(event.target.value)}
 						onKeyDown={event => {
+							if (isImeKeyEvent(event)) return;
 							if (event.key === "Enter") commit();
-							if (event.key === "Escape") {
+							onEscape(event, () => {
 								setDraft(task.content);
 								setEditing(false);
-							}
+							});
 						}}
 						value={draft}
 					/>

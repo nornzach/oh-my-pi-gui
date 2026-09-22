@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RpcContextReportResult } from "../../../shared/rpc-types";
+import { contextUsageView } from "../../lib/context-usage";
 import { formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
@@ -14,9 +15,10 @@ interface CategoryRow {
 
 /**
  * Native /context: per-category token bars over the provider-anchored
- * breakdown returned by get_context_report. Bars are sized against the full
- * context window so their sum (plus Free) always fills it — the TUI grid's
- * invariant.
+ * breakdown returned by get_context_report. With a known window the bars are
+ * sized against it so their sum (plus Free) fills it — the TUI grid's
+ * invariant. Without one they show the composition of the used context and
+ * drop every percentage, since there is nothing to divide by.
  */
 export function ContextReportDialog() {
 	const tabRpc = useTabRpc();
@@ -52,9 +54,9 @@ export function ContextReportDialog() {
 	}, [open, tabRpc.getContextReport]);
 
 	const breakdown = report?.breakdown;
-	const contextWindow = report?.contextWindow ?? 0;
+	const { capacityKnown, contextWindow, usedTokens } = contextUsageView(report, breakdown);
 	const categories: CategoryRow[] = [];
-	if (breakdown && contextWindow > 0) {
+	if (breakdown) {
 		const rows: CategoryRow[] = [
 			{
 				key: "systemPrompt",
@@ -77,10 +79,15 @@ export function ContextReportDialog() {
 		for (const row of rows) {
 			if (row.tokens > 0) categories.push(row);
 		}
-		const free = contextWindow - breakdown.usedTokens;
-		if (free > 0) categories.push({ key: "free", tokens: free, color: "var(--omp-muted)" });
+		if (capacityKnown) {
+			const free = contextWindow - usedTokens;
+			if (free > 0) categories.push({ key: "free", tokens: free, color: "var(--omp-muted)" });
+		}
 	}
-	const usedPercent = breakdown && contextWindow > 0 ? Math.round((breakdown.usedTokens / contextWindow) * 100) : 0;
+	const usedPercent = capacityKnown ? Math.round((usedTokens / contextWindow) * 100) : 0;
+	// Without a capacity the bars describe what the used context is made of
+	// rather than how full it is; one denominator keeps both readings honest.
+	const barDenominator = Math.max(1, capacityKnown ? contextWindow : usedTokens);
 
 	return (
 		<Modal onClose={close} open={open} size="md" title={t("contextReport.title")}>
@@ -92,7 +99,7 @@ export function ContextReportDialog() {
 				<div className="py-4 text-sm text-(--omp-error)">
 					{t("contextReport.error")}: {error}
 				</div>
-			) : !report || contextWindow <= 0 ? (
+			) : !report ? (
 				<div className="py-4 text-sm text-(--omp-dim)">{t("contextReport.unavailable")}</div>
 			) : (
 				<div className="space-y-4">
@@ -102,19 +109,23 @@ export function ContextReportDialog() {
 						</div>
 						<div className="shrink-0 text-xs tabular-nums text-(--omp-dim)">
 							{breakdown
-								? t("contextReport.usedOf", {
-										used: formatTokens(breakdown.usedTokens),
-										window: formatTokens(contextWindow),
-										percent: usedPercent,
-									})
-								: formatTokens(contextWindow)}
+								? capacityKnown
+									? t("contextReport.usedOf", {
+											used: formatTokens(usedTokens),
+											window: formatTokens(contextWindow),
+											percent: usedPercent,
+										})
+									: t("contextReport.usedWithoutWindow", { used: formatTokens(usedTokens) })
+								: capacityKnown
+									? formatTokens(contextWindow)
+									: t("contextReport.windowUnknown")}
 						</div>
 					</div>
 					{breakdown ? (
 						<>
 							<div className="space-y-2">
 								{categories.map(row => {
-									const fraction = row.tokens / contextWindow;
+									const fraction = row.tokens / barDenominator;
 									return (
 										<div className="flex items-center gap-3" key={row.key}>
 											<span className="w-28 shrink-0 truncate text-xs text-(--omp-text)">
@@ -125,7 +136,11 @@ export function ContextReportDialog() {
 												color={row.color}
 												height={8}
 												value={fraction}
-												valueText={`${formatTokens(row.tokens)} · ${Math.round(fraction * 100)}%`}
+												valueText={
+													capacityKnown
+														? `${formatTokens(row.tokens)} · ${Math.round(fraction * 100)}%`
+														: formatTokens(row.tokens)
+												}
 											/>
 										</div>
 									);

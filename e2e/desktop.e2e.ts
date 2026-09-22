@@ -432,7 +432,17 @@ test("settings search opens advanced controls and old refreshes cannot undo a sa
 	await expect(input).toHaveValue("8192");
 	await page.evaluate(() => window.omp.rpc.prompt("fixture hold settings"));
 	const before = (await recorded("get_settings")).length;
-	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send("config:update", {}));
+	// Main forwards every tab-scoped event wrapped in the tab's envelope, so the
+	// simulated config_update has to wear the same wire shape.
+	const activeTabId = await page.evaluate(() =>
+		window.omp.tabs.list().then(tabs => tabs.find(tab => tab.active === true)?.tabId ?? ""),
+	);
+	expect(activeTabId).toBeTruthy();
+	await app.evaluate(
+		({ BrowserWindow }, tabId) =>
+			BrowserWindow.getAllWindows()[0].webContents.send("config:update", { tabId, payload: {} }),
+		activeTabId,
+	);
 	await expect.poll(async () => (await recorded("get_settings")).length).toBeGreaterThan(before);
 	await input.fill("12345");
 	await input.press("Enter");
@@ -445,6 +455,39 @@ test("settings search opens advanced controls and old refreshes cannot undo a sa
 	await input.fill("8192");
 	await input.press("Enter");
 	await page.keyboard.press("Escape");
+});
+
+test("a failing ipc handler cannot take the other handlers on its channel down with it", async () => {
+	// One subscriber throwing during an emit used to abort the rest, so an
+	// unrelated feature (a settings refresh, a transcript batch) silently stopped
+	// receiving its own events.
+	type Boom = { hits: number; stop?: () => void };
+	const scratch = () => page.evaluate(() => (globalThis as unknown as { __boom?: Boom }).__boom);
+	await page.evaluate(() => {
+		const boom: Boom = { hits: 0 };
+		(globalThis as unknown as { __boom: Boom }).__boom = boom;
+		const throwing = window.omp.events.onConfigUpdate(() => {
+			throw new Error("simulated handler failure");
+		});
+		const counting = window.omp.events.onConfigUpdate(() => {
+			boom.hits += 1;
+		});
+		boom.stop = () => {
+			throwing();
+			counting();
+		};
+	});
+	const activeTabId = await page.evaluate(() =>
+		window.omp.tabs.list().then(tabs => tabs.find(tab => tab.active === true)?.tabId ?? ""),
+	);
+	expect(activeTabId).toBeTruthy();
+	await app.evaluate(
+		({ BrowserWindow }, tabId) =>
+			BrowserWindow.getAllWindows()[0].webContents.send("config:update", { tabId, payload: {} }),
+		activeTabId,
+	);
+	await expect.poll(async () => (await scratch())?.hits).toBe(1);
+	await page.evaluate(() => (globalThis as unknown as { __boom?: Boom }).__boom?.stop?.());
 });
 
 test("workspace navigation cannot replace the trusted desktop with an untrusted document", async () => {

@@ -16,8 +16,10 @@ import { Brain, Check, ChevronDown } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type RpcThinkingLevelState, THINKING_LEVEL_VALUES, type ThinkingLevel } from "../../../shared/rpc-types";
+import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { type ModelStore, useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
@@ -43,6 +45,7 @@ export function ThinkingControl() {
 	const configured = useModelStore(s => s.thinkingConfigured);
 	const available = useModelStore(s => s.availableThinkingLevels);
 	const [open, setOpen] = useState(false);
+	const { mounted, closing } = useOverlayPresence(open);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const menuRef = useRef<HTMLDivElement>(null);
 	const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
@@ -68,7 +71,7 @@ export function ThinkingControl() {
 			setOpen(false);
 		};
 		const onKey = (event: KeyboardEvent) => {
-			if (event.isComposing || event.keyCode === 229) return;
+			if (isImeKeyEvent(event)) return;
 			if (event.key !== "Escape") return;
 			event.preventDefault();
 			event.stopPropagation();
@@ -130,12 +133,17 @@ export function ThinkingControl() {
 				<ChevronDown size={12} className="shrink-0 text-[var(--omp-dim)]" />
 			</button>
 
-			{open && pos
+			{mounted && pos
 				? createPortal(
 						<div
 							ref={menuRef}
 							style={{ left: pos.left, bottom: pos.bottom }}
-							className="fixed z-[100] w-64 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-panel-bg)] p-1 shadow-[var(--omp-shadow-md)]"
+							aria-hidden={closing || undefined}
+							inert={closing}
+							className={cx(
+								"fixed z-[100] w-64 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-panel-bg)] p-1 shadow-[var(--omp-shadow-md)]",
+								closing ? "omp-scale-out pointer-events-none" : "omp-pop-in",
+							)}
 						>
 							{supportsThinking ? (
 								menuOptions(available).map(option => {

@@ -1,5 +1,6 @@
 import type {
 	AgentMessage,
+	ModelInfo,
 	RpcGoalState,
 	RpcLoopModeState,
 	RpcResponse,
@@ -27,6 +28,27 @@ import { isTabClosed, useTabsStore } from "../stores/tabs";
 import { useTodoStore } from "../stores/todo";
 import { type ToolsStore, useToolsStore } from "../stores/tools";
 
+/** Apply the usage half of a snapshot; caller must already be runtime-scoped. */
+function writeUsage(state: RpcSessionState): void {
+	// A snapshot without usage proves nothing — the ring renders from this field,
+	// so overwriting a good reading with null would make it vanish.
+	if (!state.contextUsage) return;
+	useSessionStore.setState(session => ({
+		contextUsage: state.contextUsage ?? null,
+		statsPulse: session.statsPulse + 1,
+	}));
+}
+
+/**
+ * Land the context-usage reading from a `get_state` snapshot.
+ *
+ * No session event carries usage, so unlike the rest of a snapshot it is not
+ * invalidated by events that arrived while the round trip was in flight.
+ */
+export function applyUsageSnapshot(state: RpcSessionState, tabId: string): void {
+	withSessionRuntime(tabId, () => writeUsage(state));
+}
+
 /** Apply a get_state snapshot to every state-derived store. */
 export function applySessionState(state: RpcSessionState, fallbackName?: string): void {
 	const runtime = focusedSessionRuntime();
@@ -34,6 +56,7 @@ export function applySessionState(state: RpcSessionState, fallbackName?: string)
 	if (useSessionStore.getState().sessionId !== state.sessionId) useSubagentGraphStore.getState().reset();
 	useModelStore.getState().setFromState(state);
 	useSessionStore.getState().setFromState(state);
+	writeUsage(state);
 	if (!state.sessionName && fallbackName) {
 		useSessionStore.setState({ sessionName: fallbackName });
 	}
@@ -43,10 +66,9 @@ export function applySessionState(state: RpcSessionState, fallbackName?: string)
 
 /**
  * Light re-sync of session state (no transcript/subagent fetch). Used for
- * model_changed: a model switch does not rewrite history, so refetching the
- * transcript mid-run would only race the live stream. Also fired on
  * agent_start: server-side plan-mode exits (plan_approval accept) emit no
  * event, so turn start is the sync point that keeps planModeEnabled honest.
+ * Model switches go through refreshModelState instead.
  */
 export async function refreshSessionState(tabId = useTabsStore.getState().activeTabId): Promise<void> {
 	if (!tabId) return;
@@ -59,17 +81,70 @@ export async function refreshSessionState(tabId = useTabsStore.getState().active
 	try {
 		const res = await runtime.command({ type: "get_state" });
 		if (
-			sessionRuntime(tabId) === runtime &&
-			sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().sessionId === sessionId &&
-			sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().eventVersion === eventVersion &&
-			res.success &&
-			res.data != null
-		) {
-			withSessionRuntime(tabId, () => applySessionState(res.data as RpcSessionState));
-		}
+			sessionRuntime(tabId) !== runtime ||
+			sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().sessionId !== sessionId ||
+			!res.success ||
+			res.data == null
+		)
+			return;
+		const state = res.data as RpcSessionState;
+		// Events that landed during the round trip already updated the stores, so
+		// this snapshot is behind on everything they carry. Usage has no event
+		// carrier, so it stays the freshest reading we have either way.
+		const churned = sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().eventVersion !== eventVersion;
+		withSessionRuntime(tabId, () => {
+			if (churned) writeUsage(state);
+			else applySessionState(state);
+		});
 	} catch {
 		// Transient — the next heartbeat or hydration retries.
 	}
+}
+
+/** Re-sync the model-derived stores after a model switch, ignoring event churn. */
+export async function refreshModelState(tabId = useTabsStore.getState().activeTabId): Promise<void> {
+	if (!tabId) return;
+	const runtime = isTabClosed(tabId) ? sessionRuntime(tabId) : ensureTabRuntime(tabId);
+	if (!runtime) return;
+	const sessionId = sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().sessionId;
+	try {
+		const res = await runtime.command({ type: "get_state" });
+		if (
+			sessionRuntime(tabId) !== runtime ||
+			sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().sessionId !== sessionId ||
+			!res.success ||
+			res.data == null
+		)
+			return;
+		const state = res.data as RpcSessionState;
+		withSessionRuntime(tabId, () => {
+			useModelStore.getState().setFromState(state);
+			// Another model means another context window, so the usage ring has to
+			// follow the switch even though the token count did not change.
+			writeUsage(state);
+		});
+	} catch {
+		// Transient — the next hydration retries.
+	}
+}
+
+function asModelInfo(value: unknown): ModelInfo | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const candidate = value as ModelInfo;
+	return typeof candidate.provider === "string" && typeof candidate.id === "string" ? candidate : undefined;
+}
+
+/**
+ * Apply an out-of-band authoritative model: the `set_model` response and
+ * `config_update` frames both carry the sidecar's live model. This is the only
+ * channel for a switch that emits no `model_changed` at all — re-selecting the
+ * current provider+id is a no-op server-side, so without it a stale label can
+ * never be corrected.
+ */
+export function applyModelInfo(model: unknown, tabId: string | null): void {
+	const info = asModelInfo(model);
+	if (!info || !tabId) return;
+	withSessionRuntime(tabId, () => useModelStore.setState({ model: info }));
 }
 
 type HydrationGuard = () => boolean;
@@ -140,6 +215,10 @@ let legacyHydrationVersion = 0;
 export async function hydrateLegacySession(fallbackName?: string, initialState?: RpcResponse): Promise<void> {
 	const version = ++legacyHydrationVersion;
 	const isCurrent = () => version === legacyHydrationVersion;
+	// This path has no tab runtime to scope to, so its stores are resolved by
+	// focus at apply time. Remember who we fetched for and refuse to write that
+	// snapshot into a pane the user switched to while the RPC was in flight.
+	const originRuntime = focusedSessionRuntime();
 	const beforeMessages = useMessagesStore.getState().messages;
 	const beforeLiveMessages = useMessagesStore.getState().liveMessages;
 	const beforeEventVersion = useSessionStore.getState().eventVersion;
@@ -159,6 +238,7 @@ export async function hydrateLegacySession(fallbackName?: string, initialState?:
 	const [stateResult, messagesResult] = await core;
 	if (!isCurrent()) return;
 	const eventsUnchanged = useSessionStore.getState().eventVersion === beforeEventVersion;
+	const focusUnchanged = !originRuntime || focusedSessionRuntime() === originRuntime;
 	const stateIsIdle =
 		stateResult.status === "fulfilled" &&
 		stateResult.value.success &&
@@ -166,6 +246,7 @@ export async function hydrateLegacySession(fallbackName?: string, initialState?:
 		!(stateResult.value.data as RpcSessionState).isStreaming;
 	if (
 		eventsUnchanged &&
+		focusUnchanged &&
 		stateResult.status === "fulfilled" &&
 		stateResult.value.success &&
 		stateResult.value.data != null
@@ -178,7 +259,7 @@ export async function hydrateLegacySession(fallbackName?: string, initialState?:
 		if (!wire.isStreaming) useMessagesStore.getState().clearStreaming();
 		void activeTabCommand({ type: "set_subagent_subscription", level: "events" });
 	}
-	if (messagesResult.status === "fulfilled" && messagesResult.value.success) {
+	if (focusUnchanged && messagesResult.status === "fulfilled" && messagesResult.value.success) {
 		const fetched = (messagesResult.value.data as { messages?: AgentMessage[] } | undefined)?.messages ?? [];
 		const current = useMessagesStore.getState().messages;
 		useMessagesStore.getState().reconcileFetched(mergeFetchedTranscript(fetched, beforeMessages, current));

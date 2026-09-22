@@ -68,7 +68,22 @@ function rpcCommand(cmd: RpcCommand, timeoutMs?: number): Promise<RpcResponse> {
 }
 
 function subscribe<T>(channel: string, callback: (data: T) => void): () => void {
-	const listener = (_event: Electron.IpcRendererEvent, data: T) => callback(data);
+	const listener = (_event: Electron.IpcRendererEvent, data: T) => {
+		// Node aborts the remaining listeners of an emit once one throws, so a
+		// single bad handler would silently freeze every other feature listening
+		// to the same main->renderer channel. Isolate it and report instead.
+		try {
+			callback(data);
+		} catch (error) {
+			const failure = error instanceof Error ? error : new Error(String(error));
+			ipcRenderer.send(IPC_COMMANDS.RUNTIME_ERROR_REPORT, {
+				source: "preload",
+				message: `IPC handler for "${channel}" failed: ${failure.message}`,
+				stack: failure.stack,
+				details: { channel },
+			} satisfies RuntimeErrorReport);
+		}
+	};
 	ipcRenderer.on(channel, listener);
 	return () => {
 		ipcRenderer.removeListener(channel, listener);

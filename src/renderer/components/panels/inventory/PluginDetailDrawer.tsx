@@ -554,7 +554,7 @@ export function PluginDetailDrawer({
 	const failedCount = Object.keys(fieldErrors).length;
 
 	return (
-		<div className="omp-fade-in absolute inset-0 z-10 flex flex-col bg-(--omp-modal-bg)">
+		<div className="omp-slide-in-right absolute inset-0 z-10 flex flex-col bg-(--omp-modal-bg)">
 			<div className="flex shrink-0 items-center gap-2 border-b border-(--omp-border-muted) px-4 py-2.5">
 				<button
 					aria-label={t("pluginDetail.back")}

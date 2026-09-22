@@ -1,15 +1,23 @@
 import { useTabRpc } from "../../lib/tab-rpc";
 /**
  * Usage window: provider quota reports (limit bars with reset countdowns)
- * plus local session token/cost tallies. Fed by rpc.getUsage().
+ * plus local session token/cost tallies.
+ *
+ * The two halves refresh on different clocks on purpose. Quotas are live calls
+ * to each provider's usage endpoint, so they are read when the window opens,
+ * when its tab changes, and on the explicit refresh. The session tallies are
+ * local journal arithmetic, so they follow every settled turn the same way the
+ * titlebar chips do.
  */
 
 import { Coins, Database, RefreshCw, Zap } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import type { UsageLimit, UsageReport, UsageResult } from "../../../shared/rpc-types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SessionStats, UsageLimit, UsageReport, UsageSessionStats } from "../../../shared/rpc-types";
 import { formatCost, formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
-import { useSessionStore } from "../../stores/session";
+import { useMessagesStore } from "../../stores/messages";
+import { type SessionStore, useSessionStore } from "../../stores/session";
+import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { Badge, Button, Modal, ProgressBar, Spinner } from "../common";
 
@@ -108,17 +116,59 @@ function ProviderReportCard({
 	);
 }
 
+/** Project the local journal stats onto the tallies block. `history` covers the
+ * whole journal (pre-compaction and sibling branches included), which is what
+ * the usage window has always reported; without it the live-context figures are
+ * the closest available. */
+function sessionTallies(stats: SessionStats): UsageSessionStats {
+	const history = stats.history;
+	if (!history) {
+		return {
+			input: stats.tokens.input,
+			output: stats.tokens.output,
+			cacheRead: stats.tokens.cacheRead,
+			cacheWrite: stats.tokens.cacheWrite,
+			totalTokens: stats.tokens.total,
+			orchestrationTokens: 0,
+			premiumRequests: stats.premiumRequests,
+			cost: stats.cost,
+		};
+	}
+	return {
+		input: history.input,
+		output: history.output,
+		cacheRead: history.cacheRead,
+		cacheWrite: history.cacheWrite,
+		totalTokens: history.totalTokens,
+		orchestrationTokens: history.orchestrationInput + history.orchestrationOutput + history.orchestrationCacheRead,
+		premiumRequests: history.premiumRequests,
+		cost: history.cost,
+	};
+}
+
 export function UsageWindow() {
 	const tabRpc = useTabRpc();
+	const tabId = useRuntimeTabId();
 	const open = useUiStore(s => s.usageOpen);
 	const close = useUiStore(s => s.closeUsage);
 	const t = useT();
 	const sidecarReady = useSessionStore(s => s.status) === "ready";
-	const [result, setResult] = useState<UsageResult | null>(null);
+	const sessionId = useSessionStore(s => s.sessionId);
+	const isStreaming = useSessionStore(s => s.isStreaming);
+	const isCompacting = useSessionStore(s => s.isCompacting);
+	const statsPulse = useSessionStore(s => s.statsPulse);
+	const messageCount = useMessagesStore(s => s.messages.length);
+
+	const [reports, setReports] = useState<UsageReport[] | null>(null);
+	const [session, setSession] = useState<UsageSessionStats | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 
-	const load = useCallback(async () => {
+	/** The tab/session a quota read was issued for. A late response from a tab
+	 * that is no longer frontmost must not overwrite the new tab's numbers. */
+	const quotaOwnerRef = useRef<string | null>(null);
+
+	const loadQuotas = useCallback(async () => {
 		setLoading(true);
 		setError(null);
 		if (!sidecarReady) {
@@ -126,22 +176,64 @@ export function UsageWindow() {
 			setLoading(false);
 			return;
 		}
+		const owner = `${tabId}/${sessionId}`;
+		quotaOwnerRef.current = owner;
+		const originSession = sessionRuntimeStore<SessionStore>(tabId, "session") ?? useSessionStore;
 		try {
 			const res = await tabRpc.getUsage();
-			if (res.success) setResult(res.data as UsageResult);
+			if (quotaOwnerRef.current !== owner || originSession.getState().sessionId !== sessionId) return;
+			if (res.success) setReports((res.data as { reports?: UsageReport[] })?.reports ?? []);
 			else setError(res.error);
 		} catch (cause) {
-			setError(String(cause));
+			if (quotaOwnerRef.current === owner) setError(String(cause));
 		} finally {
-			setLoading(false);
+			if (quotaOwnerRef.current === owner) setLoading(false);
 		}
-	}, [sidecarReady, t, tabRpc.getUsage]);
+	}, [sidecarReady, t, tabId, sessionId, tabRpc.getUsage]);
 
+	// The window is global UI state, so it survives tab switches. Anything from
+	// the previous tab has to leave before the new tab's read lands.
+	const shownOwnerRef = useRef<string | null>(null);
 	useEffect(() => {
-		if (open) void load();
-	}, [open, load]);
+		const owner = `${tabId}/${sessionId}`;
+		if (shownOwnerRef.current === owner) return;
+		shownOwnerRef.current = owner;
+		setReports(null);
+		setSession(null);
+		setError(null);
+	}, [tabId, sessionId]);
 
-	const session = result?.session;
+	// Opening the window and moving to another tab behind it are the two moments
+	// that need a fresh quota read; the refresh button covers the rest. `loadQuotas`
+	// identity already tracks the tab, its session, and the sidecar being ready.
+	useEffect(() => {
+		if (!open) return;
+		void loadQuotas();
+	}, [open, loadQuotas]);
+
+	// A settled transcript append and a fresh sidecar snapshot both move the
+	// session figures. Mid-run appends come several times a turn, so only the
+	// pulse may re-queue a command there — the serial queue stays free for the
+	// agent's own traffic.
+	const statsTrigger = isStreaming ? `streaming:${statsPulse}` : `idle:${messageCount}:${statsPulse}`;
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: statsTrigger paces the refetch; the transcript append and snapshot pulse move the figures even with a stable session id.
+	useEffect(() => {
+		if (!open || !sidecarReady || isCompacting) return;
+		let cancelled = false;
+		void tabRpc
+			.getSessionStats()
+			.then(res => {
+				if (!cancelled && res.success) setSession(sessionTallies(res.data as SessionStats));
+			})
+			.catch(() => {
+				/* the last good reading stays; the next pulse retries */
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [open, sidecarReady, isCompacting, statsTrigger, tabRpc.getSessionStats]);
+
 	const sessionRows = session
 		? [
 				{ icon: Zap, label: t("usage.inputTokens"), value: formatTokens(session.input) },
@@ -168,7 +260,7 @@ export function UsageWindow() {
 						size="sm"
 						variant="ghost"
 						icon={<RefreshCw size={12} />}
-						onClick={() => void load()}
+						onClick={() => void loadQuotas()}
 						loading={loading}
 					>
 						{t("usage.refresh")}
@@ -180,21 +272,21 @@ export function UsageWindow() {
 						{error}
 					</div>
 				)}
-				{loading && !result && (
+				{loading && reports === null && (
 					<div className="flex items-center justify-center py-8">
 						<Spinner />
 					</div>
 				)}
 
-				{result && result.reports.length === 0 && !loading && (
+				{reports && reports.length === 0 && !loading && (
 					<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-dim)]">
 						{t("usage.noApi")}
 					</div>
 				)}
 
-				{result && result.reports.length > 0 && (
+				{reports && reports.length > 0 && (
 					<div className="flex flex-col gap-3">
-						{result.reports.map(report => (
+						{reports.map(report => (
 							<ProviderReportCard key={`${report.provider}-${report.account ?? ""}`} report={report} t={t} />
 						))}
 					</div>

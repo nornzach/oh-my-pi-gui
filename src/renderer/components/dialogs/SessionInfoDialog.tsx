@@ -7,6 +7,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 
 import { useEffect, useState } from "react";
 import type { SessionStats } from "../../../shared/rpc-types";
+import { contextUsageView } from "../../lib/context-usage";
 import { basename, formatCost, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useUiStore } from "../../stores/ui";
@@ -73,6 +74,8 @@ export function SessionInfoDialog() {
 			cancelled = true;
 		};
 	}, [open, tabRpc.getSessionStats]);
+
+	const contextView = stats?.contextUsage ? contextUsageView(stats.contextUsage) : null;
 
 	return (
 		<Modal open={open} onClose={close} title={t("sessionInfo.title")} size="md">
@@ -161,23 +164,31 @@ export function SessionInfoDialog() {
 									.map(([id, count]) => ({ label: id, value: String(count) }))}
 							/>
 						)}
-						{stats.contextUsage && (
+						{stats.contextUsage && contextView && (
 							<section>
 								<h3 className="mb-1 text-omp-xxs font-semibold tracking-widest text-(--omp-dim) uppercase">
 									{t("sessionInfo.contextWindow")}
 								</h3>
 								<div className="rounded-md border border-(--omp-border-muted) px-2.5 py-2">
 									<ProgressBar
-										value={stats.contextUsage.percent / 100}
-										valueText={formatPercent(stats.contextUsage.percent, 1)}
+										value={contextView.capacityKnown ? contextView.percent / 100 : 0}
+										valueText={
+											contextView.capacityKnown
+												? formatPercent(contextView.percent, 1)
+												: t("contextUsage.windowUnknown")
+										}
 									/>
 									<div className="mt-1.5 flex items-center justify-between text-omp-xs text-(--omp-muted)">
 										<span>
-											{formatTokens(stats.contextUsage.tokens)} /{" "}
-											{formatTokens(stats.contextUsage.contextWindow)} {t("sessionInfo.tokens")}
+											{contextView.capacityKnown
+												? `${formatTokens(contextView.usedTokens)} / ${formatTokens(contextView.contextWindow)}`
+												: formatTokens(contextView.usedTokens)}{" "}
+											{t("sessionInfo.tokens")}
 										</span>
 										<span className="font-mono tabular-nums">
-											{formatPercent(stats.contextUsage.percent, 1)}
+											{contextView.capacityKnown
+												? formatPercent(contextView.percent, 1)
+												: formatTokens(null)}
 										</span>
 									</div>
 								</div>

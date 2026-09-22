@@ -1,4 +1,6 @@
+import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useDisplayPreference } from "../../lib/display-preferences";
+import { onEscape } from "../../lib/keymap";
 /**
  * Compact composer entry for session modes and lower-frequency coding
  * toggles. The trigger surfaces active mode count; the menu keeps every
@@ -48,6 +50,7 @@ export function ComposerModes() {
 
 	const [pending, setPending] = useState(false);
 	const [menuOpen, setMenuOpen] = useState(false);
+	const { mounted: menuMounted, closing: menuClosing } = useOverlayPresence(menuOpen);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const menuRef = useRef<HTMLDivElement>(null);
 	const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null);
@@ -84,7 +87,7 @@ export function ComposerModes() {
 			setMenuOpen(false);
 		};
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setMenuOpen(false);
+			onEscape(event, () => setMenuOpen(false));
 		};
 		document.addEventListener("pointerdown", onDown);
 		document.addEventListener("keydown", onKeyDown);
@@ -149,15 +152,19 @@ export function ComposerModes() {
 				<ChevronDown size={12} className="shrink-0 text-[var(--omp-dim)]" />
 			</button>
 
-			{menuOpen && pos
+			{menuMounted && pos
 				? createPortal(
 						<div
 							ref={menuRef}
 							style={{ left: pos.left, bottom: pos.bottom }}
-							className="fixed z-[100] w-64 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-panel-bg)] p-1 shadow-[var(--omp-shadow-md)]"
+							aria-hidden={menuClosing || undefined}
+							className={cx(
+								"fixed z-[100] w-64 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-panel-bg)] p-1 shadow-[var(--omp-shadow-md)]",
+								menuClosing ? "omp-scale-out pointer-events-none" : "omp-pop-in",
+							)}
 							role="menu"
 							aria-busy={pending}
-							inert={pending}
+							inert={pending || menuClosing}
 						>
 							<ModeRow
 								label={t("input.plan.label")}

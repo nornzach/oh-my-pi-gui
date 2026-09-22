@@ -53,6 +53,7 @@ import {
 } from "./lib/display-preferences";
 import { exportSessionHtml } from "./lib/export-session";
 import { useLang, useT } from "./lib/i18n";
+import { isImeKeyEvent } from "./lib/ime";
 import { chordFromEvent, compileKeymap, KEYMAP_ACTION_BY_ID, KEYMAP_ACTIONS, type KeymapActionId } from "./lib/keymap";
 import { abortActiveTurn, restoreQueuedMessages } from "./lib/messages";
 import { watchPluginActivation } from "./lib/plugin-activation";
@@ -459,7 +460,7 @@ export function App() {
 
 		const onKey = (event: KeyboardEvent) => {
 			// One physical shortcut dispatches once; IME composition owns Escape.
-			if (event.repeat || event.isComposing || event.keyCode === 229) return;
+			if (event.repeat || isImeKeyEvent(event)) return;
 			const ui = useUiStore.getState();
 			const overlayOpen =
 				ui.commandPaletteOpen ||
@@ -666,7 +667,7 @@ export function App() {
 			</Suspense>
 			<ThemePickerDialog />
 			<PlanApprovalDialog />
-			{hotkeysOpen && <HotkeysDialog />}
+			<HotkeysDialog open={hotkeysOpen} />
 			{importDialogOpen && <ImportForeignDialog />}
 			{composerEditorOpen && <ComposerEditorDialog />}
 			<Suspense fallback={null}>

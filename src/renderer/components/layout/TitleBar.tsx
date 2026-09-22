@@ -4,6 +4,8 @@ import type { SessionStats } from "../../../shared/rpc-types";
 import { useSessionList } from "../../hooks/use-session-list";
 import { basename, cx, formatCost, formatDuration, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
+import { onEscape } from "../../lib/keymap";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
@@ -29,6 +31,7 @@ export function TitleBar() {
 	const status = useSessionStore(s => s.status);
 	const isStreaming = useSessionStore(s => s.isStreaming);
 	const isCompacting = useSessionStore(s => s.isCompacting);
+	const statsPulse = useSessionStore(s => s.statsPulse);
 	const isChat = useActiveTabKind() === "chat";
 
 	const planModeEnabled = useSessionStore(s => s.planModeEnabled);
@@ -48,13 +51,18 @@ export function TitleBar() {
 	const [now, setNow] = useState(() => Date.now());
 	const nameInputRef = useRef<HTMLInputElement>(null);
 	const statsMessageCount = messages.length;
+	// A settled transcript append and a fresh sidecar snapshot are the two things
+	// that can move these figures. Mid-run appends come several times a turn, so
+	// only the pulse may re-queue a stats command there — the serial command queue
+	// has to stay free for the agent's own traffic.
+	const statsTrigger = isStreaming ? `streaming:${statsPulse}` : `idle:${statsMessageCount}:${statsPulse}`;
 	const prevSessionRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		if (editingName) nameInputRef.current?.select();
 	}, [editingName]);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: settled transcript changes refresh local usage even when the session ID is stable.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the settled transcript and the snapshot pulse both refresh the cost figures even when the session ID is stable.
 	useEffect(() => {
 		if (!sessionId || status !== "ready") {
 			setStats(null);
@@ -64,10 +72,12 @@ export function TitleBar() {
 		// Cross-session staleness is the bug: session A's tokens/cost must never
 		// display over session B. Within ONE session, keeping the previous read
 		// while the refetch is in flight beats a clear-refetch flicker on every
-		// message append; the message-count guard rejects mismatched responses.
+		// message append; the session-id guard rejects mismatched responses.
 		if (prevSessionRef.current !== sessionId) setStats(null);
 		prevSessionRef.current = sessionId;
-		if (isCompacting || isStreaming) return;
+		// Compaction rewrites the journal, so a reading taken mid-shake is noise.
+		// Streaming is no longer a reason to freeze the figures — the pulse paces it.
+		if (isCompacting) return;
 		let cancelled = false;
 		const requestedSessionId = sessionId;
 		const originSession = sessionRuntimeStore<SessionStore>(tabId, "session") ?? useSessionStore;
@@ -82,7 +92,7 @@ export function TitleBar() {
 		return () => {
 			cancelled = true;
 		};
-	}, [sessionId, statsMessageCount, status, tabRpc.getSessionStats, tabId, isCompacting, isStreaming]);
+	}, [sessionId, statsTrigger, status, tabRpc.getSessionStats, tabId, isCompacting]);
 
 	const hasRunningTool = [...tools.values()].some(tool => tool.endTime === null);
 	useEffect(() => {
@@ -154,7 +164,7 @@ export function TitleBar() {
 
 			<div className="omp-titlebar-identity no-drag flex min-w-0 items-center gap-1.5">
 				<button
-					className="omp-pressable flex min-w-0 max-w-48 items-center gap-2 truncate rounded-lg px-2 py-1.5 text-omp-lg font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-not-allowed disabled:opacity-50"
+					className="omp-pressable flex min-w-0 max-w-48 items-center gap-2 truncate rounded-lg px-2 py-1.5 text-omp-lg font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-not-allowed disabled:text-[var(--omp-dim)]"
 					disabled={isStreaming}
 					onClick={() => setWorkspaceOpen(true)}
 					title={isStreaming ? t("titlebar.abortHint") : t("titlebar.openProject")}
@@ -171,8 +181,9 @@ export function TitleBar() {
 						onChange={event => setDraft(event.target.value)}
 						onBlur={commitName}
 						onKeyDown={event => {
+							if (isImeKeyEvent(event)) return;
 							if (event.key === "Enter") commitName();
-							if (event.key === "Escape") setEditingName(false);
+							onEscape(event, () => setEditingName(false));
 						}}
 						className="min-w-0 max-w-56 rounded-lg border border-[var(--omp-input-focus-border)] bg-[var(--omp-input-bg)] px-2.5 py-1.5 text-omp-lg font-medium text-[var(--omp-text)] outline-none"
 					/>

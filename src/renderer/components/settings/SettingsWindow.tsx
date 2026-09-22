@@ -43,6 +43,7 @@ import {
 } from "../../../shared/launch-profile";
 import type { SettingEntry, SettingsSchemaResult } from "../../../shared/rpc-types";
 import { useLang, useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { setCodeLineNumbersPref } from "../../lib/markdown";
 import { en } from "../../locales/en";
 import { zh } from "../../locales/zh";
@@ -843,6 +844,7 @@ export function SettingsWindow() {
 													onBlur={commitFontSize}
 													onChange={event => setFontSizeDraft(event.target.value)}
 													onKeyDown={event => {
+														if (isImeKeyEvent(event)) return;
 														if (event.key === "Enter") event.currentTarget.blur();
 													}}
 													type="number"
@@ -918,6 +920,7 @@ export function SettingsWindow() {
 												onBlur={commitProxy}
 												onChange={event => setProxyDraft(event.target.value)}
 												onKeyDown={event => {
+													if (isImeKeyEvent(event)) return;
 													if (event.key === "Enter") event.currentTarget.blur();
 												}}
 												placeholder="http://127.0.0.1:7890"
@@ -1028,6 +1031,7 @@ export function SettingsWindow() {
 															setLaunchDrafts(prev => ({ ...prev, profile: event.target.value }))
 														}
 														onKeyDown={event => {
+															if (isImeKeyEvent(event)) return;
 															if (event.key === "Enter") event.currentTarget.blur();
 														}}
 														placeholder={t("settings.launch.profilePlaceholder")}
@@ -1045,6 +1049,7 @@ export function SettingsWindow() {
 															setLaunchDrafts(prev => ({ ...prev, sessionDir: event.target.value }))
 														}
 														onKeyDown={event => {
+															if (isImeKeyEvent(event)) return;
 															if (event.key === "Enter") event.currentTarget.blur();
 														}}
 														placeholder={t("settings.launch.sessionDirPlaceholder")}
@@ -1062,6 +1067,7 @@ export function SettingsWindow() {
 															setLaunchDrafts(prev => ({ ...prev, config: event.target.value }))
 														}
 														onKeyDown={event => {
+															if (isImeKeyEvent(event)) return;
 															if (event.key === "Enter") event.currentTarget.blur();
 														}}
 														placeholder={t("settings.launch.configPlaceholder")}

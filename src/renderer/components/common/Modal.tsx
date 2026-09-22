@@ -4,9 +4,11 @@
  */
 
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useT } from "../../lib/i18n";
+import { isImeKeyEvent } from "../../lib/ime";
 import { isTopmostDialog, registerDialogLayer } from "./dialog-layer";
 
 export type ModalSize = "sm" | "md" | "lg" | "full" | "picker";
@@ -64,34 +66,19 @@ export function Modal({
 	const panelRef = useRef<HTMLDivElement>(null);
 	const restoreRef = useRef<HTMLElement | null>(null);
 	const onCloseRef = useRef(onClose);
-	const [mounted, setMounted] = useState(open);
-	const [closing, setClosing] = useState(false);
-	// Exit phase: keep the portal mounted briefly after `open` flips false so
-	// backdrop/panel animate out instead of vanishing on the same frame.
-	// `mounted` — not `open` — gates the render, and the phase starts in the
-	// SAME commit's effect while the panel is still in the DOM. Reduced
-	// motion (and first mounts with open=false) skip straight to unmount.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: reading `mounted` without depending on it is the point — the exit decision happens once per open flip
-	useEffect(() => {
-		if (open) {
-			setMounted(true);
-			setClosing(false);
-			return;
-		}
-		if (!mounted) return;
-		if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-			setMounted(false);
-			setClosing(false);
-			return;
-		}
-		setClosing(true);
-		const timer = setTimeout(() => {
-			setMounted(false);
-			setClosing(false);
-		}, 240);
-		return () => clearTimeout(timer);
-	}, [open]);
+	// Exit phase lives in the shared overlay-presence hook: `mounted` — not `open` —
+	// gates the portal, the phase starts in the SAME commit's effect while the panel
+	// is still in the DOM, and reduced motion skips straight to unmount.
+	const { mounted, closing } = useOverlayPresence(open);
 	onCloseRef.current = onClose;
+
+	// What actually animates out. A dialog whose payload clears on close rebuilds
+	// its children from `null`, so the fading panel would collapse to an empty box;
+	// holding the tree from the last open commit lets callers drop their own
+	// `if (!payload) return null` gate and pass `open` instead.
+	const shownRef = useRef<{ ariaLabel?: string; body: ReactNode; title: ReactNode } | null>(null);
+	if (open) shownRef.current = { ariaLabel, body: children, title };
+	const shown = shownRef.current;
 
 	// Focus + keyboard + layer scope all live with `open`: the layer releases
 	// the moment close begins, handing Escape to the dialog beneath even while
@@ -113,7 +100,7 @@ export function Modal({
 			// A live IME composition owns Escape (candidate dismissal). Chromium can
 			// retain the legacy 229 code after composition ends; an explicitly resolved
 			// Escape with isComposing=false must still close the dialog.
-			if (event.isComposing || (event.keyCode === 229 && event.key !== "Escape")) return;
+			if (isImeKeyEvent(event)) return;
 			// Include fullscreen/custom dialogs that do not use Modal in the layer
 			// decision; a modal hidden beneath Settings must remain untouched.
 			if (!isTopmostDialog(panel)) return;
@@ -153,11 +140,12 @@ export function Modal({
 
 	// Render on the opening commit so the focus/layer effect sees a real panel.
 	// `mounted` only extends the closing phase for the exit animation.
-	if (!open && !mounted) return null;
+	if (!mounted || !shown) return null;
 
 	return createPortal(
 		<div
-			className={`omp-dialog-overlay fixed inset-0 z-50 flex justify-center bg-(--omp-overlay-bg) p-4 backdrop-blur-[6px] ${placement === "top" ? "items-start pt-[12dvh]" : "items-center"} ${closing ? "omp-dialog-overlay--exit" : "omp-dialog-overlay"}`}
+			className={`omp-dialog-overlay ${closing ? "omp-fade-out" : "omp-fade-in"} fixed inset-0 z-50 flex justify-center bg-(--omp-overlay-bg) p-4 backdrop-blur-[6px] ${placement === "top" ? "items-start pt-[12dvh]" : "items-center"}`}
+			inert={closing}
 			onMouseDown={event => {
 				if (closing) return;
 				if (event.target === event.currentTarget) onClose();
@@ -165,10 +153,10 @@ export function Modal({
 			role="presentation"
 		>
 			<div
-				aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
-				aria-labelledby={!chromeless && title ? titleId : undefined}
+				aria-label={shown.ariaLabel ?? (typeof shown.title === "string" ? shown.title : undefined)}
+				aria-labelledby={!chromeless && shown.title ? titleId : undefined}
 				aria-modal={!closing}
-				className={`omp-dialog-panel flex flex-col overflow-hidden rounded-2xl border border-(--omp-modal-border) bg-(--omp-modal-bg) shadow-(--omp-shadow-lg) ${SIZE_CLASSES[size]} ${panelClassName ?? ""} ${closing ? "omp-dialog-panel--exit" : "omp-scale-in"}`.trim()}
+				className={`omp-dialog-panel ${closing ? "omp-scale-out" : "omp-scale-in"} flex flex-col overflow-hidden rounded-2xl border border-(--omp-modal-border) bg-(--omp-modal-bg) shadow-(--omp-shadow-lg) ${SIZE_CLASSES[size]} ${panelClassName ?? ""}`.trim()}
 				onKeyDown={event => {
 					if (event.key === "Escape") event.stopPropagation();
 				}}
@@ -185,7 +173,7 @@ export function Modal({
 							id={titleId}
 							className="min-w-0 truncate text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)"
 						>
-							{title}
+							{shown.title}
 						</div>
 						<button
 							aria-label={t("common.close")}
@@ -197,7 +185,7 @@ export function Modal({
 						</button>
 					</div>
 				)}
-				<div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`.trim()}>{children}</div>
+				<div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`.trim()}>{shown.body}</div>
 			</div>
 		</div>,
 		document.body,

@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useMemo } from "react";
-import { useStats } from "../../hooks/use-stats";
+import { useStatsList } from "../../hooks/use-stats";
 import { compact } from "../../lib/chart";
 import { useT } from "../../lib/i18n";
 import { Badge } from "../common";
@@ -26,7 +26,7 @@ interface ErrorRow {
 export function ErrorsRoute({ range, refreshKey }: { range: StatsRange; refreshKey: number }) {
 	const t = useT();
 	const params = useMemo(() => ({ range, limit: "100" }), [range]);
-	const { data, isLoading, error, refetch } = useStats<ErrorRow[]>("/api/stats/errors", params);
+	const { data, isLoading, error, refetch } = useStatsList<ErrorRow>("/api/stats/errors", params);
 
 	useEffect(() => {
 		if (refreshKey > 0) refetch();
