@@ -1,5 +1,6 @@
 # GitHub Pages deployment — MANUAL FALLBACK ONLY.
-# The site builds via the legacy push-triggered path (.nojekyll, no Jekyll).
+# The site is the committed `site/` tree (site/.nojekyll, no Jekyll), which is also what
+# the legacy push-triggered path publishes.
 # On 2026-08-06 the legacy builder wedged for hours and this Actions path
 # carried the deploys; keep it dispatch-only so the two paths never race.
 name: Deploy Pages (manual fallback)
@@ -27,7 +28,7 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
         with:

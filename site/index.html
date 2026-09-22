@@ -381,26 +381,26 @@
       <a href="#install">Install</a>
       <a href="https://github.com/nornzach/oh-my-pi-gui">GitHub</a>
     </div>
-    <a class="btn btn-primary btn-sm" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7-arm64.dmg">Download v0.9.7</a>
+    <a class="btn btn-primary btn-sm" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8-arm64.dmg">Download <span data-omp-version>v0.9.8</span></a>
   </div>
 </nav>
 
 <header class="hero" id="top">
   <div class="container">
-    <div class="hero-badge rise d1"><span class="dot"></span>v0.9.7 · Sep 2026 — Semantic find, ^model delegation &amp; specialist roles, omp 18.2.7</div>
+    <div class="hero-badge rise d1"><span class="dot"></span><span data-omp-version>v0.9.8</span> · <span data-omp-release-date>Sep 2026</span> — bundled agent, Apple Silicon &amp; Intel</div>
     <h1 class="rise d2">One window.<br /><span class="grad">Every session in parallel.</span></h1>
     <p class="sub rise d3">The desktop GUI for the omp coding agent. Every session tab runs its own agent process — your work keeps moving in the background while you switch. All of the TUI's power, none of its walls.</p>
     <div class="hero-cta rise d4">
-      <a class="btn btn-primary" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7-arm64.dmg">
+      <a class="btn btn-primary" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8-arm64.dmg">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for macOS <span class="btn-sub">Apple Silicon</span>
       </a>
-      <a class="btn btn-ghost" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7.dmg">Intel build <span class="btn-sub">macOS x64</span></a>
+      <a class="btn btn-ghost" data-omp-dmg="x64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8.dmg">Intel build <span class="btn-sub">macOS x64</span></a>
     </div>
     <p class="hero-fine rise d5">Bundled sidecar — no agent, bun, or Node to install · <a href="https://github.com/nornzach/oh-my-pi-gui/releases">All releases</a> · <a href="#install">Build from source</a></p>
     <div class="hero-shot-wrap rise d5">
       <div class="hero-shot" id="tilt">
-        <img src="docs/screenshots/11-felt-quality.webp" alt="omp GUI — warm paper canvas with a unified teal accent family" loading="eager" />
+        <img src="assets/11-felt-quality.webp" alt="omp GUI — warm paper canvas with a unified teal accent family" loading="eager" />
       </div>
     </div>
   </div>
@@ -462,7 +462,7 @@
       </div>
     </div>
     <figure class="shot reveal reveal-late">
-      <img src="docs/screenshots/01-session-tabs.webp" alt="Three session tabs running in parallel" loading="lazy" />
+      <img src="assets/01-session-tabs.webp" alt="Three session tabs running in parallel" loading="lazy" />
       <figcaption>Three tabs, three agent processes — two running concurrently.</figcaption>
     </figure>
   </div>
@@ -487,11 +487,11 @@
     </div>
     <div class="duo reveal reveal-late">
       <figure class="shot">
-        <img src="docs/screenshots/09-dock-summary.webp" alt="Bounded Todo and Agents summaries sharing one dock scroll owner" loading="lazy" />
+        <img src="assets/09-dock-summary.webp" alt="Bounded Todo and Agents summaries sharing one dock scroll owner" loading="lazy" />
         <figcaption>Summary mode keeps urgent work visible without squeezing the composer.</figcaption>
       </figure>
       <figure class="shot">
-        <img src="docs/screenshots/10-dock-agents-focus.webp" alt="Agents card expanded into the focused full-list view" loading="lazy" />
+        <img src="assets/10-dock-agents-focus.webp" alt="Agents card expanded into the focused full-list view" loading="lazy" />
         <figcaption>Focused mode reveals every agent and collapses sibling cards to headers.</figcaption>
       </figure>
     </div>
@@ -522,28 +522,28 @@
     </div>
     <div class="cards">
       <div class="card reveal">
-        <img src="docs/screenshots/04-voice.webp" alt="Live voice mode dialog" loading="lazy" />
+        <img src="assets/04-voice.webp" alt="Live voice mode dialog" loading="lazy" />
         <div class="card-body">
           <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>Live voice mode</h3>
           <p>Real-time speech sessions with live transcripts — talk to the agent while your hands stay on the keyboard.</p>
         </div>
       </div>
       <div class="card reveal reveal-late">
-        <img src="docs/screenshots/05-collab.webp" alt="Collaboration dialog" loading="lazy" />
+        <img src="assets/05-collab.webp" alt="Collaboration dialog" loading="lazy" />
         <div class="card-body">
           <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Collaboration</h3>
           <p>Bring teammates into a session and watch the agent work together, live.</p>
         </div>
       </div>
       <div class="card reveal">
-        <img src="docs/screenshots/06-debug.webp" alt="Structured debug console" loading="lazy" />
+        <img src="assets/06-debug.webp" alt="Structured debug console" loading="lazy" />
         <div class="card-body">
           <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Structured debug console</h3>
           <p>The raw RPC event stream — search, filters and pause — for when you need to see exactly what the agent did.</p>
         </div>
       </div>
       <div class="card reveal reveal-late">
-        <img src="docs/screenshots/07-command-palette.webp" alt="Command palette in Chinese" loading="lazy" />
+        <img src="assets/07-command-palette.webp" alt="Command palette in Chinese" loading="lazy" />
         <div class="card-body">
           <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>Command palette</h3>
           <p>Every command, dialog and setting one keystroke away — fully localized, English and Chinese included.</p>
@@ -571,7 +571,7 @@
       </div>
     </div>
     <figure class="shot reveal reveal-late">
-      <img src="docs/screenshots/08-context-report.webp" alt="Context report with token bars" loading="lazy" />
+      <img src="assets/08-context-report.webp" alt="Context report with token bars" loading="lazy" />
       <figcaption>Context report — sorted token bars per source, with a copyable breakdown.</figcaption>
     </figure>
   </div>
@@ -599,11 +599,11 @@
       <h2>Up and running in a minute</h2>
       <p class="lead" style="margin-left: auto; margin-right: auto;">Grab the DMG for your Mac. The agent, its runtime and everything else are already inside.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7-arm64.dmg">
+        <a class="btn btn-primary" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8-arm64.dmg">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Apple Silicon <span class="btn-sub">arm64</span>
         </a>
-        <a class="btn btn-ghost" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.7/omp-0.9.7.dmg">Intel <span class="btn-sub">x64</span></a>
+        <a class="btn btn-ghost" data-omp-dmg="x64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.8/omp-0.9.8.dmg">Intel <span class="btn-sub">x64</span></a>
         <a class="btn btn-ghost" href="https://github.com/nornzach/oh-my-pi-gui/releases">All releases</a>
       </div>
       <div class="install-note">
@@ -707,6 +707,33 @@ bun --cwd packages/gui run package:mac:arm64 -- --publish never <span class="c">
   // duplicate marquee content for a seamless loop
   const track = document.getElementById("marquee");
   track.innerHTML += track.innerHTML;
+</script>
+
+<script>
+  // The release is the source of truth for the version string and the DMG links, so the
+  // page cannot advertise a stale build between releases. The markup ships the current
+  // release as the no-JS / rate-limited fallback; any failure simply leaves it in place.
+  const installerUrl = (assets, tag, architecture) => {
+    const version = tag.replace(/^v/, "");
+    const name = `omp-${version}${architecture === "arm64" ? "-arm64" : ""}.dmg`;
+    return assets.find((asset) => asset.name === name)?.browser_download_url;
+  };
+
+  fetch("https://api.github.com/repos/nornzach/oh-my-pi-gui/releases/latest", {
+    headers: { accept: "application/vnd.github+json" },
+  })
+    .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+    .then((release) => {
+      document.querySelectorAll("[data-omp-version]").forEach((element) => { element.textContent = release.tag_name; });
+      const date = new Date(release.published_at).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      document.querySelectorAll("[data-omp-release-date]").forEach((element) => { element.textContent = date; });
+      for (const architecture of ["arm64", "x64"]) {
+        const url = installerUrl(release.assets, release.tag_name, architecture);
+        if (!url) continue;
+        document.querySelectorAll(`[data-omp-dmg="${architecture}"]`).forEach((element) => { element.href = url; });
+      }
+    })
+    .catch(() => {});
 </script>
 
 </body>
