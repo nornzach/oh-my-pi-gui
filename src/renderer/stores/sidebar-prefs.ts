@@ -2,9 +2,14 @@
  * Sidebar presentation prefs: pinned workspaces/sessions, explicit MRU access
  * times, and workspace display aliases (rename). Persisted as one JSON blob
  * under the "sidebar" prefs key via window.omp.prefs (electron-store in main);
- * hydrate once at App mount, write fire-and-forget on change.
+ * hydrate once at App mount. Recency bookkeeping writes fire-and-forget; the
+ * pins and aliases the user can SEE are optimistic writes that roll back when
+ * the persist rejects, so a row never stays pinned across a restart.
  */
 import { create } from "zustand";
+import { translate } from "../lib/i18n";
+import { optimisticWrite } from "../lib/optimistic";
+import { toast } from "./toast";
 
 const PREFS_KEY = "sidebar";
 
@@ -24,9 +29,9 @@ interface SidebarPrefsStore {
 	sessionLastUsed: Record<string, number>;
 	hydrated: boolean;
 	hydrate: () => Promise<void>;
-	toggleGroupPin: (cwd: string) => void;
-	toggleSessionPin: (path: string) => void;
-	setGroupAlias: (cwd: string, alias: string | null) => void;
+	toggleGroupPin: (cwd: string) => Promise<void>;
+	toggleSessionPin: (path: string) => Promise<void>;
+	setGroupAlias: (cwd: string, alias: string | null) => Promise<void>;
 	touchWorkspace: (cwd: string) => void;
 	touchSession: (path: string, cwd?: string) => void;
 	reset: () => void;
@@ -64,15 +69,29 @@ function touchedMap(
 	return Object.fromEntries(entries.slice(0, limit));
 }
 
-function persist(get: () => SidebarPrefsStore): void {
-	const blob: SidebarPrefsBlob = {
-		pinnedGroups: get().pinnedGroups,
-		pinnedSessions: get().pinnedSessions,
-		groupAliases: get().groupAliases,
-		workspaceLastUsed: get().workspaceLastUsed,
-		sessionLastUsed: get().sessionLastUsed,
+function prefsBlob(state: SidebarPrefsStore): SidebarPrefsBlob {
+	return {
+		pinnedGroups: state.pinnedGroups,
+		pinnedSessions: state.pinnedSessions,
+		groupAliases: state.groupAliases,
+		workspaceLastUsed: state.workspaceLastUsed,
+		sessionLastUsed: state.sessionLastUsed,
 	};
-	void window.omp.prefs.set(PREFS_KEY, blob).catch(() => {});
+}
+
+/** Recency bookkeeping: a lost write costs an ordering hint, nothing the user
+ *  set out to do, so it stays fire-and-forget. */
+function persist(get: () => SidebarPrefsStore): void {
+	void writePrefs(get);
+}
+
+async function writePrefs(get: () => SidebarPrefsStore): Promise<{ success: boolean; error?: string }> {
+	try {
+		await window.omp.prefs.set(PREFS_KEY, prefsBlob(get()));
+		return { success: true };
+	} catch (cause) {
+		return { success: false, error: cause instanceof Error ? cause.message : String(cause) };
+	}
 }
 
 export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
@@ -100,33 +119,42 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 		}
 	},
 
-	toggleGroupPin: cwd => {
-		set(state => ({
-			pinnedGroups: state.pinnedGroups.includes(cwd)
-				? state.pinnedGroups.filter(item => item !== cwd)
-				: [...state.pinnedGroups, cwd],
-		}));
-		persist(get);
-	},
+	toggleGroupPin: cwd =>
+		optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: state => ({
+				pinnedGroups: state.pinnedGroups.includes(cwd)
+					? state.pinnedGroups.filter(item => item !== cwd)
+					: [...state.pinnedGroups, cwd],
+			}),
+			persist: () => writePrefs(get),
+			onFailure: message => toast({ variant: "error", title: translate("sidebar.pinFailed"), message }),
+		}),
 
-	toggleSessionPin: path => {
-		set(state => ({
-			pinnedSessions: state.pinnedSessions.includes(path)
-				? state.pinnedSessions.filter(item => item !== path)
-				: [...state.pinnedSessions, path],
-		}));
-		persist(get);
-	},
+	toggleSessionPin: path =>
+		optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: state => ({
+				pinnedSessions: state.pinnedSessions.includes(path)
+					? state.pinnedSessions.filter(item => item !== path)
+					: [...state.pinnedSessions, path],
+			}),
+			persist: () => writePrefs(get),
+			onFailure: message => toast({ variant: "error", title: translate("sidebar.pinFailed"), message }),
+		}),
 
-	setGroupAlias: (cwd, alias) => {
-		set(state => {
-			const groupAliases = { ...state.groupAliases };
-			if (alias?.trim()) groupAliases[cwd] = alias.trim();
-			else delete groupAliases[cwd];
-			return { groupAliases };
-		});
-		persist(get);
-	},
+	setGroupAlias: (cwd, alias) =>
+		optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: state => {
+				const groupAliases = { ...state.groupAliases };
+				if (alias?.trim()) groupAliases[cwd] = alias.trim();
+				else delete groupAliases[cwd];
+				return { groupAliases };
+			},
+			persist: () => writePrefs(get),
+			onFailure: message => toast({ variant: "error", title: translate("sidebar.renameFailed"), message }),
+		}),
 
 	touchWorkspace: cwd => {
 		if (!cwd) return;

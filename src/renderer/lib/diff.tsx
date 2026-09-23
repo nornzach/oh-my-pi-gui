@@ -1,7 +1,8 @@
 import { diffWords } from "diff";
 import type { HLJSApi } from "highlight.js";
+import { Check, Copy } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { cx, languageFromPath } from "./format";
+import { copyText, cx, languageFromPath } from "./format";
 import { getLoadedHljs, loadHljs } from "./highlight";
 import { useT } from "./i18n";
 
@@ -345,7 +346,15 @@ function buildViewRows(rows: DiffRow[], count: number): ViewRow[] {
 	return view;
 }
 
-/** Render cap for pathological diffs; a trailing ellipsis row reports the rest. */
+/**
+ * Rows painted before the diff asks permission to keep going. Every row is a
+ * real DOM element with several spans plus a possible hljs pass, so rendering
+ * the whole budget at once is what made a large patch freeze the UI on expand.
+ */
+const INITIAL_RENDER_ROWS = 150;
+/** Rows a single "show more" click reveals. */
+const MORE_RENDER_ROWS = 600;
+/** Absolute ceiling; past it the remainder is reported, never rendered. */
 const MAX_RENDER_ROWS = 3000;
 
 const LINE_STYLES: Record<DiffLine["type"], string> = {
@@ -380,9 +389,27 @@ interface DiffViewProps {
 export function DiffView({ diff, filePath, className }: DiffViewProps) {
 	const t = useT();
 	const allRows = useMemo(() => parseDiffRows(diff), [diff]);
-	const rows = useMemo(() => allRows.slice(0, MAX_RENDER_ROWS), [allRows]);
+	/**
+	 * Rows the current budget allows to be painted. A large patch is read from
+	 * its top, so the tail stays behind a "show more" row instead of becoming
+	 * three thousand DOM nodes on first expand.
+	 */
+	const [rowBudget, setRowBudget] = useState(INITIAL_RENDER_ROWS);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a new `diff` is a new patch (the panel's file selector, a re-keyed tool card), so its first paint must be cheap again — the effect body deliberately only resets state.
+	useEffect(() => setRowBudget(INITIAL_RENDER_ROWS), [diff]);
+	const rendered = Math.min(rowBudget, allRows.length, MAX_RENDER_ROWS);
+	const rows = useMemo(() => allRows.slice(0, rendered), [allRows, rendered]);
 	const intra = useMemo(() => computeIntraLine(rows), [rows]);
 	const lang = languageFromPath(filePath);
+
+	const [copied, setCopied] = useState(false);
+	const handleCopy = () => {
+		void copyText(diff).then(ok => {
+			if (!ok) return;
+			setCopied(true);
+			window.setTimeout(() => setCopied(false), 1400);
+		});
+	};
 
 	const [hljs, setHljs] = useState(getLoadedHljs);
 	useEffect(() => {
@@ -401,7 +428,11 @@ export function DiffView({ diff, filePath, className }: DiffViewProps) {
 		[rows, hljs, lang],
 	);
 
-	const omitted = Math.max(0, allRows.length - MAX_RENDER_ROWS);
+	/** Rows the budget still hides, and the part of them one click reveals. */
+	const hiddenRows = allRows.length - rendered;
+	const revealRows = Math.min(hiddenRows, MORE_RENDER_ROWS);
+	/** Rows no budget paints — an ellipsis row reports them instead. */
+	const unreachableRows = Math.max(0, allRows.length - MAX_RENDER_ROWS);
 	const viewRows = useMemo(() => buildViewRows(rows, rows.length), [rows]);
 	const gutterWidth = useMemo(() => {
 		let width = 0;
@@ -457,64 +488,85 @@ export function DiffView({ diff, filePath, className }: DiffViewProps) {
 	};
 
 	return (
-		<div className={cx("font-mono text-xs leading-[1.4] overflow-x-auto [tab-size:4]", className)}>
-			{viewRows.map((row, i) => {
-				if (row.type === "gap") {
+		// The copy affordance hangs off this box, not the scroller below, so it
+		// stays put while the patch scrolls.
+		<div className="group/diff relative">
+			<button
+				aria-label={t("diff.copy")}
+				className="absolute top-0 right-0 z-10 flex h-5 w-5 items-center justify-center rounded-md text-[var(--omp-dim)] opacity-0 transition-[opacity,background-color,color] duration-150 hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] focus:opacity-100 group-hover/diff:opacity-100"
+				onClick={handleCopy}
+				title={t(copied ? "diff.copied" : "diff.copy")}
+				type="button"
+			>
+				{copied ? <Check size={12} className="text-[var(--omp-success)]" /> : <Copy size={12} />}
+			</button>
+			<div className={cx("font-mono text-xs leading-[1.4] overflow-x-auto [tab-size:4]", className)}>
+				{viewRows.map((row, i) => {
+					if (row.type === "gap") {
+						return (
+							<div key={i} className="whitespace-pre px-2 text-[var(--omp-diff-context)]">
+								{gutterWidth > 0 && (
+									<>
+										<span
+											aria-hidden
+											className="mr-1 inline-block select-none"
+											style={{ width: `${gutterWidth}ch` }}
+										/>
+										<span
+											aria-hidden
+											className="mr-2 inline-block select-none"
+											style={{ width: `${gutterWidth}ch` }}
+										/>
+									</>
+								)}
+								<span aria-hidden className="mr-2 select-none opacity-50">
+									{" "}
+								</span>
+								<span className="opacity-50">…</span>
+							</div>
+						);
+					}
 					return (
-						<div key={i} className="whitespace-pre px-2 text-[var(--omp-diff-context)]">
+						<div key={i} className={cx("whitespace-pre px-2", LINE_STYLES[row.type])}>
 							{gutterWidth > 0 && (
 								<>
 									<span
 										aria-hidden
-										className="mr-1 inline-block select-none"
+										className="mr-1 inline-block select-none text-right opacity-50"
 										style={{ width: `${gutterWidth}ch` }}
-									/>
+									>
+										{row.displayOld}
+									</span>
 									<span
 										aria-hidden
-										className="mr-2 inline-block select-none"
+										className="mr-2 inline-block select-none text-right opacity-50"
 										style={{ width: `${gutterWidth}ch` }}
-									/>
+									>
+										{row.displayNew}
+									</span>
 								</>
 							)}
 							<span aria-hidden className="mr-2 select-none opacity-50">
-								{" "}
+								{LINE_PREFIXES[row.type]}
 							</span>
-							<span className="opacity-50">…</span>
+							{renderContent(i, row)}
 						</div>
 					);
-				}
-				return (
-					<div key={i} className={cx("whitespace-pre px-2", LINE_STYLES[row.type])}>
-						{gutterWidth > 0 && (
-							<>
-								<span
-									aria-hidden
-									className="mr-1 inline-block select-none text-right opacity-50"
-									style={{ width: `${gutterWidth}ch` }}
-								>
-									{row.displayOld}
-								</span>
-								<span
-									aria-hidden
-									className="mr-2 inline-block select-none text-right opacity-50"
-									style={{ width: `${gutterWidth}ch` }}
-								>
-									{row.displayNew}
-								</span>
-							</>
-						)}
-						<span aria-hidden className="mr-2 select-none opacity-50">
-							{LINE_PREFIXES[row.type]}
-						</span>
-						{renderContent(i, row)}
+				})}
+				{hiddenRows > unreachableRows ? (
+					<button
+						className="w-full px-2 py-1 text-left text-[var(--omp-dim)] underline-offset-2 hover:underline"
+						onClick={() => setRowBudget(budget => budget + MORE_RENDER_ROWS)}
+						type="button"
+					>
+						{t("diff.showMore", { count: revealRows })}
+					</button>
+				) : unreachableRows > 0 ? (
+					<div className="whitespace-pre px-2 text-[var(--omp-diff-context)]">
+						<span className="opacity-50">{t("diff.moreLines", { count: unreachableRows })}</span>
 					</div>
-				);
-			})}
-			{omitted > 0 && (
-				<div className="whitespace-pre px-2 text-[var(--omp-diff-context)]">
-					<span className="opacity-50">{t("diff.moreLines", { count: omitted })}</span>
-				</div>
-			)}
+				) : null}
+			</div>
 		</div>
 	);
 }

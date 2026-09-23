@@ -1,7 +1,7 @@
 import { List, Rocket, Send, Skull, Tv } from "lucide-react";
-import { useEffect, useState } from "react";
 import { cx, formatDuration, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useNowTick } from "../../lib/now-tick";
 import { resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
 
@@ -333,12 +333,7 @@ function VibeView({ op, args, result, isError, isPartial, partialResult }: ToolR
 
 	// Live wall screens carry turn elapsed times — tick once a second while any
 	// worker is on air so the durations stay fresh between partial emissions.
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		if (runningCount === 0) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [runningCount]);
+	const now = useNowTick(runningCount > 0);
 
 	const Icon = op === "spawn" ? Rocket : op === "send" ? Send : op === "kill" ? Skull : op === "list" ? List : Tv;
 

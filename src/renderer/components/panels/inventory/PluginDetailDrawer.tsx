@@ -598,6 +598,26 @@ export function PluginDetailDrawer({
 					</div>
 				) : detail !== null ? (
 					<>
+						{/* A failed refresh keeps the last good detail on screen — say so, and
+						    offer the re-read, instead of letting the panel look healthy. */}
+						{loadError !== null && (
+							<div className="flex items-start gap-2 rounded-lg border border-(--omp-error)/40 bg-(--omp-error-dim) px-3 py-2 text-omp-sm text-(--omp-error)">
+								<div className="min-w-0 flex-1">
+									<span className="font-semibold">{t("pluginDetail.stale")}</span> {loadError}
+								</div>
+								<Button
+									icon={<RefreshCw size={12} />}
+									onClick={() => {
+										setLoading(true);
+										void load();
+									}}
+									size="sm"
+									variant="ghost"
+								>
+									{t("invPanel.retry")}
+								</Button>
+							</div>
+						)}
 						<section>
 							<Toggle
 								checked={detail.enabled}

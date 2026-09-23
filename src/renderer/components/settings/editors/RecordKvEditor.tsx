@@ -7,6 +7,7 @@
  */
 
 import { Plus, X } from "lucide-react";
+import { Fragment, useState } from "react";
 import { useT } from "../../../lib/i18n";
 import { ModelValueSelect } from "../ModelValueSelect";
 
@@ -49,6 +50,8 @@ export function RecordKvEditor({
 }: RecordKvEditorProps) {
 	const t = useT();
 	const entries = Object.entries(value);
+	/** Row whose last rename collided, plus the name that collides with it. */
+	const [collision, setCollision] = useState<{ row: string; typed: string } | null>(null);
 
 	const setEntry = (index: number, key: string, val: Primitive) => {
 		const next: Record<string, unknown> = {};
@@ -59,6 +62,7 @@ export function RecordKvEditor({
 	};
 
 	const removeEntry = (index: number) => {
+		setCollision(null);
 		const next: Record<string, unknown> = {};
 		entries.forEach(([k, v], i) => {
 			if (i !== index) next[k] = v;
@@ -70,6 +74,7 @@ export function RecordKvEditor({
 		// Find a free placeholder key so we never clobber an existing entry.
 		let n = entries.length + 1;
 		while (`key${n}` in value) n += 1;
+		setCollision(null);
 		onCommit({ ...value, [`key${n}`]: valueOptions ? valueOptions[0].value : "" });
 	};
 
@@ -79,67 +84,82 @@ export function RecordKvEditor({
 				// Key by the record key (stable), not the index: rows use
 				// uncontrolled inputs, so index keys would keep stale DOM values
 				// attached to the wrong record entry after a row deletion.
-				<div className="flex items-center gap-1.5" key={k}>
-					<input
-						className={`${INPUT_CLASS} w-[45%]`}
-						disabled={disabled}
-						onBlur={e => {
-							const nk = e.target.value.trim();
-							if (nk && nk !== k) setEntry(index, nk, v as Primitive);
-						}}
-						onChange={() => {}}
-						defaultValue={k}
-						placeholder={keyPlaceholder ?? t("settings.editors.kvKey")}
-						spellCheck={false}
-					/>
-					{valueKind === "model" ? (
-						<div className="flex-1">
-							<ModelValueSelect
-								disabled={disabled}
-								kind="model"
-								onCommit={next => setEntry(index, k, next)}
-								value={typeof v === "string" ? v : ""}
-							/>
-						</div>
-					) : valueOptions ? (
-						<select
-							className={`${INPUT_CLASS} flex-1`}
-							disabled={disabled}
-							onChange={e => setEntry(index, k, e.target.value)}
-							value={typeof v === "string" ? v : String(v)}
-						>
-							{valueOptions.map(option => (
-								<option key={option.value} value={option.value}>
-									{option.label}
-								</option>
-							))}
-						</select>
-					) : (
+				<Fragment key={k}>
+					<div className="flex items-center gap-1.5">
 						<input
-							className={`${INPUT_CLASS} flex-1`}
-							defaultValue={typeof v === "string" ? v : String(v)}
+							className={`${INPUT_CLASS} w-[45%]`}
 							disabled={disabled}
 							onBlur={e => {
-								const nv = toPrimitive(e.target.value);
-								if (nv !== v) setEntry(index, k, nv);
+								const nk = e.target.value.trim();
+								if (!nk || nk === k) return;
+								if (entries.some(([other], i) => i !== index && other === nk)) {
+									// Writing it would replace that entry's value with
+									// this row's — a silent loss, so refuse instead.
+									setCollision({ row: k, typed: nk });
+									return;
+								}
+								setCollision(null);
+								setEntry(index, nk, v as Primitive);
 							}}
 							onChange={() => {}}
-							placeholder={valuePlaceholder ?? t("settings.editors.kvValue")}
+							defaultValue={k}
+							placeholder={keyPlaceholder ?? t("settings.editors.kvKey")}
 							spellCheck={false}
-							type={maskValues ? "password" : "text"}
 						/>
+						{valueKind === "model" ? (
+							<div className="flex-1">
+								<ModelValueSelect
+									disabled={disabled}
+									kind="model"
+									onCommit={next => setEntry(index, k, next)}
+									value={typeof v === "string" ? v : ""}
+								/>
+							</div>
+						) : valueOptions ? (
+							<select
+								className={`${INPUT_CLASS} flex-1`}
+								disabled={disabled}
+								onChange={e => setEntry(index, k, e.target.value)}
+								value={typeof v === "string" ? v : String(v)}
+							>
+								{valueOptions.map(option => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						) : (
+							<input
+								className={`${INPUT_CLASS} flex-1`}
+								defaultValue={typeof v === "string" ? v : String(v)}
+								disabled={disabled}
+								onBlur={e => {
+									const nv = toPrimitive(e.target.value);
+									if (nv !== v) setEntry(index, k, nv);
+								}}
+								onChange={() => {}}
+								placeholder={valuePlaceholder ?? t("settings.editors.kvValue")}
+								spellCheck={false}
+								type={maskValues ? "password" : "text"}
+							/>
+						)}
+						{!disabled && (
+							<button
+								aria-label={t("settings.editors.kvRemove")}
+								className="shrink-0 text-(--omp-dim) hover:text-(--omp-error)"
+								onClick={() => removeEntry(index)}
+								type="button"
+							>
+								<X size={13} />
+							</button>
+						)}
+					</div>
+					{collision?.row === k && (
+						<span className="pl-1 text-omp-xs text-(--omp-error)">
+							{t("settings.editors.kvDuplicateKey", { key: collision.typed })}
+						</span>
 					)}
-					{!disabled && (
-						<button
-							aria-label={t("settings.editors.kvRemove")}
-							className="shrink-0 text-(--omp-dim) hover:text-(--omp-error)"
-							onClick={() => removeEntry(index)}
-							type="button"
-						>
-							<X size={13} />
-						</button>
-					)}
-				</div>
+				</Fragment>
 			))}
 			{!disabled && (
 				<button

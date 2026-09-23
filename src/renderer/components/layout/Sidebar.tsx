@@ -22,6 +22,7 @@ import {
 	PinOff,
 	Plug,
 	Plus,
+	RefreshCw,
 	Search,
 	Settings,
 	SquarePen,
@@ -45,6 +46,7 @@ import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
+import { Button } from "../common";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
 import { LangSwitcher } from "../common/LangSwitcher";
@@ -171,7 +173,7 @@ export function Sidebar() {
 	const sessionLastUsed = useSidebarPrefs(s => s.sessionLastUsed);
 	const touchSession = useSidebarPrefs(s => s.touchSession);
 	const renameRef = useRef<HTMLInputElement>(null);
-	const { sessions, isLoading, deleteSession, renameSession } = useSessionList("global");
+	const { sessions, isLoading, error: listError, refresh, deleteSession, renameSession } = useSessionList("global");
 	const sessionId = useSessionStore(s => s.sessionId);
 	const cwd = useSessionStore(s => s.cwd);
 	const isStreaming = useSessionStore(s => s.isStreaming);
@@ -658,6 +660,7 @@ export function Sidebar() {
 						type="button"
 						aria-expanded={navigationExpanded}
 						aria-label={t(navigationExpanded ? "sidebar.navigation.collapse" : "sidebar.navigation.expand")}
+						title={t(navigationExpanded ? "sidebar.navigation.collapse" : "sidebar.navigation.expand")}
 						onClick={() => setNavigationExpanded(expanded => !expanded)}
 						className="omp-pressable mt-1 flex h-6 w-full items-center justify-center rounded-lg border border-[var(--omp-border-muted)] text-[var(--omp-dim)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-muted)]"
 					>
@@ -679,10 +682,24 @@ export function Sidebar() {
 				</div>
 
 				<div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 [overflow-anchor:none]">
+					{listError && sessions.length > 0 && (
+						<p role="alert" className="mx-3 mb-1 break-words text-omp-xs text-[var(--omp-error)]">
+							{t("sidebar.stale")}: {listError}
+						</p>
+					)}
 					{isLoading && sessions.length === 0 && (
 						<div className="px-3 py-6 text-center text-omp-lg text-[var(--omp-dim)]">{t("sidebar.loading")}</div>
 					)}
-					{!isLoading && totalCount === 0 && (
+					{listError && sessions.length === 0 && (
+						<div className="mx-1 mt-2 flex flex-col items-center gap-2 px-4 py-6 text-center">
+							<div className="text-omp-lg font-medium text-[var(--omp-error)]">{t("sidebar.loadFailed")}</div>
+							<div className="break-words text-omp-xs text-[var(--omp-muted)]">{listError}</div>
+							<Button icon={<RefreshCw size={12} />} onClick={() => refresh(true)} size="sm" variant="secondary">
+								{t("common.retry")}
+							</Button>
+						</div>
+					)}
+					{!isLoading && !listError && totalCount === 0 && (
 						<div className="mx-1 mt-2 flex flex-col items-center rounded-xl border border-dashed border-[var(--omp-border-muted)] px-4 py-6 text-center">
 							{mode === "code" ? (
 								<Code2 size={20} className="mb-2 text-[var(--omp-muted)]" />

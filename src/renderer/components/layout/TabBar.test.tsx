@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { IpcSpawnTabPayload, IpcTabInfo, IpcTabStatusPayload, SessionInfo } from "../../../shared/ipc-types";
 import type { RpcCommand, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
+import { closeActiveTab } from "../../lib/tab-close";
 import { useComposerStore } from "../../stores/composer";
 import { useMessagesStore } from "../../stores/messages";
 import { useModelStore } from "../../stores/model";
@@ -261,6 +262,10 @@ afterEach(async () => {
 	useSubagentsStore.getState().reset();
 	useModelStore.getState().reset();
 	useToolsStore.getState().reset();
+	// The arm-confirm and worktree-prompt flags live in the UI store; a chip left
+	// armed by the previous test renders ✓/✕ instead of ×, so the next test's
+	// `[aria-label="Close tab"]` query finds nothing.
+	useUiStore.setState({ armedCloseTab: null, worktreeClosePrompt: null });
 	vi.restoreAllMocks();
 	omp = installMockOmp();
 });
@@ -733,6 +738,31 @@ describe("TabBar close confirm", () => {
 		await click(chips()[0]!.querySelector('[aria-label="Close tab"]')!);
 		expect(omp.tabs.close).toHaveBeenCalledWith("t0");
 		expect(useTabsStore.getState().tabs.map(tab => tab.id)).toEqual(["t1"]);
+	});
+
+	it("⌘W and File → Close Tab leave the chip in exactly the × confirm state", async () => {
+		useTabsStore.setState({
+			tabs: [
+				{ kind: "agent", id: "t0", cwd: "/alpha", status: "running", unreadDone: false },
+				{ kind: "agent", id: "t1", cwd: "/beta", status: "ready", unreadDone: false },
+			],
+			activeTabId: "t0",
+			bundles: new Map(),
+		});
+		await mount(<TabBar />);
+
+		// The keystroke goes through the same rules as the button, so the chip the
+		// user sees after ⌘W is the armed one — no second, divergent confirm UI.
+		expect(closeActiveTab()).toBe("armed");
+		await flush();
+		expect(chips()[0]?.querySelector('[aria-label="Close tab"]')).toBeNull();
+		expect(chips()[0]?.textContent).toContain("Close tab? The running task will be aborted");
+		expect(useUiStore.getState().armedCloseTab).toEqual({ tabId: "t0" });
+
+		// ✓ on that chip finishes the close.
+		await click(chips()[0]!.querySelector('[aria-label="Confirm"]')!);
+		expect(omp.tabs.close).toHaveBeenCalledWith("t0");
+		expect(useUiStore.getState().armedCloseTab).toBeNull();
 	});
 
 	it("an idle worktree tab's × routes to the cleanup prompt, never straight to close (plan/20)", async () => {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MAX_PERSISTED_TABS, sanitizePersistedTabLayout, type TabLayoutPathChecks } from "./tab-layout";
+import {
+	MAX_PERSISTED_TABS,
+	MAX_PERSISTED_TITLE,
+	sanitizePersistedTabLayout,
+	sanitizePersistedTabLayouts,
+	type TabLayoutPathChecks,
+} from "./tab-layout";
 
 function pathChecks(directories: string[], files: string[], contentFiles: string[] = files): TabLayoutPathChecks {
 	return {
@@ -25,6 +31,25 @@ describe("persisted tab layout", () => {
 		};
 
 		expect(sanitizePersistedTabLayout(value, pathChecks(["/a", "/b"], ["/sessions/a.jsonl"]))).toEqual(value);
+	});
+
+	it("carries a saved title and bounds the one read back from prefs", () => {
+		const layout = sanitizePersistedTabLayout(
+			{
+				version: 1,
+				activeIndex: 0,
+				tabs: [
+					{ cwd: "/a", kind: "agent", title: "x".repeat(400) },
+					{ cwd: "/b", kind: "agent", title: 42 },
+				],
+			},
+			pathChecks(["/a", "/b"], []),
+		);
+
+		// A restored tab stays unspawned until shown, so its saved title is the
+		// only label it has — but prefs are untrusted input and must not grow.
+		expect(layout?.tabs[0]?.title).toHaveLength(MAX_PERSISTED_TITLE);
+		expect(layout?.tabs[1]?.title).toBeUndefined();
 	});
 
 	it("remaps and clamps a restored two-pane layout after invalid tabs are dropped", () => {
@@ -170,5 +195,69 @@ describe("persisted tab layout", () => {
 		expect(
 			sanitizePersistedTabLayout({ version: 1, activeIndex: 11, tabs }, pathChecks(directories, []))?.tabs,
 		).toHaveLength(MAX_PERSISTED_TABS);
+	});
+});
+
+describe("persisted session (all windows)", () => {
+	function layout(cwdCount: number, prefix: string, activeIndex = 0) {
+		return {
+			version: 1,
+			activeIndex,
+			tabs: Array.from({ length: cwdCount }, (_, index) => ({
+				cwd: `/${prefix}-${index}`,
+				kind: "agent",
+			})),
+		};
+	}
+
+	function dirs(...prefixes: string[]): string[] {
+		return prefixes.flatMap(prefix => Array.from({ length: 12 }, (_, index) => `/${prefix}-${index}`));
+	}
+
+	it("restores one layout per window and still reads the pre-multi-window single object", () => {
+		const first = layout(2, "a");
+		const second = layout(1, "b");
+		const paths = pathChecks(dirs("a", "b"), []);
+
+		expect(sanitizePersistedTabLayouts([first, second], paths)).toEqual([first, second]);
+		// An upgrade from the one-slot shape must not lose the session.
+		expect(sanitizePersistedTabLayouts(first, paths)).toEqual([first]);
+	});
+
+	it("skips an unsalvageable window without shifting the rest", () => {
+		const second = layout(1, "b");
+		const restored = sanitizePersistedTabLayouts(
+			[null, { version: 1, activeIndex: 0, tabs: [{ cwd: "/gone", kind: "agent" }] }, second],
+			pathChecks(dirs("b"), []),
+		);
+
+		expect(restored).toEqual([second]);
+	});
+
+	it("shares the sidecar budget across windows and stops once it is spent", () => {
+		const paths = pathChecks(dirs("a", "b"), []);
+
+		// Window 1 alone consumes the pool's capacity: window 2 restores nothing.
+		const full = sanitizePersistedTabLayouts([layout(MAX_PERSISTED_TABS, "a"), layout(2, "b")], paths);
+		expect(full.map(entry => entry.tabs.length)).toEqual([MAX_PERSISTED_TABS]);
+
+		// A partial overflow trims the last window's tabs, clamps its focus, and
+		// drops a split whose panes no longer both exist.
+		const overflowing = sanitizePersistedTabLayouts(
+			[
+				layout(MAX_PERSISTED_TABS - 2, "a"),
+				{ ...layout(4, "b", 3), split: { axis: "rows", firstIndex: 2, secondIndex: 3, ratio: 0.5 } },
+			],
+			paths,
+		);
+		expect(overflowing.map(entry => entry.tabs.length)).toEqual([MAX_PERSISTED_TABS - 2, 2]);
+		expect(overflowing[1]?.tabs.map(tab => tab.cwd)).toEqual(["/b-0", "/b-1"]);
+		expect(overflowing[1]?.activeIndex).toBe(1);
+		expect(overflowing[1]?.split).toBeUndefined();
+	});
+
+	it("returns nothing for a session with no restorable window", () => {
+		expect(sanitizePersistedTabLayouts([], pathChecks([], []))).toEqual([]);
+		expect(sanitizePersistedTabLayouts(undefined, pathChecks([], []))).toEqual([]);
 	});
 });

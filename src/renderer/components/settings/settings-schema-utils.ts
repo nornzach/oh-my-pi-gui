@@ -23,6 +23,8 @@ const CONDITION_EVALUATORS: Record<string, (values: Record<string, unknown>) => 
 	autoThinkingActive: values => values.defaultThinkingLevel === "auto",
 	usageAwareFallbackEnabled: values => values["retry.usageAwareFallback"] === true,
 	planModeEnabled: values => values["plan.enabled"] === true,
+	vimModeEnabled: values => values["tui.vimMode"] === true,
+	planAutosaveEnabled: values => values["plan.enabled"] === true && values["plan.autosave"] === true,
 	unexpectedStopDetection: values => values["features.unexpectedStopDetection"] === true,
 };
 

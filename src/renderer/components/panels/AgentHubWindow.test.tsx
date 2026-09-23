@@ -191,6 +191,28 @@ describe("AgentHubWindow hub tab", () => {
 		expect(bodyText()).not.toContain("another rendered template");
 	});
 
+	it("says the roster failed to load instead of claiming nothing was spawned", async () => {
+		installOmpMock({
+			getSubagents: vi.fn(async () => ({
+				type: "response",
+				command: "get_subagents",
+				success: false,
+				error: "sidecar went away",
+			})),
+		});
+		// Hydration's roster pull, which is the only read the hub tab gets until a
+		// turn streams again.
+		await act(async () => {
+			await useSubagentsStore.getState().refresh();
+		});
+		await mount(<AgentHubWindow initialTab="hub" onClose={() => {}} open />);
+
+		const text = document.body.textContent ?? "";
+		expect(text).toContain("Could not load the subagent roster.");
+		expect(text).toContain("sidecar went away");
+		expect(text).not.toContain("No subagents spawned yet.");
+	});
+
 	it("查看消息 opens a transcript slide-over and back closes it", async () => {
 		const omp = installOmpMock();
 		seedHub();

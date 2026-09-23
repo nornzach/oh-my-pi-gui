@@ -32,26 +32,11 @@ import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { onEscape } from "../../lib/keymap";
+import { optimisticWrite } from "../../lib/optimistic";
 import { type QueueLane, type QueueStore, useQueuedMessages, useQueueStore } from "../../stores/queue";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { Badge } from "../common";
-
-/** Links failed optimistic snapshots to their predecessors so overlapping
- *  failures can unwind transitively even when the first failure was
- *  superseded before it settled. Authoritative queue_update arrays never
- *  enter this map and therefore terminate the rollback chain. */
-const failedOptimisticStates = new WeakMap<RpcQueuedMessage[], RpcQueuedMessage[]>();
-
-function rollbackBase(items: RpcQueuedMessage[]): RpcQueuedMessage[] {
-	let current = items;
-	let previous = failedOptimisticStates.get(current);
-	while (previous && previous !== current) {
-		current = previous;
-		previous = failedOptimisticStates.get(current);
-	}
-	return current;
-}
 
 /** Apply a lane-local mutation optimistically. Failed responses and rejected
  *  transport calls roll back this mutation unless a newer snapshot superseded
@@ -64,26 +49,14 @@ async function applyLaneMutation(
 	failureKey: string,
 	t: (key: string) => string,
 ): Promise<void> {
-	const store = queueStore.getState();
-	const before = store[lane];
-	const optimisticItems = optimistic(before);
-	if (optimisticItems === before) return;
-	queueStore.setState({ [lane]: optimisticItems });
-	let failure: string | undefined;
-	try {
-		const response = await persist();
-		if (response.success) return;
-		failure = response.error ?? "RPC call failed";
-	} catch (cause) {
-		failure = cause instanceof Error ? cause.message : String(cause);
-	}
-	failedOptimisticStates.set(optimisticItems, before);
-	if (queueStore.getState()[lane] === optimisticItems) {
-		const rollback = rollbackBase(before);
-		queueStore.setState(lane === "steering" ? { steering: rollback } : { followUp: rollback });
-	}
-	toast({ variant: "error", title: t(failureKey), message: failure });
-	await queueStore.getState().refresh();
+	await optimisticWrite({
+		store: queueStore,
+		mutate: state =>
+			lane === "steering" ? { steering: optimistic(state.steering) } : { followUp: optimistic(state.followUp) },
+		persist,
+		onFailure: message => toast({ variant: "error", title: t(failureKey), message }),
+		resync: () => queueStore.getState().refresh(),
+	});
 }
 
 interface SortableQueuedRowProps {
@@ -109,35 +82,20 @@ async function applyCrossLaneMove(
 	t: (key: string) => string,
 ): Promise<void> {
 	const target: QueueLane = lane === "steering" ? "followUp" : "steering";
-	const store = queueStore.getState();
-	const item = store[lane].find(entry => entry.id === id);
-	if (!item) return;
-	const beforeSteering = store.steering;
-	const beforeFollowUp = store.followUp;
-	const optimisticSteering =
-		lane === "steering" ? beforeSteering.filter(entry => entry.id !== id) : [...beforeSteering, item];
-	const optimisticFollowUp =
-		lane === "followUp" ? beforeFollowUp.filter(entry => entry.id !== id) : [...beforeFollowUp, item];
-	queueStore.setState({ steering: optimisticSteering, followUp: optimisticFollowUp });
-	let failure: string | undefined;
-	try {
-		const response = await rpc.queueMove(id, Number.MAX_SAFE_INTEGER, target);
-		if (response.success) return;
-		failure = response.error;
-	} catch (cause) {
-		failure = cause instanceof Error ? cause.message : String(cause);
-	}
-	failedOptimisticStates.set(optimisticSteering, beforeSteering);
-	failedOptimisticStates.set(optimisticFollowUp, beforeFollowUp);
-	const current = queueStore.getState();
-	if (current.steering === optimisticSteering) {
-		queueStore.setState({ steering: rollbackBase(beforeSteering) });
-	}
-	if (current.followUp === optimisticFollowUp) {
-		queueStore.setState({ followUp: rollbackBase(beforeFollowUp) });
-	}
-	toast({ variant: "error", title: t("queuePanel.moveFailed"), message: failure });
-	await queueStore.getState().refresh();
+	await optimisticWrite({
+		store: queueStore,
+		mutate: state => {
+			const item = state[lane].find(entry => entry.id === id);
+			if (!item) return {};
+			const without = state[lane].filter(entry => entry.id !== id);
+			return lane === "steering"
+				? { steering: without, followUp: [...state.followUp, item] }
+				: { steering: [...state.steering, item], followUp: without };
+		},
+		persist: () => rpc.queueMove(id, Number.MAX_SAFE_INTEGER, target),
+		onFailure: message => toast({ variant: "error", title: t("queuePanel.moveFailed"), message }),
+		resync: () => queueStore.getState().refresh(),
+	});
 }
 
 const SortableQueuedRow = memo(function SortableQueuedRow({

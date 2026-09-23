@@ -18,6 +18,7 @@ import type { SubagentSnapshot } from "../../../../shared/rpc-types";
 import { useTabGuard } from "../../../hooks/use-tab-guard";
 import { cx, formatCost, formatTokens } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
+import { useNowTick } from "../../../lib/now-tick";
 import { useMessagesStore } from "../../../stores/messages";
 import { useSessionStore } from "../../../stores/session";
 import { useSubagentsStore } from "../../../stores/subagents";
@@ -178,17 +179,11 @@ export function AgentsDockCard({ pollMs = STREAM_POLL_MS }: { pollMs?: number })
 	const refresh = useSubagentsStore(state => state.refresh);
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 	const [view, setView] = useState<PanelView>("list");
-	const [now, setNow] = useState(() => Date.now());
 
 	const agents = useMemo(() => [...subagents.values()].sort((a, b) => a.index - b.index), [subagents]);
 	const hasRunning = agents.some(agent => isLiveSubagentStatus(agent.status));
 	const runningCount = agents.filter(agent => isLiveSubagentStatus(agent.status)).length;
-
-	useEffect(() => {
-		if (!hasRunning) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [hasRunning]);
+	const now = useNowTick(hasRunning);
 
 	useEffect(() => {
 		if (!isStreaming) return;

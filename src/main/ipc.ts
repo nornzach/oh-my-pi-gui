@@ -44,6 +44,7 @@ import type {
 import { IPC_COMMANDS, IPC_EVENTS, type RunProgressState, type TrayState } from "../shared/ipc-types";
 import { parseLaunchProfile } from "../shared/launch-profile";
 import type { RpcCommand, RpcSessionState } from "../shared/rpc-types";
+import { requestQuit } from "./app-quit";
 import { BenchmarkRunner } from "./benchmark-runner";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { openInExternalEditor } from "./editor";
@@ -57,20 +58,27 @@ import { resolveEditorCommand } from "./shell-env";
 import type { SidecarManager } from "./sidecar";
 import type { SidecarPool } from "./sidecar-pool";
 import type { StatsClient } from "./stats-client";
+import type { Revive } from "./stats-restart-policy";
 import { spawnTabForWindow } from "./tab-spawn";
 import { setTrayState } from "./tray";
+import { aggregateTrayStatus } from "./tray-labels";
 import type { SpawnWindow, WindowManager } from "./window";
 
 export interface IpcDeps {
 	sidecarPool: SidecarPool;
 	sessionIndex: SessionIndex;
 	statsClient: StatsClient;
+	/** Demand-driven revive for the bundled stats server (no server → "exhausted"). */
+	statsRestart: () => Revive;
 	logWatcher: LogWatcher;
 	windowManager: WindowManager;
 	benchmarkBinaryPath: string | null;
 	benchmarkEnv: () => Promise<NodeJS.ProcessEnv>;
 	/** Spawn a window with its own sidecar (index.ts's pool-backed helper). */
 	spawnWindow: SpawnWindow;
+	/** Where to start when the caller has no cwd. Never the volume root: a
+	 * Finder-launched app's `process.cwd()` is "/", which no session belongs in. */
+	initialCwd: () => string;
 }
 
 /**
@@ -326,14 +334,6 @@ let lastNotifyAt = 0;
 const trayStates = new Map<number, TrayState>();
 const progressStates = new Map<number, RunProgressState>();
 
-/** Collapse per-window tray statuses to one: any error > streaming > waiting > idle. */
-function aggregateTrayStatus(states: TrayState[]): TrayState["status"] {
-	if (states.some(s => s.status === "error")) return "error";
-	if (states.some(s => s.status === "streaming")) return "streaming";
-	if (states.some(s => s.status === "waiting")) return "waiting";
-	return "idle";
-}
-
 /** Collapse per-window run-progress to one: any working > waiting > idle. */
 function aggregateProgress(states: RunProgressState[]): RunProgressState {
 	if (states.some(s => s === "working")) return "working";
@@ -348,12 +348,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 
 	// Drop a closed window's tray/progress snapshot so the aggregate reflects
 	// only live windows (and re-render the tray with the new aggregate).
-	windowManager.onWindowClosed = record => {
+	windowManager.subscribeWindowClosed(record => {
 		trayStates.delete(record.id);
 		progressStates.delete(record.id);
 		benchmarkRunners.get(record.id)?.abort();
 		benchmarkRunners.delete(record.id);
-	};
+	});
 
 	// Sidecar → owning-window event forwarding (events/status/extensionUi/
 	// hostUriRequest/subagentFrame/commandsUpdate/configUpdate) is wired by
@@ -556,7 +556,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			throw new Error("Invalid session path");
 		}
 		const owner = sidecarPool.sessionOwner(payload.sessionPath);
-		if (owner) {
+		if (owner && sidecarPool.sessionOwnerIsLive(payload.sessionPath)) {
 			const response = await sidecarPool.commandForIdleSession(payload.sessionPath, { type: "drop_session" });
 			if (!response) throw new Error("Session is currently running");
 			if (!response.success) throw new Error(response.error);
@@ -564,6 +564,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			if (cancelled) throw new Error("Session deletion was cancelled");
 			return;
 		}
+		// Either no tab claims the file, or the claiming tab has no process (a
+		// restored tab that was never shown). Nothing is loaded anywhere, so the
+		// file IS the session — drop the tab's claim first so it cannot wake into
+		// a path that no longer exists.
+		if (owner) sidecarPool.noteSessionFile(owner.tabId, null);
 		return sessionIndex.deleteSession(payload.sessionPath);
 	});
 
@@ -574,13 +579,16 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		const name = typeof payload.name === "string" ? payload.name.trim() : "";
 		if (!name) throw new Error("Session name cannot be empty");
 		const command: RpcCommand = { type: "set_session_name", name, sessionPath: payload.sessionPath };
-		const owner = sidecarPool.sessionOwner(payload.sessionPath);
-		let response = owner ? await sidecarPool.commandForIdleSession(payload.sessionPath, command) : null;
-		if (!owner) {
+		// An owner with no process has no in-memory title to keep in step, so the
+		// rename is the same file edit it is for an unowned session.
+		const liveOwner =
+			sidecarPool.sessionOwner(payload.sessionPath) && sidecarPool.sessionOwnerIsLive(payload.sessionPath);
+		let response = liveOwner ? await sidecarPool.commandForIdleSession(payload.sessionPath, command) : null;
+		if (!liveOwner) {
 			const caller = sidecarFor(deps, event);
 			if (caller?.status === "ready" && caller.rpcClient) response = await caller.rpcClient.command(command);
 		}
-		if (!response) throw new Error(owner ? "Session is currently running" : "Sidecar not connected");
+		if (!response) throw new Error(liveOwner ? "Session is currently running" : "Sidecar not connected");
 		if (!response.success) throw new Error(response.error);
 	});
 
@@ -601,7 +609,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			if (owner && deps.windowManager.focusWindowById(owner.winId)) return true;
 		}
 		if (deps.sidecarPool.atCap) return false;
-		const callerCwd = cwdFor(deps, event) ?? process.cwd();
+		const callerCwd = cwdFor(deps, event) ?? deps.initialCwd();
 		const cwd = typeof payload?.cwd === "string" && payload.cwd.length > 0 ? payload.cwd : callerCwd;
 		// The new window's sidecar must spawn with the target file's kind, or the
 		// boot-time switch_session hits the agent-side kind guard and the pool
@@ -641,7 +649,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			{
 				sidecarPool: deps.sidecarPool,
 				sessionIndex,
-				fallbackCwd: () => cwdFor(deps, event) ?? process.cwd(),
+				fallbackCwd: () => cwdFor(deps, event) ?? deps.initialCwd(),
 				defaultWorkspace: ensureDefaultWorkspace,
 			},
 			win,
@@ -703,11 +711,26 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		if (typeof payload.path !== "string") {
 			throw new Error("Invalid stats path");
 		}
+		if (!statsClient.port) {
+			// Nothing is listening: ask for it and let the caller keep waiting — but
+			// only while a revive is actually possible, so a permanently dead stats
+			// server ends in an error instead of an endless "loading".
+			const revive = deps.statsRestart();
+			return {
+				error:
+					revive === "exhausted"
+						? "The bundled stats server is not running."
+						: "The bundled stats server is not ready. Please retry shortly.",
+				unavailable: revive !== "exhausted",
+			};
+		}
 		try {
 			return await statsClient.fetch(payload.path, payload.params);
 		} catch (err) {
+			// A request that reached the server and failed is a failure, not a
+			// booting server: the dashboard must show it, not retry for a budget.
 			const msg = err instanceof Error ? err.message : String(err);
-			return { error: msg, unavailable: true };
+			return { error: msg, unavailable: false };
 		}
 	});
 
@@ -729,6 +752,13 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		},
 	);
 	ipcMain.handle(IPC_COMMANDS.BENCH_ABORT, event => benchmarkRunners.get(event.sender.id)?.abort() ?? false);
+
+	// Renderer-initiated quit (the `quit` command). Straight to the guard, never
+	// `window.close()`: closing the focused window only hides the rest of the
+	// session behind it.
+	ipcMain.on(IPC_COMMANDS.APP_QUIT, () => {
+		requestQuit();
+	});
 
 	// System
 	ipcMain.handle(IPC_COMMANDS.SYSTEM_OPEN_EXTERNAL, async (_event, url: string) => {

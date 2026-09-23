@@ -24,6 +24,7 @@ import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { abortActiveTurn } from "../../lib/messages";
+import { useNowTick } from "../../lib/now-tick";
 import { useSubagentsStore } from "../../stores/subagents";
 import { toast } from "../../stores/toast";
 import { Badge, Button, Input, Modal, Spinner, type TabItem, Tabs } from "../common";
@@ -678,8 +679,8 @@ function HubTab() {
 	const tabRpc = useTabRpc();
 	const t = useT();
 	const subagents = useSubagentsStore(s => s.subagents);
+	const loadError = useSubagentsStore(s => s.error);
 	const [viewingId, setViewingId] = useState<string | null>(null);
-	const [now, setNow] = useState(() => Date.now());
 	const [aborting, setAborting] = useState(false);
 
 	// Close the slide-over if its agent leaves the roster (released mid-view).
@@ -717,12 +718,7 @@ function HubTab() {
 	}, [subagents]);
 
 	const hasRunning = liveCount > 0;
-
-	useEffect(() => {
-		if (!hasRunning) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [hasRunning]);
+	const now = useNowTick(hasRunning);
 
 	// Session-scoped abort: stops the active turn (subagents included).
 	const abortTurn = useCallback(async () => {
@@ -843,10 +839,31 @@ function HubTab() {
 			</div>
 			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
 				{sorted.length === 0 ? (
-					<div className="m-auto px-3 py-8 text-center text-omp-sm leading-relaxed text-(--omp-dim)">
-						{t("subagent.empty")}
-						<br />
-						{t("subagent.emptyHint")}
+					<div className="m-auto flex flex-col items-center gap-2 px-3 py-8 text-center text-omp-sm leading-relaxed text-(--omp-dim)">
+						{/* The roster never loaded is a different claim from none spawned. */}
+						{loadError ? (
+							<>
+								<p role="alert" className="text-(--omp-error)">
+									{t("subagent.loadFailed")}
+									<br />
+									{loadError}
+								</p>
+								<Button
+									icon={<RefreshCw size={12} />}
+									onClick={() => void refreshSubagents()}
+									size="sm"
+									variant="secondary"
+								>
+									{t("common.retry")}
+								</Button>
+							</>
+						) : (
+							<>
+								{t("subagent.empty")}
+								<br />
+								{t("subagent.emptyHint")}
+							</>
+						)}
 					</div>
 				) : (
 					sorted.map(agent => (

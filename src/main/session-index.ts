@@ -1,44 +1,48 @@
 /**
  * Watches ~/.omp/agent/sessions/ for .jsonl session files.
  * Parses title, session header, first message, and tail status.
- * LRU cache keyed by mtime:size avoids re-parsing unchanged files.
+ *
+ * Change handling is per file: a watcher event drops that path's cache entries
+ * and notifies, so a streaming agent appending to one session costs one stat —
+ * never a re-fingerprint of the whole tree. Correctness does not depend on the
+ * events, though: every read goes through `list()`, which scans and re-parses
+ * whatever its cache does not already hold, so a missed event self-heals on the
+ * next refresh instead of needing a background poll.
  */
 import { open, readdir, rm, stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { type FSWatcher, watch } from "chokidar";
 import type { SessionInfo, SessionKind } from "../shared/ipc-types";
 import { agentDir } from "./agent-paths";
+import { StampedLru } from "./session-cache";
 
 const TITLE_SLOT_BYTES = 256;
 const TAIL_BYTES = 32 * 1024;
 const HEAD_BYTES = 32 * 1024;
-const MAX_CACHE_SIZE = 4096;
-const POLL_INTERVAL_MS = 10_000;
+const MAX_PARSE_CACHE_ENTRIES = 4096;
 /** Per-file cap for full-content search reads; larger sessions match on this prefix. */
 const SEARCH_READ_BYTES = 8 * 1024 * 1024;
-/** LRU cap on cached lowercased file text (full-content search). */
-const SEARCH_CACHE_SIZE = 128;
+/**
+ * Total bytes of cached search text. Counted, not entry-counted: one entry can be
+ * the full read cap, so an entry-count ceiling alone would allow ~8 MB × entries
+ * of resident strings.
+ */
+const SEARCH_CACHE_BYTES = 64 * 1024 * 1024;
 /** Files read concurrently during a content search (bounds FD pressure). */
 const SEARCH_BATCH = 16;
 
 type SessionStatus = SessionInfo["status"];
 
-interface CacheEntry {
-	info: SessionInfo;
-}
-
 export class SessionIndex {
 	#watcher: FSWatcher | null = null;
-	#cache = new Map<string, CacheEntry>();
-	#searchCache = new Map<string, { signature: string; text: string }>();
+	#parseCache = new StampedLru<SessionInfo>(MAX_PARSE_CACHE_ENTRIES);
+	#textCache = new StampedLru<string>(SEARCH_CACHE_BYTES, text => text.length);
 	#sessionsDir: string;
 	#cwd: string;
-	#pollTimer: NodeJS.Timeout | null = null;
-	#lastSignature = "";
 
 	onChange: (() => void) | null = null;
 
-	constructor(sessionsDir?: string, cwd = process.cwd()) {
+	constructor(sessionsDir: string | undefined, cwd: string) {
 		this.#sessionsDir = sessionsDir ?? join(agentDir(), "sessions");
 		this.#cwd = resolve(cwd);
 	}
@@ -56,27 +60,18 @@ export class SessionIndex {
 			awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
 		});
 
-		this.#watcher.on("add", path => this.#onFileChange(path));
-		this.#watcher.on("change", path => this.#onFileChange(path));
-		this.#watcher.on("unlink", path => this.#onFileRemove(path));
-
-		// Poll fallback for platforms where chokidar is unreliable. Gated on a
-		// directory signature so it only notifies when something changed.
-		void this.#computeSignature().then(signature => {
-			this.#lastSignature = signature;
-		});
-		this.#pollTimer = setInterval(() => this.#pollScan(), POLL_INTERVAL_MS);
+		// add/change/unlink all mean the same thing here: this one file's cached
+		// view is dead. The event carries the path, so nothing else is touched.
+		this.#watcher.on("add", path => this.#invalidate(path));
+		this.#watcher.on("change", path => this.#invalidate(path));
+		this.#watcher.on("unlink", path => this.#invalidate(path));
 	}
 
 	stop(): void {
 		this.#watcher?.close();
 		this.#watcher = null;
-		if (this.#pollTimer) {
-			clearInterval(this.#pollTimer);
-			this.#pollTimer = null;
-		}
-		this.#cache.clear();
-		this.#searchCache.clear();
+		this.#parseCache.clear();
+		this.#textCache.clear();
 	}
 
 	/**
@@ -130,10 +125,8 @@ export class SessionIndex {
 		const root = `${resolve(this.#sessionsDir)}${sep}`;
 		if (!target.startsWith(root) || !target.endsWith(".jsonl")) throw new Error("Invalid session path");
 		await rm(target, { force: true });
-		for (const key of this.#cache.keys()) {
-			if (key.endsWith(`:${target}`)) this.#cache.delete(key);
-		}
-		this.#searchCache.delete(target);
+		this.#parseCache.delete(target);
+		this.#textCache.delete(target);
 		this.#notifyChange();
 	}
 
@@ -171,24 +164,15 @@ export class SessionIndex {
 		try {
 			const fileStat = await stat(filePath);
 			const signature = `${fileStat.mtimeMs}:${fileStat.size}`;
-			const cached = this.#searchCache.get(filePath);
-			if (cached && cached.signature === signature) {
-				// Move to end (most recently used)
-				this.#searchCache.delete(filePath);
-				this.#searchCache.set(filePath, cached);
-				return cached.text;
-			}
+			const cached = this.#textCache.get(filePath, signature);
+			if (cached !== null) return cached;
 			const fh = await open(filePath, "r");
 			try {
 				const length = Math.min(fileStat.size, SEARCH_READ_BYTES);
 				const buffer = Buffer.alloc(length);
 				await fh.read(buffer, 0, length, 0);
 				const text = buffer.toString("utf-8").toLowerCase();
-				if (this.#searchCache.size >= SEARCH_CACHE_SIZE) {
-					const oldest = this.#searchCache.keys().next().value;
-					if (oldest) this.#searchCache.delete(oldest);
-				}
-				this.#searchCache.set(filePath, { signature, text });
+				this.#textCache.set(filePath, signature, text);
 				return text;
 			} finally {
 				await fh.close();
@@ -218,86 +202,29 @@ export class SessionIndex {
 		}
 	}
 
-	#onFileChange(path: string): void {
+	/**
+	 * One session file changed, appeared, or vanished: forget exactly that file's
+	 * cached view and notify. Nothing else is stat'ed — the previous handler
+	 * re-fingerprinted every session in the tree on each event, so an agent
+	 * streaming into one file walked the whole directory repeatedly.
+	 */
+	#invalidate(path: string): void {
 		if (!path.endsWith(".jsonl")) return;
-		// Invalidate cache for this path
-		for (const key of this.#cache.keys()) {
-			if (key.endsWith(`:${path}`)) {
-				this.#cache.delete(key);
-			}
-		}
-		// Keep the signature in sync with the event so the next poll stays silent.
-		void this.#computeSignature().then(signature => {
-			this.#lastSignature = signature;
-			this.#notifyChange();
-		});
-	}
-
-	#onFileRemove(path: string): void {
-		if (!path.endsWith(".jsonl")) return;
-		for (const key of this.#cache.keys()) {
-			if (key.endsWith(`:${path}`)) {
-				this.#cache.delete(key);
-			}
-		}
-		void this.#computeSignature().then(signature => {
-			this.#lastSignature = signature;
-			this.#notifyChange();
-		});
-	}
-
-	async #pollScan(): Promise<void> {
-		// Notify only when the directory fingerprint changed; the actual
-		// re-parse still happens lazily (and cache-cheaply) in list().
-		const signature = await this.#computeSignature();
-		if (signature === this.#lastSignature) return;
-		this.#lastSignature = signature;
+		this.#parseCache.delete(path);
+		this.#textCache.delete(path);
 		this.#notifyChange();
-	}
-
-	/** mtime:size fingerprint of every session file, for change detection. */
-	async #computeSignature(): Promise<string> {
-		const entries = await this.#scanDir();
-		const parts = await Promise.all(
-			entries.map(async entry => {
-				try {
-					const fileStat = await stat(entry.path);
-					return `${entry.path}:${fileStat.mtimeMs}:${fileStat.size}`;
-				} catch {
-					return null;
-				}
-			}),
-		);
-		return parts
-			.filter(part => part !== null)
-			.sort()
-			.join("\n");
 	}
 
 	async #parseSessionFile(filePath: string): Promise<SessionInfo | null> {
 		try {
 			const fileStat = await stat(filePath);
-			const cacheKey = `${fileStat.mtimeMs}:${fileStat.size}:${filePath}`;
-
-			// LRU check
-			const cached = this.#cache.get(cacheKey);
-			if (cached) {
-				// Move to end (most recently used)
-				this.#cache.delete(cacheKey);
-				this.#cache.set(cacheKey, cached);
-				return cached.info;
-			}
+			const signature = `${fileStat.mtimeMs}:${fileStat.size}`;
+			const cached = this.#parseCache.get(filePath, signature);
+			if (cached) return cached;
 
 			const info = await this.#doParse(filePath, fileStat);
 			if (!info) return null;
-
-			// Evict oldest if over capacity
-			if (this.#cache.size >= MAX_CACHE_SIZE) {
-				const oldest = this.#cache.keys().next().value;
-				if (oldest) this.#cache.delete(oldest);
-			}
-
-			this.#cache.set(cacheKey, { info });
+			this.#parseCache.set(filePath, signature, info);
 			return info;
 		} catch {
 			return null;

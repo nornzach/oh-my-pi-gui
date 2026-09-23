@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { CustomProviderView, SessionInfo } from "../../shared/ipc-types";
+import type { SidecarRestartProgress } from "../../shared/rpc-types";
 import { KEYMAP_ACTIONS, type KeymapOverrides, sanitizeOverrides } from "../lib/keymap";
 import { readPrepaintThemeMode, type ThemeMode } from "../lib/theme";
 import { useTabsStore } from "./tabs";
@@ -75,6 +76,9 @@ interface UiStore {
 	/** Close-time cleanup prompt for a worktree-bound tab (plan/20): the tab
 	 * awaiting the user's delete/keep decision before closeTab proceeds. */
 	worktreeClosePrompt: { tabId: string } | null;
+	/** Live tab whose close is armed for confirmation: set by the chip's ×, ⌘W or
+	 * the menu, so all three share one inline confirm (the second commit closes). */
+	armedCloseTab: { tabId: string } | null;
 	/** PR Center fullscreen panel (plan/21). */
 	prCenterOpen: boolean;
 	sessionPickerOpen: boolean;
@@ -86,6 +90,13 @@ interface UiStore {
 	 * a parallel new tab (recommended) / new window vs abort-and-switch. */
 	sessionSwitchPrompt: SessionInfo | null;
 	sidecarError: string | null;
+	/** Crash-loop progress carried by the status behind `sidecarError`: non-null
+	 * while the sidecar is respawning itself, and on the terminal error once the
+	 * attempts run out. Null for renderer-detected health failures. */
+	sidecarRestart: SidecarRestartProgress | null;
+	/** The banner was dismissed by the user. A new diagnostic — or the sidecar
+	 * coming back — clears it; the one that was closed stays hidden. */
+	sidecarDismissed: boolean;
 	theme: ThemeMode;
 	fontSize: number;
 	/** Application-wide display preferences, independent of a task's terminal configuration. */
@@ -178,6 +189,8 @@ interface UiStore {
 	closeWorktreeDialog: () => void;
 	openWorktreeClosePrompt: (tabId: string) => void;
 	closeWorktreeClosePrompt: () => void;
+	armCloseTab: (tabId: string) => void;
+	cancelCloseTab: () => void;
 	openPrCenter: () => void;
 	closePrCenter: () => void;
 	openSessionPicker: () => void;
@@ -193,8 +206,9 @@ interface UiStore {
 	/** Close UI whose data or actions belong to the outgoing tab. */
 	closeSessionOverlays: () => void;
 	/** In-flight sidebar/picker session switch: keep the outgoing transcript painted. */
-	setSidecarError: (error: string | null) => void;
+	setSidecarError: (error: string | null, restart?: SidecarRestartProgress | null) => void;
 	clearSidecarError: () => void;
+	dismissSidecarBanner: () => void;
 	setTheme: (theme: ThemeMode) => void;
 	setFontSize: (size: number) => void;
 	setNotifications: (enabled: boolean) => void;
@@ -265,7 +279,14 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	closeCommandPalette: () => set({ commandPaletteOpen: false }),
 	openModelPicker: () => set({ modelPickerOpen: true }),
 	closeModelPicker: () => set({ modelPickerOpen: false }),
-	openSettings: tab => set({ settingsOpen: true, settingsTab: tab ?? "capabilities" }),
+	// Without an explicit target, a window that is already open stays on its
+	// page: ⌘, pressed again must not bounce the user back to the first tab (and
+	// wipe the search they typed).
+	openSettings: tab =>
+		set(state => ({
+			settingsOpen: true,
+			settingsTab: tab ?? (state.settingsOpen ? state.settingsTab : "capabilities"),
+		})),
 	closeSettings: () => set({ settingsOpen: false }),
 	usageOpen: false,
 	providersOpen: false,
@@ -364,6 +385,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	worktreeClosePrompt: null,
 	openWorktreeClosePrompt: tabId => set({ worktreeClosePrompt: { tabId } }),
 	closeWorktreeClosePrompt: () => set({ worktreeClosePrompt: null }),
+	armedCloseTab: null,
+	armCloseTab: tabId => set({ armedCloseTab: { tabId } }),
+	cancelCloseTab: () => set({ armedCloseTab: null }),
 	prCenterOpen: false,
 	openPrCenter: () => set({ prCenterOpen: true }),
 	closePrCenter: () => set({ prCenterOpen: false }),
@@ -409,6 +433,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 			renameDialogOpen: false,
 			worktreeDialog: null,
 			worktreeClosePrompt: null,
+			armedCloseTab: null,
 			prCenterOpen: false,
 			filePreviewPath: null,
 			sessionPickerOpen: false,
@@ -418,8 +443,12 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 			sessionSwitchPrompt: null,
 		}),
 	sidecarError: null as string | null,
-	setSidecarError: (error: string | null) => set({ sidecarError: error }),
-	clearSidecarError: () => set({ sidecarError: null }),
+	sidecarRestart: null as SidecarRestartProgress | null,
+	sidecarDismissed: false,
+	setSidecarError: (error, restart = null) =>
+		set({ sidecarError: error, sidecarRestart: restart, sidecarDismissed: false }),
+	clearSidecarError: () => set({ sidecarError: null, sidecarRestart: null, sidecarDismissed: false }),
+	dismissSidecarBanner: () => set({ sidecarDismissed: true }),
 	setTheme: theme => set({ theme }),
 	setFontSize: size => set({ fontSize: size }),
 	setNotifications: enabled => set({ notifications: enabled }),

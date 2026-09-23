@@ -1,3 +1,4 @@
+import { ImageOff } from "lucide-react";
 import {
 	type ComponentPropsWithoutRef,
 	createContext,
@@ -22,7 +23,7 @@ import { useRuntimeTabId } from "../stores/session-runtime-context";
 import { useUiStore } from "../stores/ui";
 import { saveGuiPreference } from "./display-preferences";
 import { useT } from "./i18n";
-import { PREVIEW_SCROLL_CODE } from "./preview";
+import { PREVIEW_HEIGHT_LG, PREVIEW_SCROLL_CODE } from "./preview";
 import { remarkLatexMath } from "./remark-latex-math";
 
 interface MarkdownRendererProps {
@@ -386,20 +387,26 @@ function TaskCheckbox(props: ComponentPropsWithoutRef<"input">) {
 }
 
 // ── Markdown images ─────────────────────────────────────────────────────────
-// Model output references images three ways: remote URLs (loaded directly —
-// CSP allows http/https), inline data: URLs, and local paths (screenshots,
-// generated images) that the browser cannot resolve from the bundle origin.
-// Local paths go through the fs:read-image IPC (sniffed mime + size cap) and
-// come back as data URLs.
+// Model output references images three ways: remote URLs, inline data: URLs,
+// and local paths (screenshots, generated images) that the browser cannot
+// resolve from the bundle origin. Local paths go through the fs:read-image IPC
+// (sniffed mime + size cap) and come back as data URLs. Remote URLs are never
+// fetched automatically: an `<img>` is a silent outbound request that leaks the
+// viewer's IP and reading to whoever the model named, and CSP blocks it anyway,
+// so they render as an explicit link the user chooses to open.
 
-export type MarkdownImageSrc = { kind: "direct"; src: string } | { kind: "local"; path: string } | { kind: "none" };
+export type MarkdownImageSrc =
+	| { kind: "direct"; src: string }
+	| { kind: "remote"; src: string }
+	| { kind: "local"; path: string }
+	| { kind: "none" };
 
-/** Classifies an <img> src after sanitize: direct-load URL, local path, or unusable. */
+/** Classifies an <img> src after sanitize: inline image, remote URL, local path, or unusable. */
 export function classifyImageSrc(src: string | undefined): MarkdownImageSrc {
 	if (!src) return { kind: "none" };
 	if (src.startsWith("data:") || src.startsWith("blob:")) return { kind: "direct", src };
-	if (/^https?:\/\//i.test(src)) return { kind: "direct", src };
-	if (src.startsWith("//")) return { kind: "direct", src: `https:${src}` };
+	if (/^https?:\/\//i.test(src)) return { kind: "remote", src };
+	if (src.startsWith("//")) return { kind: "remote", src: `https:${src}` };
 	if (/^file:\/\//i.test(src)) {
 		let raw = src.replace(/^file:\/\//i, "");
 		try {
@@ -414,8 +421,7 @@ export function classifyImageSrc(src: string | undefined): MarkdownImageSrc {
 	return { kind: "local", path: src };
 }
 
-const MARKDOWN_IMAGE_CLASS =
-	"my-1 max-h-72 max-w-full rounded-md border border-[var(--omp-border-muted)] object-contain";
+const MARKDOWN_IMAGE_CLASS = `my-1 ${PREVIEW_HEIGHT_LG} max-w-full rounded-md border border-[var(--omp-border-muted)] object-contain`;
 
 function MarkdownImageFallback({ alt, path }: { alt: string; path?: string }) {
 	return (
@@ -425,6 +431,33 @@ function MarkdownImageFallback({ alt, path }: { alt: string; path?: string }) {
 		>
 			<span className="truncate">{alt || path || "image"}</span>
 			{alt && path && <span className="shrink-0 truncate font-mono text-omp-xs opacity-70">{path}</span>}
+		</span>
+	);
+}
+
+/**
+ * A remote image is never fetched: the request would leak this viewer's IP and
+ * reading to the host the model named. The source stays one explicit click away.
+ */
+function RemoteMarkdownImage({ src, alt }: { src: string; alt: string }) {
+	const t = useT();
+	return (
+		<span
+			title={src}
+			className="my-1 inline-flex max-w-full items-center gap-1.5 rounded-md border border-[var(--omp-border-muted)] px-2 py-1 text-omp-md text-[var(--omp-dim)]"
+		>
+			<ImageOff size={13} className="shrink-0" aria-hidden />
+			<span className="truncate">{alt || t("markdown.remoteImage")}</span>
+			<a
+				href={src}
+				onClick={event => {
+					event.preventDefault();
+					window.omp.system.openExternal(src);
+				}}
+				className="shrink-0 truncate font-mono text-omp-xs text-[var(--omp-md-link)] underline decoration-[var(--omp-md-link-url)] hover:decoration-[var(--omp-md-link)]"
+			>
+				{t("markdown.remoteImageOpen")}
+			</a>
 		</span>
 	);
 }
@@ -471,6 +504,7 @@ function MarkdownImage({ src, alt, title, ...props }: ComponentPropsWithoutRef<"
 			/>
 		);
 	}
+	if (classified.kind === "remote") return <RemoteMarkdownImage src={classified.src} alt={altText} />;
 	return <img {...props} src={classified.src} alt={altText} title={title} className={MARKDOWN_IMAGE_CLASS} />;
 }
 

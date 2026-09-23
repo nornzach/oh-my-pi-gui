@@ -4,7 +4,9 @@ import type { SessionInfo } from "../../shared/ipc-types";
 interface SessionListResult {
 	sessions: SessionInfo[];
 	isLoading: boolean;
-	refresh: () => void;
+	/** Set when the last read failed; an empty list must not claim "nothing here". */
+	error: string | null;
+	refresh: (showSpinner?: boolean) => void;
 	deleteSession: (path: string) => Promise<void>;
 	renameSession: (path: string, name: string) => Promise<void>;
 }
@@ -24,12 +26,14 @@ interface SessionListResult {
 export function useSessionList(scope: "local" | "global" = "local"): SessionListResult {
 	const [sessions, setSessions] = useState<SessionInfo[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 	const firstLoadDone = useRef(false);
 	const debounceTimer = useRef<number | undefined>(undefined);
 
 	const refresh = useCallback(
 		(showSpinner = false) => {
 			if (showSpinner && !firstLoadDone.current) setIsLoading(true);
+			setError(null);
 			window.omp.sessions
 				.list(scope)
 				.then(list => {
@@ -39,7 +43,10 @@ export function useSessionList(scope: "local" | "global" = "local"): SessionList
 					// (titles, timestamps, counts) updates — no snapshot animation.
 					setSessions(list);
 				})
-				.catch(() => {
+				.catch(cause => {
+					// A read that never answered is not a read that found nothing — the
+					// sidebar would otherwise claim "no sessions yet" for a failure.
+					setError(cause instanceof Error ? cause.message : String(cause));
 					setIsLoading(false);
 				});
 		},
@@ -81,5 +88,5 @@ export function useSessionList(scope: "local" | "global" = "local"): SessionList
 		[refresh],
 	);
 
-	return { sessions, isLoading, refresh, deleteSession, renameSession };
+	return { sessions, isLoading, error, refresh, deleteSession, renameSession };
 }

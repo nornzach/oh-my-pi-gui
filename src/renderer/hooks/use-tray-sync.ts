@@ -1,9 +1,10 @@
 /**
  * Keeps the system-tray menu in sync: derives a TrayState snapshot from the
  * live stores (model, settings, session, language, workspace list) and pushes
- * it to the main process on every change, so the tray menu is always fresh the
- * moment it opens. Main renders the menu from the latest snapshot; actions
- * route back here via MENU_ACTION.
+ * it to the main process on every change. Main installs a new native menu only
+ * when a visible label changed and never while one is open, so pushing on every
+ * session-list refresh costs a comparison instead of swapping the menu under the
+ * cursor. Actions route back here via MENU_ACTION.
  */
 
 import { useEffect } from "react";

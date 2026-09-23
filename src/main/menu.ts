@@ -2,6 +2,7 @@
  * Native application menu for the omp GUI.
  */
 import { app, Menu, type MenuItemConstructorOptions, shell } from "electron";
+import { nativeAccelerator } from "../shared/hotkeys";
 import { IPC_EVENTS, type MenuAction } from "../shared/ipc-types";
 import { getMainLanguage, mainT } from "./i18n";
 import type { SpawnWindow, WindowManager } from "./window";
@@ -22,6 +23,11 @@ function sendMenuAction(windowManager: WindowManager, spawnWindow: SpawnWindow, 
 
 export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindow): void {
 	const language = getMainLanguage();
+	// Chord rule: a shortcut the renderer keymap owns must NOT also be a menu
+	// accelerator. Electron resolves menu accelerators before the keydown reaches
+	// the webContents, so the duplicate would fire while the user's remap of the
+	// same action stayed dead. Menu-only chords live in shared/hotkeys.ts, which
+	// the keymap reads as reserved.
 	const template: MenuItemConstructorOptions[] = [
 		...(process.platform === "darwin"
 			? [
@@ -31,7 +37,8 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 							{ role: "about" as const },
 							{
 								label: mainT("menu.settings", language),
-								accelerator: "CmdOrCtrl+,",
+								// No accelerator: ⌘, (and its ⌃, twin) belong to the renderer
+								// keymap so users can remap them.
 								click: () => sendMenuAction(windowManager, spawnWindow, "open-settings"),
 							},
 							{ type: "separator" as const },
@@ -60,7 +67,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				{ type: "separator" },
 				{
 					label: mainT("menu.newSession", language),
-					accelerator: "CmdOrCtrl+N",
+					accelerator: nativeAccelerator("session.new"),
 					click: () => sendMenuAction(windowManager, spawnWindow, "new-session"),
 				},
 				{
@@ -76,14 +83,15 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				},
 				{
 					label: mainT("menu.newWindow", language),
-					accelerator: "CmdOrCtrl+Shift+N",
+					accelerator: nativeAccelerator("window.new"),
 					click: () => {
 						// Open a parallel window in the target window's project (its
-						// sidecar keeps running untouched in the current window).
-						const cwd = windowManager.getTargetWindow()
-							? (windowManager.recordFor(windowManager.getTargetWindow()!)?.cwd ?? process.cwd())
-							: process.cwd();
-						spawnWindow(cwd);
+						// sidecar keeps running untouched in the current window). With no
+						// project to inherit, spawn without a cwd: that is the request for
+						// the GUI-owned workspace, whereas the process cwd is "/" for an
+						// app launched from Finder.
+						const win = windowManager.getTargetWindow();
+						spawnWindow(win ? windowManager.recordFor(win)?.cwd : undefined);
 					},
 				},
 				...(process.platform === "darwin"
@@ -92,12 +100,10 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 							{ type: "separator" as const },
 							{
 								label: mainT("menu.settings", language),
-								accelerator: "CmdOrCtrl+,",
+								// No accelerator: the renderer keymap owns ⌘, so users can remap it.
 								click: () => sendMenuAction(windowManager, spawnWindow, "open-settings"),
 							},
 						]),
-				{ type: "separator" },
-				{ role: "close" },
 			],
 		},
 		{
@@ -117,12 +123,12 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 			submenu: [
 				{
 					label: mainT("menu.toggleSidebar", language),
-					accelerator: "CmdOrCtrl+B",
+					// No accelerator: ⌘B/⌃B belong to the renderer keymap.
 					click: () => sendMenuAction(windowManager, spawnWindow, "toggle-sidebar"),
 				},
 				{
 					label: mainT("menu.togglePanel", language),
-					accelerator: "CmdOrCtrl+J",
+					// No accelerator: ⌘J/⌃J belong to the renderer keymap.
 					click: () => sendMenuAction(windowManager, spawnWindow, "toggle-panel"),
 				},
 				{ type: "separator" },
@@ -138,11 +144,35 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 			],
 		},
 		{
+			// The macOS habit this serves: ⌘W closes a TAB, ⇧⌘W closes the window.
+			// `{ role: "close" }` in File was window-level, so the first ⌘W killed
+			// the whole window — every tab and sidecar in it.
+			label: mainT("menu.window", language),
+			submenu: [
+				{
+					label: mainT("menu.closeTab", language),
+					// No accelerator: ⌘W belongs to the renderer keymap so users can
+					// remap it; a menu accelerator would fire first (precedent: ⌘T).
+					click: () => sendMenuAction(windowManager, spawnWindow, "close-tab"),
+				},
+				{
+					label: mainT("menu.closeWindow", language),
+					accelerator: nativeAccelerator("window.close"),
+					click: () => windowManager.getTargetWindow()?.close(),
+				},
+				{ type: "separator" },
+				{ role: "minimize" },
+				...(process.platform === "darwin"
+					? [{ role: "zoom" as const }, { type: "separator" as const }, { role: "front" as const }]
+					: []),
+			],
+		},
+		{
 			label: mainT("menu.session", language),
 			submenu: [
 				{
 					label: mainT("menu.exportHtml", language),
-					accelerator: "CmdOrCtrl+E",
+					accelerator: nativeAccelerator("session.exportHtml"),
 					click: () => sendMenuAction(windowManager, spawnWindow, "export-html"),
 				},
 				{

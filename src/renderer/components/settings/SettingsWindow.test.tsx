@@ -180,6 +180,15 @@ describe("GUI settings visibility", () => {
 		expect(html).not.toContain(">Status Line</h3>");
 	});
 
+	it("keeps conditional Vim and Plan autosave rows aligned with their enabling settings", () => {
+		const vim = entry({ path: "tui.vimModeIndicator", condition: "vimModeEnabled", tab: "experience" });
+		const autosave = entry({ path: "plan.autosaveDir", condition: "planAutosaveEnabled", tab: "tasks" });
+		expect(isSettingVisibleInGui(vim, { "tui.vimMode": false })).toBe(false);
+		expect(isSettingVisibleInGui(vim, { "tui.vimMode": true })).toBe(true);
+		expect(isSettingVisibleInGui(autosave, { "plan.enabled": true, "plan.autosave": false })).toBe(false);
+		expect(isSettingVisibleInGui(autosave, { "plan.enabled": true, "plan.autosave": true })).toBe(true);
+	});
+
 	it("renders fixed ordered arrays as choices instead of an arbitrary text field", () => {
 		const methodOrder = entry({
 			path: "compaction.methodOrder",
@@ -320,6 +329,17 @@ describe("SettingsWindow", () => {
 			settingsOpen: true,
 			settingsTab: "resources:marketplaces",
 		});
+	});
+
+	it("keeps the current page when ⌘, lands on an already-open window", () => {
+		useUiStore.getState().openSettings("mcp");
+		// No explicit target: reopening must not bounce the user to the first tab.
+		useUiStore.getState().openSettings();
+		expect(useUiStore.getState()).toMatchObject({ settingsOpen: true, settingsTab: "mcp" });
+		// A cold open still starts at the default page.
+		useUiStore.getState().closeSettings();
+		useUiStore.getState().openSettings();
+		expect(useUiStore.getState()).toMatchObject({ settingsOpen: true, settingsTab: "capabilities" });
 	});
 
 	it("renders nothing when closed", () => {

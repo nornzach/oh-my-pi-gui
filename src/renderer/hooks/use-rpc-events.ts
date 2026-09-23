@@ -525,7 +525,6 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 		// which the one-shot boot health check cannot catch.
 		let heartbeat: ReturnType<typeof setInterval> | null = null;
 		let probing = false;
-		const brickMessage = "Agent stopped responding — the command queue may be wedged. Restart the agent.";
 		const startHeartbeat = () => {
 			if (heartbeat) return;
 			heartbeat = setInterval(() => {
@@ -540,7 +539,7 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 						probing = false;
 						if (!acceptsActiveTabEvents() || useTabsStore.getState().activeTabId !== probeTabId) return;
 						if (!res.success) {
-							useUiStore.getState().setSidecarError(brickMessage);
+							useUiStore.getState().setSidecarError(translate("events.sidecarNoResponse"));
 							return;
 						}
 						useUiStore.getState().clearSidecarError();
@@ -552,7 +551,7 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 					.catch(() => {
 						probing = false;
 						if (!acceptsActiveTabEvents() || useTabsStore.getState().activeTabId !== probeTabId) return;
-						useUiStore.getState().setSidecarError(brickMessage);
+						useUiStore.getState().setSidecarError(translate("events.sidecarNoResponse"));
 					});
 			}, heartbeatMs);
 		};
@@ -635,10 +634,17 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 						if (isFocused()) useUiStore.getState().setSidecarError(translate("events.sidecarHealthFailed"));
 					}
 				})();
-			} else if (payload.status === "error" || payload.status === "exited") {
+			} else if (payload.status === "error" || payload.status === "exited" || payload.status === "restarting") {
 				if (isFocused()) {
+					// The command queue died with the process, so a probe would fail and
+					// overwrite the crash reason with a generic "not responding".
 					stopHeartbeat();
-					useUiStore.getState().setSidecarError(payload.message ?? translate("events.sidecarProcessFailed"));
+					useUiStore
+						.getState()
+						.setSidecarError(
+							payload.message ?? translate("events.sidecarProcessFailed"),
+							payload.restart ?? null,
+						);
 				}
 			}
 		};

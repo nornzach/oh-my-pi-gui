@@ -3,6 +3,8 @@ import type { IpcTabWorktree, SessionKind } from "../shared/ipc-types";
 
 export const TAB_LAYOUT_VERSION = 1;
 export const MAX_PERSISTED_TABS = 10;
+/** A persisted title is display data only — bound it so prefs cannot grow. */
+export const MAX_PERSISTED_TITLE = 120;
 
 export interface PersistedTabDescriptor {
 	cwd: string;
@@ -11,6 +13,12 @@ export interface PersistedTabDescriptor {
 	worktree?: IpcTabWorktree;
 	/** Untargeted startup tab, disposable once another real tab exists. */
 	placeholder?: boolean;
+	/**
+	 * Last title the live session reported. A restored tab stays unspawned
+	 * until it is shown, so this is the only title the chip can render in the
+	 * meantime; the live session overwrites it on wake.
+	 */
+	title?: string;
 }
 
 export interface PersistedTabLayout {
@@ -128,6 +136,8 @@ export function sanitizePersistedTabLayout(
 			kind === "chat" &&
 			(!sessionPath || paths.sessionHasContent?.(sessionPath) === false);
 		if (candidate.placeholder === true || legacyEmptyStartupChat) descriptor.placeholder = true;
+		const title = nonEmptyString(candidate.title);
+		if (title) descriptor.title = title.slice(0, MAX_PERSISTED_TITLE);
 		retained.push({ descriptor, sourceIndex });
 	}
 
@@ -169,4 +179,35 @@ export function sanitizePersistedTabLayout(
 		activeIndex,
 		...(split ? { split } : {}),
 	};
+}
+
+/**
+ * The whole session: one layout per window, in window order.
+ *
+ * Accepts the current array and the pre-multi-window shape (a bare layout
+ * object), so an upgrade restores what the last version saved. The pool caps
+ * sidecars at `MAX_PERSISTED_TABS` in total, so a restored set is trimmed to
+ * that budget — otherwise every window past the cap silently lost its tabs.
+ */
+export function sanitizePersistedTabLayouts(
+	value: unknown,
+	paths: TabLayoutPathChecks = diskPathChecks,
+): PersistedTabLayout[] {
+	const candidates = Array.isArray(value) ? value : [value];
+	const layouts: PersistedTabLayout[] = [];
+	let budget = MAX_PERSISTED_TABS;
+	for (const candidate of candidates) {
+		if (budget <= 0) break;
+		const layout = sanitizePersistedTabLayout(candidate, paths);
+		if (!layout) continue;
+		if (layout.tabs.length > budget) {
+			const activeIndex = Math.min(layout.activeIndex, budget - 1);
+			layout.tabs = layout.tabs.slice(0, budget);
+			if (layout.split) delete layout.split;
+			layout.activeIndex = activeIndex;
+		}
+		budget -= layout.tabs.length;
+		layouts.push(layout);
+	}
+	return layouts;
 }

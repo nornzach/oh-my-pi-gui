@@ -1,4 +1,15 @@
-import { BookOpen, Check, ChevronRight, FileText, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import {
+	AlertTriangle,
+	BookOpen,
+	Check,
+	ChevronRight,
+	FileText,
+	Pencil,
+	Plus,
+	RefreshCw,
+	Trash2,
+	X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSkillDetail, RpcSkillInfo, RpcSkillsResult } from "../../../shared/rpc-types";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
@@ -102,6 +113,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 	const [detailLoading, setDetailLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [detailError, setDetailError] = useState<string | null>(null);
+	const [detailAttempt, setDetailAttempt] = useState(0);
 	const [busyName, setBusyName] = useState<string | null>(null);
 	const [editor, setEditor] = useState<EditorState | null>(null);
 	const [deleteArmed, setDeleteArmed] = useState(false);
@@ -148,6 +160,9 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 		if (sidecarReady && routeReady) void loadSkills();
 	}, [loadSkills, routeKey, routeReady, sidecarReady]);
 
+	/* `detailAttempt` is never read inside: it is the retry button's bump that re-runs
+	   this same detail read, which has no loader of its own to call. */
+	// biome-ignore lint/correctness/useExhaustiveDependencies: retry is a dependency by bump
 	useEffect(() => {
 		setDeleteArmed(false);
 		setDetail(null);
@@ -175,7 +190,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 			.finally(() => {
 				if (request === detailRequest.current && requestRoute === routeRef.current) setDetailLoading(false);
 			});
-	}, [routeKey, routeReady, selectedName, sidecarReady, tabRpc.getSkillDetail]);
+	}, [detailAttempt, routeKey, routeReady, selectedName, sidecarReady, tabRpc.getSkillDetail]);
 
 	const visible = useMemo(() => filterSkills(skills, query, filter), [filter, query, skills]);
 	const selected = skills.find(skill => skill.name === selectedName) ?? null;
@@ -315,16 +330,18 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 
 			<div className="skills-master-detail overflow-hidden rounded-lg border border-(--omp-border-muted)">
 				<aside className="skills-list-pane min-h-0">
-					{loading && skills.length === 0 ? (
-						<div className="flex h-full items-center justify-center">
-							<Spinner size="sm" />
-						</div>
-					) : error ? (
+					{/* A failed read outranks the empty list: an outage must not read as "no skills installed". */}
+					{error ? (
 						<div className="flex h-full flex-col items-center justify-center gap-3 px-5 text-center">
-							<p className="text-omp-sm text-(--omp-error)">{error}</p>
+							<AlertTriangle className="text-(--omp-warning)" size={20} />
+							<p className="text-omp-sm text-(--omp-muted)">{error}</p>
 							<Button onClick={() => void loadSkills()} size="sm">
 								{t("common.retry")}
 							</Button>
+						</div>
+					) : loading && skills.length === 0 ? (
+						<div className="flex h-full items-center justify-center">
+							<Spinner size="sm" />
 						</div>
 					) : visible.length === 0 ? (
 						<div className="flex h-full items-center justify-center px-5 text-center text-omp-sm text-(--omp-dim)">
@@ -527,9 +544,19 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 										<Spinner size="sm" />
 									</div>
 								) : detailError ? (
-									<p className="rounded-lg border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent px-3 py-2 text-omp-sm text-(--omp-error)">
-										{detailError}
-									</p>
+									<div className="flex flex-col items-start gap-2">
+										<p className="rounded-lg border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent px-3 py-2 text-omp-sm text-(--omp-error)">
+											{detailError}
+										</p>
+										<Button
+											icon={<RefreshCw size={12} />}
+											onClick={() => setDetailAttempt(attempt => attempt + 1)}
+											size="sm"
+											variant="secondary"
+										>
+											{t("common.retry")}
+										</Button>
+									</div>
 								) : detail ? (
 									<div className="skills-preview-pane min-h-0 flex-1 overflow-y-auto border-t border-(--omp-border-muted) pt-3 text-omp-md">
 										<MarkdownRenderer content={detail.body} />

@@ -6,12 +6,17 @@
  * lands in one place. Pair the scroll tiers with the matching content cap.
  */
 
+/** Heights only, for surfaces that clip rather than scroll (images, code
+ *  cells that bring their own overflow). */
+export const PREVIEW_HEIGHT_MD = "max-h-64";
+export const PREVIEW_HEIGHT_LG = "max-h-72";
+
 /** Short outputs: status lines, small JSON, error text (160px). */
 export const PREVIEW_SCROLL_SM = "max-h-40 overflow-auto";
 /** Medium outputs: command output, match lists, code cells (256px). */
-export const PREVIEW_SCROLL_MD = "max-h-64 overflow-auto";
+export const PREVIEW_SCROLL_MD = `${PREVIEW_HEIGHT_MD} overflow-auto`;
 /** Tall previews: file contents, diffs, read results (288px). */
-export const PREVIEW_SCROLL_LG = "max-h-72 overflow-auto";
+export const PREVIEW_SCROLL_LG = `${PREVIEW_HEIGHT_LG} overflow-auto`;
 /** Markdown code fences in assistant prose — taller, code is the content (416px). */
 export const PREVIEW_SCROLL_CODE = "max-h-[26rem] overflow-auto";
 

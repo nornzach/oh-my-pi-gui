@@ -8,14 +8,15 @@
  * layer — no graph dependency. Live-updates as subagent frames arrive.
  */
 
-import { Bot, Terminal, X } from "lucide-react";
+import { Bot, RefreshCw, Terminal, X } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import type { SubagentSnapshot } from "../../../shared/rpc-types";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useNowTick } from "../../lib/now-tick";
 import { useMessagesStore } from "../../stores/messages";
 import { useSubagentsStore } from "../../stores/subagents";
-import { Badge } from "../common";
+import { Badge, Button } from "../common";
 import { SubagentTranscript } from "./SubagentTranscript";
 import {
 	buildSubagentDag,
@@ -133,19 +134,15 @@ function MainNode({ x, y }: { x: number; y: number }) {
 export function SubagentDag() {
 	const t = useT();
 	const subagents = useSubagentsStore(state => state.subagents);
+	const loadError = useSubagentsStore(state => state.error);
+	const refresh = useSubagentsStore(state => state.refresh);
 	const toolCallOwners = useSubagentGraphStore(state => state.toolCallOwners);
 	const messages = useMessagesStore(state => state.messages);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
-	const [now, setNow] = useState(() => Date.now());
 
 	const agents = useMemo(() => [...subagents.values()].sort((a, b) => a.index - b.index), [subagents]);
 	const hasRunning = agents.some(agent => isLiveSubagentStatus(agent.status));
-
-	useEffect(() => {
-		if (!hasRunning) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [hasRunning]);
+	const now = useNowTick(hasRunning);
 
 	useEffect(() => {
 		if (selectedId && !subagents.has(selectedId)) setSelectedId(null);
@@ -159,6 +156,21 @@ export function SubagentDag() {
 	);
 
 	const selected = selectedId ? (subagents.get(selectedId) ?? null) : null;
+
+	if (agents.length === 0 && loadError) {
+		return (
+			<div className="flex flex-col items-center gap-2 px-3 py-8 text-center text-omp-sm leading-relaxed text-(--omp-error)">
+				<p role="alert">
+					{t("subagent.loadFailed")}
+					<br />
+					{loadError}
+				</p>
+				<Button icon={<RefreshCw size={12} />} onClick={() => void refresh()} size="sm" variant="secondary">
+					{t("common.retry")}
+				</Button>
+			</div>
+		);
+	}
 
 	if (agents.length === 0) {
 		return (

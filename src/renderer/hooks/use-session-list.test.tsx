@@ -71,11 +71,12 @@ let root: Root;
 let container: { textContent: string | null; remove: () => void };
 
 function Probe() {
-	const { sessions, isLoading } = useSessionList("global");
+	const { error, isLoading, sessions } = useSessionList("global");
 	return (
 		<div>
 			<span data-testid="loading">{String(isLoading)}</span>
 			<span data-testid="count">{sessions.length}</span>
+			<span data-testid="error">{error ?? ""}</span>
 		</div>
 	);
 }
@@ -131,5 +132,34 @@ describe("useSessionList silent refresh", () => {
 
 		expect(probeText('[data-testid="loading"]')).toBe("false");
 		expect(probeText('[data-testid="count"]')).toBe("2");
+	});
+
+	it("reports a failed read as an error, not as an empty session list", async () => {
+		listResult = [session("/s/one.jsonl")];
+		const omp = installMockOmp();
+		// The sidebar renders "No code sessions yet" whenever the list is empty and
+		// loading is done — so a swallowed rejection becomes a false domain claim.
+		omp.sessions.list.mockRejectedValueOnce(new Error("session index unreadable"));
+		container = document.createElement("div") as never;
+		document.body.appendChild(container as never);
+		root = createRoot(container as unknown as Element);
+
+		await act(async () => {
+			root.render(<Probe />);
+		});
+		await flush();
+
+		expect(probeText('[data-testid="loading"]')).toBe("false");
+		expect(probeText('[data-testid="count"]')).toBe("0");
+		expect(probeText('[data-testid="error"]')).toBe("session index unreadable");
+
+		// The next good read clears it; the error is not sticky.
+		await act(async () => {
+			onSessionsChanged?.();
+		});
+		await flush(400);
+
+		expect(probeText('[data-testid="count"]')).toBe("1");
+		expect(probeText('[data-testid="error"]')).toBe("");
 	});
 });

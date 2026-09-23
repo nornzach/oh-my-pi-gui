@@ -80,12 +80,14 @@ export function ToolsRoute({ range, refreshKey }: { range: StatsRange; refreshKe
 				label: t("stats.tools.col.last"),
 				align: "right",
 				render: row =>
-					new Date(row.lastUsed).toLocaleString(undefined, {
-						month: "short",
-						day: "numeric",
-						hour: "2-digit",
-						minute: "2-digit",
-					}),
+					row.lastUsed > 0
+						? new Date(row.lastUsed).toLocaleString(undefined, {
+								month: "short",
+								day: "numeric",
+								hour: "2-digit",
+								minute: "2-digit",
+							})
+						: t("stats.tools.never"),
 			},
 		],
 		[t],

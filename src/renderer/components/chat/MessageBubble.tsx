@@ -14,7 +14,6 @@ import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { toolEntryKey } from "../../stores/tools";
-import { editArgumentSummary } from "../tools/edit-args";
 import { type RunningIndicator, ToolCard } from "../tools/ToolCard";
 import { CustomMessageCard, isCustomMessageCardType } from "./CustomMessageCard";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -28,43 +27,6 @@ export interface MessageBubbleProps {
 	runningIndicator?: RunningIndicator;
 	/** Opening assistant emoji projected onto this user turn. */
 	reaction?: string;
-}
-
-function toolSummary(toolName: string, input: Record<string, unknown>): string {
-	const pick = (...keys: string[]): string | undefined => {
-		for (const k of keys) {
-			const v = input[k];
-			if (typeof v === "string" && v) return v;
-		}
-		return undefined;
-	};
-	switch (toolName) {
-		case "read":
-		case "write":
-			return pick("path", "file") ?? "";
-		case "edit":
-		case "apply_patch":
-			return editArgumentSummary(input);
-		case "bash":
-			return pick("command", "cmd") ?? "";
-		case "grep":
-			return pick("pattern") ?? "";
-		case "glob":
-			return pick("path", "pattern") ?? "";
-		case "task":
-			return pick("i", "name", "description") ?? "";
-		case "eval":
-			return pick("title", "language") ?? "";
-		case "goal":
-			return pick("objective", "op") ?? "";
-		case "resolve":
-		case "reject":
-			return pick("reason") ?? "";
-		case "web_search":
-			return pick("query", "i") ?? "";
-		default:
-			return pick("path", "name", "i") ?? "";
-	}
 }
 
 const COMPACTION_METHOD_KEYS: Record<string, string> = {
@@ -94,7 +56,6 @@ function ToolCardWithResult({ call, runningIndicator }: { call: ToolCallContent;
 			toolCallId={toolEntryKey(call)}
 			toolName={call.name}
 			args={call.arguments}
-			summary={toolSummary(call.name, call.arguments)}
 			runningIndicator={runningIndicator}
 		/>
 	);

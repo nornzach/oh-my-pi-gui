@@ -112,6 +112,7 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 	);
 	const [baseUrl, setBaseUrl] = useState(editing?.baseUrl ?? "");
 	const [apiKey, setApiKey] = useState("");
+	const [clearKey, setClearKey] = useState(false);
 	const [showKey, setShowKey] = useState(false);
 	const [auth, setAuth] = useState<"apiKey" | "none" | "oauth" | undefined>(editing?.auth);
 	const [authHeader, setAuthHeader] = useState(editing?.authHeader ?? false);
@@ -235,6 +236,7 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 			api,
 			baseUrl: baseUrl.trim(),
 			...(apiKey.trim().length > 0 ? { apiKey: apiKey.trim() } : {}),
+			...(clearKey ? { clearApiKey: true } : {}),
 			...(auth ? { auth } : {}),
 			...(authHeader ? { authHeader: true } : {}),
 			...(headerEntries.length > 0
@@ -357,9 +359,16 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 							type={showKey ? "text" : "password"}
 							mono
 							value={apiKey}
-							onChange={event => setApiKey(event.target.value)}
-							placeholder={editing?.apiKeyPreview ?? t("providerCfg.form.apiKeyPlaceholder")}
-							disabled={readonly || submitting}
+							onChange={event => {
+								setApiKey(event.target.value);
+								setClearKey(false);
+							}}
+							placeholder={
+								clearKey
+									? t("providerCfg.form.apiKeyRemoving")
+									: (editing?.apiKeyPreview ?? t("providerCfg.form.apiKeyPlaceholder"))
+							}
+							disabled={readonly || submitting || clearKey}
 							className="pr-8"
 							autoComplete="off"
 						/>
@@ -368,14 +377,41 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 							aria-label={showKey ? t("providerCfg.form.apiKeyHide") : t("providerCfg.form.apiKeyShow")}
 							className="absolute right-2 top-1/2 -translate-y-1/2 text-(--omp-dim) transition-colors hover:text-(--omp-text) disabled:opacity-50"
 							onClick={() => setShowKey(prev => !prev)}
-							disabled={readonly || submitting}
+							disabled={readonly || submitting || clearKey}
 						>
 							{showKey ? <EyeOff size={13} /> : <Eye size={13} />}
 						</button>
 					</div>
-					<span className="mt-1 block text-omp-sm text-(--omp-dim)">
-						{editing?.hasApiKey ? t("providerCfg.form.apiKeyKeep") : t("providerCfg.form.apiKeyOptional")}
+					<span className={`mt-1 block text-omp-sm ${clearKey ? "text-(--omp-warning)" : "text-(--omp-dim)"}`}>
+						{clearKey
+							? t("providerCfg.form.apiKeyRemovingHint")
+							: editing?.hasApiKey
+								? t("providerCfg.form.apiKeyKeep")
+								: t("providerCfg.form.apiKeyOptional")}
 					</span>
+					{/* The field is masked, so a blank submit cannot mean "delete" —
+						without this action the only way to revoke a key is to delete the
+						whole provider (baseUrl, headers and models included). */}
+					{editing?.hasApiKey && !readonly && !clearKey && (
+						<button
+							type="button"
+							onClick={() => setClearKey(true)}
+							disabled={submitting}
+							className="text-omp-sm font-medium text-(--omp-error) transition-opacity hover:opacity-80 disabled:opacity-50"
+						>
+							{t("providerCfg.form.apiKeyRemove")}
+						</button>
+					)}
+					{clearKey && (
+						<button
+							type="button"
+							onClick={() => setClearKey(false)}
+							disabled={submitting}
+							className="text-omp-sm font-medium text-(--omp-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
+						>
+							{t("providerCfg.form.apiKeyKeepIt")}
+						</button>
+					)}
 				</div>
 
 				<div>

@@ -177,6 +177,31 @@ describe("WorkspaceDirsDialog", () => {
 		useUiStore.getState().openWorkspaceDirs();
 		await mount(<WorkspaceDirsDialog />);
 		expect(document.body.textContent ?? "").toContain("sidecar down");
+		// A refusal is not an empty workspace: the "no directories" message would
+		// tell the user to add a root when the read is what broke.
+		expect(document.body.textContent ?? "").not.toContain("No workspace directories");
+	});
+
+	it("re-reads the roots from the error's retry affordance", async () => {
+		const omp = installMockOmp({
+			rpc: {
+				getDirectories: vi
+					.fn<() => Promise<RpcResponse>>()
+					.mockResolvedValueOnce(failure("sidecar down"))
+					.mockResolvedValue(success(directories(CWD, EXTRA))),
+			},
+		});
+		useUiStore.getState().openWorkspaceDirs();
+		await mount(<WorkspaceDirsDialog />);
+		expect(omp.rpc.getDirectories).toHaveBeenCalledTimes(1);
+
+		await click(findButton("Retry"));
+		await flush();
+
+		expect(omp.rpc.getDirectories).toHaveBeenCalledTimes(2);
+		const text = document.body.textContent ?? "";
+		expect(text).toContain(EXTRA);
+		expect(text).not.toContain("sidecar down");
 	});
 
 	it("adds a directory picked from the native dialog and refreshes the list", async () => {

@@ -1,5 +1,6 @@
 appId: sh.omp.gui
 productName: omp
+afterPack: scripts/after-pack.cjs
 directories:
   buildResources: resources
   output: dist
@@ -9,6 +10,13 @@ files:
 extraResources:
   - from: resources/omp
     to: omp
+# `omp://` deep links only work if LaunchServices sees CFBundleURLTypes, which
+# this block is the only thing that writes. Without it `open-url` never fires in
+# an installed build and the handler in src/main/deep-link.ts is dead code.
+protocols:
+  - name: omp
+    schemes:
+      - omp
 asar: true
 compression: maximum
 
@@ -33,6 +41,18 @@ mac:
   entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
     NSMicrophoneUsageDescription: omp uses the microphone for voice dictation in the composer.
+    # Electron's stock bundle asks for camera and Bluetooth with text that names no
+    # app; omp never calls either API, so the prompt a user might see stays honest.
+    NSCameraUsageDescription: omp does not use the camera.
+    NSBluetoothAlwaysUsageDescription: omp does not use Bluetooth.
+    NSBluetoothPeripheralUsageDescription: omp does not use Bluetooth.
+    # Two origins only: the loopback stats server and GitHub releases over TLS.
+    # Declaring that is stricter than the default, so an accidental remote
+    # cleartext request cannot start working because some build set
+    # NSAllowsArbitraryLoads.
+    NSAppTransportSecurity:
+      NSAllowsArbitraryLoads: false
+      NSAllowsLocalNetworking: true
   notarize: false
 
 dmg:

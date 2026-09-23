@@ -104,6 +104,11 @@ export function focusedSessionRuntime(): SessionRuntime | null {
 	return sessionRuntime(executionTabId) ?? sessionRuntime(focusedTabId);
 }
 
+/** Tab id a window-level (non-pane-scoped) action targets. */
+export function focusedRuntimeTabId(): string | null {
+	return focusedSessionRuntime()?.tabId ?? focusedTabId;
+}
+
 /** Scope synchronous event reduction to its originating tab without changing UI focus. */
 export function withSessionRuntime<T>(tabId: string, run: () => T): T {
 	const previous = executionTabId;

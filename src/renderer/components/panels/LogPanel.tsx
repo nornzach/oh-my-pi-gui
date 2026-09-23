@@ -3,11 +3,12 @@
  * with search filtering, level filter, and pin-aware auto-scroll.
  */
 
-import { ArrowDown, Search, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, RotateCw, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LogBatch } from "../../../shared/ipc-types";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { Button } from "../common";
 
 const MAX_LINES = 1000;
 
@@ -50,31 +51,31 @@ export function LogPanel() {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	const [error, setError] = useState<string | null>(null);
-	useEffect(() => {
-		let active = true;
-		const receive = (batch: LogBatch) => {
-			if (!active) return;
-			setLines(previous => {
-				const all = new Map(previous.map(line => [line.seq, line]));
-				batch.lines.forEach((text, index) => {
-					const seq = batch.nextSequence - batch.lines.length + index;
-					all.set(seq, { seq, text, level: detectLevel(text) });
-				});
-				return [...all.values()].sort((a, b) => a.seq - b.seq).slice(-MAX_LINES);
+
+	const applyBatch = useCallback((batch: LogBatch): void => {
+		setLines(previous => {
+			const all = new Map(previous.map(line => [line.seq, line]));
+			batch.lines.forEach((text, index) => {
+				const seq = batch.nextSequence - batch.lines.length + index;
+				all.set(seq, { seq, text, level: detectLevel(text) });
 			});
-		};
-		const unsubscribe = window.omp.events.onLogBatch(receive);
+			return [...all.values()].sort((a, b) => a.seq - b.seq).slice(-MAX_LINES);
+		});
+	}, []);
+
+	const reload = useCallback((): void => {
+		setError(null);
 		void window.omp.runtime
 			.logSnapshot()
-			.then(receive)
-			.catch(cause => {
-				if (active) setError(String(cause));
-			});
-		return () => {
-			active = false;
-			unsubscribe();
-		};
-	}, []);
+			.then(applyBatch)
+			.catch(cause => setError(String(cause)));
+	}, [applyBatch]);
+
+	useEffect(() => {
+		const unsubscribe = window.omp.events.onLogBatch(applyBatch);
+		void reload();
+		return unsubscribe;
+	}, [applyBatch, reload]);
 
 	const filtered = useMemo(() => {
 		const q = query.trim().toLowerCase();
@@ -190,7 +191,16 @@ export function LogPanel() {
 					onScroll={onScroll}
 					ref={scrollRef}
 				>
-					{filtered.length === 0 ? (
+					{error ? (
+						<div className="flex flex-col items-center gap-2 py-8 text-center font-sans">
+							<p role="alert" className="text-omp-sm text-(--omp-error)">
+								{error}
+							</p>
+							<Button icon={<RotateCw size={12} />} onClick={reload} size="sm" variant="secondary">
+								{t("common.retry")}
+							</Button>
+						</div>
+					) : filtered.length === 0 ? (
 						<div className="py-8 text-center font-sans text-omp-sm text-(--omp-dim)">
 							{lines.length === 0 ? t("logPanel.waiting") : t("logPanel.noMatch")}
 						</div>

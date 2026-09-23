@@ -90,6 +90,11 @@ const ALLOW_IDENTICAL: Record<string, true> = {
 
 const LATIN_LETTER = /[a-zA-Z]/;
 
+/** Drops `{placeholder}` tokens so only prose is checked — they are code, not English words. */
+function proseOf(value: string): string {
+	return value.replace(/\{\w+\}/g, "");
+}
+
 function placeholdersOf(value: string): Set<string> {
 	return new Set([...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]));
 }
@@ -124,7 +129,7 @@ describe("locale parity", () => {
 		for (const key of Object.keys(en)) {
 			if (!TRANSLATED_NAMESPACES.some(ns => key.startsWith(ns))) continue;
 			if (ALLOW_IDENTICAL[key]) continue;
-			if (!LATIN_LETTER.test(en[key])) continue;
+			if (!LATIN_LETTER.test(proseOf(en[key]))) continue;
 			expect(zh[key], `zh["${key}"] duplicates the English source`).not.toBe(en[key]);
 		}
 	});

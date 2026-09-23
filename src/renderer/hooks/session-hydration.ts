@@ -239,11 +239,18 @@ export async function hydrateLegacySession(fallbackName?: string, initialState?:
 	if (!isCurrent()) return;
 	const eventsUnchanged = useSessionStore.getState().eventVersion === beforeEventVersion;
 	const focusUnchanged = !originRuntime || focusedSessionRuntime() === originRuntime;
+	// `get_state` is the only witness to a live turn. A failed read counts as not
+	// live: a card left spinning never resolves, while a wrongly aborted card is
+	// repaired by the next execution event.
+	const stateIsStreaming =
+		stateResult.status === "fulfilled" &&
+		stateResult.value.success &&
+		(stateResult.value.data as RpcSessionState | null)?.isStreaming === true;
 	const stateIsIdle =
 		stateResult.status === "fulfilled" &&
 		stateResult.value.success &&
 		stateResult.value.data != null &&
-		!(stateResult.value.data as RpcSessionState).isStreaming;
+		!stateIsStreaming;
 	if (
 		eventsUnchanged &&
 		focusUnchanged &&
@@ -266,7 +273,10 @@ export async function hydrateLegacySession(fallbackName?: string, initialState?:
 		if (eventsUnchanged && stateIsIdle && useMessagesStore.getState().liveMessages === beforeLiveMessages) {
 			useMessagesStore.getState().clearDeliveredLiveMessages();
 		}
-		if (eventsUnchanged) useToolsStore.getState().hydrateMessages(useMessagesStore.getState().messages);
+		if (eventsUnchanged)
+			useToolsStore
+				.getState()
+				.hydrateMessages(useMessagesStore.getState().messages, { turnIsLive: stateIsStreaming });
 	}
 	await subagents;
 	await secondary;
@@ -326,11 +336,18 @@ export async function hydrateTabSession(tabId: string, fallbackName?: string): P
 	if (!isCurrent()) return;
 	const eventsUnchanged =
 		sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().eventVersion === beforeEventVersion;
+	// `get_state` is the only witness to a live turn. A failed read counts as not
+	// live: a card left spinning never resolves, while a wrongly aborted card is
+	// repaired by the next execution event.
+	const stateIsStreaming =
+		stateResult.status === "fulfilled" &&
+		stateResult.value.success &&
+		(stateResult.value.data as RpcSessionState | null)?.isStreaming === true;
 	const stateIsIdle =
 		stateResult.status === "fulfilled" &&
 		stateResult.value.success &&
 		stateResult.value.data != null &&
-		!(stateResult.value.data as RpcSessionState).isStreaming;
+		!stateIsStreaming;
 
 	if (
 		eventsUnchanged &&
@@ -377,7 +394,8 @@ export async function hydrateTabSession(tabId: string, fallbackName?: string): P
 		if (eventsUnchanged && stateIsIdle && messages?.getState().liveMessages === beforeLiveMessages) {
 			messages.getState().clearDeliveredLiveMessages();
 		}
-		if (eventsUnchanged) tools?.getState().hydrateMessages(messages?.getState().messages ?? []);
+		if (eventsUnchanged)
+			tools?.getState().hydrateMessages(messages?.getState().messages ?? [], { turnIsLive: stateIsStreaming });
 	}
 
 	// Subagents and secondary chips do not hold the transcript hostage. Their

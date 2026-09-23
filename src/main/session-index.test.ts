@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import type { SessionInfo } from "../shared/ipc-types";
 import { SessionIndex } from "./session-index";
 
 const tempDirs: string[] = [];
@@ -54,5 +55,34 @@ describe("SessionIndex session kind", () => {
 		expect(await index.kindFor(chatFile)).toBe("chat");
 		expect(await index.kindFor(agentFile)).toBe("agent");
 		expect(await index.kindFor(path.join(dir, "missing.jsonl"))).toBe("agent");
+	});
+});
+
+describe("SessionIndex cache scope", () => {
+	function row(infos: SessionInfo[], id: string) {
+		return infos.find(info => info.id === id);
+	}
+
+	it("re-reads only the session that was written to", async () => {
+		const { index, dir } = await makeIndex();
+		const growing = await writeSession(dir, "growing");
+		await writeSession(dir, "quiet");
+
+		const first = await index.list("global");
+		const quietBefore = row(first, "quiet");
+		expect(row(first, "growing")?.messageCount).toBe(0);
+
+		await fs.appendFile(
+			growing,
+			`${JSON.stringify({ type: "message", message: { role: "user", content: "next turn" } })}\n`,
+		);
+		const second = await index.list("global");
+
+		// The written file's row is a fresh parse…
+		expect(row(second, "growing")?.messageCount).toBe(1);
+		// …and the untouched one is the very same object, which is only true if it
+		// was never re-stat'ed or re-parsed. One append used to invalidate every
+		// entry whose key merely contained a path.
+		expect(row(second, "quiet")).toBe(quietBefore);
 	});
 });

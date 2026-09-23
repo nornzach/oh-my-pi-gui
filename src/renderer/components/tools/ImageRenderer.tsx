@@ -1,22 +1,27 @@
 import { Image as ImageIcon } from "lucide-react";
-import { extractImageDataUrl, resultText } from "../../lib/format";
+import { extractImageDataUrls, resultDetails, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import type { ToolRendererProps } from "./ToolCard";
 
-/** Image tools (inspect_image, image_gen): preview + caption. */
+function firstStringList(value: unknown): string {
+	return Array.isArray(value) && typeof value[0] === "string" ? value[0] : "";
+}
+
+/**
+ * Image tools. `generate_image` returns its pictures as `{ data, mimeType }`
+ * pairs under `details.images` plus the saved files in `details.imagePaths`,
+ * while an inspection call carries a content image block — `extractImageDataUrls`
+ * sees both, so every picture the call produced is previewed.
+ */
 export function ImageRenderer({ args, result, isError, isPartial, partialResult }: ToolRendererProps) {
 	const t = useT();
-	const path = typeof args.path === "string" ? args.path : "";
-	const prompt = typeof args.prompt === "string" ? args.prompt : "";
 	const effective = isPartial ? partialResult : result;
-	// { content, details } envelopes keep images in content blocks; some tools
-	// (image_gen) stash the payload under details instead — search both.
-	const image =
-		extractImageDataUrl(effective) ??
-		(effective != null && typeof effective === "object" && !Array.isArray(effective)
-			? extractImageDataUrl((effective as Record<string, unknown>).details)
-			: null) ??
-		(typeof args.path === "string" && args.path.startsWith("data:image/") ? args.path : null);
+	const details = resultDetails(effective);
+	const argsPath = typeof args.path === "string" ? args.path : "";
+	const inline = argsPath.startsWith("data:image/") ? argsPath : null;
+	const path = inline ? "" : argsPath || firstStringList(details?.imagePaths);
+	const prompt = typeof args.subject === "string" ? args.subject : typeof args.prompt === "string" ? args.prompt : "";
+	const images = inline ? [...extractImageDataUrls(effective), inline] : extractImageDataUrls(effective);
 	const caption = resultText(effective);
 
 	return (
@@ -25,13 +30,23 @@ export function ImageRenderer({ args, result, isError, isPartial, partialResult 
 				<ImageIcon size={12} className="shrink-0 text-[var(--omp-thinking-xhigh)]" />
 				{path && <span className="min-w-0 flex-1 truncate text-[var(--omp-text)]">{path}</span>}
 				{!path && prompt && <span className="min-w-0 flex-1 truncate text-[var(--omp-muted)]">{prompt}</span>}
+				{images.length > 1 && (
+					<span className="shrink-0 tabular-nums text-[var(--omp-dim)]">
+						{t("tools.image.count", { count: images.length })}
+					</span>
+				)}
 			</div>
-			{image ? (
-				<img
-					src={image}
-					alt={path || prompt || t("tools.image.alt")}
-					className="max-h-72 rounded-md border border-[var(--omp-border-muted)] object-contain"
-				/>
+			{images.length > 0 ? (
+				<div className="flex flex-wrap gap-1.5">
+					{images.map(src => (
+						<img
+							alt={path || prompt || t("tools.image.alt")}
+							className="max-h-72 rounded-md border border-[var(--omp-border-muted)] object-contain"
+							key={src}
+							src={src}
+						/>
+					))}
+				</div>
 			) : (
 				caption && (
 					<pre
@@ -46,7 +61,7 @@ export function ImageRenderer({ args, result, isError, isPartial, partialResult 
 					</pre>
 				)
 			)}
-			{isPartial && !image && !caption && (
+			{isPartial && images.length === 0 && !caption && (
 				<div className="text-omp-sm italic text-[var(--omp-accent)]">{t("tools.image.generating")}</div>
 			)}
 		</div>

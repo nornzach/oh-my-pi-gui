@@ -14,7 +14,7 @@ import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Button, Modal, Spinner } from "../common";
+import { Badge, Button, ConfirmDialog, Modal, Spinner } from "../common";
 
 function AuthBadge({ provider, t }: { provider: ProviderInfo; t: (k: string) => string }) {
 	if (!provider.authenticated) return <Badge variant="muted">{t("providers.badge.noAuth")}</Badge>;
@@ -157,6 +157,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [busyProvider, setBusyProvider] = useState<string | null>(null);
+	const [pendingLogout, setPendingLogout] = useState<{ id: string; name: string } | null>(null);
 	const requestVersion = useRef(0);
 
 	// The provider list is catalog state, not window state: a `get_providers` read
@@ -243,6 +244,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 	};
 
 	const handleLogout = async (providerId: string) => {
+		setPendingLogout(null);
 		const name = providers.find(p => p.id === providerId)?.name ?? providerId;
 		setBusyProvider(providerId);
 		try {
@@ -263,6 +265,14 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 		} finally {
 			setBusyProvider(null);
 		}
+	};
+
+	const requestLogout = (providerId: string) => {
+		// Signing out destroys a credential that only an interactive re-login can
+		// restore, so the row asks first — the same distance deleting the whole
+		// provider already has.
+		const provider = providers.find(candidate => candidate.id === providerId);
+		setPendingLogout({ id: providerId, name: provider?.name ?? providerId });
 	};
 
 	const handleEdit = async (providerId: string) => {
@@ -292,136 +302,164 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 	);
 
 	return (
-		<Modal open={open} onClose={close} title={t("providers.title")} size="lg">
-			<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
-				<div className="flex items-center justify-between">
-					<span className="text-omp-sm font-semibold uppercase tracking-wider text-[var(--omp-muted)]">
-						{t("providers.authenticated")}
-					</span>
-					<div className="flex items-center gap-1.5">
-						<Button size="sm" variant="ghost" icon={<Plus size={12} />} onClick={() => openProviderConfig()}>
-							{t("providerCfg.list.add")}
-						</Button>
-						<Button
-							size="sm"
-							variant="ghost"
-							icon={<ExternalLink size={12} />}
-							onClick={() => {
-								void window.omp.models.openConfig().catch(cause => {
-									toast({ variant: "error", title: t("providers.editConfig"), message: String(cause) });
-								});
-							}}
-						>
-							{t("providers.editConfig")}
-						</Button>
-						<Button
-							size="sm"
-							variant="ghost"
-							icon={<RefreshCw size={12} />}
-							onClick={() => void load(true)}
-							loading={loading}
-						>
-							{t("providers.refresh")}
-						</Button>
-					</div>
-				</div>
-
-				{configError && (
-					<div
-						role="alert"
-						className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]"
-					>
-						{configError}
-					</div>
-				)}
-				{error && (
-					<div className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]">
-						{error}
-					</div>
-				)}
-				{discoveryErrors.length > 0 && (
-					<div className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]">
-						{t("providers.discoveryFailed", { details: discoveryErrors.join("; ") })}
-					</div>
-				)}
-				{refreshPending && (
-					<div
-						className="flex items-center gap-2 rounded-md bg-[var(--omp-bg-tertiary)] px-3 py-2 text-omp-md text-[var(--omp-muted)]" // surface-ok: transient discovery status banner
-					>
-						<Spinner size="sm" />
-						{t("providers.refreshPending")}
-					</div>
-				)}
-				{loading && providers.length === 0 && (
-					<div className="flex items-center justify-center py-8">
-						<Spinner />
-					</div>
-				)}
-
-				{!loading && authenticated.length === 0 && (
-					<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-dim)]">
-						{t("providers.noAuth")}
-					</div>
-				)}
-
-				{authenticated.length > 0 && (
-					<div className="flex flex-col gap-2">
-						{authenticated.map(p => (
-							<ProviderRow
-								key={p.id}
-								provider={p}
-								customConfigs={customConfigs}
-								onLogin={handleLogin}
-								onLogout={handleLogout}
-								onEdit={handleEdit}
-								busy={busyProvider === p.id}
-								t={t}
-							/>
-						))}
-					</div>
-				)}
-
-				{unauthenticated.length > 0 && (
-					<>
+		<>
+			<Modal open={open} onClose={close} title={t("providers.title")} size="lg">
+				<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
+					<div className="flex items-center justify-between">
 						<span className="text-omp-sm font-semibold uppercase tracking-wider text-[var(--omp-muted)]">
-							{t("providers.available")}
+							{t("providers.authenticated")}
 						</span>
+						<div className="flex items-center gap-1.5">
+							<Button size="sm" variant="ghost" icon={<Plus size={12} />} onClick={() => openProviderConfig()}>
+								{t("providerCfg.list.add")}
+							</Button>
+							<Button
+								size="sm"
+								variant="ghost"
+								icon={<ExternalLink size={12} />}
+								onClick={() => {
+									void window.omp.models.openConfig().catch(cause => {
+										toast({ variant: "error", title: t("providers.editConfig"), message: String(cause) });
+									});
+								}}
+							>
+								{t("providers.editConfig")}
+							</Button>
+							<Button
+								size="sm"
+								variant="ghost"
+								icon={<RefreshCw size={12} />}
+								onClick={() => void load(true)}
+								loading={loading}
+							>
+								{t("providers.refresh")}
+							</Button>
+						</div>
+					</div>
+
+					{configError && (
+						<div
+							role="alert"
+							className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]"
+						>
+							{configError}
+						</div>
+					)}
+					{/* Whether rows are on screen decides the claim: stale catalog, or nothing loaded. */}
+					{error && (
+						<div
+							role="alert"
+							className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]"
+						>
+							<span className="font-semibold">
+								{providers.length > 0 ? t("providers.stale") : t("providers.loadFailed")}
+							</span>{" "}
+							{error}
+						</div>
+					)}
+					{discoveryErrors.length > 0 && (
+						<div className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]">
+							{t("providers.discoveryFailed", { details: discoveryErrors.join("; ") })}
+						</div>
+					)}
+					{refreshPending && (
+						<div
+							className="flex items-center gap-2 rounded-md bg-[var(--omp-bg-tertiary)] px-3 py-2 text-omp-md text-[var(--omp-muted)]" // surface-ok: transient discovery status banner
+						>
+							<Spinner size="sm" />
+							{t("providers.refreshPending")}
+						</div>
+					)}
+					{loading && providers.length === 0 && (
+						<div className="flex items-center justify-center py-8">
+							<Spinner />
+						</div>
+					)}
+
+					{!loading && !error && authenticated.length === 0 && (
+						<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-dim)]">
+							{t("providers.noAuth")}
+						</div>
+					)}
+
+					{authenticated.length > 0 && (
 						<div className="flex flex-col gap-2">
-							{unauthenticated.map(p => (
+							{authenticated.map(p => (
 								<ProviderRow
 									key={p.id}
 									provider={p}
 									customConfigs={customConfigs}
 									onLogin={handleLogin}
-									onLogout={handleLogout}
+									onLogout={requestLogout}
 									onEdit={handleEdit}
 									busy={busyProvider === p.id}
 									t={t}
 								/>
 							))}
 						</div>
-					</>
-				)}
-
-				<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-2.5">
-					<div className="mb-1 text-omp-sm font-semibold text-[var(--omp-text)]">{t("providers.customTitle")}</div>
-					<div className="text-omp-xs leading-[1.5] text-[var(--omp-muted)]">
-						{t("providers.customHelp", {
-							file: "~/.omp/agent/models.yml",
-							baseUrl: "baseUrl",
-							apiKey: "apiKey",
-							models: "models",
-						})}
-					</div>
-					{/* A provider the session lists no models for is absent from the rows above,
-						which reads as "the add did nothing". Name it and say why. */}
-					{!loading && providers.length > 0 && unlistedConfigs.length > 0 && (
-						<div className="mt-2 text-omp-xs leading-[1.5] text-[var(--omp-warning)]">
-							{t("providers.customWithoutModels", { ids: unlistedConfigs.map(config => config.id).join(", ") })}
-						</div>
 					)}
+
+					{unauthenticated.length > 0 && (
+						<>
+							<span className="text-omp-sm font-semibold uppercase tracking-wider text-[var(--omp-muted)]">
+								{t("providers.available")}
+							</span>
+							<div className="flex flex-col gap-2">
+								{unauthenticated.map(p => (
+									<ProviderRow
+										key={p.id}
+										provider={p}
+										customConfigs={customConfigs}
+										onLogin={handleLogin}
+										onLogout={requestLogout}
+										onEdit={handleEdit}
+										busy={busyProvider === p.id}
+										t={t}
+									/>
+								))}
+							</div>
+						</>
+					)}
+
+					<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-2.5">
+						<div className="mb-1 text-omp-sm font-semibold text-[var(--omp-text)]">
+							{t("providers.customTitle")}
+						</div>
+						<div className="text-omp-xs leading-[1.5] text-[var(--omp-muted)]">
+							{t("providers.customHelp", {
+								file: "~/.omp/agent/models.yml",
+								baseUrl: "baseUrl",
+								apiKey: "apiKey",
+								models: "models",
+							})}
+						</div>
+						<div className="mt-1 text-omp-xs leading-[1.5] text-[var(--omp-dim)]">
+							{t("providers.customRouteHint")}
+						</div>
+						{/* A provider the session lists no models for is absent from the rows above,
+						which reads as "the add did nothing". Name it and say why. */}
+						{!loading && providers.length > 0 && unlistedConfigs.length > 0 && (
+							<div className="mt-2 text-omp-xs leading-[1.5] text-[var(--omp-warning)]">
+								{t("providers.customWithoutModels", {
+									ids: unlistedConfigs.map(config => config.id).join(", "),
+								})}
+							</div>
+						)}
+					</div>
 				</div>
-			</div>
-		</Modal>
+			</Modal>
+			<ConfirmDialog
+				open={pendingLogout !== null}
+				title={t("providers.logoutTitle", { provider: pendingLogout?.name ?? "" })}
+				message={t("providers.logoutBody", { provider: pendingLogout?.name ?? "" })}
+				warning={t("providers.logoutWarning")}
+				confirmLabel={t("providers.logoutConfirm")}
+				busy={pendingLogout !== null && busyProvider === pendingLogout.id}
+				onCancel={() => setPendingLogout(null)}
+				onConfirm={() => {
+					if (pendingLogout) void handleLogout(pendingLogout.id);
+				}}
+			/>
+		</>
 	);
 }

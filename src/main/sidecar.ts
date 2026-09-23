@@ -24,7 +24,9 @@ import type {
 	RpcReadyFrame,
 	RpcResponse,
 	SessionInfoUpdateFrame,
+	SidecarRestartProgress,
 	SidecarStatus,
+	SidecarStatusPayload,
 	SubagentFrame,
 } from "../shared/rpc-types";
 import { EventBatcher } from "./event-batcher";
@@ -33,6 +35,25 @@ import { RpcClient } from "./rpc-client";
 
 const MAX_RESTART_ATTEMPTS = 3;
 const RESTART_DELAYS = [1000, 2000, 4000];
+
+/** stderr lines kept per spawn for the crash report. */
+const STDERR_TAIL_LINES = 20;
+/** Cap on the stderr excerpt appended to the user-visible restart reason. */
+const STDERR_REASON_CHARS = 240;
+
+/**
+ * Leading stderr line of the crashed spawn: a fatal message comes first
+ * (`dyld: Library not loaded …`, `error: ENOENT …`) and whatever follows is
+ * stack or warning noise. The full tail rides on the runtime-log report.
+ */
+function stderrExcerpt(lines: string[]): string {
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+		return trimmed.length > STDERR_REASON_CHARS ? `${trimmed.slice(0, STDERR_REASON_CHARS - 1)}…` : trimmed;
+	}
+	return "";
+}
 
 /** Event types routed to the EventBatcher. Hoisted: one lookup table for the
  * process, not one allocation per frame. */
@@ -71,6 +92,11 @@ export interface SidecarOptions {
 	binaryPath: string;
 	cwd: string;
 	extraFlags?: string[];
+	/**
+	 * `app.isPackaged`, injected because the missing-binary message branches on
+	 * it: only a dev tree can act on a build instruction.
+	 */
+	packaged?: boolean;
 	/** Fresh GUI tabs must not inherit the CLI's persistent autoResume setting. */
 	fresh?: boolean;
 	/** Session kind: "agent" (default) or "chat" (tool-free conversation). Immutable per sidecar. */
@@ -94,6 +120,25 @@ export interface SidecarOptions {
 	 * start()/restart(), failure degrades to the inherited PATH.
 	 */
 	shellEnv?: () => Promise<Record<string, string>>;
+	/**
+	 * Persists a crash report (reason + stderr tail) for post-mortem diagnosis.
+	 * Same point-of-use injection as `proxyEnv`/`shellEnv`: the real
+	 * implementation is `writeRuntimeLog`, which resolves its path through
+	 * Electron's `app`, so the manager must keep working without it.
+	 */
+	reportFailure?: (report: SidecarFailureReport) => void;
+}
+
+/** One crash-loop step, as handed to `reportFailure`. */
+export interface SidecarFailureReport {
+	/** Exit/signal reason with the leading stderr line appended. */
+	reason: string;
+	/** Respawn about to be scheduled, or the exhausted count on the final error. */
+	attempt: number;
+	maxAttempts: number;
+	/** stderr tail captured from this spawn (up to STDERR_TAIL_LINES). */
+	stderr: string[];
+	cwd: string;
 }
 
 /**
@@ -129,8 +174,21 @@ function resolveBunExe(): string {
 	return "bun";
 }
 
+/**
+ * The "no omp binary" message, worded for the build that hit it. A dev tree
+ * can rebuild the sidecar; a packaged app cannot, so telling its user to run
+ * `build:omp` sends them into a source checkout they do not have.
+ */
+export function missingSidecarMessage(packaged: boolean, resourcesPath?: string): string {
+	if (!packaged) {
+		return "Built-in omp not found. Build it with `bun --cwd=packages/gui run build:omp`, then relaunch.";
+	}
+	const target = resourcesPath ? join(resourcesPath, "omp") : "the bundled omp binary";
+	return `omp is missing from this installation (${target}). Reinstall omp GUI, then relaunch.`;
+}
+
 export interface SidecarEvents {
-	status: (payload: { status: SidecarStatus; message?: string; cwd: string }) => void;
+	status: (payload: SidecarStatusPayload) => void;
 	events: (events: AgentSessionEvent[]) => void;
 	extensionUi: (request: ExtensionUIRequest) => void;
 	hostToolCall: (request: HostToolCallRequest) => void;
@@ -149,7 +207,23 @@ export class SidecarManager extends EventEmitter {
 	#detachParser: (() => void) | null = null;
 	#restartCount = 0;
 	#restartTimer: NodeJS.Timeout | null = null;
-	#status: SidecarStatus = "starting";
+	/**
+	 * Spawn-cycle counter, bumped whenever a cycle is torn down or started.
+	 * Every continuation that outlives the synchronous spawn (protocol
+	 * negotiation, env resolution) captures it and drops itself when it no
+	 * longer matches, so a dead child can never report `ready` or reset the
+	 * crash-loop counter.
+	 */
+	#generation = 0;
+	/** `start()` calls in flight; a superseded env resolution must not spawn. */
+	#startSeq = 0;
+	#lastStderr: string[] = [];
+	/**
+	 * `asleep` until something calls start(): a restored background tab costs
+	 * nothing until it is shown. start() flips to `starting` synchronously, so
+	 * "is a spawn already under way?" is answerable from this field alone.
+	 */
+	#status: SidecarStatus = "asleep";
 	#options: SidecarOptions;
 	#proxyEnvVars: Record<string, string> = {};
 	#shellEnvVars: Record<string, string> = {};
@@ -180,10 +254,7 @@ export class SidecarManager extends EventEmitter {
 		// Closed loop: only the bundled binary (or an explicit source override)
 		// may run. Missing it is an actionable error, never an external fallback.
 		if (!this.#options.binaryPath && !this.#options.sourceCli) {
-			this.#setStatus(
-				"error",
-				"Built-in omp not found. Build it with `bun --cwd=packages/gui run build:omp`, then relaunch.",
-			);
+			this.#setStatus("error", missingSidecarMessage(!!this.#options.packaged, process.resourcesPath));
 			return;
 		}
 		this.#setStatus("starting");
@@ -194,11 +265,16 @@ export class SidecarManager extends EventEmitter {
 			return;
 		}
 		const fallback = () => ({}) as Record<string, string>;
+		// Env resolution takes up to 4s. A restart()/start() landing inside that
+		// window supersedes this pending spawn — it already killed whatever child
+		// existed (nothing yet) — so spawning here would orphan the newer child
+		// and tear it down with the session it just opened.
+		const seq = ++this.#startSeq;
 		void Promise.all([
 			resolveProxyEnv ? resolveProxyEnv().catch(fallback) : Promise.resolve({}),
 			resolveShellEnv ? resolveShellEnv().catch(fallback) : Promise.resolve({}),
 		]).then(([proxyEnv, shellEnv]) => {
-			if (this.#disposed) return;
+			if (this.#disposed || seq !== this.#startSeq) return;
 			this.#proxyEnvVars = proxyEnv;
 			this.#shellEnvVars = shellEnv;
 			this.#spawn();
@@ -206,6 +282,16 @@ export class SidecarManager extends EventEmitter {
 	}
 
 	#spawn(): void {
+		// One live child per manager. `#child` is only ever set here, so anything
+		// still attached means a previous spawn was never retired — kill it through
+		// the normal teardown instead of letting it run parser-less and unkillable.
+		const superseded = this.#child;
+		if (superseded) {
+			this.#cleanup();
+			superseded.kill("SIGTERM");
+		}
+		this.#generation++;
+		this.#lastStderr = [];
 		const { binaryPath, sourceCli, cwd, extraFlags } = this.#options;
 
 		const args = ["--mode", "rpc-ui"];
@@ -269,11 +355,17 @@ export class SidecarManager extends EventEmitter {
 			this.#detachParser = attachNdjsonParser(child.stdout, frame => this.#routeFrame(frame));
 		}
 
-		// Log stderr to main process console for diagnostics
+		// Log stderr to main process console for diagnostics, and keep a per-spawn
+		// tail: a sidecar that dies before it can log anywhere only speaks through
+		// this pipe, so without the ring the crash report is just an exit code.
 		child.stderr?.on("data", (chunk: Buffer) => {
 			const text = chunk.toString("utf-8").trim();
 			if (text) {
 				console.error(`[sidecar stderr] ${text}`);
+				for (const line of text.split("\n")) {
+					this.#lastStderr.push(line);
+					if (this.#lastStderr.length > STDERR_TAIL_LINES) this.#lastStderr.shift();
+				}
 				this.emit("stderr", text);
 			}
 		});
@@ -402,37 +494,54 @@ export class SidecarManager extends EventEmitter {
 		// tab has booted successfully, later crash/manual restarts may auto-resume
 		// the session it has since created or opened.
 		this.#freshLaunchPending = false;
+		// Negotiation settles after this frame — and when the sidecar dies on boot,
+		// `#cleanup()` rejects the pending command on a generation that is already
+		// gone. Unguarded, that rejection announced "ready" and zeroed the restart
+		// counter, so a broken binary respawned forever behind a healthy UI.
+		const generation = this.#generation;
+		const announceReady = (): void => {
+			if (!this.#isLive(generation)) return;
+			this.#setStatus("ready");
+			this.#restartCount = 0;
+		};
 		// Stay on v1 when an older/malformed sidecar omits the negotiation fields
 		// or advertises limits this decoder cannot safely honor.
 		if (supportsRpcProtocolV2(ready)) {
 			this.#rpcClient
 				?.command({ type: "negotiate_protocol", protocolVersion: 2 })
-				.then(() => {
-					this.#setStatus("ready");
-					this.#restartCount = 0;
-				})
-				.catch(() => {
-					this.#setStatus("ready");
-					this.#restartCount = 0;
-				});
+				.then(announceReady, announceReady);
 		} else {
-			this.#setStatus("ready");
-			this.#restartCount = 0;
+			announceReady();
 		}
 	}
 
+	/** Continuation guard: false once the spawn cycle that captured `generation`
+	 *  has been torn down or replaced. */
+	#isLive(generation: number): boolean {
+		return !this.#disposed && generation === this.#generation;
+	}
+
 	#attemptRestart(reason: string): void {
-		if (this.#restartCount >= MAX_RESTART_ATTEMPTS) {
-			this.#setStatus("error", `Failed after ${MAX_RESTART_ATTEMPTS} attempts: ${reason}`);
+		// The exit code alone is never the diagnosis; the spawn's stderr carries it.
+		const excerpt = stderrExcerpt(this.#lastStderr);
+		const detail = excerpt ? `${reason} — ${excerpt}` : reason;
+		const exhausted = this.#restartCount >= MAX_RESTART_ATTEMPTS;
+		const attempt = exhausted ? MAX_RESTART_ATTEMPTS : this.#restartCount + 1;
+		this.#options.reportFailure?.({
+			reason: detail,
+			attempt,
+			maxAttempts: MAX_RESTART_ATTEMPTS,
+			stderr: [...this.#lastStderr],
+			cwd: this.#options.cwd,
+		});
+		if (exhausted) {
+			this.#setStatus("error", detail, { attempt, maxAttempts: MAX_RESTART_ATTEMPTS });
 			return;
 		}
 
-		const delay = RESTART_DELAYS[this.#restartCount] ?? 4000;
-		this.#restartCount++;
-		this.#setStatus(
-			"restarting",
-			`Restarting in ${delay}ms (attempt ${this.#restartCount}/${MAX_RESTART_ATTEMPTS}): ${reason}`,
-		);
+		const delay = RESTART_DELAYS[attempt - 1] ?? 4000;
+		this.#restartCount = attempt;
+		this.#setStatus("restarting", detail, { attempt, maxAttempts: MAX_RESTART_ATTEMPTS });
 
 		this.#restartTimer = setTimeout(() => {
 			this.#restartTimer = null;
@@ -442,12 +551,15 @@ export class SidecarManager extends EventEmitter {
 		}, delay);
 	}
 
-	#setStatus(status: SidecarStatus, message?: string): void {
+	#setStatus(status: SidecarStatus, message?: string, restart?: SidecarRestartProgress): void {
 		this.#status = status;
-		this.emit("status", { status, message, cwd: this.#options.cwd });
+		this.emit("status", { status, message, cwd: this.#options.cwd, restart });
 	}
 
 	#cleanup(): void {
+		// Any async continuation of the current cycle (pending negotiation) is
+		// stale from here on, even before the replacement spawns.
+		this.#generation++;
 		this.#detachParser?.();
 		this.#detachParser = null;
 		this.#batcher?.flushNow();

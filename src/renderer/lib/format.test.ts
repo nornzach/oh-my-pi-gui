@@ -91,6 +91,25 @@ describe("image result extraction", () => {
 		expect(extractImageDataUrls(result)).toEqual(["data:image/png;base64,first", "data:image/jpeg;base64,second"]);
 		expect(extractImageDataUrl(result)).toBeNull();
 	});
+
+	it("reads generate_image's untagged {data, mimeType} pairs as pictures", () => {
+		// Not content blocks — `generate_image` reports the raw bytes it got back,
+		// so a renderer that only understands `{type: "image"}` shows no preview.
+		const result = {
+			content: [{ type: "text", text: "Provider: openai\nModel: gpt-image-1\nGenerated 2 image(s):" }],
+			details: {
+				provider: "openai",
+				imageCount: 2,
+				imagePaths: ["/tmp/omp-image-1.png", "/tmp/omp-image-2.jpg"],
+				images: [
+					{ data: "first", mimeType: "image/png" },
+					{ data: "second", mimeType: "image/jpeg" },
+				],
+			},
+		};
+
+		expect(extractImageDataUrls(result)).toEqual(["data:image/png;base64,first", "data:image/jpeg;base64,second"]);
+	});
 });
 
 describe("sanitizeToolText", () => {

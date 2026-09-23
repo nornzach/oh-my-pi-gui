@@ -223,6 +223,90 @@ providers:
 			expect(saved.models[0].unrenderedField).toBe("kept");
 		});
 
+		test("keeps a legacy thinking ladder through a GUI edit", () => {
+			const file = modelsPath();
+			writeFileSync(
+				file,
+				`providers:
+  legacy-thinking:
+    api: openai-completions
+    baseUrl: https://api.test.com/v1
+    models:
+      - id: ranged-model
+        thinking:
+          mode: effort
+          minLevel: low
+          maxLevel: high
+      - id: levelled-model
+        thinking:
+          mode: budget
+          levels: [minimal, medium]
+          effortMap: {minimal: low}
+`,
+				"utf8",
+			);
+
+			const loaded = listModelsProviders().find(provider => provider.id === "legacy-thinking");
+			if (!loaded) throw new Error("legacy-thinking provider missing after parse");
+			// The agent normalizes both legacy shapes to an ordered `efforts`
+			// ladder. A view that loses it renders "no thinking" for a thinking
+			// model, and the next save deletes the block.
+			expect(loaded.models[0].thinking).toEqual({ mode: "effort", efforts: ["low", "medium", "high"] });
+			expect(loaded.models[1].thinking).toEqual({ mode: "budget", efforts: ["minimal", "medium"] });
+
+			upsertModelsProvider({
+				id: "legacy-thinking",
+				api: "openai-completions",
+				baseUrl: "https://api.test.com/v1",
+				models: loaded.models.map(model => ({ ...model, name: `${model.id} (renamed)` })),
+			});
+
+			const saved = parse(readFileSync(file, "utf8")).providers["legacy-thinking"].models;
+			expect(saved[0]).toEqual({
+				id: "ranged-model",
+				name: "ranged-model (renamed)",
+				thinking: { mode: "effort", efforts: ["low", "medium", "high"] },
+			});
+			// `effortMap` is not rendered by the editor, so it must survive; the
+			// range keys it normalizes from must not (they would outlive an edit
+			// that shortens the ladder).
+			expect(saved[1]).toEqual({
+				id: "levelled-model",
+				name: "levelled-model (renamed)",
+				thinking: { mode: "budget", efforts: ["minimal", "medium"], effortMap: { minimal: "low" } },
+			});
+		});
+
+		test("drops a stored API key only when the edit explicitly asks", () => {
+			const file = modelsPath();
+			writeFileSync(
+				file,
+				`providers:
+  keyed:
+    api: openai-completions
+    baseUrl: https://api.test.com/v1
+    apiKey: sk-stored-secret
+    models: []
+`,
+				"utf8",
+			);
+
+			const base = {
+				id: "keyed",
+				api: "openai-completions" as const,
+				baseUrl: "https://api.test.com/v1",
+				models: [],
+			};
+			// The key field is masked, so submitting it blank means "not re-typed".
+			upsertModelsProvider(base);
+			expect(parse(readFileSync(file, "utf8")).providers.keyed.apiKey).toBe("sk-stored-secret");
+
+			// Explicit removal is the only path that erases the secret — without
+			// it the key is undeletable short of dropping the whole provider.
+			upsertModelsProvider({ ...base, clearApiKey: true });
+			expect(parse(readFileSync(file, "utf8")).providers.keyed).not.toHaveProperty("apiKey");
+		});
+
 		test("rejects built-in provider upsert", () => {
 			const input: CustomProviderInput = {
 				id: "openai",
@@ -313,6 +397,28 @@ providers:
 
 		test("rejects built-in provider deletion", () => {
 			expect(() => deleteModelsProvider("anthropic")).toThrow("built-in provider");
+		});
+	});
+
+	describe("built-in roster", () => {
+		test("rejects catalog built-ins outside the historic short list", () => {
+			// The guard's job is to stop the GUI writing a models.yml entry that
+			// the agent reads as an override of a built-in provider. These three
+			// are real built-ins the GUI list predated.
+			for (const id of ["meta", "ollama-cloud", "venice"]) {
+				expect(() =>
+					upsertModelsProvider({ id, api: "openai-completions", baseUrl: "https://evil.test/v1", models: [] }),
+				).toThrow("built-in provider");
+				expect(() => deleteModelsProvider(id)).toThrow("built-in provider");
+			}
+		});
+
+		test("flags a hand-written built-in override as built-in, not as a custom provider", () => {
+			writeFileSync(
+				modelsPath(),
+				"providers:\n  meta:\n    api: openai-completions\n    baseUrl: https://x.test/v1\n",
+			);
+			expect(listModelsProviders().find(p => p.id === "meta")?.builtin).toBe(true);
 		});
 	});
 

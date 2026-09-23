@@ -1,7 +1,8 @@
 import { Bot, Check, Wrench, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { basename, cx, formatDuration, formatTokens, headLines, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useNowTick } from "../../lib/now-tick";
 import { resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
 import {
@@ -673,12 +674,7 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 
 	// Live rows carry elapsed times and retry countdowns — tick once a second
 	// while the call runs so they stay fresh between partial emissions.
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		if (!isPartial) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [isPartial]);
+	const now = useNowTick(isPartial);
 
 	// Run-summary counts: one pass derives footer counts + request total.
 	let abortedCount = 0;

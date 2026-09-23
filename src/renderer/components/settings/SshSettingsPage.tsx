@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSshHostInfo, RpcSshHostInput, RpcSshHostsResult, RpcSshTestResult } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
-import { Button, Input, Spinner, TextArea } from "../common";
+import { Button, ConfirmDialog, Input, Spinner, TextArea } from "../common";
 
 interface HostDraft extends RpcSshHostInput {
 	name: string;
@@ -11,6 +11,20 @@ interface HostDraft extends RpcSshHostInput {
 }
 
 const EMPTY_DRAFT: HostDraft = { name: "", host: "", port: 22, scope: "project", compat: false };
+
+type Health = "healthy" | "failed" | "unknown";
+
+/**
+ * One health rule for the list row, the header dot and the reachable count. A
+ * host nobody has probed is "unknown", never "healthy" — the header used to
+ * render its dot as success for anything that was not an explicit failure, so a
+ * freshly added host looked reachable before it had ever been tested.
+ */
+function hostHealth(host: RpcSshHostInfo | undefined, result: RpcSshTestResult | undefined): Health {
+	if (result?.ok === false) return "failed";
+	if (result?.ok === true || host?.os !== undefined) return "healthy";
+	return "unknown";
+}
 
 function toDraft(host: RpcSshHostInfo): HostDraft {
 	return {
@@ -50,7 +64,12 @@ export function SshSettingsPage() {
 	const [saving, setSaving] = useState(false);
 	const [testing, setTesting] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [confirmDelete, setConfirmDelete] = useState(false);
 	const [error, setError] = useState<string>();
+	// A failed read is not the same claim as a form-validation refusal even though
+	// both surface in the same banner; the host list only hides its empty state
+	// for the first.
+	const [loadError, setLoadError] = useState<string>();
 	const [tests, setTests] = useState<Record<string, RpcSshTestResult>>({});
 
 	const load = useCallback(
@@ -60,6 +79,7 @@ export function SshSettingsPage() {
 				const response = await tabRpc.getSshHosts();
 				if (!response.success) {
 					setError(response.error);
+					setLoadError(response.error);
 					return;
 				}
 				const next = response.data as RpcSshHostsResult;
@@ -73,8 +93,11 @@ export function SshSettingsPage() {
 				setSelected(fallback);
 				if (fallback) setDraft(toDraft(fallback));
 				setError(undefined);
+				setLoadError(undefined);
 			} catch (cause) {
-				setError(errorMessage(cause));
+				const message = errorMessage(cause);
+				setError(message);
+				setLoadError(message);
 			} finally {
 				setLoading(false);
 			}
@@ -87,9 +110,7 @@ export function SshSettingsPage() {
 	}, [load]);
 
 	const reachable = useMemo(
-		() =>
-			data?.hosts.filter(host => tests[host.name]?.ok === true || (!tests[host.name] && host.os !== undefined))
-				.length ?? 0,
+		() => data?.hosts.filter(host => hostHealth(host, tests[host.name]) === "healthy").length ?? 0,
 		[data?.hosts, tests],
 	);
 
@@ -180,6 +201,7 @@ export function SshSettingsPage() {
 	};
 
 	const remove = async () => {
+		setConfirmDelete(false);
 		if (!selected?.editable) return;
 		setDeleting(true);
 		try {
@@ -209,6 +231,9 @@ export function SshSettingsPage() {
 				<Spinner />
 			</div>
 		);
+
+	const detailHealth = hostHealth(selected, tests[draft.name]);
+	const tested = tests[draft.name]?.ok === true;
 
 	return (
 		<div>
@@ -266,9 +291,9 @@ export function SshSettingsPage() {
 					</div>
 					<div className="divide-y divide-(--omp-border-muted)">
 						{data?.hosts.map(host => {
-							const result = tests[host.name];
-							const healthy = result?.ok === true || (!result && host.os !== undefined);
-							const failed = result?.ok === false;
+							const health = hostHealth(host, tests[host.name]);
+							const failed = health === "failed";
+							const healthy = health === "healthy";
 							return (
 								<button
 									className={`grid w-full grid-cols-[minmax(100px,.7fr)_minmax(180px,1.4fr)_70px_110px_80px] items-center gap-3 px-3 py-3 text-left hover:bg-(--omp-bg-tertiary) ${selected?.name === host.name && selected.scope === host.scope ? "bg-(--omp-selected-bg)" : ""}`}
@@ -300,7 +325,12 @@ export function SshSettingsPage() {
 								</button>
 							);
 						})}
-						{(data?.hosts.length ?? 0) === 0 && (
+						{loading && !data && (
+							<div className="flex h-56 items-center justify-center">
+								<Spinner size="md" />
+							</div>
+						)}
+						{!loading && !loadError && (data?.hosts.length ?? 0) === 0 && (
 							<div className="flex h-56 flex-col items-center justify-center gap-2 text-center">
 								<Server className="text-(--omp-dim)" size={24} />
 								<div className="text-omp-md font-medium text-(--omp-text)">{t("ssh.empty.title")}</div>
@@ -316,7 +346,7 @@ export function SshSettingsPage() {
 				<aside className="ssh-detail-pane min-w-0 overflow-y-auto p-3">
 					<div className="mb-4 flex items-center gap-2 border-b border-(--omp-border-muted) pb-3">
 						<div
-							className={`size-2 rounded-full ${tests[draft.name]?.ok === false ? "bg-(--omp-error)" : "bg-(--omp-success)"}`}
+							className={`size-2 shrink-0 rounded-full ${detailHealth === "failed" ? "bg-(--omp-error)" : detailHealth === "healthy" ? "bg-(--omp-success)" : "bg-(--omp-dim)"}`}
 						/>
 						<div className="min-w-0 flex-1">
 							<h3 className="truncate text-omp-md font-semibold text-(--omp-text)">
@@ -328,9 +358,11 @@ export function SshSettingsPage() {
 								</p>
 							)}
 						</div>
-						{tests[draft.name]?.ok && (
-							<span className="text-omp-xxs text-(--omp-success)">{t("ssh.connected")}</span>
-						)}
+						<span
+							className={`shrink-0 text-omp-xxs ${detailHealth === "failed" ? "text-(--omp-error)" : detailHealth === "healthy" ? "text-(--omp-success)" : "text-(--omp-dim)"}`}
+						>
+							{tested ? t("ssh.connected") : t(`ssh.health.${detailHealth}`)}
+						</span>
 					</div>
 
 					<div className="space-y-3">
@@ -432,7 +464,7 @@ export function SshSettingsPage() {
 								disabled={saving || testing || loading}
 								icon={<Trash2 size={12} />}
 								loading={deleting}
-								onClick={() => void remove()}
+								onClick={() => setConfirmDelete(true)}
 								size="sm"
 								variant="ghost"
 							/>
@@ -478,6 +510,19 @@ export function SshSettingsPage() {
 					)}
 				</aside>
 			</div>
+
+			<ConfirmDialog
+				busy={deleting}
+				message={t("ssh.deleteBody", {
+					name: selected?.name ?? "",
+					target: selected ? targetText(selected) : "",
+				})}
+				onCancel={() => setConfirmDelete(false)}
+				onConfirm={() => void remove()}
+				open={confirmDelete}
+				title={t("ssh.deleteTitle", { name: selected?.name ?? "" })}
+				warning={t("ssh.deleteWarning")}
+			/>
 		</div>
 	);
 }

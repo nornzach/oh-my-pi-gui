@@ -14,6 +14,7 @@ import { LogPanel } from "../panels/LogPanel";
 
 const MIN_WIDTH = 360;
 const MAX_WIDTH = 840;
+const PANEL_WIDTH_PREF = "gui.panelWidth";
 /** Below this the inspector overlays instead of docking (see PanelContainer). */
 const COMPACT_QUERY = "(max-width: 1000px)";
 
@@ -64,7 +65,42 @@ export function PanelContainer() {
 	const visiblePanelTab = isChat && !CHAT_TAB_IDS.has(panelTab) ? "files" : panelTab;
 
 	const [width, setWidth] = useState(defaultPanelWidth);
+	const [widthHydrated, setWidthHydrated] = useState(false);
 	const dragging = useRef(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		const prefs = window.omp?.prefs;
+		if (typeof prefs?.get !== "function") {
+			setWidthHydrated(true);
+			return;
+		}
+		void prefs
+			.get(PANEL_WIDTH_PREF)
+			.then(value => {
+				if (cancelled) return;
+				const saved = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+				if (saved !== null) {
+					const viewportLimit = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, window.innerWidth - 56));
+					setWidth(Math.min(viewportLimit, Math.max(MIN_WIDTH, saved)));
+				}
+				setWidthHydrated(true);
+			})
+			.catch(() => {
+				if (!cancelled) setWidthHydrated(true);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!widthHydrated || typeof window.omp?.prefs?.set !== "function") return;
+		const timer = window.setTimeout(() => {
+			void window.omp.prefs.set(PANEL_WIDTH_PREF, Math.round(width)).catch(() => {});
+		}, 150);
+		return () => window.clearTimeout(timer);
+	}, [width, widthHydrated]);
 
 	useEffect(() => {
 		const clampToViewport = () => {
@@ -154,9 +190,26 @@ export function PanelContainer() {
 			<div
 				role="separator"
 				aria-orientation="vertical"
+				aria-valuemin={MIN_WIDTH}
+				aria-valuemax={MAX_WIDTH}
+				aria-valuenow={Math.round(width)}
+				tabIndex={0}
 				onPointerDown={startDrag}
 				onPointerMove={onDrag}
 				onPointerUp={endDrag}
+				onKeyDown={event => {
+					if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+					event.preventDefault();
+					const viewportLimit = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, window.innerWidth - 56));
+					const max = Math.min(MAX_WIDTH, viewportLimit);
+					setWidth(current =>
+						event.key === "Home"
+							? MIN_WIDTH
+							: event.key === "End"
+								? max
+								: Math.min(max, Math.max(MIN_WIDTH, current + (event.key === "ArrowLeft" ? 24 : -24))),
+					);
+				}}
 				className="absolute inset-y-0 left-0 z-10 w-1 -translate-x-1/2 cursor-col-resize transition-colors hover:bg-[var(--omp-accent)]/40 active:bg-[var(--omp-accent)] max-[1000px]:hidden"
 			/>
 		</aside>

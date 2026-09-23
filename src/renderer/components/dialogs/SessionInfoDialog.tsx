@@ -5,13 +5,13 @@ import { useTabRpc } from "../../lib/tab-rpc";
  * window usage. Replaces the forwarded "/session info" text command.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SessionStats } from "../../../shared/rpc-types";
 import { contextUsageView } from "../../lib/context-usage";
 import { basename, formatCost, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useUiStore } from "../../stores/ui";
-import { Modal, ProgressBar, Spinner } from "../common";
+import { AsyncSection, Modal, ProgressBar } from "../common";
 
 interface Row {
 	label: string;
@@ -51,44 +51,40 @@ export function SessionInfoDialog() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	useEffect(() => {
-		if (!open) return;
+	const reload = useCallback(async () => {
 		setLoading(true);
 		setError(null);
+		try {
+			const response = await tabRpc.getSessionStats();
+			if (response.success) setStats(response.data as SessionStats);
+			else setError(response.error);
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : String(cause));
+		} finally {
+			setLoading(false);
+		}
+	}, [tabRpc.getSessionStats]);
+
+	useEffect(() => {
+		if (!open) return;
 		setStats(null);
-		let cancelled = false;
-		void tabRpc
-			.getSessionStats()
-			.then(response => {
-				if (cancelled) return;
-				if (response.success) setStats(response.data as SessionStats);
-				else setError(response.error);
-			})
-			.catch(cause => {
-				if (!cancelled) setError(String(cause));
-			})
-			.finally(() => {
-				if (!cancelled) setLoading(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [open, tabRpc.getSessionStats]);
+		void reload();
+	}, [open, reload]);
 
 	const contextView = stats?.contextUsage ? contextUsageView(stats.contextUsage) : null;
 
 	return (
 		<Modal open={open} onClose={close} title={t("sessionInfo.title")} size="md">
-			<div className="flex flex-col gap-4">
-				{error ? (
-					<div className="py-8 text-center text-xs text-[var(--omp-error)]">{error}</div>
-				) : loading || !stats ? (
-					<div className="flex items-center justify-center gap-2 py-8">
-						<Spinner size="sm" />
-						<span className="text-xs text-(--omp-dim)">{t("sessionInfo.loading")}</span>
-					</div>
-				) : (
-					<>
+			<AsyncSection
+				className="py-8"
+				error={error}
+				hasData={stats !== null}
+				loading={loading}
+				loadingLabel={t("sessionInfo.loading")}
+				onRetry={() => void reload()}
+			>
+				{stats && (
+					<div className="flex flex-col gap-4">
 						{stats.history && (
 							<Section
 								title={t("sessionInfo.history")}
@@ -194,9 +190,9 @@ export function SessionInfoDialog() {
 								</div>
 							</section>
 						)}
-					</>
+					</div>
 				)}
-			</div>
+			</AsyncSection>
 		</Modal>
 	);
 }

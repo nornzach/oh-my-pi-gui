@@ -8,24 +8,6 @@ import type { ComposerImage } from "../../stores/composer";
 const MENTION_FS_DEPTH = 8;
 const MENTION_FS_MAX_ENTRIES = 2000;
 
-/**
- * Commands suppressed on chat tabs: mode toggles whose wiring is gated by
- * restrictToolNames (plan/goal/loop/vibe/modes) and tool-spawning commands
- * (task/tan/security). They stay OFF the slash menu in chat tabs — the menu
- * must never offer a command that does nothing. Session/transport commands
- * (/compact, /clear, /model, /export…) still work tool-free and stay.
- */
-export const CHAT_DEAD_COMMANDS: ReadonlySet<string> = new Set([
-	"plan",
-	"goal",
-	"loop",
-	"vibe",
-	"modes",
-	"task",
-	"tan",
-	"security",
-]);
-
 /** Cap on completion menu items. */
 export const MAX_MENU_ITEMS = 8;
 /** Cap on fuzzy file results shown above the scheme entries in the @ menu. */

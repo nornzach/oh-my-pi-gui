@@ -3,10 +3,9 @@
  * states, metric cards, generic table, chart container.
  */
 
-import { AlertTriangle, Inbox, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { useT } from "../../lib/i18n";
-import { Button, Spinner } from "../common";
+import { AsyncSection } from "../common";
 
 export function RouteFrame({
 	loading,
@@ -24,54 +23,21 @@ export function RouteFrame({
 	children: ReactNode;
 }) {
 	const t = useT();
-	if (loading && !hasData) {
-		return (
-			<div className="flex h-64 items-center justify-center gap-2.5">
-				<Spinner size="md" />
-				<span className="text-xs text-(--omp-dim)">{t("stats.loading")}</span>
-			</div>
-		);
-	}
-	if (error && !hasData) {
-		return (
-			<div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
-				<AlertTriangle className="text-(--omp-warning)" size={20} />
-				<div className="max-w-sm text-xs leading-relaxed text-(--omp-muted)">
-					<span className="font-semibold text-(--omp-text)">{t("stats.unavailable")}</span>
-					<br />
-					{error}
-				</div>
-				<Button icon={<RefreshCw size={12} />} onClick={onRetry} size="sm" variant="secondary">
-					{t("stats.retry")}
-				</Button>
-			</div>
-		);
-	}
-	if (empty && !error) {
-		return (
-			<div className="flex h-64 flex-col items-center justify-center gap-2 text-center">
-				<Inbox className="text-(--omp-dim)" size={20} />
-				<span className="text-xs text-(--omp-dim)">{t("stats.emptyRange")}</span>
-			</div>
-		);
-	}
 	return (
-		<>
-			{error && (
-				<div
-					role="alert"
-					className="mb-3 flex items-center gap-3 rounded border border-(--omp-border-muted) p-3 text-omp-sm text-(--omp-warning)"
-				>
-					<span className="flex-1">
-						{t("stats.stale")}: {error}
-					</span>
-					<Button onClick={onRetry} size="sm" variant="secondary">
-						{t("stats.retry")}
-					</Button>
-				</div>
-			)}
+		<AsyncSection
+			empty={empty}
+			emptyLabel={t("stats.emptyRange")}
+			error={error}
+			errorTitle={t("stats.unavailable")}
+			hasData={hasData}
+			loading={loading}
+			loadingLabel={t("stats.loading")}
+			onRetry={onRetry}
+			retryLabel={t("stats.retry")}
+			staleLabel={t("stats.stale")}
+		>
 			{children}
-		</>
+		</AsyncSection>
 	);
 }
 

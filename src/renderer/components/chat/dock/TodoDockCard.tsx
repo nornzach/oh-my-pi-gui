@@ -33,15 +33,19 @@ import {
 	ListTodo,
 	Pencil,
 	X,
+	XCircle,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { TodoPhase, TodoTask } from "../../../../shared/rpc-types";
 import { useT } from "../../../lib/i18n";
 import { isImeKeyEvent } from "../../../lib/ime";
 import { onEscape } from "../../../lib/keymap";
-import { type TabRpc, useTabRpc } from "../../../lib/tab-rpc";
+import { type OptimisticTarget, optimisticWrite } from "../../../lib/optimistic";
+import { useTabRpc } from "../../../lib/tab-rpc";
+import { sessionRuntimeStore, useRuntimeTabId } from "../../../stores/session-runtime-context";
 import { toast } from "../../../stores/toast";
-import { type UiTodoPhase, type UiTodoTask, useTodoStore } from "../../../stores/todo";
+import { type TodoStore, type UiTodoPhase, type UiTodoTask, useTodoStore } from "../../../stores/todo";
+import { anchorFromEvent, ContextMenu, type ContextMenuAnchor, type ContextMenuItem } from "../../common/ContextMenu";
 import { DockCard } from "./DockCard";
 import { buildTodoDockSummary } from "./dock-summary";
 import { useWorkspaceDockFocus } from "./WorkspaceDockFocus";
@@ -54,7 +58,17 @@ const STATUS_LABEL_KEY: Record<TodoTask["status"], string> = {
 	abandoned: "todoPanel.status.abandoned",
 };
 
-const STATUS_CYCLE: TodoTask["status"][] = ["pending", "in_progress", "completed", "blocked", "abandoned"];
+/**
+ * Blocked and abandoned are verdicts about a task, not steps on the way to done,
+ * so they stay out of the click loop: one click on a finished task used to claim
+ * it was stuck, which the agent then re-planned around. They are set from the
+ * row's context menu, and a click on such a task returns it to pending.
+ */
+const STATUS_CYCLE: TodoTask["status"][] = ["pending", "in_progress", "completed"];
+
+function nextStatus(current: TodoTask["status"]): TodoTask["status"] {
+	return STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length] ?? "pending";
+}
 
 function TodoStatusIcon({ status }: { status: TodoTask["status"] }) {
 	if (status === "in_progress") {
@@ -69,15 +83,11 @@ function TodoStatusIcon({ status }: { status: TodoTask["status"] }) {
 	return <Circle aria-hidden="true" className="text-[var(--omp-dim)]" size={15} strokeDasharray="2.5 2.5" />;
 }
 
-async function pushTodos(phases: UiTodoPhase[], t: (key: string) => string, rpc: TabRpc): Promise<void> {
-	const payload: TodoPhase[] = phases.map(phase => ({
+function todoPayload(phases: UiTodoPhase[]): TodoPhase[] {
+	return phases.map(phase => ({
 		name: phase.name,
 		tasks: phase.tasks.map(task => ({ content: task.content, status: task.status })),
 	}));
-	const response = await rpc.setTodos(payload);
-	if (!response.success) {
-		toast({ variant: "error", title: t("todoPanel.updateFailed"), message: response.error });
-	}
 }
 
 interface SortableTaskRowProps {
@@ -91,6 +101,28 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(task.content);
+	const [statusMenu, setStatusMenu] = useState<ContextMenuAnchor>();
+	const statusItems: ContextMenuItem[] = [
+		{
+			id: "blocked",
+			icon: AlertCircle,
+			label: t("todoPanel.markBlocked"),
+			onSelect: () => {
+				setStatusMenu(undefined);
+				onPatch(phaseId, task.id, { status: "blocked" });
+			},
+		},
+		{
+			danger: true,
+			id: "abandoned",
+			icon: XCircle,
+			label: t("todoPanel.markAbandoned"),
+			onSelect: () => {
+				setStatusMenu(undefined);
+				onPatch(phaseId, task.id, { status: "abandoned" });
+			},
+		},
+	];
 	const commit = () => {
 		const content = draft.trim();
 		setEditing(false);
@@ -125,16 +157,21 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 					status: t(STATUS_LABEL_KEY[task.status] ?? "todoPanel.status.pending"),
 				})}
 				className="omp-pressable flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-				onClick={() =>
-					onPatch(phaseId, task.id, {
-						status: STATUS_CYCLE[(STATUS_CYCLE.indexOf(task.status) + 1) % STATUS_CYCLE.length],
-					})
-				}
+				onClick={() => onPatch(phaseId, task.id, { status: nextStatus(task.status) })}
+				onContextMenu={event => setStatusMenu(anchorFromEvent(event))}
 				title={t("todoPanel.cycleHint")}
 				type="button"
 			>
 				<TodoStatusIcon status={task.status} />
 			</button>
+			{statusMenu && (
+				<ContextMenu
+					items={statusItems}
+					onClose={() => setStatusMenu(undefined)}
+					x={statusMenu.x}
+					y={statusMenu.y}
+				/>
+			)}
 			{editing ? (
 				<span className="flex min-w-0 flex-1 items-center gap-1">
 					<input
@@ -262,6 +299,8 @@ function PhaseSection({
 
 export function TodoDockCard() {
 	const rpc = useTabRpc();
+	const tabId = useRuntimeTabId();
+	const todoStore = sessionRuntimeStore<TodoStore>(tabId, "todo") ?? useTodoStore;
 	const t = useT();
 	const { managed, focusedCard, focusCard, clearFocus } = useWorkspaceDockFocus();
 	const focused = focusedCard === "todo";
@@ -278,12 +317,30 @@ export function TodoDockCard() {
 		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
 	);
 
+	/* The dock edits through setPhases, which archives each change as a
+	   transcript snapshot — so both the optimistic value and its rollback go
+	   through it instead of assigning `phases` behind the archive's back. */
+	const writes = useMemo<OptimisticTarget<TodoStore>>(
+		() => ({
+			getState: () => todoStore.getState(),
+			setState: partial => {
+				if (partial.phases) setPhases(partial.phases);
+				else todoStore.setState(partial);
+			},
+		}),
+		[setPhases, todoStore],
+	);
+
 	const applyPhases = useCallback(
 		(next: UiTodoPhase[]) => {
-			setPhases(next);
-			void pushTodos(next, t, rpc);
+			void optimisticWrite({
+				store: writes,
+				mutate: () => ({ phases: next }),
+				persist: () => rpc.setTodos(todoPayload(next)),
+				onFailure: message => toast({ variant: "error", title: t("todoPanel.updateFailed"), message }),
+			});
 		},
-		[setPhases, t, rpc],
+		[rpc, t, writes],
 	);
 
 	const patchTask = useCallback(

@@ -1,58 +1,32 @@
 /**
- * System tray with status icon and a rich quick-access menu: live config info
- * (model / thinking / fast / approval), usage + token consumption, workspace
- * jumping, quick-start and quick-config actions, and a language toggle. The
- * renderer pushes a TrayState snapshot on every relevant change, so the menu
- * is always fresh the moment it opens; actions route back to the renderer via
- * MENU_ACTION (it owns the RPC + i18n + UI stores).
+ * System tray with a rich quick-access menu: live config info (model / thinking
+ * / fast / approval), usage + token consumption, workspace jumping, quick-start
+ * and quick-config actions, and a language toggle. The renderer pushes a
+ * TrayState snapshot on every relevant change; main installs a new native menu
+ * only when a visible label actually changes, and never while one is open.
+ * Actions route back to the renderer via MENU_ACTION (it owns the RPC + i18n +
+ * UI stores).
  */
 
 import { app, Menu, nativeImage, Tray } from "electron";
 import { IPC_EVENTS, type MenuAction, type MenuActionPayload, type TrayState } from "../shared/ipc-types";
+import { approvalLabel, formatTokens, menuSignature, type TrayLang, t, trayTooltip } from "./tray-labels";
 import type { SpawnWindow, WindowManager } from "./window";
 
-type TrayStatus = "idle" | "streaming" | "waiting" | "error";
-type TrayLang = "zh" | "en";
-
 let tray: Tray | null = null;
-let currentStatus: TrayStatus = "idle";
 let windowManagerRef: WindowManager | null = null;
 let spawnWindowRef: SpawnWindow | null = null;
 let trayState: TrayState | null = null;
+/** Label set the currently installed native menu renders, and whether it is open. */
+let installedSignature: string | null = null;
+let menuIsOpen = false;
+let tooltip = "omp";
 
-/** Tray-label strings, translated in main (the renderer reports the language). */
-const L: Record<string, { zh: string; en: string }> = {
-	showHide: { zh: "显示 / 隐藏", en: "Show / Hide" },
-	quit: { zh: "退出", en: "Quit" },
-	newSession: { zh: "新建会话", en: "New Session" },
-	openProject: { zh: "打开项目…", en: "Open Project…" },
-	handoff: { zh: "交接(Handoff)", en: "Handoff" },
-	usageStats: { zh: "Usage 统计…", en: "Usage Stats…" },
-	workspaces: { zh: "工作区跳转", en: "Switch Workspace" },
-	addWorkspace: { zh: "添加工作区…", en: "Add Workspace…" },
-	quickStart: { zh: "快速开始", en: "Quick Start" },
-	quickConfig: { zh: "快速配置", en: "Quick Config" },
-	fastMode: { zh: "快速模式", en: "Fast Mode" },
-	thinking: { zh: "思考强度", en: "Thinking" },
-	approval: { zh: "工具审批", en: "Tool Approval" },
-	language: { zh: "语言", en: "Language" },
-	approvalYolo: { zh: "完全访问", en: "Full access" },
-	approvalWrite: { zh: "自动编辑", en: "Auto-edit" },
-	approvalAsk: { zh: "每次询问", en: "Ask every time" },
-	context: { zh: "上下文", en: "Context" },
-	tokens: { zh: "tokens", en: "tokens" },
-	noModel: { zh: "未选模型", en: "No model" },
-};
-
-function t(lang: TrayLang, key: keyof typeof L): string {
-	return L[key][lang];
-}
-
-function buildIcon(_status: TrayStatus): Electron.NativeImage {
+function buildIcon(): Electron.NativeImage {
 	// macOS status items are template images: the system applies the correct
 	// foreground color for light/dark and selected menu-bar states. Render at
-	// 2× so the small π mark remains crisp on Retina displays. The run status
-	// stays available in the tray menu; changing it no longer turns the app mark
+	// 2× so the small π mark remains crisp on Retina displays. The run status is
+	// text (tooltip + menu header); painting it here would turn the app mark
 	// into a large, visually noisy traffic-light dot.
 	const logicalSize = 18;
 	const scaleFactor = 2;
@@ -106,32 +80,23 @@ function send(windowManager: WindowManager, action: MenuAction, payload?: MenuAc
 	});
 }
 
-function formatTokens(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-	return String(n);
-}
-
 function buildContextMenu(windowManager: WindowManager, state: TrayState | null): Electron.Menu {
 	const lang: TrayLang = state?.language === "en" ? "en" : "zh";
 	const template: Electron.MenuItemConstructorOptions[] = [];
 
-	// Header: app + current project.
-	const project = state?.projectName || "omp";
-	template.push({ label: `● omp — ${project}`, enabled: false }, { type: "separator" });
+	// Header: app + current project + the aggregate run status. This is where
+	// status surfaces — the icon is a static template mark by design.
+	template.push({ label: trayTooltip(state), enabled: false }, { type: "separator" });
 
 	// Config info (read-only): model · thinking · fast · approval.
 	if (state) {
 		const model = state.modelId || t(lang, "noModel");
 		template.push({ label: `${model} · ${t(lang, "thinking")} ${state.thinkingLevel}`, enabled: false });
-		const approvalLabel =
-			state.approvalMode === "yolo"
-				? t(lang, "approvalYolo")
-				: state.approvalMode === "write"
-					? t(lang, "approvalWrite")
-					: t(lang, "approvalAsk");
 		const fastLabel = `${t(lang, "fastMode")}: ${state.fastMode ? "✓" : "—"}`;
-		template.push({ label: `${fastLabel} · ${t(lang, "approval")}: ${approvalLabel}`, enabled: false });
+		template.push({
+			label: `${fastLabel} · ${t(lang, "approval")}: ${approvalLabel(lang, state.approvalMode)}`,
+			enabled: false,
+		});
 		// Usage / token consumption (read-only). The percent is absent — never 0 —
 		// for a model whose context window Core does not know.
 		if (state.contextPercent !== null || state.contextTokens !== null) {
@@ -189,12 +154,7 @@ function buildContextMenu(windowManager: WindowManager, state: TrayState | null)
 			{
 				label: t(lang, "approval"),
 				submenu: (["yolo", "write", "always-ask"] as const).map(mode => ({
-					label:
-						mode === "yolo"
-							? t(lang, "approvalYolo")
-							: mode === "write"
-								? t(lang, "approvalWrite")
-								: t(lang, "approvalAsk"),
+					label: approvalLabel(lang, mode),
 					type: "radio" as const,
 					checked: state?.approvalMode === mode,
 					click: () => send(windowManager, "set-approval", { approvalMode: mode }),
@@ -209,12 +169,13 @@ function buildContextMenu(windowManager: WindowManager, state: TrayState | null)
 
 	template.push({ type: "separator" });
 
-	// Show / Hide + Quit.
+	// Show / Hide + Quit. Targets the focused window, not the first-created one,
+	// so the toggle acts on the window the user is looking at.
 	template.push(
 		{
 			label: t(lang, "showHide"),
 			click: () => {
-				const win = windowManager.getMainWindow();
+				const win = windowManager.getTargetWindow();
 				if (win?.isVisible()) win.hide();
 				else if (win) win.show();
 				else spawnWindowRef?.();
@@ -227,20 +188,35 @@ function buildContextMenu(windowManager: WindowManager, state: TrayState | null)
 	return Menu.buildFromTemplate(template);
 }
 
-function rebuildMenu(): void {
+/**
+ * Install a menu built from the current snapshot. The instance remembers whether
+ * the user has it open: a push that lands mid-open is recorded but not installed
+ * (replacing the menu underneath dismisses it), and flushes when it closes.
+ */
+function installMenu(): void {
 	if (!tray || !windowManagerRef) return;
-	tray.setContextMenu(buildContextMenu(windowManagerRef, trayState));
+	const state = trayState;
+	installedSignature = state ? menuSignature(state) : null;
+	const menu = buildContextMenu(windowManagerRef, state);
+	menu.on("menu-will-show", () => {
+		menuIsOpen = true;
+	});
+	menu.on("menu-will-close", () => {
+		menuIsOpen = false;
+		if (trayState && menuSignature(trayState) !== installedSignature) installMenu();
+	});
+	tray.setContextMenu(menu);
 }
 
 export function createTray(windowManager: WindowManager, spawnWindow: SpawnWindow): Tray {
 	windowManagerRef = windowManager;
 	spawnWindowRef = spawnWindow;
-	tray = new Tray(buildIcon("idle"));
-	tray.setToolTip("omp");
-	tray.setContextMenu(buildContextMenu(windowManager, null));
+	tray = new Tray(buildIcon());
+	tray.setToolTip(trayTooltip(null));
+	installMenu();
 
 	tray.on("click", () => {
-		const win = windowManager.getMainWindow();
+		const win = windowManager.getTargetWindow();
 		if (win) {
 			win.show();
 			win.focus();
@@ -252,20 +228,20 @@ export function createTray(windowManager: WindowManager, spawnWindow: SpawnWindo
 	return tray;
 }
 
-/** Renderer pushes a fresh snapshot; cache it and rebuild the menu + icon. */
+/**
+ * Renderer pushed a fresh snapshot. Hover text tracks the status; the native
+ * menu is rebuilt only when a label a user can read actually changed, so the
+ * per-append session refresh stops swapping menus.
+ */
 export function setTrayState(state: TrayState): void {
 	trayState = state;
-	if (state.status !== currentStatus) {
-		currentStatus = state.status;
-		tray?.setImage(buildIcon(state.status));
+	const nextTooltip = trayTooltip(state);
+	if (nextTooltip !== tooltip && tray) {
+		tooltip = nextTooltip;
+		tray.setToolTip(nextTooltip);
 	}
-	rebuildMenu();
-}
-
-export function setTrayStatus(status: TrayStatus): void {
-	if (!tray || currentStatus === status) return;
-	currentStatus = status;
-	tray.setImage(buildIcon(status));
+	if (menuIsOpen || menuSignature(state) === installedSignature) return;
+	installMenu();
 }
 
 export function destroyTray(): void {
@@ -273,4 +249,7 @@ export function destroyTray(): void {
 	tray = null;
 	windowManagerRef = null;
 	trayState = null;
+	installedSignature = null;
+	menuIsOpen = false;
+	tooltip = "omp";
 }

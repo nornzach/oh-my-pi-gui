@@ -35,6 +35,7 @@ export function ModelPicker() {
 	const availableModels = useModelStore(state => state.availableModels);
 	const current = useModelStore(state => state.model);
 	const refreshAvailableModels = useModelStore(state => state.refreshAvailableModels);
+	const openProviders = useUiStore(state => state.openProviders);
 	// Live session usage: models whose window is smaller render with an
 	// over-context warning and compact-first on pick (TUI markOverContext parity).
 	const contextUsage = useSessionStore(state => state.contextUsage);
@@ -291,6 +292,18 @@ export function ModelPicker() {
 														? t("modelPicker.auth.notSignedIn")
 														: t("modelPicker.auth.unavailable")}
 											</Badge>
+										)}
+										{auth?.available && !auth.authenticated && (
+											<button
+												type="button"
+												className="rounded px-1.5 py-0.5 text-omp-xxs font-medium text-(--omp-accent) hover:bg-(--omp-selected-bg)"
+												onClick={() => {
+													close();
+													openProviders();
+												}}
+											>
+												{t("providers.login")}
+											</button>
 										)}
 										<span className="ml-auto text-omp-xxs tabular-nums text-(--omp-dim)">
 											{models.length}

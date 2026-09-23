@@ -148,6 +148,27 @@ describe("subagents store refresh", () => {
 		expect(row?.progress?.resolvedModel).toBe("openai/gpt-5.2");
 	});
 
+	it("records why the roster could not be read and clears it on the next good fetch", async () => {
+		// An empty roster after a failed read is not the same claim as "nothing
+		// spawned": the hub and the DAG can only tell those apart from the store.
+		getSubagents.mockResolvedValueOnce({
+			type: "response",
+			command: "get_subagents",
+			success: false,
+			error: "boom",
+		});
+		await useSubagentsStore.getState().refresh();
+		expect(useSubagentsStore.getState().error).toBe("boom");
+
+		getSubagents.mockRejectedValueOnce(new Error("sidecar went away"));
+		await useSubagentsStore.getState().refresh();
+		expect(useSubagentsStore.getState().error).toBe("sidecar went away");
+
+		getSubagents.mockResolvedValueOnce(ok([snap({ id: "a1", status: "running" })]));
+		await useSubagentsStore.getState().refresh();
+		expect(useSubagentsStore.getState().error).toBeNull();
+	});
+
 	it("failed fetch leaves frame-driven state untouched", async () => {
 		useSubagentsStore.getState().setSnapshots([snap({ id: "live", status: "running" })]);
 		getSubagents.mockResolvedValue({ type: "response", command: "get_subagents", success: false, error: "boom" });

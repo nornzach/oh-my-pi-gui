@@ -8,9 +8,12 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { app, BrowserWindow, globalShortcut, nativeImage, session } from "electron";
 import Store from "electron-store";
+import { nativeAccelerator } from "../shared/hotkeys";
 import type { SessionKind } from "../shared/ipc-types";
+import { installQuitGuard, requestQuit } from "./app-quit";
 import { setupDeepLinks } from "./deep-link";
 import { ensureDefaultWorkspace } from "./default-workspace";
+import { firstUsableCwd } from "./initial-cwd";
 import { registerIpcHandlers } from "./ipc";
 import { LogWatcher } from "./log-watcher";
 import { createMenu } from "./menu";
@@ -21,7 +24,7 @@ import { SidecarManager } from "./sidecar";
 import { SidecarPool } from "./sidecar-pool";
 import { StatsClient } from "./stats-client";
 import { StatsServerManager } from "./stats-server";
-import { type PersistedTabLayout, sanitizePersistedTabLayout } from "./tab-layout";
+import { type PersistedTabLayout, sanitizePersistedTabLayouts } from "./tab-layout";
 import { createTray, destroyTray } from "./tray";
 import { setupUpdater } from "./updater";
 import { WindowManager } from "./window";
@@ -107,6 +110,9 @@ function resolveSourceCli(): string | null {
 interface MainPrefs {
 	lastProject?: string;
 	proxyUrl?: string;
+	/** One layout per live window, in window order. */
+	tabLayouts?: PersistedTabLayout[];
+	/** Pre-multi-window shape, migrated on the first persist. */
 	tabLayout?: PersistedTabLayout;
 	[key: string]: unknown;
 }
@@ -126,12 +132,7 @@ function resolveExplicitStartupCwd(): string | undefined {
 function resolveInitialCwd(): string {
 	const explicitCwd = resolveExplicitStartupCwd();
 	if (explicitCwd) return explicitCwd;
-
-	const lastProject = prefsStore().get("lastProject");
-	if (lastProject && existsSync(lastProject)) return lastProject;
-
-	const launchCwd = process.cwd();
-	return launchCwd !== "/" && existsSync(launchCwd) ? launchCwd : homedir();
+	return firstUsableCwd([prefsStore().get("lastProject"), process.cwd()]) ?? homedir();
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -238,18 +239,56 @@ function installMainRuntimeLogging(): void {
 	});
 }
 
+/**
+ * The saved session: one tab layout per window. Reads tolerate both the current
+ * array and the pre-multi-window single layout written by older builds.
+ */
+function readSavedTabLayouts(): PersistedTabLayout[] {
+	const store = prefsStore();
+	const layouts = sanitizePersistedTabLayouts(store.get("tabLayouts"));
+	if (layouts.length > 0) return layouts;
+	return sanitizePersistedTabLayouts(store.get("tabLayout"));
+}
+
+/**
+ * Rewrite the saved session from the live windows. Runs on every tab change and
+ * every window close, so a window the user closed for good never comes back and
+ * a secondary window's tabs are no longer dropped on the floor.
+ */
+function persistTabLayouts(): void {
+	const layouts: PersistedTabLayout[] = [];
+	for (const win of windowManager.getAllWindows()) {
+		const layout = sidecarPool.tabLayoutForWindow(win);
+		if (layout) layouts.push(layout);
+	}
+	// No live window means the app is quitting (or idle in the dock), not that
+	// the session was abandoned — writing an empty set would wipe the restore.
+	if (layouts.length === 0) return;
+	const store = prefsStore();
+	store.set("tabLayouts", layouts);
+	store.delete("tabLayout");
+}
+
+/** Reopen one saved window: its tabs in order, at the layout's active cwd. */
+function spawnWindowWithLayout(layout: PersistedTabLayout): BrowserWindow | null {
+	const activeCwd = layout.tabs[layout.activeIndex]?.cwd ?? layout.tabs[0]?.cwd;
+	if (!activeCwd) return null;
+	const win = windowManager.createWindow({ cwd: activeCwd });
+	if (sidecarPool.restoreLayout(win, layout) > 0) return win;
+	win.close();
+	return null;
+}
+
 /** Spawn a window with its own sidecar (the pool's 1:1 owner). Null at cap.
  *  With no target, create a fresh global chat; explicit workspace/session
  *  requests retain their selected/fallback cwd and requested session kind. */
 function spawnWindow(cwd?: string, pendingSessionPath?: string, kind?: SessionKind): BrowserWindow | null {
 	const restoreSavedLayout = cwd === undefined && pendingSessionPath === undefined && kind === undefined;
-	const savedLayout = restoreSavedLayout ? sanitizePersistedTabLayout(prefsStore().get("tabLayout")) : null;
-	if (savedLayout) {
-		const activeCwd = savedLayout.tabs[savedLayout.activeIndex]?.cwd ?? savedLayout.tabs[0]?.cwd;
-		if (activeCwd) {
-			const win = windowManager.createWindow({ cwd: activeCwd });
-			if (sidecarPool.restoreLayout(win, savedLayout) > 0) return win;
-			win.close();
+	if (restoreSavedLayout) {
+		const [saved] = readSavedTabLayouts();
+		if (saved) {
+			const restored = spawnWindowWithLayout(saved);
+			if (restored) return restored;
 		}
 	}
 	const target = resolveWindowSpawnTarget(
@@ -288,12 +327,26 @@ app.whenReady().then(() => {
 	sidecarPool = new SidecarPool((cwd, kind, fresh) => {
 		const sc = new SidecarManager({
 			binaryPath: bundledOmp ?? "",
+			packaged: app.isPackaged,
 			sourceCli: sourceCli ?? undefined,
 			cwd,
 			kind,
 			fresh,
 			proxyEnv: resolveProxyEnvForSpawn,
 			shellEnv: shellSpawnEnv,
+			// Finder-launched omp has no terminal, and a sidecar that dies before
+			// it can write its own log only speaks through stderr — land the tail
+			// in gui-runtime.jsonl so it is readable after the fact.
+			reportFailure: report => {
+				writeRuntimeLog(
+					{
+						source: "sidecar-restart",
+						message: report.reason,
+						details: { attempt: report.attempt, maxAttempts: report.maxAttempts, stderr: report.stderr },
+					},
+					{ cwd: report.cwd },
+				);
+			},
 		});
 		// Ready-health-check applies to every pooled sidecar, not just the first.
 		sc.on("status", ({ status }) => {
@@ -311,11 +364,10 @@ app.whenReady().then(() => {
 		});
 		return sc;
 	}, 10);
-	sidecarPool.onWindowTabsChanged = (win, layout) => {
-		if (windowManager.getMainWindow() !== win) return;
-		if (layout) prefsStore().set("tabLayout", layout);
-		else prefsStore().delete("tabLayout");
-	};
+	sidecarPool.onWindowTabsChanged = () => persistTabLayouts();
+	// A closed window's tabs have to leave the saved session with it, or the next
+	// launch resurrects a window the user deliberately shut.
+	windowManager.subscribeWindowClosed(() => persistTabLayouts());
 	sessionIndex = new SessionIndex(undefined, initialCwd);
 	statsClient = new StatsClient();
 	// Built-in stats dashboard: spawned from the SAME bundled binary. No
@@ -337,16 +389,18 @@ app.whenReady().then(() => {
 		sidecarPool,
 		sessionIndex,
 		statsClient,
+		statsRestart: () => statsServer?.ensureRunning() ?? "exhausted",
 		logWatcher,
 		windowManager,
 		benchmarkBinaryPath: bundledOmp,
 		benchmarkEnv: async () => ({ ...process.env, ...(await shellSpawnEnv()), ...(await resolveProxyEnvForSpawn()) }),
 		spawnWindow,
+		initialCwd: resolveInitialCwd,
 	});
 
 	// Global shortcut: Cmd+Shift+O — toggle focused window, else show the most
 	// recent, else spawn one (multi-window decision tree).
-	globalShortcut.register("CommandOrControl+Shift+O", () => {
+	globalShortcut.register(nativeAccelerator("window.toggle"), () => {
 		const focused = BrowserWindow.getFocusedWindow();
 		if (focused && !focused.isDestroyed() && windowManager.recordFor(focused)) {
 			if (focused.isVisible()) focused.hide();
@@ -366,7 +420,16 @@ app.whenReady().then(() => {
 	});
 	sessionIndex.start();
 	logWatcher.start();
+	// Read before the first window restores: every tab change rewrites the store,
+	// so a later read would only see the just-restored primary window.
+	const savedLayouts = readSavedTabLayouts();
 	spawnWindow(explicitStartupCwd);
+	// A bare launch restores the saved session in full. The window above carries
+	// layout[0]; these are the secondary windows whose tabs used to be dropped at
+	// relaunch. An argv cwd is an explicit "open this", not a restore.
+	if (!explicitStartupCwd) {
+		for (const layout of savedLayouts.slice(1)) spawnWindowWithLayout(layout);
+	}
 
 	// Tray, menu, deep links, updater
 	createTray(windowManager, spawnWindow);
@@ -388,15 +451,19 @@ app.on("activate", () => {
 // Quit on all windows closed (except macOS)
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
-		app.quit();
+		requestQuit();
 	}
 });
 
-// Cleanup on quit
-app.on("before-quit", () => {
-	statsServer?.kill();
-	sidecarPool?.disposeAll();
-	sessionIndex?.stop();
-	logWatcher?.stop();
-	destroyTray();
-});
+// Cleanup on quit, behind the "sessions are still working" confirmation: ⌘Q
+// used to SIGTERM every live agent run without a word.
+installQuitGuard(
+	() => (sidecarPool ? sidecarPool.tabInventory() : []),
+	() => {
+		statsServer?.kill();
+		sidecarPool?.disposeAll();
+		sessionIndex?.stop();
+		logWatcher?.stop();
+		destroyTray();
+	},
+);

@@ -65,7 +65,7 @@ function hitPath(rel: string, cwd: unknown): string {
 }
 
 /** Semantic search: ranked files and verified passages, plus text-only phase updates. */
-export function FindRenderer({ args, result, isError, isPartial, partialResult }: ToolRendererProps) {
+export function FindRenderer({ args, result, isError, isPartial, partialResult, interrupted }: ToolRendererProps) {
 	const t = useT();
 	const effective = isPartial ? partialResult : result;
 	const details = resultDetails(effective);
@@ -81,7 +81,8 @@ export function FindRenderer({ args, result, isError, isPartial, partialResult }
 	const failed = Boolean(
 		isError || (effective && typeof effective === "object" && "isError" in effective && effective.isError),
 	);
-	const pending = !failed && (isPartial || result == null);
+	// `result == null` alone is not liveness: an interrupted call never gets one.
+	const pending = !failed && !interrupted && (isPartial || result == null);
 	const structured = Array.isArray(details?.hits);
 	const hits = structured
 		? (details.hits as unknown[]).filter(isHit).sort((a, b) => b.contentScore - a.contentScore)

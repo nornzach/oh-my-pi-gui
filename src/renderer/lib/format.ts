@@ -307,6 +307,11 @@ function collectImageDataUrls(value: unknown, keys: readonly string[], depth = 0
 				return [src.url];
 			}
 		}
+		if (typeof r.data === "string" && typeof r.mimeType === "string" && r.mimeType.startsWith("image/")) {
+			// `generate_image` reports its pictures as bare `{ data, mimeType }`
+			// pairs under `details.images` — same bytes, no content-block tag.
+			return [`data:${r.mimeType};base64,${r.data}`];
+		}
 		return keys.flatMap(key => collectImageDataUrls(r[key], keys, depth + 1));
 	}
 	return [];

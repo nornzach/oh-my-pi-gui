@@ -6,6 +6,9 @@ export type SubagentNode = SubagentSnapshot;
 
 export interface SubagentsStore {
 	subagents: Map<string, SubagentNode>;
+	/** Why the roster could not be read. Rows stay on screen when set; an empty
+	    roster plus an error is "couldn't load", never "nothing spawned". */
+	error: string | null;
 	applyFrame: (frame: SubagentFrame) => void;
 	setSnapshots: (snapshots: SubagentNode[]) => void;
 	/**
@@ -63,6 +66,7 @@ export const createSubagentsStore = (command: TabCommand = activeTabCommand) => 
 	let refreshVersion = 0;
 	return createStore<SubagentsStore>()((set, get) => ({
 		subagents: new Map(),
+		error: null,
 		applyFrame: frame => {
 			// Copy-on-first-write: frames that match no known subagent leave the
 			// map untouched and must not trigger a re-render.
@@ -148,9 +152,15 @@ export const createSubagentsStore = (command: TabCommand = activeTabCommand) => 
 				// that is no longer foreground — its snapshots must not merge into
 				// the new session's store.
 				if (version !== refreshVersion || (options?.expect && !options.expect())) return;
-				if (!res.success) return;
+				if (!res.success) {
+					set({ error: res.error });
+					return;
+				}
 				const data = res.data as { subagents?: SubagentNode[] } | undefined;
-				if (!data?.subagents) return;
+				if (!data?.subagents) {
+					set({ error: null });
+					return;
+				}
 				const current = get().subagents;
 				const fetched = new Set<string>();
 				const subagents = new Map<string, SubagentNode>();
@@ -173,14 +183,17 @@ export const createSubagentsStore = (command: TabCommand = activeTabCommand) => 
 					if (!fetched.has(id) && (!LIVE_STATUSES[node.status] || node !== before.get(id)))
 						subagents.set(id, node);
 				}
-				set({ subagents });
-			} catch {
-				// Best-effort poll: frames + hydration remain authoritative.
+				set({ subagents, error: null });
+			} catch (cause) {
+				// Best-effort poll: frames + hydration remain authoritative. The
+				// failure is still recorded so the empty roster can name it.
+				if (version !== refreshVersion || (options?.expect && !options.expect())) return;
+				set({ error: cause instanceof Error ? cause.message : String(cause) });
 			}
 		},
 		reset: () => {
 			refreshVersion++;
-			set({ subagents: new Map() });
+			set({ subagents: new Map(), error: null });
 		},
 	}));
 };

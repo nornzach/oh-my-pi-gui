@@ -304,8 +304,8 @@ interface AsyncJob {
 
 function asyncJobs(details: Record<string, unknown> | undefined): AsyncJob[] {
 	const jobsValue = details?.jobs;
-	const raw = Array.isArray(jobsValue) && jobsValue.length > 0 ? jobsValue : [details ?? {}];
-	return raw
+	if (!Array.isArray(jobsValue)) return [];
+	return jobsValue
 		.filter((job): job is Record<string, unknown> => typeof job === "object" && job !== null)
 		.map(job => ({
 			jobId: str(job.jobId),
@@ -350,6 +350,16 @@ function AsyncResultCard({ message, inProcess }: { message: AgentMessage; inProc
 	const t = useT();
 	const jobs = asyncJobs(resultDetails(message));
 	const results = asyncJobResults(resultText(message.content), jobs);
+
+	// A batch without job rows must not invent one: the delivery text is the
+	// only truthful summary left.
+	if (jobs.length === 0) {
+		return (
+			<CompletionRows inProcess={inProcess}>
+				<CompletionRow label={resultText(message.content) || t("chat.exec.finished")} />
+			</CompletionRows>
+		);
+	}
 
 	return (
 		<CompletionRows inProcess={inProcess}>

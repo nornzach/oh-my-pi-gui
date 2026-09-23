@@ -34,6 +34,7 @@ globals.requestAnimationFrame = (callback: () => void) => setTimeout(callback, 0
 interface TestElement {
 	textContent: string | null;
 	remove: () => void;
+	getAttribute: (name: string) => string | null;
 	querySelector: (selector: string) => TestElement | null;
 	querySelectorAll: (selector: string) => TestElement[];
 }
@@ -252,6 +253,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(useUiStore.getState().hotkeysOpen).toBe(true);
 
 		const collapse = navigation!.querySelector('[aria-label="Collapse navigation"]');
+		expect(collapse?.getAttribute("title")).toBe("Collapse navigation");
 		await fire(collapse, "onClick");
 		expect((navigation!.querySelector(".omp-sidebar-group") as unknown as Element).getAttribute("aria-hidden")).toBe(
 			"true",
@@ -762,5 +764,28 @@ describe("Sidebar menus and pinned ordering", () => {
 			"/work/alpha/one.jsonl",
 			"/work/alpha/two.jsonl",
 		]);
+	});
+});
+
+describe("Sidebar session-list failures", () => {
+	it("names the failed read instead of claiming there are no sessions", async () => {
+		const omp = installMockOmp([]);
+		omp.sessions.list.mockRejectedValue(new Error("session index unreadable"));
+		seedStores();
+		await mount(<Sidebar />);
+
+		// A read that never answered is not a read that found nothing: the dashed
+		// "No code sessions yet" card is a false all-clear about the user's history.
+		const text = document.body.textContent ?? "";
+		expect(text).toContain("Could not load your sessions.");
+		expect(text).toContain("session index unreadable");
+		expect(text).not.toContain("No code sessions yet");
+
+		const callsBeforeRetry = omp.sessions.list.mock.calls.length;
+		const retry = [...document.body.querySelectorAll("button")].find(b => (b.textContent ?? "") === "Retry");
+		if (!retry) throw new Error("retry button not found");
+		await fire(retry as unknown as Element, "onClick");
+		await flush();
+		expect(omp.sessions.list.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
 	});
 });

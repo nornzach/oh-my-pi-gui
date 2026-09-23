@@ -71,7 +71,7 @@ function SessionPane({ tabId, split, label }: { tabId: string; split: boolean; l
 		? "var(--omp-accent)"
 		: tab.unreadDone
 			? "var(--omp-success)"
-			: tab.status === "ready"
+			: tab.status === "ready" || tab.status === "asleep"
 				? "var(--omp-dim)"
 				: tab.status === "error" || tab.status === "exited"
 					? "var(--omp-error)"

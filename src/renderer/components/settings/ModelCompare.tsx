@@ -143,6 +143,19 @@ export function buildModelRows(input: {
 
 type SortKey = "provider" | "model" | "context" | "cost" | "quota" | "roles";
 
+export type UnusableReason = "disabled" | "no-auth";
+
+/**
+ * Why a row cannot be made the session model. Auth that the catalog simply did
+ * not describe is *not* a reason: a degraded `get_providers` read is not
+ * evidence of no access, and treating it as one would lock the whole matrix.
+ */
+export function unusableReason(row: Row): UnusableReason | null {
+	if (row.disabled) return "disabled";
+	if (row.authKnown && !row.authenticated) return "no-auth";
+	return null;
+}
+
 const COMPARATORS: Record<SortKey, (a: Row, b: Row, dir: 1 | -1) => number> = {
 	provider: (a, b, dir) => a.provider.localeCompare(b.provider) * dir || a.id.localeCompare(b.id),
 	model: (a, b, dir) => a.id.localeCompare(b.id) * dir || a.provider.localeCompare(b.provider),
@@ -369,7 +382,10 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 
 	const assignSession = useCallback(
 		async (row: Row) => {
-			if (busyKey !== null || isCurrent(row)) return;
+			// The unusable check belongs here rather than only on the controls: the
+			// whole row is a click target, so a disabled "Use" button alone would not
+			// keep an off or signed-out provider from becoming the session model.
+			if (busyKey !== null || isCurrent(row) || unusableReason(row) !== null) return;
 			setBusyKey(row.key);
 			try {
 				const res = await tabRpc.setModel(row.provider, row.id);
@@ -502,16 +518,25 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 						{visibleRows.map(row => {
 							const active = isCurrent(row);
 							const busy = busyKey === row.key;
+							const blocked = active ? null : unusableReason(row);
 							return (
 								<tr
 									className={cx(
-										"cursor-pointer border-b border-(--omp-border-muted) transition-colors last:border-b-0 hover:bg-(--omp-bg-tertiary)",
+										"border-b border-(--omp-border-muted) transition-colors last:border-b-0",
+										blocked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-(--omp-bg-tertiary)",
 										active && "bg-(--omp-selected-bg)",
-										!active && row.authKnown && !row.authenticated && "opacity-60",
 									)}
 									key={row.key}
 									onClick={() => void assignSession(row)}
-									title={t("modelCompare.useHint")}
+									title={
+										blocked
+											? t(
+													blocked === "disabled"
+														? "modelCompare.blockedDisabled"
+														: "modelCompare.blockedNoAuth",
+												)
+											: t("modelCompare.useHint")
+									}
 								>
 									<td
 										className={cx(
@@ -604,7 +629,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 												</span>
 											) : (
 												<Button
-													disabled={busyKey !== null}
+													disabled={busyKey !== null || blocked !== null}
 													icon={<Check size={12} />}
 													loading={busy}
 													onClick={() => void assignSession(row)}

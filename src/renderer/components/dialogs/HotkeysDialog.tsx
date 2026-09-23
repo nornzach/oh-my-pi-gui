@@ -3,11 +3,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
 import {
 	chordFromEvent,
+	chordOwner,
 	detectConflicts,
+	type HotkeyGroupId,
 	KEYMAP_ACTION_BY_ID,
 	KEYMAP_ACTIONS,
 	type KeymapActionId,
 	type KeymapConflict,
+	keymapActionsForGroup,
+	type ReservedChordGroup,
+	reservedChordsForGroup,
 } from "../../lib/keymap";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
@@ -34,12 +39,23 @@ interface HotkeyGroup {
 	rows: HotkeyRow[];
 }
 
+/** Remappable rows for a group, straight from the registry. */
+function remapRows(group: HotkeyGroupId): HotkeyRow[] {
+	return keymapActionsForGroup(group).map(action => ({ actionId: action.id }));
+}
+
+/** Non-remappable rows for an owner class (composer keys, native chords). */
+function reservedRows(group: ReservedChordGroup): HotkeyRow[] {
+	return reservedChordsForGroup(group).map(entry => ({ keys: entry.chord, labelKey: entry.labelKey }));
+}
+
 // GUI shortcut reference (plan/17 §6.2): the data-driven replacement for the
-// TUI's static /hotkeys markdown. Remappable rows reference lib/keymap.ts's
-// action table (single source for App.tsx's dispatch and this dialog);
-// composer rows (InputArea's handleKeyDown) and the hardcoded global keys
-// (Esc abort, ⇧Tab thinking cycle) stay static — terminal-only TUI rows
-// (suspend, display reset, $EDITOR) are deliberately absent.
+// TUI's static /hotkeys markdown. Remappable rows come from lib/keymap.ts's
+// action table and non-remappable rows from its reserved-chord table — so an
+// action can exist only with a row here, and the same chords the recorder
+// conflict-checks against are the ones on display. Unmodified keys (Enter, @,
+// /) and the shift-only ⇧Tab / Escape globals stay static; terminal-only TUI
+// rows (suspend, display reset, $EDITOR) are deliberately absent.
 const HOTKEY_GROUPS: HotkeyGroup[] = [
 	{
 		titleKey: "hotkeys.group.input",
@@ -52,8 +68,8 @@ const HOTKEY_GROUPS: HotkeyGroup[] = [
 			{ keys: "$", labelKey: "hotkeys.row.pythonMode" },
 			{ keys: "@", labelKey: "hotkeys.row.mention" },
 			{ keys: "/", labelKey: "hotkeys.row.commands" },
-			{ keys: "⌃R", labelKey: "hotkeys.row.history" },
 			{ keys: "↑ / ↓", labelKey: "hotkeys.row.historyNav" },
+			...reservedRows("input"),
 		],
 	},
 	{
@@ -61,29 +77,12 @@ const HOTKEY_GROUPS: HotkeyGroup[] = [
 		rows: [
 			{ keys: "Esc", labelKey: "hotkeys.row.abort" },
 			{ keys: "⇧Tab", labelKey: "hotkeys.row.thinkingCycle" },
-			{ actionId: "thinking.toggle" },
-			{ actionId: "retry" },
-			{ actionId: "dequeue" },
-			{ actionId: "plan.toggle" },
-			{ actionId: "model.cycleForward" },
-			{ actionId: "model.cycleBackward" },
+			...remapRows("generation"),
 		],
 	},
-	{
-		titleKey: "hotkeys.group.view",
-		rows: [
-			{ actionId: "palette" },
-			{ actionId: "settings" },
-			{ actionId: "sidebar.toggle" },
-			{ actionId: "panel.toggle" },
-			{ actionId: "tools.expand" },
-			{ actionId: "hotkeys" },
-		],
-	},
-	{
-		titleKey: "hotkeys.group.session",
-		rows: [{ actionId: "model.select" }, { actionId: "agents.hub" }],
-	},
+	{ titleKey: "hotkeys.group.view", rows: remapRows("view") },
+	{ titleKey: "hotkeys.group.session", rows: remapRows("session") },
+	{ titleKey: "hotkeys.group.native", rows: reservedRows("native") },
 ];
 
 interface ResolvedRow {
@@ -138,8 +137,9 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 
 	const captureAction = capture ? KEYMAP_ACTION_BY_ID[capture.actionId] : null;
 
-	// Live conflict display for the captured chord: error on a user-user
-	// collision (blocks save), warning on shadowing another action's default.
+	// Live conflict display for the captured chord: a native owner or a second
+	// user binding blocks the save, a shadowed default or the composer's own key
+	// only warns (the user binding wins the slot outside those contexts).
 	const captureConflict: KeymapConflict | null = useMemo(() => {
 		if (!capture?.chord) return null;
 		const candidate = { ...overrides, [capture.actionId]: [capture.chord] };
@@ -149,8 +149,10 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 	const captureConflictLabel = useMemo(() => {
 		if (!capture || !captureConflict) return null;
 		const otherId = captureConflict.actionIds.find(id => id !== capture.actionId);
-		const other = otherId ? KEYMAP_ACTION_BY_ID[otherId as KeymapActionId] : null;
+		const other = otherId ? chordOwner(otherId) : undefined;
 		const params = { action: other ? t(other.labelKey) : (otherId ?? "") };
+		if (other && other.holds !== "action")
+			return t(other.holds === "native" ? "hotkeys.remap.conflictNative" : "hotkeys.remap.conflictInput", params);
 		return captureConflict.kind === "error"
 			? t("hotkeys.remap.conflictUser", params)
 			: t("hotkeys.remap.conflictShadow", params);

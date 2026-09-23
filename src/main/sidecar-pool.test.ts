@@ -26,7 +26,11 @@ class FakeSidecar extends EventEmitter {
 	get status(): SidecarStatus {
 		return this.currentStatus;
 	}
-	currentStatus: SidecarStatus = "starting";
+	/**
+	 * A manager exists before any process does: `start()` is what reports
+	 * `starting`, exactly like SidecarManager.
+	 */
+	currentStatus: SidecarStatus = "asleep";
 	readonly rpcClient = {
 		command: async (command: RpcCommand): Promise<RpcResponse> => {
 			this.rpcCommands.push(command);
@@ -35,9 +39,11 @@ class FakeSidecar extends EventEmitter {
 	};
 	start(): void {
 		this.started = true;
+		if (this.currentStatus === "asleep") this.emitStatus("starting");
 	}
 	restart(cwd?: string, sessionPath?: string): void {
 		this.restartArgs.push({ cwd, sessionPath });
+		if (this.currentStatus === "asleep") this.emitStatus("starting");
 	}
 	kill(): void {}
 	dispose(): void {
@@ -147,6 +153,7 @@ describe("SidecarPool session kind", () => {
 		expect(kinds).toEqual(["agent", "chat"]);
 
 		const [, chatSidecar] = sidecars;
+		fw.sent.length = 0;
 		chatSidecar?.emitStatus("ready");
 		expect(fw.sentTo(IPC_EVENTS.TAB_STATUS).map(s => s.data)).toEqual([
 			{ kind: "chat", tabId: "tab-chat", cwd: "/b", status: "ready", placeholder: false, sessionPath: null },
@@ -211,6 +218,7 @@ describe("SidecarPool tabs", () => {
 		pool.acquire("/a", fw.win, "tab-a");
 		pool.acquire("/b", fw.win, "tab-b");
 		const [a, b] = sidecars;
+		fw.sent.length = 0;
 
 		a?.emitAgentEvents(["agent_start"]);
 		b?.emitAgentEvents(["agent_start"]);
@@ -384,6 +392,7 @@ describe("SidecarPool tabs", () => {
 		pool.acquire("/a", fw.win, "tab-a");
 		pool.acquire("/b", fw.win, "tab-b");
 		const [, b] = sidecars;
+		fw.sent.length = 0;
 
 		b?.emitSessionInfo({ title: "Fix flaky test", sessionId: "sess-1" });
 		// Background session-info pushes a light snapshot and caches for later.
@@ -427,6 +436,69 @@ describe("SidecarPool tabs", () => {
 				title: "Fix flaky test",
 			},
 		]);
+	});
+
+	it("spawns only the tabs a restored layout shows, then wakes a sleeping tab on demand", () => {
+		const sidecars: FakeSidecar[] = [];
+		const pool = new SidecarPool(cwd => {
+			const sidecar = new FakeSidecar(cwd);
+			sidecars.push(sidecar);
+			return sidecar as unknown as SidecarManager;
+		});
+		const fw = fakeWindow(1);
+		pool.restoreLayout(fw.win, {
+			version: 1,
+			activeIndex: 2,
+			tabs: [
+				{ cwd: "/a", kind: "agent", sessionPath: "/sessions/a.jsonl" },
+				{ cwd: "/b", kind: "agent" },
+				{ cwd: "/c", kind: "agent" },
+			],
+		});
+
+		// A sidecar holds ~200 MB of private memory, so a restored background tab
+		// is an entry — not a process — until it is rendered.
+		expect(sidecars.map(sidecar => sidecar.started)).toEqual([false, false, true]);
+		expect(sidecars[0]?.restartArgs).toEqual([]);
+		const tabs = pool.tabsForWindow(fw.win);
+		expect(tabs.map(tab => tab.status)).toEqual(["asleep", "asleep", "starting"]);
+
+		// Showing it spawns it, resuming the session its layout saved.
+		const [sleeping] = tabs;
+		fw.sent.length = 0;
+		expect(pool.setActiveTab(fw.win, sleeping!.tabId)).toBe(true);
+		expect(sidecars[0]?.restartArgs).toEqual([{ cwd: undefined, sessionPath: "/sessions/a.jsonl" }]);
+		expect(fw.sentTo(IPC_EVENTS.TAB_STATUS).map(entry => (entry.data as IpcTabStatusPayload).status)).toEqual([
+			"starting",
+		]);
+
+		// Hiding and re-showing it does not spawn a second process.
+		pool.setActiveTab(fw.win, tabs[1]!.tabId);
+		pool.setActiveTab(fw.win, sleeping!.tabId);
+		expect(sidecars[0]?.restartArgs).toHaveLength(1);
+	});
+
+	it("labels a sleeping tab with the title its session last had", () => {
+		const pool = new SidecarPool(cwd => new FakeSidecar(cwd) as unknown as SidecarManager);
+		const fw = fakeWindow(1);
+		pool.restoreLayout(fw.win, {
+			version: 1,
+			activeIndex: 1,
+			tabs: [
+				{ cwd: "/a", kind: "agent", sessionPath: "/sessions/a.jsonl", title: "Fix races" },
+				{ cwd: "/b", kind: "agent", title: "Audit report" },
+			],
+		});
+
+		// With the process deferred, the saved title is the only thing the chip
+		// can say besides the folder name — so it must survive the round trip.
+		expect(pool.tabsForWindow(fw.win).map(tab => tab.title)).toEqual(["Fix races", "Audit report"]);
+		expect(pool.tabLayoutForWindow(fw.win)?.tabs[0]).toEqual({
+			cwd: "/a",
+			kind: "agent",
+			sessionPath: "/sessions/a.jsonl",
+			title: "Fix races",
+		});
 	});
 
 	it("restores tab order, sessions, kinds, and the persisted active tab", () => {
@@ -622,6 +694,46 @@ describe("SidecarPool session ownership (F-OWN)", () => {
 		});
 	});
 
+	it("reports a session as live only while some process holds it", () => {
+		const { pool, sidecars } = fakePool();
+		const fw = fakeWindow(1);
+		pool.restoreLayout(fw.win, {
+			version: 1,
+			activeIndex: 1,
+			tabs: [
+				{ cwd: "/a", kind: "agent", sessionPath: "/sessions/s.jsonl" },
+				{ cwd: "/b", kind: "agent" },
+			],
+		});
+		const owner = pool.sessionOwner("/sessions/s.jsonl");
+		if (!owner) throw new Error("expected the restored tab to own the session");
+		const sidecar = sidecars[0];
+
+		// Unowned paths are never live, and neither is an asleep owner — ipc.ts
+		// deletes or renames those straight on disk instead of asking a
+		// drop_session that has nobody to answer, rather than refusing with
+		// "Session is currently running".
+		expect(pool.sessionOwnerIsLive("/sessions/other.jsonl")).toBe(false);
+		expect(pool.sessionOwnerIsLive("/sessions/s.jsonl")).toBe(false);
+
+		// Showing the tab spawns it, and a spawn in flight counts as live: it is
+		// about to read the file.
+		expect(pool.setActiveTab(fw.win, owner.tabId)).toBe(true);
+		expect(sidecar?.status).toBe("starting");
+		expect(pool.sessionOwnerIsLive("/sessions/s.jsonl")).toBe(true);
+
+		sidecar?.emitStatus("ready");
+		expect(pool.sessionOwnerIsLive("/sessions/s.jsonl")).toBe(true);
+		sidecar?.emitStatus("restarting");
+		expect(pool.sessionOwnerIsLive("/sessions/s.jsonl")).toBe(true);
+
+		// A dead process holds nothing.
+		sidecar?.emitStatus("exited");
+		expect(pool.sessionOwnerIsLive("/sessions/s.jsonl")).toBe(false);
+		sidecar?.emitStatus("error");
+		expect(pool.sessionOwnerIsLive("/sessions/s.jsonl")).toBe(false);
+	});
+
 	it("registers the owner at acquire-with-sessionPath and unregisters on release", () => {
 		const { pool } = fakePool();
 		const fw = fakeWindow(1);
@@ -738,6 +850,7 @@ describe("SidecarPool session cwd tracking", () => {
 		const { pool, sidecars } = fakePool();
 		const fw = fakeWindow(1);
 		pool.acquire("/spawn-a", fw.win, "tab-a");
+		fw.sent.length = 0;
 
 		// switch_session re-roots the agent silently; the get_state report moves
 		// the tab off its spawn cwd…
@@ -876,5 +989,39 @@ describe("SidecarPool request-origin routing (F-UI-ORIGIN)", () => {
 		);
 		expect(a?.sentFrames).toEqual([]);
 		expect(b?.sentFrames).toEqual([]);
+	});
+});
+
+describe("SidecarPool quit inventory", () => {
+	it("reports every live tab's in-flight run across windows and drops released tabs", () => {
+		const { pool, sidecars } = fakePool();
+		const first = fakeWindow(1);
+		const second = fakeWindow(2);
+		pool.acquire("/a", first.win, "tab-a");
+		pool.acquire("/b", second.win, "tab-b");
+		pool.acquire("/c", second.win, "tab-c");
+		const [a, b, c] = sidecars;
+
+		// Nothing running yet: ⌘Q must not ask.
+		expect(pool.tabInventory()).toEqual([
+			{ windowId: 1, tabId: "tab-a", inFlight: false },
+			{ windowId: 2, tabId: "tab-b", inFlight: false },
+			{ windowId: 2, tabId: "tab-c", inFlight: false },
+		]);
+
+		// A background window's run counts the same as the active one's, and an
+		// automatic compaction is work too.
+		a?.emitAgentEvents(["agent_start"]);
+		c?.emitAgentEvents(["auto_compaction_start"]);
+		expect(pool.tabInventory().filter(entry => entry.inFlight)).toEqual([
+			{ windowId: 1, tabId: "tab-a", inFlight: true },
+			{ windowId: 2, tabId: "tab-c", inFlight: true },
+		]);
+
+		// A closed tab leaves the inventory; the guard must not ask about work
+		// that no longer exists.
+		b?.emitAgentEvents(["agent_end"]);
+		expect(pool.releaseTab("tab-b")).toBe(true);
+		expect(pool.tabInventory().map(entry => entry.tabId)).toEqual(["tab-a", "tab-c"]);
 	});
 });

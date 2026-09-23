@@ -4,6 +4,7 @@ import {
 	applicationResourcesChanged,
 	RENDERER_RECOVERY_COOLDOWN_MS,
 	shouldReloadRenderer,
+	shouldRestartForChangedResources,
 } from "./renderer-recovery";
 
 const launchIdentity: ApplicationResourceIdentity = {
@@ -35,5 +36,18 @@ describe("renderer crash recovery", () => {
 	it("does not infer resource drift when no packaged archive existed at launch", () => {
 		expect(applicationResourcesChanged(null, launchIdentity)).toBe(false);
 		expect(applicationResourcesChanged(null, null)).toBe(false);
+	});
+
+	it("restarts only for failures that mean the shell is unrecoverable", () => {
+		// Routine renderer noise must never relaunch the app and drop every
+		// running agent with it.
+		expect(shouldRestartForChangedResources({ kind: "console-error" })).toBe(false);
+		expect(shouldRestartForChangedResources({ kind: "main-frame-navigation" })).toBe(false);
+		// A subframe that failed to load is recoverable; the app shell is not.
+		expect(shouldRestartForChangedResources({ kind: "load-failure", mainFrame: false })).toBe(false);
+		expect(shouldRestartForChangedResources({ kind: "load-failure", mainFrame: true })).toBe(true);
+		// A clean renderer exit is already handled by reload, not by a restart.
+		expect(shouldRestartForChangedResources({ kind: "process-gone", reloadable: false })).toBe(false);
+		expect(shouldRestartForChangedResources({ kind: "process-gone", reloadable: true })).toBe(true);
 	});
 });

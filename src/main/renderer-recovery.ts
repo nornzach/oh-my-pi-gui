@@ -36,3 +36,26 @@ export function shouldReloadRenderer(
 ): boolean {
 	return reason !== "clean-exit" && now - lastRecoveryAt >= RENDERER_RECOVERY_COOLDOWN_MS;
 }
+
+/**
+ * Which renderer failures justify replacing the whole process when the packaged
+ * resources were swapped underneath it. A console error or an in-place main-frame
+ * navigation is routine — both used to relaunch the app and kill every running
+ * agent; only a load failure or a dead process means the shell is unrecoverable.
+ */
+export type RendererFailure =
+	| { kind: "console-error" }
+	| { kind: "main-frame-navigation" }
+	| { kind: "load-failure"; mainFrame: boolean }
+	| { kind: "process-gone"; reloadable: boolean };
+
+export function shouldRestartForChangedResources(failure: RendererFailure): boolean {
+	switch (failure.kind) {
+		case "load-failure":
+			return failure.mainFrame;
+		case "process-gone":
+			return failure.reloadable;
+		default:
+			return false;
+	}
+}

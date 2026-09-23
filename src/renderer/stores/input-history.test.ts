@@ -34,7 +34,7 @@ function persistedPrompts(prefs: PrefsMock): string[] {
 }
 
 beforeEach(() => {
-	useInputHistoryStore.setState({ entries: [], hydrated: false, navIndex: -1, navDraft: "" });
+	useInputHistoryStore.setState({ entries: [], hydrated: false, navIndex: -1, navDraft: "", navContext: undefined });
 });
 
 describe("input-history secret scrubbing", () => {
@@ -96,6 +96,17 @@ describe("input-history secret scrubbing", () => {
 		await useInputHistoryStore.getState().hydrate();
 		expect(useInputHistoryStore.getState().entries.map(entry => entry.prompt)).toEqual(["hello"]);
 		expect(prefs.set).not.toHaveBeenCalled();
+	});
+
+	it("recalls only the current workspace and does not cross tab owners", () => {
+		installPrefs();
+		useInputHistoryStore.getState().record("workspace one", "/work/one");
+		useInputHistoryStore.getState().record("workspace two", "/work/two");
+
+		expect(useInputHistoryStore.getState().prev("draft", { cwd: "/work/one", owner: "tab-one:s1" })).toBe(
+			"workspace one",
+		);
+		expect(useInputHistoryStore.getState().next({ cwd: "/work/two", owner: "tab-two:s2" })).toBeUndefined();
 	});
 });
 

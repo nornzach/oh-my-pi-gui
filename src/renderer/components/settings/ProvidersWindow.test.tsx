@@ -260,6 +260,7 @@ afterEach(async () => {
 	listProviders.mockReset();
 	listProviders.mockResolvedValue([]);
 	logout.mockResolvedValue({ type: "response", command: "logout", success: true });
+	logout.mockClear();
 });
 
 describe("ProvidersWindow", () => {
@@ -330,8 +331,14 @@ describe("ProvidersWindow", () => {
 		await act(async () => {
 			logoutButton?.click();
 		});
+		// Destroying a credential is never a one-click action (deleting the
+		// provider itself has confirmed for the same reason).
+		await act(async () => {
+			buttonWithLabel(translate("providers.logoutConfirm"))?.click();
+		});
 
 		expect(logout).toHaveBeenCalledWith("my-proxy");
+		expect(logout).toHaveBeenCalledOnce();
 		// A non-forced read is answered from a cache row that is still fresh, which
 		// is why the row kept showing the logged-in provider after logout.
 		expect(getProviders).toHaveBeenCalledWith(true);
@@ -341,6 +348,37 @@ describe("ProvidersWindow", () => {
 			.join("\n");
 		expect(message).toContain("My Proxy");
 		expect(message).not.toContain("my-proxy");
+	});
+
+	it("keeps the credential until the sign-out is confirmed", async () => {
+		useSessionStore.setState({ status: "ready" });
+		useUiStore.getState().openProviders();
+		await mountWindow();
+
+		await act(async () => {
+			buttonWithLabel(translate("providers.logout"))?.click();
+		});
+		expect(logout).not.toHaveBeenCalled();
+		expect(text()).toContain(translate("providers.logoutTitle", { provider: "anthropic" }));
+
+		// Backing out of the prompt leaves the provider signed in.
+		await act(async () => {
+			buttonWithLabel(translate("common.cancel"))?.click();
+		});
+		expect(logout).not.toHaveBeenCalled();
+	});
+
+	it("does not tell the user to log in when the catalog read failed", async () => {
+		// A read that never answered is not evidence that no provider is
+		// authenticated; the window used to say both at once.
+		getProviders.mockRejectedValueOnce(new Error("socket hang up"));
+		useSessionStore.setState({ status: "ready" });
+		useUiStore.getState().openProviders();
+		await mountWindow();
+
+		expect(text()).toContain("socket hang up");
+		expect(text()).toContain(translate("providers.loadFailed"));
+		expect(text()).not.toContain(translate("providers.noAuth"));
 	});
 
 	it("explains a models.yml provider the sidecar lists no models for", async () => {

@@ -1,8 +1,9 @@
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RpcGitChanges, RpcGitDiff } from "../../../shared/rpc-types";
 import { DiffView } from "../../lib/diff";
 import { useT } from "../../lib/i18n";
+import type { TabRpc } from "../../lib/tab-rpc";
 import { useTabRpc } from "../../lib/tab-rpc";
 
 export function RepositoryChanges() {
@@ -15,18 +16,24 @@ export function RepositoryChanges() {
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [query, setQuery] = useState("");
+	const loadedFor = useRef<TabRpc | null>(null);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refresh explicitly reloads the checkout.
 	useEffect(() => {
 		let active = true;
 		setLoading(true);
-		setChanges(null);
-		setSelected("");
+		// A reload is not an initial load: only switching to another session's
+		// client wipes the rows, so a failed refresh keeps the last good diff up.
+		if (loadedFor.current !== rpc) {
+			setChanges(null);
+			setSelected("");
+		}
 		setError(null);
 		void Promise.resolve()
 			.then(() => rpc.getGitChanges())
 			.then(response => {
 				if (!active) return;
 				if (!response.success) throw new Error(response.error ?? t("rpc.failed"));
+				loadedFor.current = rpc;
 				setChanges(response.data as RpcGitChanges);
 			})
 			.catch(cause => {
@@ -79,7 +86,7 @@ export function RepositoryChanges() {
 					{error}
 				</p>
 			)}
-			{loading ? (
+			{loading && !changes ? (
 				<p>{t("common.loading")}</p>
 			) : changes && !changes.isRepo ? (
 				<p>{t("diffPanel.notRepo")}</p>

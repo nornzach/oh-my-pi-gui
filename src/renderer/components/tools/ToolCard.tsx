@@ -1,9 +1,12 @@
-import { Check, ChevronRight, Loader2, X } from "lucide-react";
+import { Ban, Check, ChevronRight, Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cx, durationBetween } from "../../lib/format";
+import { useT } from "../../lib/i18n";
+import { useNowTick } from "../../lib/now-tick";
 import { useToolsStore } from "../../stores/tools";
 import { useUiStore } from "../../stores/ui";
-import { getToolRenderer } from "./index";
+import { GenericRenderer } from "./GenericRenderer";
+import { getToolRenderer, getToolSummary } from "./index";
 
 export interface ToolRendererProps {
 	args: Record<string, unknown>;
@@ -11,14 +14,18 @@ export interface ToolRendererProps {
 	isError?: boolean;
 	isPartial?: boolean;
 	partialResult?: unknown;
+	/**
+	 * The call ended without ever reporting a result (interrupted turn, dead
+	 * process). Renderers must stop showing live text — the run is over, but
+	 * no `result` arrives to replace it.
+	 */
+	interrupted?: boolean;
 }
 
 export interface ToolCardProps {
 	toolCallId: string;
 	toolName: string;
 	args: Record<string, unknown>;
-	/** One-line summary for the collapsed header (path, command, pattern…). */
-	summary?: string;
 	/** A parent activity indicator can own animation for a live tool group. */
 	runningIndicator?: RunningIndicator;
 }
@@ -30,7 +37,8 @@ export type RunningIndicator = "spinner" | "dot";
  * expand/collapse. The body comes from the tool registry; the tool_result
  * arrives via the tools store keyed by toolCallId.
  */
-export function ToolCard({ toolCallId, toolName, args, summary, runningIndicator = "spinner" }: ToolCardProps) {
+export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinner" }: ToolCardProps) {
+	const t = useT();
 	const entry = useToolsStore(s => s.activeTools.get(toolCallId));
 	const expandAll = useUiStore(s => s.toolsExpandAll);
 	const [expanded, setExpanded] = useState(expandAll.expanded);
@@ -45,14 +53,8 @@ export function ToolCard({ toolCallId, toolName, args, summary, runningIndicator
 	const status = entryStatus === "pending" ? "running" : entryStatus;
 	const isError = Boolean(entry?.isError);
 	const isPartial = status === "running";
-	// Live duration tick (VibeRenderer pattern): re-render every second while
-	// running so the badge keeps counting; stops on its own once the tool ends.
-	const [now, setNow] = useState(() => Date.now());
-	useEffect(() => {
-		if (!isPartial) return;
-		const timer = setInterval(() => setNow(Date.now()), 1000);
-		return () => clearInterval(timer);
-	}, [isPartial]);
+	const isAborted = status === "aborted";
+	const now = useNowTick(isPartial);
 	const duration = entry ? durationBetween(entry.startTime, isPartial ? now : entry.endTime) : null;
 	// While args stream in, `args` is still {} — surface the raw partial JSON
 	// (truncated) so a long bash/edit call doesn't sit as an empty card until
@@ -62,20 +64,25 @@ export function ToolCard({ toolCallId, toolName, args, summary, runningIndicator
 			? entry.streamingArgs.slice(0, 160)
 			: undefined;
 	const Renderer = getToolRenderer(toolName);
+	const summary = getToolSummary(toolName, args);
 
 	const railColor =
 		status === "error" || isError
 			? "var(--omp-tool-rail-error)"
-			: status === "done"
-				? "var(--omp-tool-rail-done)"
-				: "var(--omp-tool-rail-running)";
+			: status === "aborted"
+				? "var(--omp-warning)"
+				: status === "done"
+					? "var(--omp-tool-rail-done)"
+					: "var(--omp-tool-rail-running)";
 
 	const statusBg =
 		status === "error" || isError
 			? "var(--omp-tool-error-bg)"
-			: status === "done"
-				? "var(--omp-tool-success-bg)"
-				: "var(--omp-tool-pending-bg)";
+			: status === "aborted"
+				? "var(--omp-warning-dim)"
+				: status === "done"
+					? "var(--omp-tool-success-bg)"
+					: "var(--omp-tool-pending-bg)";
 
 	return (
 		<div
@@ -107,6 +114,11 @@ export function ToolCard({ toolCallId, toolName, args, summary, runningIndicator
 				) : status === "running" ? (
 					<span aria-hidden className="omp-tool-status-icon flex h-3 w-3 shrink-0 items-center justify-center">
 						<span className="h-1.5 w-1.5 rounded-full bg-[var(--omp-accent)]" />
+					</span>
+				) : status === "aborted" ? (
+					<span className="omp-tool-status-icon flex shrink-0 items-center">
+						<Ban size={12} className="text-[var(--omp-warning)]" />
+						<span className="sr-only">{t("tools.status.interrupted")}</span>
 					</span>
 				) : isError ? (
 					<X size={12} className="omp-tool-status-icon shrink-0 text-[var(--omp-error)]" />
@@ -144,13 +156,26 @@ export function ToolCard({ toolCallId, toolName, args, summary, runningIndicator
 			</button>
 			{expanded && (
 				<div className="omp-tool-body omp-fade-in border-t border-[var(--omp-border-muted)]/70 px-3.5 py-2.5">
-					<Renderer
-						args={args}
-						result={entry?.result}
-						isError={isError}
-						isPartial={isPartial}
-						partialResult={entry?.partialResult}
-					/>
+					{isAborted && (
+						<div className="mb-1.5 flex items-center gap-1.5 font-mono text-omp-sm text-[var(--omp-warning)]">
+							<Ban size={11} className="shrink-0" />
+							{t("tools.status.interrupted")}
+						</div>
+					)}
+					{/* A specialized renderer would claim "no matches" for a call that never
+					 * returned, so an output-less abort shows only what was asked for. */}
+					{isAborted && entry?.result == null && entry?.partialResult == null ? (
+						<GenericRenderer args={args} result={null} interrupted />
+					) : (
+						<Renderer
+							args={args}
+							result={entry?.result}
+							isError={isError}
+							isPartial={isPartial}
+							partialResult={entry?.partialResult}
+							interrupted={isAborted}
+						/>
+					)}
 				</div>
 			)}
 		</div>

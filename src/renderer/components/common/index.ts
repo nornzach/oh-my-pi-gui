@@ -2,6 +2,7 @@
  * Common UI primitives barrel.
  */
 
+export { AsyncSection, type AsyncSectionProps } from "./AsyncSection";
 export { Badge, type BadgeProps, type BadgeVariant } from "./Badge";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
 export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";

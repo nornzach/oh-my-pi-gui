@@ -3,7 +3,8 @@ import { act, type ReactElement } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { RpcResponse } from "../../../../shared/rpc-types";
-import { I18nProvider } from "../../../lib/i18n";
+import { I18nProvider, translate } from "../../../lib/i18n";
+import { useToastStore } from "../../../stores/toast";
 import { useTodoStore } from "../../../stores/todo";
 import { useUiStore } from "../../../stores/ui";
 
@@ -17,6 +18,8 @@ Object.assign(globalThis as Record<string, unknown>, {
 	Node,
 	IS_REACT_ACT_ENVIRONMENT: true,
 });
+// The status menu clamps itself to the viewport, which linkedom does not model.
+Object.assign(window as unknown as Record<string, unknown>, { innerWidth: 1280, innerHeight: 900 });
 
 const setTodos: Mock<() => Promise<RpcResponse>> = vi.fn(async () => ({
 	type: "response",
@@ -43,10 +46,19 @@ async function mount(element: ReactElement = <TodoDockCard />): Promise<void> {
 	});
 }
 
+function statusCycleButton(): { click(): void; dispatchEvent(event: Event): void } {
+	const cycle = [...container.querySelectorAll("button")].find(button =>
+		button.getAttribute("aria-label")?.startsWith("Status:"),
+	) as unknown as { click(): void; dispatchEvent(event: Event): void } | undefined;
+	if (!cycle) throw new Error("status cycle control missing");
+	return cycle;
+}
+
 afterEach(async () => {
 	await act(async () => root?.unmount());
 	container?.remove();
 	setTodos.mockClear();
+	useToastStore.setState({ toasts: [] });
 	useTodoStore.getState().reset();
 	useUiStore.setState({ dockCollapsed: {}, dockFocus: null });
 });
@@ -168,5 +180,120 @@ describe("TodoDockCard", () => {
 		expect(cardClass).toContain("shrink-0");
 		expect(cardClass).toContain("overflow-clip");
 		expect(card.firstElementChild?.getAttribute("class") ?? "").toContain("sticky");
+	});
+
+	it("unwinds a status cycle the sidecar refused, even though the store re-normalised it", async () => {
+		// The dock writes through setPhases, which clones and re-ids every phase,
+		// so the object the optimistic guard must recognise is what landed in the
+		// store — not the one the click built. Comparing the wrong identity left
+		// a checked-off task looking done while Core never stored it.
+		useTodoStore.getState().setPhases([
+			{
+				name: "Live",
+				tasks: [{ content: "Survive a refused write", status: "pending" }],
+			},
+		]);
+		await mount();
+
+		const cycle = [...container.querySelectorAll("button")].find(button =>
+			button.getAttribute("aria-label")?.startsWith("Status:"),
+		) as unknown as { click: () => void } | undefined;
+		if (!cycle) throw new Error("status cycle control missing");
+		setTodos.mockResolvedValueOnce({
+			type: "response",
+			command: "set_todos",
+			success: false,
+			error: "session is read-only",
+		} satisfies RpcResponse);
+
+		await act(async () => cycle.click());
+		await act(async () => {
+			const { promise, resolve } = Promise.withResolvers<void>();
+			setTimeout(resolve, 0);
+			await promise;
+		});
+
+		expect(setTodos).toHaveBeenCalledWith([
+			{ name: "Live", tasks: [{ content: "Survive a refused write", status: "in_progress" }] },
+		]);
+		expect(useTodoStore.getState().phases[0]?.tasks[0]?.status).toBe("pending");
+		expect(container.textContent).toContain("Survive a refused write");
+		expect(useToastStore.getState().toasts).toContainEqual(
+			expect.objectContaining({
+				variant: "error",
+				title: translate("todoPanel.updateFailed"),
+				message: "session is read-only",
+			}),
+		);
+	});
+
+	it("keeps an accepted status cycle", async () => {
+		useTodoStore.getState().setPhases([
+			{
+				name: "Live",
+				tasks: [{ content: "Confirm a stored write", status: "pending" }],
+			},
+		]);
+		await mount();
+
+		const cycle = [...container.querySelectorAll("button")].find(button =>
+			button.getAttribute("aria-label")?.startsWith("Status:"),
+		) as unknown as { click: () => void } | undefined;
+		if (!cycle) throw new Error("status cycle control missing");
+
+		await act(async () => cycle.click());
+		await act(async () => {
+			const { promise, resolve } = Promise.withResolvers<void>();
+			setTimeout(resolve, 0);
+			await promise;
+		});
+
+		expect(useTodoStore.getState().phases[0]?.tasks[0]?.status).toBe("in_progress");
+		expect(useToastStore.getState().toasts).toEqual([]);
+	});
+
+	it("keeps blocked and abandoned out of the single-click cycle", async () => {
+		// "blocked" is a verdict the agent re-plans around, so one click on a
+		// finished task must not reach it.
+		useTodoStore.getState().setPhases([
+			{
+				name: "Live",
+				tasks: [{ content: "Shipped work", status: "completed" }],
+			},
+		]);
+		await mount();
+
+		await act(async () => statusCycleButton().click());
+
+		expect(setTodos).toHaveBeenCalledWith([
+			{ name: "Live", tasks: [{ content: "Shipped work", status: "pending" }] },
+		]);
+		expect(useTodoStore.getState().phases[0]?.tasks[0]?.status).toBe("pending");
+	});
+
+	it("marks a task abandoned from the row menu", async () => {
+		useTodoStore.getState().setPhases([
+			{
+				name: "Live",
+				tasks: [{ content: "Dropped work", status: "pending" }],
+			},
+		]);
+		await mount();
+
+		const event = Object.assign(new Event("contextmenu", { bubbles: true, cancelable: true }), {
+			clientX: 24,
+			clientY: 32,
+		});
+		await act(async () => statusCycleButton().dispatchEvent(event));
+
+		const abandon = [...document.querySelectorAll("button")].find(
+			button => button.textContent?.trim() === translate("todoPanel.markAbandoned"),
+		) as unknown as { click: () => void } | undefined;
+		expect(abandon).toBeDefined();
+		await act(async () => abandon?.click());
+
+		expect(setTodos).toHaveBeenCalledWith([
+			{ name: "Live", tasks: [{ content: "Dropped work", status: "abandoned" }] },
+		]);
 	});
 });

@@ -5,15 +5,18 @@
 
 import * as fs from "node:original-fs";
 import { join } from "node:path";
-import { app, BrowserWindow, Menu, screen, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, type MessageBoxOptions, screen, shell } from "electron";
 import Store from "electron-store";
 import type { RunProgressState, SessionKind } from "../shared/ipc-types";
+import { quitRisk, requestQuit } from "./app-quit";
 import { editableContextMenuTemplate } from "./editable-context-menu";
 import { getMainLanguage, mainT } from "./i18n";
 import {
 	type ApplicationResourceIdentity,
 	applicationResourcesChanged,
+	type RendererFailure,
 	shouldReloadRenderer,
+	shouldRestartForChangedResources,
 } from "./renderer-recovery";
 import { writeRuntimeLog } from "./runtime-log";
 import { type Rect, restoreWithinDisplays } from "./window-bounds";
@@ -56,9 +59,10 @@ export interface WindowRecord {
 }
 
 /**
- * Spawn a window with its own sidecar (index.ts's pool-backed helper). Empty
- * `cwd` falls back to resolveInitialCwd (lastProject → launch cwd), never a
- * bare process.cwd() which is "/" for Finder-launched apps. `kind` is the
+ * Spawn a window with its own sidecar (index.ts's pool-backed helper). With no
+ * target it restores the saved session, else opens the GUI-owned workspace; an
+ * explicit but empty cwd falls back to resolveInitialCwd. Neither path can land
+ * on a bare process.cwd(), which is "/" for Finder-launched apps. `kind` is the
  * target session file's stamped kind (OPEN_NEW_WINDOW resolves it from the
  * session index); omitted = agent.
  */
@@ -70,15 +74,23 @@ export class WindowManager {
 	#resourceArchivePath = app.isPackaged ? join(process.resourcesPath, "app.asar") : null;
 	#launchResourceIdentity = this.#readResourceIdentity();
 	#resourceRestartScheduled = false;
-	/** Fired when a window closes; index.ts uses it to release the window's sidecar. */
-	onWindowClosed: ((record: WindowRecord) => void) | null = null;
+	#windowClosedListeners = new Set<(record: WindowRecord) => void>();
+	/**
+	 * Subscribe to window teardown (tray aggregates, tab-layout persistence).
+	 * A listener set rather than one slot because more than one consumer needs
+	 * it — returns the unsubscribe function.
+	 */
+	subscribeWindowClosed(listener: (record: WindowRecord) => void): () => void {
+		this.#windowClosedListeners.add(listener);
+		return () => this.#windowClosedListeners.delete(listener);
+	}
 
 	constructor() {
 		this.#store = new Store<StoreSchema>({ name: "window-state" });
 	}
 
-	createWindow(opts: { cwd?: string; pendingSessionPath?: string } = {}): BrowserWindow {
-		const cwd = opts.cwd ?? process.cwd();
+	createWindow(opts: { cwd: string; pendingSessionPath?: string }): BrowserWindow {
+		const cwd = opts.cwd;
 		const saved = this.#store.get("windowState", {
 			width: DEFAULT_WIDTH,
 			height: DEFAULT_HEIGHT,
@@ -157,7 +169,7 @@ export class WindowManager {
 
 		win.on("closed", () => {
 			this.#records.delete(record.id);
-			this.onWindowClosed?.(record);
+			for (const listener of this.#windowClosedListeners) listener(record);
 		});
 
 		return win;
@@ -168,15 +180,11 @@ export class WindowManager {
 		const context = () => ({ windowId: record.id, cwd: record.cwd });
 		let lastRendererRecoveryAt = 0;
 
-		win.webContents.on("did-start-navigation", (_event, _url, _isInPlace, isMainFrame) => {
-			if (isMainFrame) this.#restartForChangedResources(record, "main-frame-navigation");
-		});
-
 		win.webContents.on(
 			"did-fail-load",
 			(_event, errorCode, errorDescription, validatedURL, isMainFrame, frameProcessId, frameRoutingId) => {
 				if (errorCode === -3) return;
-				if (this.#restartForChangedResources(record, "renderer-load-failure")) return;
+				if (this.#restartForChangedResources(record, { kind: "load-failure", mainFrame: isMainFrame })) return;
 				if (!isMainFrame) return;
 				writeRuntimeLog(
 					{
@@ -221,9 +229,8 @@ export class WindowManager {
 				},
 				context(),
 			);
-			if (shouldReload && resourcesChanged) {
-				this.#restartForChangedResources(record, "renderer-process-gone");
-			} else if (shouldReload) {
+			if (this.#restartForChangedResources(record, { kind: "process-gone", reloadable: shouldReload })) return;
+			if (shouldReload) {
 				queueMicrotask(() => {
 					if (!win.isDestroyed() && !win.webContents.isDestroyed()) this.#loadRenderer(win);
 				});
@@ -252,7 +259,6 @@ export class WindowManager {
 				},
 				context(),
 			);
-			this.#restartForChangedResources(record, "renderer-console-error");
 		});
 	}
 
@@ -283,19 +289,21 @@ export class WindowManager {
 		return applicationResourcesChanged(this.#launchResourceIdentity, this.#readResourceIdentity());
 	}
 
-	#restartForChangedResources(record: WindowRecord, trigger: string): boolean {
+	#restartForChangedResources(record: WindowRecord, failure: RendererFailure): boolean {
+		if (!shouldRestartForChangedResources(failure)) return false;
 		const currentIdentity = this.#readResourceIdentity();
 		if (!applicationResourcesChanged(this.#launchResourceIdentity, currentIdentity)) return false;
+		// One prompt per run, even when the user declines: a shell reading stale
+		// resources keeps failing, and a modal on every failure is unusable.
 		if (this.#resourceRestartScheduled) return true;
 		this.#resourceRestartScheduled = true;
 		writeRuntimeLog(
 			{
 				source: "application-resources",
-				message:
-					"Packaged application resources changed while omp was running; restarting before renderer recovery",
+				message: "Packaged application resources changed while omp was running; asking to restart",
 				url: record.win.webContents.getURL(),
 				details: {
-					trigger,
+					trigger: failure.kind,
 					launchInode: this.#launchResourceIdentity?.inode ?? -1,
 					currentInode: currentIdentity?.inode ?? -1,
 					launchSize: this.#launchResourceIdentity?.size ?? -1,
@@ -304,11 +312,28 @@ export class WindowManager {
 			},
 			{ windowId: record.id, cwd: record.cwd },
 		);
-		queueMicrotask(() => {
-			app.relaunch();
-			app.quit();
-		});
+		void this.#confirmRestartForChangedResources(record);
 		return true;
+	}
+
+	async #confirmRestartForChangedResources(record: WindowRecord): Promise<void> {
+		const language = getMainLanguage();
+		const risk = quitRisk();
+		const options: MessageBoxOptions = {
+			type: "question",
+			buttons: [mainT("restart.now", language), mainT("restart.later", language)],
+			defaultId: 0,
+			cancelId: 1,
+			message: mainT("restart.title", language),
+			detail: mainT("restart.body", language, { working: risk.workingTabs, total: risk.totalTabs }),
+		};
+		const owner = record.win.isDestroyed() ? null : record.win;
+		const answer = owner ? await dialog.showMessageBox(owner, options) : await dialog.showMessageBox(options);
+		if (answer.response !== 0) return;
+		// `requestQuit` carries the approval, so the guard below the restart
+		// prompt never asks a second time about the same running sessions.
+		app.relaunch();
+		requestQuit();
 	}
 
 	recordFor(win: BrowserWindow): WindowRecord | undefined {

@@ -8,7 +8,18 @@
  * stores. Follows the ModelPicker overlay pattern.
  */
 
-import { ArrowDownAZ, Check, Clock, Folder, FolderTree, Globe, History, MessageCircle, Search } from "lucide-react";
+import {
+	ArrowDownAZ,
+	Check,
+	Clock,
+	Folder,
+	FolderTree,
+	Globe,
+	History,
+	MessageCircle,
+	RotateCw,
+	Search,
+} from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { SessionInfo } from "../../../shared/ipc-types";
 import { requestSessionSwitch, switchSessionNow } from "../../hooks/use-session-switch";
@@ -18,7 +29,7 @@ import { isImeKeyEvent } from "../../lib/ime";
 import { mergeContentMatches, rankSessions, type SessionSortMode } from "../../lib/session-search";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Modal, Spinner } from "../common";
+import { Badge, Button, Modal, Spinner } from "../common";
 
 type SessionScope = "local" | "global";
 
@@ -53,6 +64,11 @@ export function SessionPickerDialog() {
 
 	const effectiveShowPath = showPath ?? scope === "global";
 
+	const [attempt, setAttempt] = useState(0);
+
+	/* The retry button's bump is the only reason this effect re-runs; nothing inside
+	   reads it. */
+	// biome-ignore lint/correctness/useExhaustiveDependencies: retry re-reads by bump
 	useEffect(() => {
 		if (!open) return;
 		setQuery("");
@@ -84,7 +100,7 @@ export function SessionPickerDialog() {
 		return () => {
 			cancelled = true;
 		};
-	}, [open]);
+	}, [attempt, open]);
 
 	const switchScope = async (target: SessionScope) => {
 		if (target === scope || loading) return;
@@ -260,7 +276,19 @@ export function SessionPickerDialog() {
 					role={showOptions ? "listbox" : undefined}
 				>
 					{error ? (
-						<div className="py-10 text-center text-xs text-[var(--omp-error)]">{error}</div>
+						<div className="flex flex-col items-center gap-2 py-10 text-center">
+							<p role="alert" className="text-xs text-[var(--omp-error)]">
+								{error}
+							</p>
+							<Button
+								icon={<RotateCw size={12} />}
+								onClick={() => setAttempt(count => count + 1)}
+								size="sm"
+								variant="secondary"
+							>
+								{t("common.retry")}
+							</Button>
+						</div>
 					) : loading ? (
 						<div className="flex items-center justify-center gap-2 py-10">
 							<Spinner size="sm" />

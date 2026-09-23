@@ -1,4 +1,4 @@
-import { CircleGauge, LoaderCircle } from "lucide-react";
+import { CircleGauge, LoaderCircle, RotateCw } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RpcContextReportResult } from "../../../shared/rpc-types";
@@ -8,6 +8,7 @@ import { cx, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
+import { Button } from "../common";
 
 interface AnchorPosition {
 	bottom?: number;
@@ -123,6 +124,11 @@ export function ContextUsagePopover() {
 		};
 	}, [dismiss, open, updateAnchor]);
 
+	const [attempt, setAttempt] = useState(0);
+
+	/* The retry button's bump is the only reason this effect re-runs; nothing
+	   inside reads it. */
+	// biome-ignore lint/correctness/useExhaustiveDependencies: retry re-reads by bump
 	useEffect(() => {
 		if (!open || !sidecarReady || !usageKey || usageKey === loadedKey) return;
 		let cancelled = false;
@@ -148,7 +154,7 @@ export function ContextUsagePopover() {
 		return () => {
 			cancelled = true;
 		};
-	}, [loadedKey, open, sidecarReady, usageKey, rpc]);
+	}, [attempt, loadedKey, open, sidecarReady, usageKey, rpc]);
 
 	const breakdown = loadedKey === usageKey ? report?.breakdown : undefined;
 	const view = contextUsageView(contextUsage, breakdown);
@@ -301,7 +307,19 @@ export function ContextUsagePopover() {
 								{t("contextUsage.loading")}
 							</div>
 						) : error && categories.length === 0 ? (
-							<div className="py-4 text-omp-md text-[var(--omp-dim)]">{t("contextUsage.unavailable")}</div>
+							<div className="flex flex-col items-start gap-2 py-4">
+								<p role="alert" className="text-omp-md text-[var(--omp-dim)]">
+									{t("contextUsage.unavailable")}
+								</p>
+								<Button
+									icon={<RotateCw size={12} />}
+									onClick={() => setAttempt(count => count + 1)}
+									size="sm"
+									variant="secondary"
+								>
+									{t("common.retry")}
+								</Button>
+							</div>
 						) : (
 							<div className="mt-3 space-y-2.5">
 								{categories.map(category => (

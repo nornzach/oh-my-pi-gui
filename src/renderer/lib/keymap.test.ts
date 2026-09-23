@@ -3,17 +3,24 @@
  * plan/17 §6.3): chord parse/serialize round-trips and alias acceptance,
  * replace-not-union compilation, both conflict classes (user-user error,
  * default-shadow warning), and override sanitization that ignores unknown
- * actions on hydration. GUI-local only — nothing here touches the TUI's
- * keybindings.yml.
+ * actions on hydration. B5 adds the single-chord-table invariants: every action
+ * has exactly one reference group, every chord the app owns (registry default,
+ * composer key, or native menu accelerator) has one claimant, and the reserved
+ * chords actually block or warn in the recorder. GUI-local only — nothing here
+ * touches the TUI's keybindings.yml.
  */
 
 import { describe, expect, it } from "vitest";
+import { NATIVE_CHORDS } from "../../shared/hotkeys";
 import {
 	chordFromEvent,
 	compileKeymap,
 	detectConflicts,
 	KEYMAP_ACTIONS,
+	keymapActionsForGroup,
 	parseChord,
+	RESERVED_CHORDS,
+	reservedChordsForGroup,
 	sanitizeOverrides,
 	serializeChord,
 } from "./keymap";
@@ -23,6 +30,23 @@ function canonical(input: string): string {
 	const parsed = parseChord(input);
 	if (!parsed) throw new Error(`"${input}" does not parse`);
 	return serializeChord(parsed);
+}
+
+/** Electron accelerator spelling → the canonical chord the dialog promises.
+ *  "CmdOrCtrl" is one chord: the dialog shows the ⌘ form for both platforms. */
+function acceleratorToChord(accelerator: string): string {
+	const parts = accelerator.split("+");
+	const key = (parts.pop() ?? "").toUpperCase();
+	const flags = { ctrl: false, alt: false, shift: false, meta: false };
+	for (const part of parts) {
+		const token = part.toLowerCase();
+		if (token === "ctrl" || token === "control") flags.ctrl = true;
+		else if (token === "alt" || token === "option") flags.alt = true;
+		else if (token === "shift") flags.shift = true;
+		else if (token === "cmd" || token === "command" || token === "cmdorctrl" || token === "commandorcontrol")
+			flags.meta = true;
+	}
+	return serializeChord({ ...flags, key });
 }
 
 const NO_MODS = { ctrlKey: false, altKey: false, shiftKey: false, metaKey: false };
@@ -142,6 +166,63 @@ describe("detectConflicts", () => {
 	it("ignores a user chord equal to its own action's default or listed twice", () => {
 		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌥R"] })).toEqual([]);
 		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃⇧R", "ctrl+shift+r"] })).toEqual([]);
+	});
+
+	it("blocks a binding on a chord the native layer already registers", () => {
+		// Electron resolves the menu/global accelerator before the renderer sees
+		// the keydown, so such a binding could never fire.
+		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌘N"] })).toEqual([
+			{ kind: "error", chord: "⌘N", actionIds: ["retry", "session.new"] },
+		]);
+	});
+
+	it("warns for a composer chord instead: it still fires anywhere else", () => {
+		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃R"] })).toEqual([
+			{ kind: "warning", chord: "⌃R", actionIds: ["retry", "composer.history"] },
+		]);
+	});
+});
+
+describe("hotkey reference table", () => {
+	it("files every remappable action in exactly one group", () => {
+		// A second group would render the action twice (two rows, one binding); a
+		// dropped one could never be remapped at all — the dialog is the only
+		// entry point. The required `hotkeyGroup` field makes "none" a type error,
+		// and HotkeysDialog's render test covers "no section for this group".
+		const seen = new Set<string>();
+		for (const group of new Set(KEYMAP_ACTIONS.map(action => action.hotkeyGroup))) {
+			for (const action of keymapActionsForGroup(group)) {
+				expect(seen.has(action.id), `${action.id} claimed by two groups`).toBe(false);
+				seen.add(action.id);
+			}
+		}
+		expect([...seen].sort()).toEqual(KEYMAP_ACTIONS.map(action => action.id).sort());
+	});
+
+	it("gives every chord the app owns exactly one claimant", () => {
+		// Two owners of one chord is a dead binding: the compiled map lets the
+		// later action win, and a default landing on the composer's ⌃R or a menu
+		// accelerator never reaches the renderer at all.
+		const claims = [
+			...KEYMAP_ACTIONS.flatMap(action => action.defaults.map(chord => ({ id: action.id, chord }))),
+			...RESERVED_CHORDS.map(entry => ({ id: entry.id, chord: entry.chord })),
+		];
+		for (const claim of claims) expect(canonical(claim.chord), `"${claim.chord}"`).toBe(claim.chord);
+		const chords = claims.map(claim => claim.chord);
+		expect(new Set(chords).size).toBe(chords.length);
+	});
+
+	it("lists each native menu chord once, in both owners' tables", () => {
+		const native = reservedChordsForGroup("native").map(entry => entry.id);
+		expect(native.sort()).toEqual(NATIVE_CHORDS.map(entry => entry.id).sort());
+	});
+
+	it("spells every Electron accelerator with the keys the dialog displays", () => {
+		// The menu registers the accelerator; the dialog promises the chord. Edit
+		// only one of the two and the documented shortcut does nothing.
+		for (const entry of NATIVE_CHORDS) {
+			expect(acceleratorToChord(entry.accelerator), entry.id).toBe(entry.chord);
+		}
 	});
 });
 

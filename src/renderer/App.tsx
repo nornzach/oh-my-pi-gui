@@ -57,6 +57,7 @@ import { isImeKeyEvent } from "./lib/ime";
 import { chordFromEvent, compileKeymap, KEYMAP_ACTION_BY_ID, KEYMAP_ACTIONS, type KeymapActionId } from "./lib/keymap";
 import { abortActiveTurn, restoreQueuedMessages } from "./lib/messages";
 import { watchPluginActivation } from "./lib/plugin-activation";
+import { closeActiveTab } from "./lib/tab-close";
 import { acceptsActiveTabEvents, onActiveTabRouteSettled, onActiveTabRouteState } from "./lib/tab-routing";
 import { focusedTabRpc } from "./lib/tab-rpc";
 import { applyFontSize, watchSystemTheme } from "./lib/theme";
@@ -425,6 +426,11 @@ export function App() {
 					// ⌥T — new worktree tab (create dialog, plan/20).
 					useUiStore.getState().openWorktreeDialog();
 					return;
+				case "tab.close":
+					// ⌘W — close the active tab, arming the chip's inline confirm
+					// while its run is live (⇧⌘W closes the window from the menu).
+					closeActiveTab();
+					return;
 				case "pr.center":
 					// ⌥P — PR Center panel (plan/21).
 					useUiStore.getState().openPrCenter();
@@ -556,6 +562,10 @@ export function App() {
 			// Menu commands below read or mutate the selected sidecar. Ignore the
 			// short selected-vs-routed gap instead of sending them to the old tab.
 			if (!acceptsActiveTabEvents()) return;
+			if (action === "close-tab") {
+				closeActiveTab();
+				return;
+			}
 			if (action === "open-settings") {
 				ui.openSettings();
 				return;

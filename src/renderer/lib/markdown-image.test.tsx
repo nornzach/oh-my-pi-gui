@@ -1,8 +1,8 @@
 /**
- * Contract tests for markdown image rendering: remote URLs and inline data:
- * URLs must survive sanitization and render as <img>, local paths route to
- * the fs:read-image IPC (SSR shows the path placeholder — resolution is an
- * effect), and hostile protocols stay stripped.
+ * Contract tests for markdown image rendering: inline data: URLs survive
+ * sanitization and render as <img>, remote URLs never become a request, local
+ * paths route to the fs:read-image IPC (SSR shows the path placeholder —
+ * resolution is an effect), and hostile protocols stay stripped.
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -21,22 +21,25 @@ const TINY_PNG =
 	"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 describe("classifyImageSrc", () => {
-	it("passes data:, blob:, and http(s): URLs through directly", () => {
+	it("keeps inline data: and blob: URLs as direct loads", () => {
 		expect(classifyImageSrc(TINY_PNG)).toEqual({ kind: "direct", src: TINY_PNG });
 		expect(classifyImageSrc("blob:https://app/uuid")).toEqual({ kind: "direct", src: "blob:https://app/uuid" });
+	});
+
+	it("classifies http(s) and protocol-relative URLs as remote, never as a load", () => {
 		expect(classifyImageSrc("https://example.com/x.png")).toEqual({
-			kind: "direct",
+			kind: "remote",
 			src: "https://example.com/x.png",
 		});
 		expect(classifyImageSrc("http://localhost:8080/x.png")).toEqual({
-			kind: "direct",
+			kind: "remote",
 			src: "http://localhost:8080/x.png",
 		});
 	});
 
 	it("upgrades protocol-relative URLs to https", () => {
 		expect(classifyImageSrc("//cdn.example.com/x.png")).toEqual({
-			kind: "direct",
+			kind: "remote",
 			src: "https://cdn.example.com/x.png",
 		});
 	});
@@ -66,10 +69,13 @@ describe("markdown images", () => {
 		expect(html).toContain('alt="pixel"');
 	});
 
-	it("renders remote https images with themed sizing", () => {
+	it("renders a remote URL as an opt-in link, never as a loadable image", () => {
 		const html = render("![shot](https://example.com/shot.png)");
-		expect(html).toContain('src="https://example.com/shot.png"');
-		expect(html).toContain("max-h-72");
+		// An <img> here is an outbound GET the user never asked for: it names this
+		// machine (IP, timing) to whoever the model pointed at.
+		expect(html).not.toContain("<img");
+		expect(html).toContain("shot");
+		expect(html).toContain('href="https://example.com/shot.png"');
 	});
 
 	it("renders local paths as a resolving placeholder carrying the path", () => {

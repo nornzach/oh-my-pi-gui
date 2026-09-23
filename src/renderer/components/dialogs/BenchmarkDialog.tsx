@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { IpcBenchmarkModelReport, IpcBenchmarkProfile, IpcBenchmarkRunResult } from "../../../shared/ipc-types";
 import { formatUsd } from "../../lib/chart";
+import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useModelStore } from "../../stores/model";
 import { Button, Input, Modal } from "../common";
@@ -24,6 +25,9 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 	const [parallel, setParallel] = useState(2);
 	const [running, setRunning] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// The benchmark writes its diagnostics to stderr on both success and failure,
+	// so a run that produced no rows still has a reason to show.
+	const [stderr, setStderr] = useState<string | null>(null);
 	const [result, setResult] = useState<IpcBenchmarkRunResult | null>(null);
 
 	useEffect(() => {
@@ -63,8 +67,11 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 		if (running || !valid) return;
 		setRunning(true);
 		setError(null);
+		setStderr(null);
 		try {
 			const next = await window.omp.bench.run({ models: selectors, profile, runs, parallel });
+			const output = next.stderr?.trim();
+			setStderr(output ? output : null);
 			if (next.success) setResult(next);
 			else setError(next.error);
 		} catch (cause) {
@@ -158,9 +165,26 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 					</Button>
 				</div>
 
-				{error && (
-					<div className="rounded-lg border border-(--omp-error)/40 bg-(--omp-error-dim) p-3 text-sm text-(--omp-error)">
-						{error}
+				{(error ?? stderr) && (
+					<div
+						className={cx(
+							"rounded-lg border p-3 text-sm",
+							error
+								? "border-(--omp-error)/40 bg-(--omp-error-dim) text-(--omp-error)"
+								: "border-(--omp-border-muted) text-(--omp-muted)",
+						)}
+					>
+						{error && <div>{error}</div>}
+						{stderr && (
+							<pre
+								className={cx(
+									"max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-omp-xs",
+									error && "mt-2",
+								)}
+							>
+								{stderr}
+							</pre>
+						)}
 					</div>
 				)}
 				{result?.success && (

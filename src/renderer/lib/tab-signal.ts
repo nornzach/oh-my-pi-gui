@@ -21,6 +21,11 @@ export function tabSignalPresentation(tab: SessionTab, activeRuntime = false): T
 	if (tab.status === "starting") {
 		return { active: true, color: "var(--omp-warning)", labelKey: "titlebar.status.connecting", running: false };
 	}
+	// A restored tab whose process has not been spawned yet. Inert, not a
+	// warning: nothing is wrong and nothing is happening.
+	if (tab.status === "asleep") {
+		return { active: false, color: "var(--omp-dim)", labelKey: "titlebar.status.asleep", running: false };
+	}
 	return {
 		active: tab.status === "restarting",
 		color: tab.status === "error" || tab.status === "exited" ? "var(--omp-error)" : "var(--omp-warning)",

@@ -43,6 +43,7 @@ import {
 import { type SessionStore, useSessionStore } from "./session";
 import {
 	deleteSessionRuntime,
+	focusedRuntimeTabId,
 	sessionRuntimeStore,
 	setFocusedSessionRuntime,
 	useRuntimeTabId,
@@ -196,7 +197,16 @@ export function tabDisplayTitle(
  */
 export function useActiveTabKind(): SessionKind {
 	const tabId = useRuntimeTabId();
-	return useTabsStore(state => state.tabs.find(tab => tab.id === (tabId ?? state.activeTabId))?.kind ?? "agent");
+	return useTabsStore(state => tabKindOf(state, tabId));
+}
+
+/** Non-hook read for imperative callers (the command registry's window build). */
+export function activeTabKind(): SessionKind {
+	return tabKindOf(useTabsStore.getState(), focusedRuntimeTabId());
+}
+
+function tabKindOf(state: Pick<TabsStore, "tabs" | "activeTabId">, tabId: string | null): SessionKind {
+	return state.tabs.find(tab => tab.id === (tabId ?? state.activeTabId))?.kind ?? "agent";
 }
 
 export interface TabsStore {

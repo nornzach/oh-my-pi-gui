@@ -16,6 +16,18 @@ export interface InputHistoryEntry {
 	prompt: string;
 	/** Epoch ms when sent; 0 for legacy entries without a timestamp. */
 	ts: number;
+	/** Working directory at submission; absent on legacy history. */
+	cwd?: string;
+}
+
+export interface InputHistoryContext {
+	cwd: string;
+	/** A tab/session pair, so switching composers cannot restore another draft. */
+	owner: string;
+}
+
+export function workspaceHistory(entries: InputHistoryEntry[], cwd?: string): InputHistoryEntry[] {
+	return cwd === undefined ? entries : entries.filter(entry => entry.cwd === cwd);
 }
 
 const PREFS_KEY = "inputHistory";
@@ -82,21 +94,22 @@ interface InputHistoryStore {
 	navIndex: number;
 	/** Draft stashed when recall began; restored when cycling back down past the newest entry. */
 	navDraft: string;
+	navContext: InputHistoryContext | undefined;
 	/** Load persisted history once. Safe to call on every composer mount. */
 	hydrate: () => Promise<void>;
 	/** Record a sent input (dedupes against the most recent entry, caps, persists, exits recall).
 	 *  Secret-bearing commands are recorded in memory but scrubbed from the persisted prefs. */
-	record: (prompt: string) => void;
+	record: (prompt: string, cwd?: string) => void;
 	/** Token-AND search over entries, newest first. Empty query returns recent entries. */
 	search: (query: string, limit?: number) => InputHistoryEntry[];
 	/** Most recent entries, newest first. */
 	recent: (limit?: number) => InputHistoryEntry[];
 	/** Recall an older entry. `currentDraft` is stashed on the first step so `next` can restore it.
 	 *  Returns the text to show, or undefined when history is empty or the oldest entry is reached. */
-	prev: (currentDraft: string) => string | undefined;
+	prev: (currentDraft: string, context?: InputHistoryContext) => string | undefined;
 	/** Recall a newer entry; past the newest entry restores the stashed draft.
 	 *  Returns undefined when not navigating. */
-	next: () => string | undefined;
+	next: (context?: InputHistoryContext) => string | undefined;
 	/** Leave recall mode (on send or manual edit). */
 	resetNav: () => void;
 }
@@ -120,11 +133,12 @@ function parseStored(raw: unknown): InputHistoryEntry[] {
 			continue;
 		}
 		if (item && typeof item === "object") {
-			const candidate = item as { prompt?: unknown; ts?: unknown };
+			const candidate = item as { prompt?: unknown; ts?: unknown; cwd?: unknown };
 			if (typeof candidate.prompt === "string" && candidate.prompt.trim()) {
 				entries.push({
 					prompt: candidate.prompt,
 					ts: typeof candidate.ts === "number" && Number.isFinite(candidate.ts) ? candidate.ts : 0,
+					...(typeof candidate.cwd === "string" ? { cwd: candidate.cwd } : {}),
 				});
 			}
 		}
@@ -137,6 +151,7 @@ export const useInputHistoryStore = create<InputHistoryStore>()((set, get) => ({
 	hydrated: false,
 	navIndex: -1,
 	navDraft: "",
+	navContext: undefined,
 
 	hydrate: async () => {
 		if (get().hydrated) return;
@@ -152,18 +167,17 @@ export const useInputHistoryStore = create<InputHistoryStore>()((set, get) => ({
 		}
 	},
 
-	record: prompt => {
+	record: (prompt, cwd) => {
 		const trimmed = prompt.trim();
 		if (!trimmed) return;
 		const { entries } = get();
 		const head = entries[0];
 		// Re-sending the same input just refreshes its timestamp instead of duplicating it.
+		const entry = { prompt: trimmed, ts: Date.now(), ...(cwd === undefined ? {} : { cwd }) };
 		const next =
-			head && head.prompt === trimmed
-				? [{ prompt: trimmed, ts: Date.now() }, ...entries.slice(1)]
-				: [{ prompt: trimmed, ts: Date.now() }, ...entries];
+			head && head.prompt === trimmed && head.cwd === cwd ? [entry, ...entries.slice(1)] : [entry, ...entries];
 		if (next.length > MAX_ENTRIES) next.length = MAX_ENTRIES;
-		set({ entries: next, navIndex: -1, navDraft: "" });
+		set({ entries: next, navIndex: -1, navDraft: "", navContext: undefined });
 		persist(next);
 	},
 
@@ -171,17 +185,23 @@ export const useInputHistoryStore = create<InputHistoryStore>()((set, get) => ({
 
 	recent: (limit = DEFAULT_LIMIT) => get().entries.slice(0, limit),
 
-	prev: currentDraft => {
-		const { entries, navIndex, navDraft } = get();
+	prev: (currentDraft, context) => {
+		const state = get();
+		const entries = workspaceHistory(state.entries, context?.cwd);
+		const sameContext = state.navContext?.owner === context?.owner && state.navContext?.cwd === context?.cwd;
+		const navIndex = sameContext ? state.navIndex : -1;
+		const navDraft = sameContext ? state.navDraft : "";
 		if (entries.length === 0) return undefined;
 		const nextIndex = navIndex + 1;
 		if (nextIndex >= entries.length) return undefined;
-		set({ navIndex: nextIndex, navDraft: navIndex === -1 ? currentDraft : navDraft });
+		set({ navIndex: nextIndex, navDraft: navIndex === -1 ? currentDraft : navDraft, navContext: context });
 		return entries[nextIndex].prompt;
 	},
 
-	next: () => {
-		const { entries, navIndex, navDraft } = get();
+	next: context => {
+		const { entries: allEntries, navIndex, navDraft, navContext } = get();
+		if (navContext?.owner !== context?.owner || navContext?.cwd !== context?.cwd) return undefined;
+		const entries = workspaceHistory(allEntries, context?.cwd);
 		if (navIndex === -1) return undefined;
 		const nextIndex = navIndex - 1;
 		if (nextIndex === -1) {
@@ -189,10 +209,12 @@ export const useInputHistoryStore = create<InputHistoryStore>()((set, get) => ({
 			return navDraft;
 		}
 		set({ navIndex: nextIndex });
-		return entries[nextIndex].prompt;
+		return entries[nextIndex]?.prompt;
 	},
 
 	resetNav: () => {
-		if (get().navIndex !== -1) set({ navIndex: -1, navDraft: "" });
+		if (get().navIndex !== -1 || get().navContext !== undefined) {
+			set({ navIndex: -1, navDraft: "", navContext: undefined });
+		}
 	},
 }));

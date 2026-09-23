@@ -1981,4 +1981,28 @@ export type AssistantMessageEvent =
 // Sidecar Status
 // ============================================================================
 
-export type SidecarStatus = "starting" | "ready" | "exited" | "error" | "restarting";
+/**
+ * `asleep` is the state of a sidecar that was created but never spawned — a
+ * restored background tab, whose process is started the first time the tab
+ * becomes visible. It is distinct from `exited` (a spawn that ran and ended)
+ * and from `starting` (a spawn already under way).
+ */
+export type SidecarStatus = "asleep" | "starting" | "ready" | "exited" | "error" | "restarting";
+
+/** Crash-loop progress carried by a `restarting` status, and by the terminal
+ * `error` when the attempts ran out. Structured so the banner can render
+ * "attempt N/M" without parsing main's diagnostic text. */
+export interface SidecarRestartProgress {
+	attempt: number;
+	maxAttempts: number;
+}
+
+/** Payload of `SidecarManager`'s `status` event, forwarded to the renderer as
+ * the `SIDECAR_STATUS` IPC. `message` is the raw technical reason (exit code +
+ * stderr tail), never user-facing copy. */
+export interface SidecarStatusPayload {
+	status: SidecarStatus;
+	message?: string;
+	cwd: string;
+	restart?: SidecarRestartProgress;
+}

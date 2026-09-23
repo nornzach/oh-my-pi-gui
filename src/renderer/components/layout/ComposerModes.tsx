@@ -8,7 +8,7 @@ import { onEscape } from "../../lib/keymap";
  * second settings row.
  */
 
-import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RpcResponse, RpcSessionState } from "../../../shared/rpc-types";
@@ -181,6 +181,7 @@ export function ComposerModes() {
 											: t("input.goal.title")
 									}
 									checked={goalActive}
+									navigates
 									onSelect={() => select(() => openModes("goal"))}
 								/>
 							)}
@@ -188,18 +189,21 @@ export function ComposerModes() {
 								label={t("modesPanel.tabs.loop")}
 								title={loopActive ? t("input.loop.activeTitle", { args: loopArgs }) : t("input.loop.title")}
 								checked={loopActive}
+								navigates
 								onSelect={() => select(() => openModes("loop"))}
 							/>
 							<ModeRow
 								label={t("modesPanel.tabs.vibe")}
 								title={t("modesPanel.tabs.vibe")}
 								checked={vibeModeEnabled}
+								navigates
 								onSelect={() => select(() => openModes("vibe"))}
 							/>
 							<ModeRow
 								label={t("input.roles.label")}
 								title={t("input.roles.title")}
 								checked={false}
+								navigates
 								onSelect={() => select(openModelRoles)}
 							/>
 							<div className="mx-2 my-1 border-t border-[var(--omp-border-muted)]" />
@@ -244,17 +248,19 @@ function ModeRow({
 	label,
 	title,
 	checked,
+	navigates,
 	onSelect,
 }: {
 	label: string;
 	title: string;
 	checked: boolean;
+	navigates?: boolean;
 	onSelect: () => void;
 }) {
 	return (
 		<button
 			type="button"
-			aria-pressed={checked}
+			aria-pressed={navigates ? undefined : checked}
 			className="omp-pressable flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-omp-md font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
 			onClick={onSelect}
 			title={title}
@@ -262,6 +268,7 @@ function ModeRow({
 		>
 			<span className="min-w-0 flex-1 truncate">{label}</span>
 			{checked && <Check size={13} className="shrink-0 text-[var(--omp-accent)]" strokeWidth={3} />}
+			{navigates && <ChevronRight size={13} className="shrink-0 text-[var(--omp-dim)]" />}
 		</button>
 	);
 }

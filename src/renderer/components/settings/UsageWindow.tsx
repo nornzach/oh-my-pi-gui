@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionStats, UsageLimit, UsageReport, UsageSessionStats } from "../../../shared/rpc-types";
 import { formatCost, formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useNowTick } from "../../lib/now-tick";
 import { useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
@@ -24,9 +25,10 @@ import { Badge, Button, Modal, ProgressBar, Spinner } from "../common";
 function resetCountdown(
 	resetsAt: number | undefined,
 	t: (k: string, p?: Record<string, string | number>) => string,
+	now: number,
 ): string | null {
 	if (!resetsAt) return null;
-	const ms = resetsAt - Date.now();
+	const ms = resetsAt - now;
 	if (ms <= 0) return t("usage.resetting");
 	return t("usage.resetsIn", { time: formatDuration(ms) });
 }
@@ -48,7 +50,15 @@ export function limitValueText(
 	return t("usage.valueUnknown");
 }
 
-function LimitRow({ limit, t }: { limit: UsageLimit; t: (k: string, p?: Record<string, string | number>) => string }) {
+function LimitRow({
+	limit,
+	t,
+	now,
+}: {
+	limit: UsageLimit;
+	t: (k: string, p?: Record<string, string | number>) => string;
+	now: number;
+}) {
 	const fraction = limit.usedFraction ?? (limit.used !== undefined && limit.limit ? limit.used / limit.limit : 0);
 	return (
 		<div className="flex flex-col gap-1 py-1.5">
@@ -64,8 +74,8 @@ function LimitRow({ limit, t }: { limit: UsageLimit; t: (k: string, p?: Record<s
 				</div>
 			</div>
 			<ProgressBar value={fraction} height={5} valueText={`${Math.round(fraction * 100)}%`} />
-			{resetCountdown(limit.resetsAt, t) && (
-				<span className="text-omp-xs text-[var(--omp-dim)]">{resetCountdown(limit.resetsAt, t)}</span>
+			{resetCountdown(limit.resetsAt, t, now) && (
+				<span className="text-omp-xs text-[var(--omp-dim)]">{resetCountdown(limit.resetsAt, t, now)}</span>
 			)}
 			{limit.notes && limit.notes.length > 0 && (
 				<div className="flex flex-col gap-0.5">
@@ -83,9 +93,11 @@ function LimitRow({ limit, t }: { limit: UsageLimit; t: (k: string, p?: Record<s
 function ProviderReportCard({
 	report,
 	t,
+	now,
 }: {
 	report: UsageReport;
 	t: (k: string, p?: Record<string, string | number>) => string;
+	now: number;
 }) {
 	return (
 		<div className="rounded-lg border border-[var(--omp-border-muted)] p-3">
@@ -109,7 +121,7 @@ function ProviderReportCard({
 			)}
 			<div className="divide-y divide-[var(--omp-border-muted)]">
 				{(Array.isArray(report.limits) ? report.limits : []).map(limit => (
-					<LimitRow key={limit.id} limit={limit} t={t} />
+					<LimitRow key={limit.id} limit={limit} t={t} now={now} />
 				))}
 			</div>
 		</div>
@@ -163,6 +175,7 @@ export function UsageWindow() {
 	const [session, setSession] = useState<UsageSessionStats | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+	const now = useNowTick(open);
 
 	/** The tab/session a quota read was issued for. A late response from a tab
 	 * that is no longer frontmost must not overwrite the new tab's numbers. */
@@ -287,7 +300,12 @@ export function UsageWindow() {
 				{reports && reports.length > 0 && (
 					<div className="flex flex-col gap-3">
 						{reports.map(report => (
-							<ProviderReportCard key={`${report.provider}-${report.account ?? ""}`} report={report} t={t} />
+							<ProviderReportCard
+								key={`${report.provider}-${report.account ?? ""}`}
+								report={report}
+								t={t}
+								now={now}
+							/>
 						))}
 					</div>
 				)}

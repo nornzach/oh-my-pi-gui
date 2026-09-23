@@ -7,18 +7,14 @@
  */
 
 import { useEffect, useState } from "react";
+import type { SessionKind } from "../../../shared/ipc-types";
 import type { AvailableCommand, AvailableModelsResult, ModelInfo } from "../../../shared/rpc-types";
+import { isCommandAvailable } from "../../lib/command-availability";
 import { getEmojiSuggestions } from "../../lib/emoji";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useModelStore } from "../../stores/model";
-import {
-	CHAT_DEAD_COMMANDS,
-	fuzzyScore,
-	MAX_MENTION_FILE_ITEMS,
-	MAX_MENU_ITEMS,
-	MENTION_SCHEMES,
-} from "./input-area-utils";
+import { fuzzyScore, MAX_MENTION_FILE_ITEMS, MAX_MENU_ITEMS, MENTION_SCHEMES } from "./input-area-utils";
 
 export interface CompletionItem {
 	value: string;
@@ -50,7 +46,7 @@ export function useCompletionMenu({
 	filePaths,
 	commands,
 	emojiAutocomplete,
-	isChat,
+	tabKind,
 	textareaRef,
 	setMenu,
 }: {
@@ -58,13 +54,14 @@ export function useCompletionMenu({
 	filePaths: string[];
 	commands: AvailableCommand[];
 	emojiAutocomplete: boolean;
-	isChat: boolean;
+	tabKind: SessionKind;
 	textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 	setMenu: (menu: CompletionMenu | null) => void;
 }) {
 	const t = useT();
 	const rpc = useTabRpc();
 	const models = useModelStore(state => state.availableModels);
+	const isChat = tabKind === "chat";
 	const [selection, setSelection] = useState("");
 	useEffect(() => {
 		const el = textareaRef.current;
@@ -199,8 +196,9 @@ export function useCompletionMenu({
 			const items = commands
 				.filter(
 					command =>
-						// Chat tabs: never offer commands that are silent no-ops there.
-						(!isChat || !CHAT_DEAD_COMMANDS.has(command.name)) &&
+						// Every surface shares one availability rule: never offer a command
+						// that does nothing in this tab kind.
+						isCommandAvailable(tabKind, command.name) &&
 						(!query ||
 							command.name.toLowerCase().includes(query) ||
 							command.aliases?.some(alias => alias.toLowerCase().includes(query))),
@@ -310,5 +308,5 @@ export function useCompletionMenu({
 		return () => {
 			cancelled = true;
 		};
-	}, [text, selection, models, filePaths, commands, emojiAutocomplete, isChat, textareaRef, setMenu, t, rpc]);
+	}, [text, selection, models, filePaths, commands, emojiAutocomplete, tabKind, textareaRef, setMenu, t, rpc]);
 }

@@ -54,8 +54,10 @@ import {
 	type RpcResponse,
 	type SessionInfoUpdateFrame,
 	type SidecarStatus,
+	type SidecarStatusPayload,
 	type SubagentFrame,
 } from "../shared/rpc-types";
+import type { WindowTabFact } from "./quit-guard";
 import type { SidecarManager } from "./sidecar";
 import { nextSnowflake } from "./snowflake";
 import { type PersistedTabDescriptor, type PersistedTabLayout, TAB_LAYOUT_VERSION } from "./tab-layout";
@@ -66,20 +68,12 @@ function forwardToWindow(win: BrowserWindow, channel: string, data: unknown): vo
 	if (!win.isDestroyed()) win.webContents.send(channel, data);
 }
 
-/** Payload of the sidecar's `status` event (see SidecarEvents). */
-interface StatusPayload {
-	status: SidecarStatus;
-	message?: string;
-	cwd: string;
-}
-
 interface PoolEntry {
 	sidecar: SidecarManager;
 	tabId: string;
 	win: BrowserWindow;
 	/** win.webContents.id, cached at acquire — safe to read after the window is destroyed. */
 	winId: number;
-	/** Last status this tab's sidecar reported (TAB_STATUS / GET_TABS). */
 	/** Session kind: "agent" (default) or "chat" (tool-free). Immutable; set at acquire. */
 	kind: "agent" | "chat";
 	/** Untargeted startup tab; disposed when the user opens an explicit tab. */
@@ -90,6 +84,7 @@ interface PoolEntry {
 	 * this tab owns a ~/.omp/wt checkout.
 	 */
 	worktree?: IpcTabWorktree;
+	/** Last status this tab's sidecar reported (TAB_STATUS / GET_TABS). */
 	status: SidecarStatus;
 	/** Agent run in flight (agent_start seen, no agent_end yet) — synthesized "running". */
 	running: boolean;
@@ -97,6 +92,11 @@ interface PoolEntry {
 	compacting?: boolean;
 	/** Session meta cached from session_info_update (TAB_STATUS / GET_TABS). */
 	sessionId?: string;
+	/**
+	 * Session meta cached from session_info_update — or, for a tab restored from
+	 * the layout that has not been spawned yet, seeded from the persisted title
+	 * so its chip has something better than a folder name to show.
+	 */
 	title?: string | null;
 	/**
 	 * Session file this tab is attached to (F-OWN). Set at acquire when
@@ -178,6 +178,13 @@ export class SidecarPool {
 	 * The first tab of a window becomes its active tab; later tabs start in
 	 * the background (light TAB_STATUS wiring only). Removes the entry when
 	 * the window closes.
+	 *
+	 * `deferStart` creates the tab WITHOUT spawning its process and without
+	 * claiming the window's active slot: a sidecar holds ~200 MB of private
+	 * memory, so a restored layout must not pay for tabs nobody has looked at.
+	 * The spawn happens in `#wireFull`, i.e. the first time the tab is
+	 * rendered — `#syncFullWiring` is the single point that knows a tab became
+	 * visible.
 	 */
 	acquire(
 		cwd: string,
@@ -188,6 +195,8 @@ export class SidecarPool {
 		worktree?: IpcTabWorktree,
 		fresh = false,
 		placeholder = false,
+		deferStart = false,
+		title?: string,
 	): SidecarManager | null {
 		if (this.atCap) return null;
 		this.#reserved++;
@@ -205,13 +214,16 @@ export class SidecarPool {
 				running: false,
 				detachFull: null,
 			};
+			if (title) entry.title = title;
 			this.#wireLight(entry);
 			this.#entries.add(entry);
 			this.#byTabId.set(tabId, entry);
 			// F-OWN: a spawn-with-sessionPath attaches immediately — register the
-			// owner before any duplicate attach can slip past the IPC guard.
+			// owner before any duplicate attach can slip past the IPC guard. A
+			// deferred tab registers too: it owns that file the moment it exists,
+			// which is what makes "open this session elsewhere" refuse-or-focus.
 			if (sessionPath) this.#registerSessionFile(entry, sessionPath);
-			if (!this.#activeByWindow.has(entry.winId)) {
+			if (!deferStart && !this.#activeByWindow.has(entry.winId)) {
 				this.#activeByWindow.set(entry.winId, entry.tabId);
 				this.#visibleByWindow.set(entry.winId, new Set([entry.tabId]));
 				this.#syncFullWiring(entry.winId);
@@ -221,11 +233,7 @@ export class SidecarPool {
 				this.#releaseEntry(entry);
 			});
 
-			// A fresh sidecar with a session to resume goes through restart():
-			// kill() is a no-op on a not-yet-spawned manager, so this is a plain
-			// start() carrying --session.
-			if (sessionPath) sidecar.restart(undefined, sessionPath);
-			else sidecar.start();
+			if (!deferStart) this.#ensureStarted(entry);
 			this.#notifyWindowTabsChanged(win);
 			return sidecar;
 		} catch {
@@ -237,10 +245,25 @@ export class SidecarPool {
 		}
 	}
 
+	/**
+	 * Spawn a tab's sidecar unless one is already under way or it has already
+	 * run. A fresh sidecar with a session to resume goes through restart():
+	 * kill() is a no-op on a not-yet-spawned manager, so this is a plain
+	 * start() carrying --session. Safe to call on every visibility change —
+	 * `status` leaves "asleep" synchronously inside start(), so a second call
+	 * can never double-spawn.
+	 */
+	#ensureStarted(entry: PoolEntry): void {
+		if (entry.sidecar.status !== "asleep") return;
+		const sessionPath = entry.sessionFile;
+		if (sessionPath) entry.sidecar.restart(undefined, sessionPath);
+		else entry.sidecar.start();
+	}
+
 	/** Per-tab light wiring, attached for the entry's whole life: TAB_STATUS pushes. */
 	#wireLight(entry: PoolEntry): void {
 		const { sidecar, win } = entry;
-		sidecar.on("status", (payload: StatusPayload) => {
+		sidecar.on("status", (payload: SidecarStatusPayload) => {
 			entry.status = payload.status;
 			// A restart/exit kills any in-flight run along with the process.
 			if (payload.status !== "ready") {
@@ -290,9 +313,13 @@ export class SidecarPool {
 	 * Full-channel wiring, attached only while the tab is visible in its window
 	 * tab. Idempotent: an already-wired entry is left untouched, so a repeated
 	 * setActiveTab cannot stack duplicate listeners.
+	 *
+	 * Being wired IS being shown, so this is where a deferred tab's process
+	 * gets spawned — the one moment the pool knows the user can see it.
 	 */
 	#wireFull(entry: PoolEntry): void {
 		if (entry.detachFull) return;
+		this.#ensureStarted(entry);
 		const { sidecar, win } = entry;
 		const removers: (() => void)[] = [];
 		const forwardActive = <T>(channel: string, payload: T): void => {
@@ -307,7 +334,7 @@ export class SidecarPool {
 		wire("events", (events: AgentSessionEvent[]) => {
 			forwardActive(IPC_EVENTS.EVENTS_BATCH, events);
 		});
-		wire("status", (payload: StatusPayload) => {
+		wire("status", (payload: SidecarStatusPayload) => {
 			forwardActive(IPC_EVENTS.SIDECAR_STATUS, { ...payload, cwd: sidecar.cwd });
 		});
 		wire("extensionUi", (request: ExtensionUIRequest) => {
@@ -503,6 +530,22 @@ export class SidecarPool {
 	}
 
 	/**
+	 * Whether the owner tab of `sessionPath` has a process holding that session
+	 * in memory. `asleep` (restored but never shown), `exited` and `error` have
+	 * no process at all, so the file on disk is the entire session: a delete or
+	 * rename must go to the filesystem instead of a `drop_session` /
+	 * `set_session_name` with nobody to answer it — which `commandForIdleSession`
+	 * would refuse as if a run were in flight. `starting` counts as live: that
+	 * spawn is about to read the file.
+	 */
+	sessionOwnerIsLive(sessionPath: string): boolean {
+		const owner = this.#sessionOwners.get(sessionPath);
+		const entry = owner ? this.#byTabId.get(owner.tabId) : undefined;
+		if (!entry) return false;
+		return entry.status !== "asleep" && entry.status !== "exited" && entry.status !== "error";
+	}
+
+	/**
 	 * The owner BLOCKING `tabId`'s attach to `sessionPath` — the file's current
 	 * owner when it is a different tab, else null (unowned, or owned by the
 	 * issuer itself, which re-attaches freely). An untracked issuer (null
@@ -607,6 +650,15 @@ export class SidecarPool {
 		return tabs;
 	}
 
+	/** What every live tab is doing right now — the ⌘Q guard's inventory. */
+	tabInventory(): WindowTabFact[] {
+		return [...this.#entries].map(entry => ({
+			windowId: entry.winId,
+			tabId: entry.tabId,
+			inFlight: entry.running || entry.compacting === true,
+		}));
+	}
+
 	/** Serializable layout for the window, excluding transient run/status data. */
 	tabLayoutForWindow(win: BrowserWindow): PersistedTabLayout | null {
 		const entries = [...this.#entries].filter(entry => entry.win === win);
@@ -627,6 +679,9 @@ export class SidecarPool {
 				if (entry.sessionFile) descriptor.sessionPath = entry.sessionFile;
 				if (entry.worktree) descriptor.worktree = entry.worktree;
 				if (entry.placeholder) descriptor.placeholder = true;
+				// Written even when the live title is null, so a cleared title
+				// cannot survive as a stale one until the tab is spawned again.
+				if (entry.title !== undefined) descriptor.title = entry.title ?? undefined;
 				return descriptor;
 			}),
 			...(split && firstIndex >= 0 && secondIndex >= 0
@@ -635,7 +690,12 @@ export class SidecarPool {
 		};
 	}
 
-	/** Recreate saved tabs with fresh runtime ids, then restore their active index. */
+	/**
+	 * Recreate saved tabs with fresh runtime ids, then restore their active
+	 * index. Every tab is acquired with `deferStart`: only the panes the view
+	 * ends up showing get a process, so a restored ten-tab session costs one
+	 * sidecar instead of ten.
+	 */
 	restoreLayout(win: BrowserWindow, layout: PersistedTabLayout): number {
 		const winId = win.webContents.id;
 		this.#restoringWindows.add(winId);
@@ -655,6 +715,8 @@ export class SidecarPool {
 					tab.worktree,
 					!tab.sessionPath,
 					tab.placeholder === true,
+					true,
+					tab.title,
 				);
 				if (!sidecar) continue;
 				restoredCount++;
@@ -666,6 +728,8 @@ export class SidecarPool {
 			if (activeTabId) {
 				const firstTabId = layout.split ? restoredTabIds[layout.split.firstIndex] : undefined;
 				const secondTabId = layout.split ? restoredTabIds[layout.split.secondIndex] : undefined;
+				// Routing the view is what spawns the shown tabs, so a split whose
+				// panes were both dropped still falls back to one visible tab.
 				if (layout.split && firstTabId && secondTabId) {
 					this.setTabView(win, activeTabId, [firstTabId, secondTabId], {
 						axis: layout.split.axis,

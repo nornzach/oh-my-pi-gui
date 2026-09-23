@@ -31,6 +31,7 @@ import { useSessionList } from "../../hooks/use-session-list";
 import { basename, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { sessionHasContent } from "../../lib/session-title";
+import { type LiveTabRuntime, performTabClose, tabNeedsCloseConfirm } from "../../lib/tab-close";
 import { tabSignalPresentation } from "../../lib/tab-signal";
 import type { ComposerStore } from "../../stores/composer";
 import { useComposerStore } from "../../stores/composer";
@@ -56,10 +57,12 @@ function TabChip({
 	label,
 	workspaceLabel,
 	confirmingClose,
+	closeNeedsConfirm,
 	onArmClose,
 	onConfirmClose,
 	onCancelClose,
 	onContextMenu,
+	onKeyboardNavigate,
 }: {
 	tab: SessionTab;
 	active: boolean;
@@ -67,10 +70,12 @@ function TabChip({
 	label: string;
 	workspaceLabel: string;
 	confirmingClose: boolean;
+	closeNeedsConfirm: boolean;
 	onArmClose: () => void;
 	onConfirmClose: () => void;
 	onCancelClose: () => void;
 	onContextMenu: (event: ReactMouseEvent<HTMLDivElement>) => void;
+	onKeyboardNavigate: (key: string) => void;
 }) {
 	const t = useT();
 	const switchTab = useTabsStore(s => s.switchTab);
@@ -79,18 +84,14 @@ function TabChip({
 	const activeRuntime = useSessionStore(s => (active ? s.isStreaming || s.isCompacting : false));
 	const signal = tabSignalPresentation(tab, activeRuntime);
 	const signalLabel = t(signal.labelKey);
-	// Closing kills the tab's sidecar: a live run (running, starting, or the
-	// active tab's stream outrunning the pool's status pushes) dies with it,
-	// so those route through the inline confirm. Idle tabs go straight to the
-	// confirm handler (which detours worktree tabs to the cleanup prompt).
-	const closeNeedsConfirm = signal.running || tab.status === "starting";
 
 	return (
 		<div
+			id={`omp-tab-${tab.id}`}
 			role="tab"
 			draggable
 			aria-selected={active}
-			tabIndex={0}
+			tabIndex={active ? 0 : -1}
 			onClick={() => void switchTab(tab.id)}
 			onContextMenu={onContextMenu}
 			onDragStart={(event: ReactDragEvent<HTMLDivElement>) => {
@@ -105,6 +106,14 @@ function TabChip({
 				if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
 					event.preventDefault();
 					void switchTab(tab.id);
+					return;
+				}
+				if (
+					["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) &&
+					event.target === event.currentTarget
+				) {
+					event.preventDefault();
+					onKeyboardNavigate(event.key);
 				}
 			}}
 			title={`${label} — ${workspaceLabel}${tab.worktree ? ` — ${tab.worktree.branch}` : ""}`}
@@ -237,17 +246,20 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 	const pruningPlaceholderRef = useRef<string | null>(null);
 	const sessionsById = useMemo(() => new Map(sessions.map(session => [session.id, session])), [sessions]);
 	const sessionsByPath = useMemo(() => new Map(sessions.map(session => [session.path, session])), [sessions]);
-	// Inline close confirm for live tabs (AgentHub abort parity): the first
-	// click arms, the ✓ executes, ✕ or the timeout cancels. One arm at a time.
-	const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
+	// Inline close confirm for live tabs (AgentHub abort parity): the first action
+	// arms, the ✓ executes, ✕ or the timeout cancels. The arm lives in the ui
+	// store because × , ⌘W and File → Close Tab all share it.
+	const armedCloseTab = useUiStore(s => s.armedCloseTab);
+	const armCloseTab = useUiStore(s => s.armCloseTab);
+	const cancelCloseTab = useUiStore(s => s.cancelCloseTab);
 	const [tabMenu, setTabMenu] = useState<{ anchor: ContextMenuAnchor; tabId: string } | null>(null);
-	const confirmTimerRef = useRef<number | undefined>(undefined);
+	const tabOrder = useMemo(() => tabs.map(tab => tab.id), [tabs]);
 
 	useEffect(() => {
-		return () => {
-			window.clearTimeout(confirmTimerRef.current);
-		};
-	}, []);
+		if (!armedCloseTab) return;
+		const timer = window.setTimeout(cancelCloseTab, confirmCloseMs);
+		return () => window.clearTimeout(timer);
+	}, [armedCloseTab, cancelCloseTab, confirmCloseMs]);
 
 	// The untargeted startup chat is an idle landing surface, not a permanent
 	// tab. Replace it once an explicit tab exists, but only while it is truly
@@ -319,31 +331,9 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 		tabs,
 	]);
 
-	const cancelCloseConfirm = () => {
-		window.clearTimeout(confirmTimerRef.current);
-		confirmTimerRef.current = undefined;
-		setConfirmCloseId(null);
-	};
-
-	const armCloseConfirm = (id: string) => {
-		cancelCloseConfirm();
-		setConfirmCloseId(id);
-		confirmTimerRef.current = window.setTimeout(() => {
-			confirmTimerRef.current = undefined;
-			setConfirmCloseId(null);
-		}, confirmCloseMs);
-	};
-
 	const confirmClose = (id: string) => {
-		cancelCloseConfirm();
-		// Worktree-bound tabs detour through the cleanup prompt (delete/keep)
-		// before the tab actually closes (plan/20).
 		const tab = tabs.find(entry => entry.id === id);
-		if (tab?.worktree) {
-			useUiStore.getState().openWorktreeClosePrompt(id);
-			return;
-		}
-		void closeTab(id);
+		if (tab) performTabClose(tab);
 	};
 
 	const closeTabs = async (ids: readonly string[]) => {
@@ -360,12 +350,14 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 		if (replacement) await closeTab(target.id);
 	};
 
-	const protectedFromBatchClose = (tab: SessionTab) =>
-		tab.worktree != null ||
-		tab.status === "running" ||
-		tab.status === "starting" ||
-		tab.compacting === true ||
-		(tab.id === activeTabId && (liveStreaming || liveCompacting));
+	// A batch close can't run an inline confirm per tab, so it refuses anything a
+	// single close would have confirmed: live work and worktree checkouts.
+	const liveRuntime: LiveTabRuntime = {
+		activeTabId,
+		streaming: liveStreaming,
+		compacting: liveCompacting,
+	};
+	const protectedFromBatchClose = (tab: SessionTab) => tab.worktree != null || tabNeedsCloseConfirm(tab, liveRuntime);
 
 	return (
 		<>
@@ -390,11 +382,26 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 							visible={visible}
 							label={label}
 							workspaceLabel={workspaceLabel}
-							confirmingClose={confirmCloseId === tab.id}
-							onArmClose={() => armCloseConfirm(tab.id)}
+							confirmingClose={armedCloseTab?.tabId === tab.id}
+							closeNeedsConfirm={tabNeedsCloseConfirm(tab, liveRuntime)}
+							onArmClose={() => armCloseTab(tab.id)}
 							onConfirmClose={() => confirmClose(tab.id)}
-							onCancelClose={cancelCloseConfirm}
+							onCancelClose={cancelCloseTab}
 							onContextMenu={event => setTabMenu({ anchor: anchorFromEvent(event), tabId: tab.id })}
+							onKeyboardNavigate={key => {
+								const index = tabOrder.indexOf(tab.id);
+								const targetIndex =
+									key === "Home"
+										? 0
+										: key === "End"
+											? tabOrder.length - 1
+											: (index + (key === "ArrowLeft" ? -1 : 1) + tabOrder.length) % tabOrder.length;
+								const target = tabOrder[targetIndex];
+								if (target) {
+									void useTabsStore.getState().switchTab(target);
+									requestAnimationFrame(() => document.getElementById(`omp-tab-${target}`)?.focus());
+								}
+							}}
 						/>
 					);
 				})}

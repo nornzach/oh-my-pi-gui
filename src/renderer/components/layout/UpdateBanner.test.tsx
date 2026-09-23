@@ -40,7 +40,7 @@ afterEach(async () => {
 		root.unmount();
 	});
 	container.remove();
-	useUpdaterStore.setState({ status: { state: "idle" }, dismissedVersion: undefined });
+	useUpdaterStore.setState({ status: { state: "idle" }, dismissed: {} });
 	check.mockClear();
 	download.mockClear();
 	apply.mockClear();
@@ -50,7 +50,7 @@ describe("UpdateBanner", () => {
 	it("offers the architecture installer instead of Squirrel installation in manual mode", async () => {
 		useUpdaterStore.setState({
 			status: { state: "available", version: "0.8.5", mode: "manual" },
-			dismissedVersion: undefined,
+			dismissed: {},
 		});
 		await mount(<UpdateBanner />);
 
@@ -61,7 +61,7 @@ describe("UpdateBanner", () => {
 	it("keeps Finder replacement guidance visible and reopens the verified installer", async () => {
 		useUpdaterStore.setState({
 			status: { state: "downloaded", version: "0.8.5", mode: "manual" },
-			dismissedVersion: undefined,
+			dismissed: {},
 		});
 		await mount(<UpdateBanner />);
 
@@ -80,7 +80,7 @@ describe("UpdateBanner", () => {
 	it("retains restart-and-install for certificate-backed automatic updates", async () => {
 		useUpdaterStore.setState({
 			status: { state: "downloaded", version: "0.8.5", mode: "automatic" },
-			dismissedVersion: undefined,
+			dismissed: {},
 		});
 		await mount(<UpdateBanner />);
 
@@ -91,7 +91,7 @@ describe("UpdateBanner", () => {
 	it("keeps user-initiated verification failures visible with a retry action", async () => {
 		useUpdaterStore.setState({
 			status: { state: "error", message: "Installer failed SHA-512 verification.", showInBanner: true },
-			dismissedVersion: undefined,
+			dismissed: {},
 		});
 		await mount(<UpdateBanner />);
 
@@ -105,10 +105,45 @@ describe("UpdateBanner", () => {
 		expect(check).toHaveBeenCalledOnce();
 	});
 
+	it("lets a user close a failure banner, and keeps the closed notice closed", async () => {
+		useUpdaterStore.setState({
+			status: { state: "error", message: "GitHub release feed unreachable.", showInBanner: true },
+			dismissed: {},
+		});
+		await mount(<UpdateBanner />);
+
+		const [dismissButton] = container.querySelectorAll('[aria-label="Dismiss this update notice"]');
+		expect(dismissButton).toBeDefined();
+		await act(async () => {
+			dismissButton?.click();
+		});
+		expect(container.textContent).toBe("");
+
+		// The four-hourly poll replays the same failure: still hidden.
+		await act(async () => {
+			useUpdaterStore.getState().setStatus({
+				state: "error",
+				message: "GitHub release feed unreachable.",
+				showInBanner: true,
+			});
+		});
+		expect(container.textContent).toBe("");
+	});
+
+	it("stays away while the notice a previous launch dismissed is still current", async () => {
+		useUpdaterStore.setState({
+			status: { state: "error", message: "GitHub release feed unreachable.", showInBanner: true },
+			dismissed: { error: true },
+		});
+		await mount(<UpdateBanner />);
+
+		expect(container.textContent).toBe("");
+	});
+
 	it("keeps passive polling failures out of the banner", async () => {
 		useUpdaterStore.setState({
 			status: { state: "error", message: "Offline", showInBanner: false },
-			dismissedVersion: undefined,
+			dismissed: {},
 		});
 		await mount(<UpdateBanner />);
 

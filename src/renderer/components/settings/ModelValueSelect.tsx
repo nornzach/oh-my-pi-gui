@@ -191,10 +191,15 @@ export function ModelValueSelect({ kind, value, disabled, onCommit, placeholder 
 
 	const renderOption = (option: SelectOption) => {
 		const selected = option.value === value;
+		// `disabled` is a recognition label, not a lock: choosing a disabled
+		// provider for a `*Provider` setting only fails when something later
+		// tries to call it.
+		const unavailable = option.disabled === true;
 		return (
 			<button
 				aria-selected={selected}
-				className={`${ROW_CLASS} ${selected ? "bg-(--omp-selected-bg)" : ""}`}
+				className={`${ROW_CLASS} ${selected ? "bg-(--omp-selected-bg)" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
+				disabled={unavailable}
 				key={option.value}
 				onClick={() => choose(option.value)}
 				role="option"

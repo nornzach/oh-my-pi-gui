@@ -87,7 +87,7 @@ export function PrCenterWindow() {
 	}));
 
 	return (
-		<Modal open={open} onClose={close} title="" size="full" bodyClassName="p-0">
+		<Modal open={open} onClose={close} title={t("prCenter.title")} size="full" bodyClassName="p-0">
 			<div className="flex h-[80vh] min-h-0 flex-col">
 				{/* Header */}
 				<div className="flex shrink-0 items-center gap-3 border-b border-(--omp-border-muted) px-4 py-2.5">
@@ -103,8 +103,12 @@ export function PrCenterWindow() {
 						<Button
 							variant="ghost"
 							size="sm"
-							onClick={() => void usePrCenterStore.getState().refresh()}
-							disabled={listLoading || !repo?.available}
+							onClick={() =>
+								void (repo?.available
+									? usePrCenterStore.getState().refresh()
+									: usePrCenterStore.getState().probe())
+							}
+							disabled={listLoading}
 							title={t("prCenter.refresh")}
 						>
 							<RefreshCw size={12} className={listLoading ? "animate-spin" : undefined} />
@@ -116,7 +120,21 @@ export function PrCenterWindow() {
 				</div>
 
 				{/* Body */}
-				{!repo ? (
+				{!repo && error ? (
+					<div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+						<p role="alert" className="max-w-sm text-omp-md text-(--omp-error)">
+							{error}
+						</p>
+						<Button
+							icon={<RefreshCw size={12} />}
+							onClick={() => void usePrCenterStore.getState().probe()}
+							size="sm"
+							variant="secondary"
+						>
+							{t("common.retry")}
+						</Button>
+					</div>
+				) : !repo ? (
 					<div className="flex flex-1 items-center justify-center gap-2 text-omp-md text-(--omp-dim)">
 						<Spinner size="sm" /> {t("prCenter.probing")}
 					</div>
@@ -137,7 +155,20 @@ export function PrCenterWindow() {
 									{error}
 								</p>
 							)}
-							{listLoading && list.length === 0 ? (
+							{error && list.length === 0 ? (
+								/* The banner above names the failure; this keeps the pane
+								   from reading as "no pull requests" while nothing loaded. */
+								<div className="flex flex-1 items-center justify-center">
+									<Button
+										icon={<RefreshCw size={12} />}
+										onClick={() => void usePrCenterStore.getState().refresh()}
+										size="sm"
+										variant="secondary"
+									>
+										{t("common.retry")}
+									</Button>
+								</div>
+							) : error ? null : listLoading && list.length === 0 ? (
 								<div className="flex flex-1 items-center justify-center gap-2 text-omp-md text-(--omp-dim)">
 									<Spinner size="sm" /> {t("prCenter.loading")}
 								</div>

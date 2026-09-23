@@ -1,10 +1,11 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import Store from "electron-store";
-import { describe, expect, it } from "vitest";
-import type { CommandOutputFrame, PromptResultFrame, SidecarStatus } from "../shared/rpc-types";
-import { SidecarManager } from "./sidecar";
+import { describe, expect, it, vi } from "vitest";
+import type { CommandOutputFrame, PromptResultFrame, SidecarStatus, SidecarStatusPayload } from "../shared/rpc-types";
+import { missingSidecarMessage, type SidecarFailureReport, SidecarManager } from "./sidecar";
 
 async function waitForReady(sidecar: SidecarManager): Promise<void> {
 	const ready = Promise.withResolvers<void>();
@@ -230,4 +231,153 @@ describe("SidecarManager", () => {
 			await fs.rm(adoptedCwd, { recursive: true, force: true });
 		}
 	});
+
+	it("keeps a boot-crashing sidecar in the restart loop instead of a false ready", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-boot-crash-"));
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		// Advertises protocol v2 and never answers `negotiate_protocol`, then dies:
+		// teardown rejects the pending negotiation on a generation that is already
+		// gone, which is what used to report "ready" and zero the restart counter.
+		await fs.writeFile(
+			binaryPath,
+			`#!/usr/bin/env bun\nprocess.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 2, supportedProtocolVersions: [2], maxFrameBytes: 1048576, maxReassembledFrameBytes: 67108864 }) + "\\n");\nsetTimeout(() => process.exit(3), 120);\n`,
+		);
+		await fs.chmod(binaryPath, 0o755);
+
+		const statuses: SidecarStatusPayload[] = [];
+		const sidecar = new SidecarManager({ binaryPath, cwd: tempDir });
+		sidecar.on("status", payload => statuses.push(payload));
+		try {
+			sidecar.start();
+			await expect
+				.poll(() => statuses.some(payload => payload.status === "restarting"), { timeout: 9_000, interval: 50 })
+				.toBe(true);
+			// The rejected negotiation settles as a microtask after the status push.
+			await delay(20);
+
+			expect(statuses.at(-1)).toMatchObject({
+				status: "restarting",
+				restart: { attempt: 1, maxAttempts: 3 },
+			});
+			expect(statuses.filter(payload => payload.status === "ready")).toEqual([]);
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	}, 15_000);
+
+	it("drops a spawn whose env resolution was superseded by a restart", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-superseded-"));
+		const pidPath = path.join(tempDir, "pids.txt");
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		await fs.writeFile(
+			binaryPath,
+			`#!/usr/bin/env bun\nimport * as fs from "node:fs/promises";\nawait fs.appendFile(${JSON.stringify(pidPath)}, String(process.pid) + "\\n");\nprocess.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 1, supportedProtocolVersions: [1] }) + "\\n");\nprocess.stdin.resume();\n`,
+		);
+		await fs.chmod(binaryPath, 0o755);
+
+		const sidecar = new SidecarManager({
+			binaryPath,
+			cwd: tempDir,
+			proxyEnv: async () => {
+				await delay(200);
+				return {};
+			},
+		});
+		const readPids = async (): Promise<string[]> => {
+			try {
+				return (await fs.readFile(pidPath, "utf8")).trim().split("\n").filter(Boolean);
+			} catch {
+				return [];
+			}
+		};
+		try {
+			sidecar.start();
+			// Inside the first env window: restart() has no child to kill yet, so
+			// without the guard both pending resolutions would spawn.
+			await delay(50);
+			sidecar.restart();
+			await expect.poll(readPids, { timeout: 9_000, interval: 50 }).toHaveLength(1);
+			// Both resolutions are 50ms apart, so a superseded spawn that was going
+			// to happen has long since written its pid by now.
+			await delay(1_000);
+			expect(await readPids()).toHaveLength(1);
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	}, 15_000);
+
+	it("surfaces a reinstall instruction, not a build instruction, when the packaged binary is missing", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-nobin-packaged-"));
+		const statuses: SidecarStatusPayload[] = [];
+		const sidecar = new SidecarManager({ binaryPath: "", cwd: tempDir, packaged: true });
+		sidecar.on("status", payload => statuses.push(payload));
+		try {
+			sidecar.start();
+			expect(statuses[0]).toMatchObject({ status: "error" });
+			expect(statuses[0].message).toContain("Reinstall");
+			// A packaged user has no source checkout — sending them to build:omp
+			// is an instruction they cannot follow.
+			expect(statuses[0].message).not.toContain("build:omp");
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps the build instruction for a dev tree with no sidecar binary", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-nobin-dev-"));
+		const statuses: SidecarStatusPayload[] = [];
+		const sidecar = new SidecarManager({ binaryPath: "", cwd: tempDir });
+		sidecar.on("status", payload => statuses.push(payload));
+		try {
+			sidecar.start();
+			expect(statuses[0]).toMatchObject({ status: "error" });
+			expect(statuses[0].message).toContain("build:omp");
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("names the missing packaged binary by path", () => {
+		expect(missingSidecarMessage(true, "/Applications/omp.app/Contents/Resources")).toContain(
+			path.join("/Applications/omp.app/Contents/Resources", "omp"),
+		);
+	});
+
+	it("carries the crashed spawn's stderr into the restart reason and the crash report", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-stderr-"));
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		await fs.writeFile(
+			binaryPath,
+			`#!/usr/bin/env bun\nprocess.stderr.write("dyld: Library not loaded: pi_natives\\n  Referenced by: omp\\n");\nsetTimeout(() => process.exit(4), 120);\n`,
+		);
+		await fs.chmod(binaryPath, 0o755);
+
+		const reportFailure = vi.fn();
+		const statuses: SidecarStatusPayload[] = [];
+		const sidecar = new SidecarManager({ binaryPath, cwd: tempDir, reportFailure });
+		sidecar.on("status", payload => statuses.push(payload));
+		try {
+			sidecar.start();
+			await expect
+				.poll(() => statuses.some(payload => payload.status === "restarting"), { timeout: 9_000, interval: 50 })
+				.toBe(true);
+
+			const reason = statuses[statuses.length - 1].message ?? "";
+			expect(reason).toContain("Exit code 4");
+			expect(reason).toContain("dyld: Library not loaded: pi_natives");
+			// Stack-ish continuation lines stay out of the one-line reason.
+			expect(reason).not.toContain("Referenced by");
+
+			const report = reportFailure.mock.calls[0]?.[0] as SidecarFailureReport;
+			expect(report).toMatchObject({ attempt: 1, maxAttempts: 3, cwd: tempDir });
+			expect(report.stderr).toEqual(["dyld: Library not loaded: pi_natives", "  Referenced by: omp"]);
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	}, 15_000);
 });

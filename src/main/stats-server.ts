@@ -10,15 +10,14 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { stripVTControlCharacters } from "node:util";
+import { MAX_RESTART_ATTEMPTS, RestartBudget, type Revive } from "./stats-restart-policy";
 
 // Bind a private ephemeral port; separate GUI instances must not share an index or listener.
 const DEFAULT_PORT = 0;
-const MAX_RESTART_ATTEMPTS = 3;
-const RESTART_DELAYS = [1000, 2000, 4000];
 
 export class StatsServerManager extends EventEmitter {
 	#child: ChildProcess | null = null;
-	#restartCount = 0;
+	#budget = new RestartBudget();
 	#restartTimer: NodeJS.Timeout | null = null;
 	#disposed = false;
 	#port = DEFAULT_PORT;
@@ -36,6 +35,19 @@ export class StatsServerManager extends EventEmitter {
 	start(): void {
 		if (this.#disposed) return;
 		this.#spawn();
+	}
+
+	/**
+	 * Bring the server up because something now wants to read it. Without this,
+	 * a manager that spent its restart budget stays at port 0 for the rest of the
+	 * session and every dashboard read answers "not ready" forever.
+	 */
+	ensureRunning(): Revive {
+		if (this.#disposed) return "exhausted";
+		if (this.#child || this.#restartTimer) return "already-pending";
+		const verdict = this.#budget.revive(Date.now());
+		if (verdict === "scheduled") this.#spawn();
+		return verdict;
 	}
 
 	#spawn(): void {
@@ -66,7 +78,7 @@ export class StatsServerManager extends EventEmitter {
 			const match = /http:\/\/(?:localhost|127\.0\.0\.1):([0-9]+)(?=[\s/])/.exec(text);
 			if (match && Number(match[1]) > 0) {
 				this.#port = Number(match[1]);
-				this.#restartCount = 0;
+				this.#budget.noteReady();
 				console.log(`[stats-server] ready on http://localhost:${this.#port}`);
 				this.emit("ready", this.#port);
 				stdout = "";
@@ -97,14 +109,14 @@ export class StatsServerManager extends EventEmitter {
 	#attemptRestart(reason: string): void {
 		this.#port = 0;
 		this.emit("exit", null);
-		if (this.#restartCount >= MAX_RESTART_ATTEMPTS) {
+		const delay = this.#budget.nextDelay();
+		if (delay === null) {
 			console.error(`[stats-server] failed after ${MAX_RESTART_ATTEMPTS} attempts: ${reason}`);
 			return;
 		}
-		const delay = RESTART_DELAYS[this.#restartCount] ?? 4000;
-		this.#restartCount++;
-		console.warn(`[stats-server] restart ${this.#restartCount}/${MAX_RESTART_ATTEMPTS} in ${delay}ms: ${reason}`);
+		console.warn(`[stats-server] restart in ${delay}ms: ${reason}`);
 		this.#restartTimer = setTimeout(() => {
+			this.#restartTimer = null;
 			if (!this.#disposed) this.#spawn();
 		}, delay);
 	}

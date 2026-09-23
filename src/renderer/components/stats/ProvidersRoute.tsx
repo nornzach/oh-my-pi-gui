@@ -160,7 +160,9 @@ export function ProvidersRoute({ range, refreshKey }: { range: StatsRange; refre
 			series[point.hour] += point.totalTokens;
 			byProvider.set(point.provider, series);
 		}
-		const top = [...byProvider.entries()].slice(0, 4);
+		const top = [...byProvider.entries()]
+			.sort(([, a], [, b]) => b.reduce((sum, value) => sum + value, 0) - a.reduce((sum, value) => sum + value, 0))
+			.slice(0, 4);
 		return {
 			labels: hours.map(hour => `${hour}`),
 			datasets: top.map(([provider, series], index) => ({

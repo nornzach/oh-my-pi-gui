@@ -52,6 +52,7 @@ export function GainRoute({ range, refreshKey }: { range: StatsRange; refreshKey
 
 	const stats = data;
 	const overall = stats?.overall;
+	const sourceEntries = Object.entries(stats?.bySource ?? {}).filter(([, totals]) => totals.hits > 0);
 	const theme = chartTheme();
 
 	const chart = useMemo(() => {
@@ -126,29 +127,24 @@ export function GainRoute({ range, refreshKey }: { range: StatsRange; refreshKey
 					<ChartBox height={260}>
 						<Bar data={chart} options={barOptions} />
 					</ChartBox>
-					{stats && Object.keys(stats.bySource ?? {}).length > 1 && (
-						<SectionTitle>{t("stats.gain.bySource")}</SectionTitle>
-					)}
-					{stats &&
-						Object.entries(stats.bySource ?? {})
-							.filter(([, totals]) => totals.hits > 0)
-							.map(([source, totals]) => (
-								<div
-									className="mb-1.5 flex items-center gap-3 rounded-md border border-(--omp-border-muted) bg-transparent px-3 py-2 text-omp-sm"
-									key={source}
-								>
-									<span className="font-mono font-medium text-(--omp-text)">{source}</span>
-									<span className="text-(--omp-muted)">
-										{t("stats.gain.tokens", { count: compact(totals.savedTokens) })}
-									</span>
-									<span className="text-(--omp-dim)">{t("stats.gain.hits", { count: totals.hits })}</span>
-									{totals.reductionPercent != null && Number.isFinite(totals.reductionPercent) && (
-										<span className="ml-auto text-(--omp-success)">
-											−{formatPercent(totals.reductionPercent, 0)}
-										</span>
-									)}
-								</div>
-							))}
+					{sourceEntries.length > 0 && <SectionTitle>{t("stats.gain.bySource")}</SectionTitle>}
+					{sourceEntries.map(([source, totals]) => (
+						<div
+							className="mb-1.5 flex items-center gap-3 rounded-md border border-(--omp-border-muted) bg-transparent px-3 py-2 text-omp-sm"
+							key={source}
+						>
+							<span className="font-mono font-medium text-(--omp-text)">{source}</span>
+							<span className="text-(--omp-muted)">
+								{t("stats.gain.tokens", { count: compact(totals.savedTokens) })}
+							</span>
+							<span className="text-(--omp-dim)">{t("stats.gain.hits", { count: totals.hits })}</span>
+							{totals.reductionPercent != null && Number.isFinite(totals.reductionPercent) && (
+								<span className="ml-auto text-(--omp-success)">
+									−{formatPercent(totals.reductionPercent, 0)}
+								</span>
+							)}
+						</div>
+					))}
 				</>
 			)}
 		</RouteFrame>

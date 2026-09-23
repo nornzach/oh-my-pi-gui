@@ -21,7 +21,7 @@ import { type TabRpc, useTabRpc } from "../../lib/tab-rpc";
  * and keyboard navigation (↑/↓ select, Enter switch, L edit label).
  */
 
-import { GitBranch, Maximize, RotateCcw, Tag, ZoomIn, ZoomOut } from "lucide-react";
+import { GitBranch, Maximize, RotateCcw, RotateCw, Tag, ZoomIn, ZoomOut } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSwitchLeafResult } from "../../../shared/rpc-types";
@@ -190,6 +190,11 @@ export function SessionTreeDialog() {
 		offsetsRef.current = offsets;
 	}, [transform, size, offsets]);
 
+	const [attempt, setAttempt] = useState(0);
+
+	/* The retry button's bump is the only reason this effect re-runs; nothing inside
+	   reads it. */
+	// biome-ignore lint/correctness/useExhaustiveDependencies: retry re-reads by bump
 	useEffect(() => {
 		if (!open) return;
 		setLoading(true);
@@ -218,7 +223,7 @@ export function SessionTreeDialog() {
 		return () => {
 			cancelled = true;
 		};
-	}, [open, sessionKey, tabRpc]);
+	}, [attempt, open, sessionKey, tabRpc]);
 
 	const filteredEntries = useMemo(
 		() => (model ? filterTreeEntries(model.entries, filterMode) : []),
@@ -754,7 +759,19 @@ export function SessionTreeDialog() {
 					)}
 				</div>
 				{error ? (
-					<div className="flex flex-1 items-center justify-center text-xs text-[var(--omp-error)]">{error}</div>
+					<div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+						<p role="alert" className="text-xs text-[var(--omp-error)]">
+							{error}
+						</p>
+						<Button
+							icon={<RotateCw size={12} />}
+							onClick={() => setAttempt(count => count + 1)}
+							size="sm"
+							variant="secondary"
+						>
+							{t("common.retry")}
+						</Button>
+					</div>
 				) : loading || !layout ? (
 					<div className="flex flex-1 items-center justify-center gap-2">
 						<Spinner size="sm" />

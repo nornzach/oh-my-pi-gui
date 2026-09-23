@@ -17,11 +17,12 @@ function formatBytes(bytes: number): string {
 export function UpdateBanner() {
 	const t = useT();
 	const status = useUpdaterStore(s => s.status);
-	const dismissedVersion = useUpdaterStore(s => s.dismissedVersion);
+	const dismissed = useUpdaterStore(s => s.dismissed);
 	const dismiss = useUpdaterStore(s => s.dismiss);
+	const dismissError = useUpdaterStore(s => s.dismissError);
 
 	if (status.state === "available") {
-		if (dismissedVersion === status.version) return null;
+		if (dismissed.version === status.version) return null;
 		return (
 			<div className="flex items-center gap-2 border-b border-(--omp-border-muted) bg-transparent px-3 py-1.5 text-omp-md">
 				<Download size={13} className="shrink-0 text-(--omp-accent)" />
@@ -96,6 +97,9 @@ export function UpdateBanner() {
 	}
 
 	if (status.state === "error" && status.showInBanner !== false) {
+		// A dismissed failure stays hidden until a check actually succeeds again, so
+		// the four-hourly poll can't resurrect a banner the user already closed.
+		if (dismissed.error) return null;
 		return (
 			<div className="flex items-center gap-2 border-b border-(--omp-border-muted) bg-transparent px-3 py-1.5 text-omp-md">
 				<AlertTriangle size={13} className="shrink-0 text-(--omp-error)" />
@@ -103,6 +107,14 @@ export function UpdateBanner() {
 				<Button size="sm" onClick={() => void window.omp.updater.check()}>
 					{t("updater.retry")}
 				</Button>
+				<button
+					type="button"
+					aria-label={t("updater.dismissFailure")}
+					className="shrink-0 text-(--omp-dim) hover:text-(--omp-text)"
+					onClick={dismissError}
+				>
+					<X size={13} />
+				</button>
 			</div>
 		);
 	}

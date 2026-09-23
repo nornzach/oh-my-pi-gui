@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronDown, Mic, MoreHorizontal, Paperclip, Square, X, Zap } from "lucide-react";
+import { ArrowUp, ChevronDown, Mic, MoreHorizontal, Paperclip, Square, SquarePen, X, Zap } from "lucide-react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -67,7 +67,8 @@ export function InputArea() {
 	const runtimeTabId = contextTabId ?? activeTabId;
 	const routeReady = runtimeTabId !== null;
 	/** Chat tabs are tool-free: approval/mode chrome is meaningless there. */
-	const isChat = useActiveTabKind() === "chat";
+	const tabKind = useActiveTabKind();
+	const isChat = tabKind === "chat";
 	const status = useSessionStore(s => s.status);
 	const sessionId = useSessionStore(s => s.sessionId);
 	const queuedMessageCount = useSessionStore(s => s.queuedMessageCount);
@@ -102,6 +103,7 @@ export function InputArea() {
 	const [recording, setRecording] = useState(false);
 	/** Pending large-paste choice: the paste already happened, this picks the form. */
 	const [pasteMenu, setPasteMenu] = useState<{ content: string; lineCount: number } | null>(null);
+	const pasteMenuRef = useRef<HTMLDivElement>(null);
 	const [runSettingsOpen, setRunSettingsOpen] = useState(false);
 	const { mounted: runSettingsMounted, closing: runSettingsClosing } = useOverlayPresence(runSettingsOpen);
 	const [runSettingsPos, setRunSettingsPos] = useState<{ left: number; bottom: number } | null>(null);
@@ -174,6 +176,20 @@ export function InputArea() {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const mountedRef = useRef(true);
+
+	// A large-paste choice stays reversible until the user explicitly chooses a
+	// representation. Outside click cancels it instead of silently inserting
+	// the default form.
+	useEffect(() => {
+		if (!pasteMenu) return;
+		const onPointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			if (target instanceof Node && pasteMenuRef.current?.contains(target)) return;
+			setPasteMenu(null);
+		};
+		document.addEventListener("pointerdown", onPointerDown);
+		return () => document.removeEventListener("pointerdown", onPointerDown);
+	}, [pasteMenu]);
 
 	// An in-flight dictation is cancelled (never transcribed) if the composer unmounts.
 	useEffect(() => {
@@ -282,7 +298,7 @@ export function InputArea() {
 		filePaths,
 		commands,
 		emojiAutocomplete,
-		isChat,
+		tabKind,
 		textareaRef,
 		setMenu,
 	});
@@ -546,16 +562,25 @@ export function InputArea() {
 		});
 	}, [recording, send, t, setText]);
 
+	/**
+	 * Fullscreen editor dialog (TUI app.editor.external parity, GUI-native form).
+	 * Opens with the EXPANDED draft (paste markers resolved). Reached by ⌃G and
+	 * by the toolbar button — the chord is genuinely undiscoverable otherwise.
+	 */
+	const openDraftEditor = () => {
+		useUiStore.getState().openComposerEditor(expandPasteMarkers(text));
+	};
+
 	const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
 		// IME composition (Chinese/Japanese/Korean input): while the candidate
 		// window is open, Enter and friends belong to the IME — committing the
 		// composition must never send the message.
 		if (isImeKeyEvent(e)) return;
-		// Pending paste choice: Esc takes the default (paste inline).
+		// Pending paste choice: Esc cancels the decision without inserting text.
 		if (pasteMenu) {
 			if (e.key === "Escape") {
 				e.preventDefault();
-				choosePasteInline();
+				setPasteMenu(null);
 			}
 			return;
 		}
@@ -593,11 +618,10 @@ export function InputArea() {
 			setHistorySearchOpen(open => !open);
 			return;
 		}
-		// ⌃G: fullscreen editor dialog (TUI app.editor.external parity, GUI-native
-		// form). Opens with the EXPANDED draft (paste markers resolved).
+		// ⌃G: fullscreen editor dialog.
 		if (e.key === "g" && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
 			e.preventDefault();
-			useUiStore.getState().openComposerEditor(expandPasteMarkers(text));
+			openDraftEditor();
 			return;
 		}
 		// Up/Down prompt-history recall: Up from the first line cycles to older
@@ -610,9 +634,9 @@ export function InputArea() {
 				const history = useInputHistoryStore.getState();
 				let recalled: string | undefined;
 				if (e.key === "ArrowUp" && !text.slice(0, caretStart).includes("\n")) {
-					recalled = history.prev(text);
+					recalled = history.prev(text, { cwd, owner: `${runtimeTabId}:${sessionId}` });
 				} else if (e.key === "ArrowDown" && !text.slice(caretEnd).includes("\n")) {
-					recalled = history.next();
+					recalled = history.next({ cwd, owner: `${runtimeTabId}:${sessionId}` });
 				}
 				if (recalled !== undefined) {
 					e.preventDefault();
@@ -682,7 +706,12 @@ export function InputArea() {
 				)}
 
 				{pasteMenu && (
-					<div className="omp-pop-in absolute bottom-full left-0 right-0 z-20 mb-2 rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-3 shadow-[var(--omp-shadow-lg)]">
+					<div
+						ref={pasteMenuRef}
+						role="dialog"
+						aria-label={t("input.paste.title", { lines: pasteMenu.lineCount, chars: pasteMenu.content.length })}
+						className="omp-pop-in absolute bottom-full left-0 right-0 z-20 mb-2 rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-3 shadow-[var(--omp-shadow-lg)]"
+					>
 						<div className="flex items-baseline justify-between gap-3">
 							<span className="text-omp-md font-medium text-[var(--omp-text)]">
 								{t("input.paste.title", { lines: pasteMenu.lineCount, chars: pasteMenu.content.length })}
@@ -719,6 +748,13 @@ export function InputArea() {
 								className="omp-pressable rounded-lg border border-[var(--omp-border)] px-3 py-1.5 text-omp-md font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
 							>
 								{t("input.paste.saveFile")}
+							</button>
+							<button
+								type="button"
+								onClick={() => setPasteMenu(null)}
+								className="omp-pressable rounded-lg border border-[var(--omp-border)] px-3 py-1.5 text-omp-md font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+							>
+								{t("input.paste.cancel")}
 							</button>
 						</div>
 					</div>
@@ -771,6 +807,7 @@ export function InputArea() {
 
 					{historySearchOpen && (
 						<HistorySearchOverlay
+							cwd={cwd}
 							onSelect={prompt => {
 								setHistorySearchOpen(false);
 								setText(prompt);
@@ -925,6 +962,17 @@ export function InputArea() {
 									event.target.value = "";
 								}}
 							/>
+
+							<button
+								type="button"
+								data-draft-editor-trigger
+								disabled={collabReadOnly}
+								onClick={openDraftEditor}
+								title={t("editor.title")}
+								className="omp-pressable flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+							>
+								<SquarePen size={16} />
+							</button>
 
 							{sttEnabled && (
 								<button

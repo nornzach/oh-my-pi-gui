@@ -11,7 +11,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { AgentMessage, SubagentSnapshot } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { toast } from "../../stores/toast";
-import { Spinner } from "../common";
+import { Button, Spinner } from "../common";
 import { registerTranscriptToolCalls } from "./subagent-graph";
 
 function messageText(message: AgentMessage): string {
@@ -63,6 +63,7 @@ export const SubagentTranscript = memo(function SubagentTranscript({ agent }: { 
 				const response = await rpc.getSubagentMessages(agent.id, agent.sessionFile, fromByte);
 				if (version !== generation.current) return;
 				if (!response.success) {
+					setError(response.error);
 					toast({ variant: "error", title: t("subagent.transcriptFailed"), message: response.error });
 					setState(prev => ({ ...prev, loading: false, hasMore: false }));
 					return;
@@ -116,12 +117,23 @@ export const SubagentTranscript = memo(function SubagentTranscript({ agent }: { 
 
 	return (
 		<div className="space-y-1.5 px-2 py-2">
-			{error && (
-				<p role="alert" className="text-omp-sm text-(--omp-error)">
-					{error}
-				</p>
-			)}
-			{state.messages.length === 0 && (
+			{error &&
+				(state.messages.length === 0 ? (
+					<div className="flex flex-col items-start gap-2">
+						<p role="alert" className="text-omp-sm text-(--omp-error)">
+							{error}
+						</p>
+						<Button icon={<RefreshCw size={12} />} onClick={() => void load(0)} size="sm" variant="secondary">
+							{t("common.retry")}
+						</Button>
+					</div>
+				) : (
+					/* Rows from the last good page stay on screen under the failure. */
+					<p role="alert" className="text-omp-sm text-(--omp-error)">
+						{error}
+					</p>
+				))}
+			{!error && state.messages.length === 0 && (
 				<div className="text-omp-sm text-(--omp-dim) italic">{t("subagent.noEntries")}</div>
 			)}
 			{state.messages.map((message, index) => {

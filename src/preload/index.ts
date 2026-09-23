@@ -108,6 +108,11 @@ const api: OmpApi = {
 		logPath: () => ipcRenderer.invoke(IPC_COMMANDS.RUNTIME_LOG_PATH) as Promise<string>,
 		logSnapshot: () => ipcRenderer.invoke(IPC_COMMANDS.LOG_SNAPSHOT) as Promise<LogBatch>,
 	},
+	// Fire-and-forget: the guard may show a modal, and the renderer has nothing
+	// to learn from the outcome.
+	app: {
+		quit: () => ipcRenderer.send(IPC_COMMANDS.APP_QUIT),
+	},
 
 	rpc: {
 		...createSessionRpcClient(rpcCommand),

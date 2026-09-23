@@ -36,6 +36,7 @@ interface MockOmp {
 		getSubagents: Mock<() => Promise<RpcResponse>>;
 		setSubagentSubscription: Mock<(level: string) => Promise<RpcResponse>>;
 	};
+	app: { quit: Mock<() => void> };
 	sessions: { consumePendingOpen: Mock<() => Promise<unknown>> };
 }
 
@@ -72,6 +73,7 @@ function installMockOmp(): MockOmp {
 			setSubagentSubscription: vi.fn(async () => success({})),
 		},
 		sessions: { consumePendingOpen: vi.fn(async () => null) },
+		app: { quit: vi.fn() },
 	};
 	(globalThis as Record<string, unknown>).window = { omp, confirm: vi.fn(() => true), close: vi.fn() };
 	return omp;
@@ -267,7 +269,7 @@ describe("planComposerSubmit GUI-only routing", () => {
 		expect(omp.rpc.prompt).not.toHaveBeenCalled();
 	});
 
-	it("maps typed /exit to closing only the current GUI window", () => {
+	it("maps typed /exit to a real app quit, not closing the focused window", () => {
 		const omp = installMockOmp();
 		const close = vi.fn();
 		((globalThis as Record<string, unknown>).window as Record<string, unknown>).close = close;
@@ -279,8 +281,12 @@ describe("planComposerSubmit GUI-only routing", () => {
 			commands: [guiOnly("exit")],
 		});
 
+		// window.close() leaves every other window and its running agents alive
+		// while reporting the app as quit; the guard-owned quit is the only one
+		// that tears the session down (and confirms first).
 		expect(submit.kind).toBe("handled");
-		expect(close).toHaveBeenCalledTimes(1);
+		expect(omp.app.quit).toHaveBeenCalledTimes(1);
+		expect(close).not.toHaveBeenCalled();
 		expect(omp.rpc.prompt).not.toHaveBeenCalled();
 	});
 

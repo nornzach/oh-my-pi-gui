@@ -24,6 +24,9 @@
  * typing app-wide and a shift-only chord would hijack capital letters.
  */
 
+import { NATIVE_CHORDS } from "../../shared/hotkeys";
+import { isImeKeyEvent } from "./ime";
+
 export interface Chord {
 	ctrl: boolean;
 	alt: boolean;
@@ -32,6 +35,12 @@ export interface Chord {
 	/** Canonical base key: uppercase letter, digit, literal punctuation, glyph (↑↓←→↵⇥␣⎋⌫⌦), or F-key. */
 	key: string;
 }
+
+/** Sections of the hotkeys reference the remappable rows are filed under. */
+export type HotkeyGroupId = "generation" | "view" | "session";
+
+/** Owner class of a non-remappable chord: a focused control, or the native layer. */
+export type ReservedChordGroup = "input" | "native";
 
 export interface KeymapAction {
 	readonly id: string;
@@ -46,6 +55,19 @@ export interface KeymapAction {
 	 * False = suppressed by overlayOpen / defaultPrevented / [role=dialog].
 	 */
 	readonly overlaySafe: boolean;
+	/** Required so no action can exist without a row in the reference dialog. */
+	readonly hotkeyGroup: HotkeyGroupId;
+}
+
+/** A chord something other than the keymap claims: the composer's own keydown
+ *  (InputArea.handleKeyDown) or the native menu / global shortcut. Neither can
+ *  be dispatched through the registry, so neither is remappable — but both
+ *  occupy the chord, and the recorder must say so. */
+export interface ReservedChord {
+	readonly id: string;
+	readonly labelKey: string;
+	readonly chord: string;
+	readonly hotkeyGroup: ReservedChordGroup;
 }
 
 /** actionId → replacement chord list (canonical or aliased; sanitized on hydration). */
@@ -162,6 +184,9 @@ export interface KeyEventLike {
 /** Anything an Escape handler can claim: React synthetic events and native events alike. */
 interface EscapeCapable {
 	key: string;
+	keyCode?: number;
+	isComposing?: boolean;
+	nativeEvent?: { isComposing?: boolean };
 	preventDefault(): void;
 }
 
@@ -171,6 +196,7 @@ interface EscapeCapable {
  * that closes on Escape must consume it or the running agent dies with it.
  */
 export function onEscape(event: EscapeCapable, dismiss: () => void): boolean {
+	if (isImeKeyEvent(event)) return false;
 	if (event.key !== "Escape") return false;
 	event.preventDefault();
 	dismiss();
@@ -249,32 +275,163 @@ export function chordFromEvent(event: KeyEventLike): string | null {
 
 /**
  * GUI-remappable actions (TUI app.* naming, plan/17 §6.2). Single source for
- * App.tsx's dispatch and HotkeysDialog's remap rows. `defaults` for the ⌘
- * actions include their ⌃ twin: the pre-B3 handler accepted `metaKey ||
- * ctrlKey` for that block, and the compiled map fully replaces those chains.
+ * App.tsx's dispatch and HotkeysDialog's rows; the native menu keeps its own
+ * chords in shared/hotkeys.ts because Electron resolves those before the
+ * renderer sees a keydown.
+ * `defaults` for the ⌘ actions include their ⌃ twin: the pre-B3 handler
+ * accepted `metaKey || ctrlKey` for that block, and the compiled map fully
+ * replaces those chains.
  */
 export const KEYMAP_ACTIONS = [
 	// ⌃P is overlaySafe: its pre-B3 branch lived in the unguarded ⌘/⌃ block and
 	// cycled the model even with an overlay open.
-	{ id: "model.cycleForward", labelKey: "hotkeys.row.modelNext", defaults: ["⌃P"], overlaySafe: true },
-	{ id: "model.cycleBackward", labelKey: "hotkeys.row.modelPrev", defaults: ["⇧⌃P"], overlaySafe: false },
-	{ id: "retry", labelKey: "hotkeys.row.retry", defaults: ["⌥R"], overlaySafe: false },
-	{ id: "pr.center", labelKey: "hotkeys.row.prCenter", defaults: ["⌥P"], overlaySafe: false },
-	{ id: "dequeue", labelKey: "hotkeys.row.dequeue", defaults: ["⌥↑"], overlaySafe: false },
-	{ id: "plan.toggle", labelKey: "hotkeys.row.planToggle", defaults: ["⌥⇧P"], overlaySafe: false },
-	{ id: "tools.expand", labelKey: "hotkeys.row.expandTools", defaults: ["⌃O"], overlaySafe: false },
-	{ id: "thinking.toggle", labelKey: "hotkeys.row.thinkingToggle", defaults: ["⌃T"], overlaySafe: false },
-	{ id: "model.select", labelKey: "hotkeys.row.modelPicker", defaults: ["⌥M"], overlaySafe: false },
-	{ id: "agents.hub", labelKey: "hotkeys.row.agentHub", defaults: ["⌥A"], overlaySafe: false },
-	{ id: "palette", labelKey: "hotkeys.row.palette", defaults: ["⌘K", "⌃K"], overlaySafe: true },
-	{ id: "tab.new", labelKey: "hotkeys.row.tabNew", defaults: ["⌘T"], overlaySafe: false },
-	{ id: "tab.newChat", labelKey: "hotkeys.row.tabNewChat", defaults: ["⇧⌘T"], overlaySafe: false },
-	{ id: "tab.newWorktree", labelKey: "hotkeys.row.tabNewWorktree", defaults: ["⌥T"], overlaySafe: false },
-	{ id: "settings", labelKey: "hotkeys.row.settings", defaults: ["⌘,", "⌃,"], overlaySafe: true },
-	{ id: "sidebar.toggle", labelKey: "hotkeys.row.sidebar", defaults: ["⌘B", "⌃B"], overlaySafe: true },
-	{ id: "panel.toggle", labelKey: "hotkeys.row.panel", defaults: ["⌘J", "⌃J"], overlaySafe: true },
-	{ id: "hotkeys", labelKey: "hotkeys.row.hotkeys", defaults: ["⌘/", "⌃/"], overlaySafe: true },
+	{
+		id: "model.cycleForward",
+		labelKey: "hotkeys.row.modelNext",
+		defaults: ["⌃P"],
+		overlaySafe: true,
+		hotkeyGroup: "generation",
+	},
+	{
+		id: "model.cycleBackward",
+		labelKey: "hotkeys.row.modelPrev",
+		defaults: ["⇧⌃P"],
+		overlaySafe: false,
+		hotkeyGroup: "generation",
+	},
+	{ id: "retry", labelKey: "hotkeys.row.retry", defaults: ["⌥R"], overlaySafe: false, hotkeyGroup: "generation" },
+	{ id: "pr.center", labelKey: "hotkeys.row.prCenter", defaults: ["⌥P"], overlaySafe: false, hotkeyGroup: "session" },
+	{ id: "dequeue", labelKey: "hotkeys.row.dequeue", defaults: ["⌥↑"], overlaySafe: false, hotkeyGroup: "generation" },
+	{
+		id: "plan.toggle",
+		labelKey: "hotkeys.row.planToggle",
+		defaults: ["⌥⇧P"],
+		overlaySafe: false,
+		hotkeyGroup: "generation",
+	},
+	{
+		id: "tools.expand",
+		labelKey: "hotkeys.row.expandTools",
+		defaults: ["⌃O"],
+		overlaySafe: false,
+		hotkeyGroup: "view",
+	},
+	{
+		id: "thinking.toggle",
+		labelKey: "hotkeys.row.thinkingToggle",
+		defaults: ["⌃T"],
+		overlaySafe: false,
+		hotkeyGroup: "generation",
+	},
+	{
+		id: "model.select",
+		labelKey: "hotkeys.row.modelPicker",
+		defaults: ["⌥M"],
+		overlaySafe: false,
+		hotkeyGroup: "session",
+	},
+	{
+		id: "agents.hub",
+		labelKey: "hotkeys.row.agentHub",
+		defaults: ["⌥A"],
+		overlaySafe: false,
+		hotkeyGroup: "session",
+	},
+	{ id: "palette", labelKey: "hotkeys.row.palette", defaults: ["⌘K", "⌃K"], overlaySafe: true, hotkeyGroup: "view" },
+	{ id: "tab.new", labelKey: "hotkeys.row.tabNew", defaults: ["⌘T"], overlaySafe: false, hotkeyGroup: "session" },
+	{
+		id: "tab.newChat",
+		labelKey: "hotkeys.row.tabNewChat",
+		defaults: ["⇧⌘T"],
+		overlaySafe: false,
+		hotkeyGroup: "session",
+	},
+	{
+		id: "tab.newWorktree",
+		labelKey: "hotkeys.row.tabNewWorktree",
+		defaults: ["⌥T"],
+		overlaySafe: false,
+		hotkeyGroup: "session",
+	},
+	{
+		// ⌘W closes the active TAB (⇧⌘W closes the window — shared/hotkeys.ts).
+		id: "tab.close",
+		labelKey: "hotkeys.row.tabClose",
+		defaults: ["⌘W"],
+		overlaySafe: false,
+		hotkeyGroup: "session",
+	},
+	{
+		id: "settings",
+		labelKey: "hotkeys.row.settings",
+		defaults: ["⌘,", "⌃,"],
+		overlaySafe: true,
+		hotkeyGroup: "view",
+	},
+	{
+		id: "sidebar.toggle",
+		labelKey: "hotkeys.row.sidebar",
+		defaults: ["⌘B", "⌃B"],
+		overlaySafe: true,
+		hotkeyGroup: "view",
+	},
+	{
+		id: "panel.toggle",
+		labelKey: "hotkeys.row.panel",
+		defaults: ["⌘J", "⌃J"],
+		overlaySafe: true,
+		hotkeyGroup: "view",
+	},
+	{ id: "hotkeys", labelKey: "hotkeys.row.hotkeys", defaults: ["⌘/", "⌃/"], overlaySafe: true, hotkeyGroup: "view" },
 ] as const satisfies readonly KeymapAction[];
+
+/** Chords the composer's own keydown handler owns (InputArea.handleKeyDown).
+ *  They still work outside the composer, so a collision is a warning. */
+const COMPOSER_CHORDS: readonly ReservedChord[] = [
+	{ id: "composer.history", labelKey: "hotkeys.row.history", chord: "⌃R", hotkeyGroup: "input" },
+	{ id: "composer.editor", labelKey: "hotkeys.row.composerEditor", chord: "⌃G", hotkeyGroup: "input" },
+];
+
+/** Every chord the GUI already owns that the registry cannot dispatch. */
+export const RESERVED_CHORDS: readonly ReservedChord[] = [
+	...COMPOSER_CHORDS,
+	...NATIVE_CHORDS.map(entry => ({
+		id: entry.id,
+		labelKey: entry.labelKey,
+		chord: entry.chord,
+		hotkeyGroup: "native" as const,
+	})),
+];
+
+/** Rows the reference dialog files under a group, in registry order. */
+export function keymapActionsForGroup<const Group extends HotkeyGroupId>(
+	group: Group,
+): Extract<(typeof KEYMAP_ACTIONS)[number], { hotkeyGroup: Group }>[] {
+	return KEYMAP_ACTIONS.filter(
+		(action): action is Extract<(typeof KEYMAP_ACTIONS)[number], { hotkeyGroup: Group }> =>
+			action.hotkeyGroup === group,
+	);
+}
+
+/** Non-remappable rows the reference dialog files under a group. */
+export function reservedChordsForGroup(group: ReservedChordGroup): ReservedChord[] {
+	return RESERVED_CHORDS.filter(entry => entry.hotkeyGroup === group);
+}
+
+export interface ChordOwner {
+	readonly labelKey: string;
+	/** "action" = a remappable registry row; the others name who holds the chord. */
+	readonly holds: "action" | ReservedChordGroup;
+}
+
+/** Who owns a chord id — a remappable action or a reserved chord. */
+export function chordOwner(id: string): ChordOwner | undefined {
+	const action: KeymapAction | undefined = KEYMAP_ACTIONS.find(candidate => candidate.id === id);
+	if (action) return { labelKey: action.labelKey, holds: "action" };
+	const reserved: ReservedChord | undefined = RESERVED_CHORDS.find(candidate => candidate.id === id);
+	if (!reserved) return undefined;
+	return { labelKey: reserved.labelKey, holds: reserved.hotkeyGroup };
+}
 
 export type KeymapActionId = (typeof KEYMAP_ACTIONS)[number]["id"];
 
@@ -315,22 +472,29 @@ export function compileKeymap<A extends KeymapAction>(
 }
 
 export interface KeymapConflict {
-	/** "error" blocks saving (ambiguous dispatch); "warning" allows it (user wins the slot). */
+	/** "error" blocks saving (ambiguous dispatch, or a chord native code owns);
+	 *  "warning" allows it (the user binding wins the slot). */
 	kind: "error" | "warning";
 	/** Canonical chord string in dispute. */
 	chord: string;
-	/** Claimants: the colliding user actions (error) or [user action, shadowed default owner] (warning). */
+	/** Claimants: the colliding user actions (error) or [user action, shadowed owner]. */
 	actionIds: string[];
 }
 
 /**
  * (a) user-user: one chord claimed by 2+ user bindings → error (TUI
  * getConflicts parity). (b) shadow: a user chord equals another action's LIVE
- * default chord → warning — the TUI never detects this; the GUI does
- * (plan/17 §6.3). Defaults of an action that is itself remapped are dead and
- * cast no shadow.
+ * default chord → warning — the TUI never detects this; the GUI does (plan/17
+ * §6.3). Defaults of an action that is itself remapped are dead and cast no
+ * shadow. (c) reserved: a user chord taken by a focused control → warning (it
+ * still fires elsewhere), or by the native menu / global shortcut → error
+ * (Electron resolves it before the renderer ever sees the keydown).
  */
-export function detectConflicts(actions: readonly KeymapAction[], overrides: KeymapOverrides): KeymapConflict[] {
+export function detectConflicts(
+	actions: readonly KeymapAction[],
+	overrides: KeymapOverrides,
+	reserved: readonly ReservedChord[] = RESERVED_CHORDS,
+): KeymapConflict[] {
 	const defaultChords = new Map<string, Set<string>>();
 	for (const action of actions) {
 		const chords = new Set<string>();
@@ -368,6 +532,15 @@ export function detectConflicts(actions: readonly KeymapAction[], overrides: Key
 			if (defaultChords.get(action.id)?.has(chord)) {
 				conflicts.push({ kind: "warning", chord, actionIds: [userAction, action.id] });
 			}
+		}
+		for (const entry of reserved) {
+			const parsed = parseChord(entry.chord);
+			if (!parsed || serializeChord(parsed) !== chord) continue;
+			conflicts.push({
+				kind: entry.hotkeyGroup === "native" ? "error" : "warning",
+				chord,
+				actionIds: [userAction, entry.id],
+			});
 		}
 	}
 	return conflicts;

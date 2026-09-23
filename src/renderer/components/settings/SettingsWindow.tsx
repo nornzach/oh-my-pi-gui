@@ -23,6 +23,8 @@ import {
 	Blocks,
 	BookOpen,
 	Braces,
+	ChevronDown,
+	ChevronRight,
 	HardDriveDownload,
 	Network,
 	Search,
@@ -129,6 +131,7 @@ export function SettingsWindow() {
 	const t = useT();
 	const { lang } = useLang();
 	const contentRef = useRef<HTMLDivElement>(null);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 	const [focusedSetting, setFocusedSetting] = useState<string | null>(null);
 	const open = useUiStore(state => state.settingsOpen);
 	const requestedTab = useUiStore(state => state.settingsTab);
@@ -498,6 +501,21 @@ export function SettingsWindow() {
 	const managementTab = MANAGEMENT_TAB_IDS.has(tab);
 	const showGlobalSearch = true;
 
+	// The search field advertises Cmd/Ctrl+K. Capture it while Settings is open
+	// so the application's global command palette does not steal the shortcut.
+	useEffect(() => {
+		if (!open || !showGlobalSearch) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (isImeKeyEvent(event) || event.key.toLowerCase() !== "k" || (!event.metaKey && !event.ctrlKey)) return;
+			event.preventDefault();
+			event.stopImmediatePropagation();
+			searchInputRef.current?.focus();
+			searchInputRef.current?.select();
+		};
+		document.addEventListener("keydown", onKeyDown, true);
+		return () => document.removeEventListener("keydown", onKeyDown, true);
+	}, [open]);
+
 	// Global search covers every GUI-relevant schema setting across all tabs.
 	// TUI-only entries never appear in results.
 	const searchGroups = useMemo(() => {
@@ -630,14 +648,19 @@ export function SettingsWindow() {
 								<button
 									type="button"
 									aria-expanded={group.items.some(item => item.id === tab)}
-									className="settings-nav-group-label mb-1 w-full rounded-lg px-3 py-2 text-left text-omp-md font-medium text-(--omp-text) hover:bg-(--omp-selected-bg)"
+									className="settings-nav-group-label mb-1 flex w-full items-center gap-1 rounded-lg px-3 py-2 text-left text-omp-md font-medium text-(--omp-text) hover:bg-(--omp-selected-bg)"
 									onClick={() => {
 										setTab(group.items[0].id);
 										setQuery("");
 										setFocusedSetting(null);
 									}}
 								>
-									{t(`settings.nav.${group.id}`)}
+									{group.items.some(item => item.id === tab) ? (
+										<ChevronDown aria-hidden="true" className="shrink-0 text-(--omp-dim)" size={13} />
+									) : (
+										<ChevronRight aria-hidden="true" className="shrink-0 text-(--omp-dim)" size={13} />
+									)}
+									<span className="min-w-0 truncate">{t(`settings.nav.${group.id}`)}</span>
 								</button>
 								{group.items.some(item => item.id === tab) &&
 									group.items.map(tb => {
@@ -699,6 +722,7 @@ export function SettingsWindow() {
 									className="h-8 w-full rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) pr-12 pl-8 text-omp-sm text-(--omp-text) outline-none transition-colors placeholder:text-(--omp-dim) focus:border-(--omp-input-focus-border)"
 									onChange={event => setQuery(event.target.value)}
 									placeholder={t("settings.searchPlaceholder")}
+									ref={searchInputRef}
 									spellCheck={false}
 									value={query}
 								/>

@@ -1,9 +1,13 @@
 /**
  * sidebar-prefs store contract: pin toggles, MRU access times, workspace
- * aliases, persistence payloads, and hydrate-from-blob.
+ * aliases, persistence payloads, and hydrate-from-blob. A rejected prefs write
+ * must undo the optimistic toggle (the sidebar would otherwise show a pin that
+ * disappears on the next launch).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { translate } from "../lib/i18n";
 import { useSidebarPrefs } from "./sidebar-prefs";
+import { useToastStore } from "./toast";
 
 const get = vi.fn(async (_key: string) => null as unknown);
 const set = vi.fn(async (_key: string, _value: unknown) => {});
@@ -13,6 +17,7 @@ afterEach(() => {
 	get.mockClear();
 	set.mockClear();
 	useSidebarPrefs.getState().reset();
+	useToastStore.setState({ toasts: [] });
 });
 
 describe("sidebar-prefs store", () => {
@@ -90,5 +95,31 @@ describe("sidebar-prefs store", () => {
 		await useSidebarPrefs.getState().hydrate();
 		expect(useSidebarPrefs.getState().hydrated).toBe(true);
 		expect(useSidebarPrefs.getState().pinnedGroups).toEqual([]);
+	});
+
+	it("rolls back a group pin when the prefs write is rejected", async () => {
+		useSidebarPrefs.setState({ pinnedGroups: ["/work/kept"] });
+		set.mockRejectedValueOnce(new Error("disk full"));
+
+		await useSidebarPrefs.getState().toggleGroupPin("/work/a");
+
+		expect(set).toHaveBeenCalledWith("sidebar", expect.objectContaining({ pinnedGroups: ["/work/kept", "/work/a"] }));
+		expect(useSidebarPrefs.getState().pinnedGroups).toEqual(["/work/kept"]);
+		expect(useToastStore.getState().toasts).toContainEqual(
+			expect.objectContaining({ variant: "error", title: translate("sidebar.pinFailed"), message: "disk full" }),
+		);
+	});
+
+	it("keeps an earlier pin and reports a rename that the store refused to save", async () => {
+		useSidebarPrefs.setState({ pinnedSessions: ["/s/kept.jsonl"], groupAliases: { "/work/a": "Frontend" } });
+		set.mockRejectedValueOnce(new Error("EPERM"));
+
+		await useSidebarPrefs.getState().setGroupAlias("/work/a", "Platform");
+
+		expect(useSidebarPrefs.getState().groupAliases).toEqual({ "/work/a": "Frontend" });
+		expect(useSidebarPrefs.getState().pinnedSessions).toEqual(["/s/kept.jsonl"]);
+		expect(useToastStore.getState().toasts).toContainEqual(
+			expect.objectContaining({ variant: "error", title: translate("sidebar.renameFailed"), message: "EPERM" }),
+		);
 	});
 });

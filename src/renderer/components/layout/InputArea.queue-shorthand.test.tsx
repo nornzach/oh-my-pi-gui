@@ -9,7 +9,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { AgentMessage, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../lib/i18n";
+import { pasteMarkerText, storePaste } from "../../lib/paste-blobs";
 import { useComposerStore } from "../../stores/composer";
+import { useInputHistoryStore } from "../../stores/input-history";
 import { useMessagesStore } from "../../stores/messages";
 import { useModelStore } from "../../stores/model";
 import { useQueueStore } from "../../stores/queue";
@@ -237,6 +239,7 @@ afterEach(async () => {
 	useMessagesStore.getState().reset();
 	useModelStore.getState().reset();
 	useComposerStore.getState().reset();
+	useInputHistoryStore.setState({ entries: [], navIndex: -1, navDraft: "", navContext: undefined });
 	useQueueStore.getState().setFromFrame({ steering: [], followUp: [] });
 	useSettingsStore.getState().reset();
 	useTabsStore.getState().reset();
@@ -385,6 +388,7 @@ describe("InputArea queue shorthand submit", () => {
 		await typeInto(findTextarea(), "slow network prompt");
 
 		await pressEnter(findTextarea());
+		await flush();
 
 		expect(prompt).toHaveBeenCalledWith("slow network prompt", []);
 		expect(useMessagesStore.getState().liveMessages).toMatchObject([
@@ -473,6 +477,113 @@ describe("InputArea queue shorthand submit", () => {
 		await flush();
 
 		expect(followUp).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("InputArea prompt history", () => {
+	// ↑ recall replays text into the composer, so an entry is a promise that
+	// pressing Enter again sends exactly that. Anything the sidecar never
+	// accepted must stay out of the list.
+	it("records a prompt once the sidecar accepts it", async () => {
+		await mount();
+		await act(async () => useSessionStore.setState({ isStreaming: false }));
+		await typeInto(findTextarea(), "delivered prompt");
+		await pressEnter(findTextarea());
+		await flush();
+		await flush();
+
+		expect(prompt).toHaveBeenCalledWith("delivered prompt", []);
+		expect(useInputHistoryStore.getState().entries.map(entry => entry.prompt)).toEqual(["delivered prompt"]);
+	});
+
+	it("keeps a refused prompt out of history", async () => {
+		await mount();
+		await act(async () => useSessionStore.setState({ isStreaming: false }));
+		prompt.mockReturnValueOnce(
+			Promise.resolve<RpcResponse>({ type: "response", command: "prompt", success: false, error: "busy" }),
+		);
+		await typeInto(findTextarea(), "refused prompt");
+		await pressEnter(findTextarea());
+		await flush();
+		await flush();
+
+		expect(prompt).toHaveBeenCalledTimes(1);
+		expect(useInputHistoryStore.getState().entries).toEqual([]);
+	});
+
+	it("keeps a session-switch blocked by a running turn out of history", async () => {
+		await mount();
+		await typeInto(findTextarea(), "/new");
+		await pressEnter(findTextarea());
+		await flush();
+
+		expect(prompt).not.toHaveBeenCalled();
+		expect(useInputHistoryStore.getState().entries).toEqual([]);
+	});
+
+	it("does not record a shorthand whose remaining items were never dispatched", async () => {
+		await mount();
+		followUp.mockRejectedValueOnce(new Error("transport disconnected"));
+		await typeInto(findTextarea(), "=>\n1. alpha\n2. beta");
+		await pressEnter(findTextarea());
+		await flush();
+		await flush();
+
+		expect(followUp).toHaveBeenCalledTimes(1);
+		expect(useInputHistoryStore.getState().entries).toEqual([]);
+	});
+});
+
+describe("InputArea draft editor", () => {
+	// ⌃G alone was undiscoverable: the full-screen editor had no visible entry
+	// point, and both entries must hand it the expanded draft — a marker pasted
+	// into the editor would come back as literal "[Paste #1…]" text.
+	function draftEditorButton(): TestElement {
+		const button = document.querySelector("button[data-draft-editor-trigger]") as unknown as TestElement | null;
+		if (!button) throw new Error("draft editor trigger missing");
+		return button;
+	}
+
+	async function pressCtrlG(): Promise<void> {
+		const textarea = findTextarea();
+		const propsKey = Object.getOwnPropertyNames(textarea).find(key => key.startsWith("__reactProps$"));
+		const props = propsKey
+			? ((textarea as unknown as Record<string, unknown>)[propsKey] as {
+					onKeyDown?: (event: Record<string, unknown>) => void;
+				})
+			: undefined;
+		if (!props?.onKeyDown) throw new Error("textarea onKeyDown not found");
+		await act(async () =>
+			props.onKeyDown?.({
+				key: "g",
+				shiftKey: false,
+				ctrlKey: true,
+				metaKey: false,
+				altKey: false,
+				nativeEvent: { isComposing: false },
+				preventDefault: () => {},
+			}),
+		);
+	}
+
+	it("opens the editor from the toolbar with paste markers resolved", async () => {
+		await mount();
+		const blob = storePaste("alpha\nbravo");
+		await typeInto(findTextarea(), `summary ${pasteMarkerText(blob.id, blob.content)}`);
+		await click(draftEditorButton());
+
+		expect(useUiStore.getState().composerEditorOpen).toBe(true);
+		expect(useUiStore.getState().composerEditorInitial).toBe("summary alpha\nbravo");
+	});
+
+	it("opens the same expanded draft from the ⌃G chord", async () => {
+		await mount();
+		const blob = storePaste("alpha\nbravo");
+		await typeInto(findTextarea(), `summary ${pasteMarkerText(blob.id, blob.content)}`);
+		await pressCtrlG();
+
+		expect(useUiStore.getState().composerEditorOpen).toBe(true);
+		expect(useUiStore.getState().composerEditorInitial).toBe("summary alpha\nbravo");
 	});
 });
 

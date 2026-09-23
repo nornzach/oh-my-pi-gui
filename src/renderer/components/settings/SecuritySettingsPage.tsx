@@ -9,8 +9,7 @@ import type {
 } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
-import { useUiStore } from "../../stores/ui";
-import { Button, Input, Spinner } from "../common";
+import { Button, ConfirmDialog, Input, Spinner } from "../common";
 
 const ACTIVE_PHASES = new Set(["queued", "preparing", "reviewing", "publishing"]);
 const SEVERITIES = ["critical", "high", "medium", "low", "informational"] as const;
@@ -57,7 +56,6 @@ function errorMessage(error: unknown): string {
 export function SecuritySettingsPage() {
 	const tabRpc = useTabRpc();
 	const t = useT();
-	const closeSettings = useUiStore(state => state.closeSettings);
 	const [dashboard, setDashboard] = useState<RpcSecurityDashboardResult>();
 	const [selectedScan, setSelectedScan] = useState<RpcSecurityScanResult>();
 	const [selectedFindingId, setSelectedFindingId] = useState<string>();
@@ -71,6 +69,7 @@ export function SecuritySettingsPage() {
 	const [rationale, setRationale] = useState("");
 	const [savingDisposition, setSavingDisposition] = useState(false);
 	const [validating, setValidating] = useState(false);
+	const [pendingScan, setPendingScan] = useState(false);
 	const generation = useRef(0);
 	const loadInFlightRef = useRef<Promise<void> | undefined>(undefined);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Changing the task client invalidates the previous task's responses.
@@ -167,6 +166,7 @@ export function SecuritySettingsPage() {
 	}, [selectedFinding]);
 
 	const runScan = async () => {
+		setPendingScan(false);
 		setRunning(true);
 		setError(undefined);
 		try {
@@ -187,6 +187,19 @@ export function SecuritySettingsPage() {
 		} finally {
 			setRunning(false);
 		}
+	};
+
+	/**
+	 * The feature master switch used to flip as a side effect of a button labelled
+	 * "Scan". Turning security on is its own decision — it enables scan planning
+	 * and execution beyond this one run — so it is confirmed first.
+	 */
+	const requestScan = () => {
+		if (dashboard?.enabled) {
+			void runScan();
+			return;
+		}
+		setPendingScan(true);
 	};
 
 	const pickScan = async (scanId: string) => {
@@ -235,7 +248,9 @@ export function SecuritySettingsPage() {
 				setError(response.error);
 				return;
 			}
-			closeSettings();
+			// The user asked to re-check one finding, not to leave Settings: the
+			// dashboard read back is what reports the new verdict.
+			await refresh();
 		} catch (cause) {
 			setError(errorMessage(cause));
 		} finally {
@@ -319,7 +334,7 @@ export function SecuritySettingsPage() {
 						icon={<Play size={12} />}
 						loading={running}
 						disabled={!dashboard?.repositoryRoot || !dashboard.modelReady || !!activeOperation}
-						onClick={() => void runScan()}
+						onClick={requestScan}
 						size="sm"
 						variant="primary"
 					>
@@ -593,6 +608,17 @@ export function SecuritySettingsPage() {
 					</div>
 				</section>
 			)}
+
+			<ConfirmDialog
+				busy={running}
+				confirmLabel={t("security.enableScanAction")}
+				message={t("security.enableScanBody")}
+				onCancel={() => setPendingScan(false)}
+				onConfirm={() => void runScan()}
+				open={pendingScan}
+				title={t("security.enableScanTitle")}
+				warning={t("security.enableScanWarning")}
+			/>
 		</div>
 	);
 }

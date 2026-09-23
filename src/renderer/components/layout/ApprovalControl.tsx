@@ -8,13 +8,14 @@
  */
 
 import { Check, ChevronDown, ShieldCheck } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { type ApprovalMode, useSettingsStore } from "../../stores/settings";
+import { ConfirmDialog } from "../common";
 
 const MODES: ApprovalMode[] = ["yolo", "write", "always-ask"];
 
@@ -23,6 +24,7 @@ export function ApprovalControl() {
 	const mode = useSettingsStore(s => s.approvalMode);
 	const setApprovalMode = useSettingsStore(s => s.setApprovalMode);
 	const [open, setOpen] = useState(false);
+	const [pendingYolo, setPendingYolo] = useState(false);
 	const { mounted, closing } = useOverlayPresence(open);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 	const menuRef = useRef<HTMLDivElement>(null);
@@ -48,7 +50,7 @@ export function ApprovalControl() {
 			if (isImeKeyEvent(event)) return;
 			if (event.key !== "Escape") return;
 			event.preventDefault();
-			event.stopPropagation();
+			event.stopImmediatePropagation();
 			setOpen(false);
 			triggerRef.current?.focus();
 		};
@@ -60,11 +62,35 @@ export function ApprovalControl() {
 		};
 	}, [open]);
 
+	useEffect(() => {
+		if (!open) return;
+		requestAnimationFrame(() => {
+			menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"][aria-checked="true"]')?.focus();
+		});
+	}, [open]);
+
+	const moveMenuFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+		const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
+		if (items.length === 0) return;
+		event.preventDefault();
+		const current = items.indexOf(document.activeElement as HTMLButtonElement);
+		const next =
+			event.key === "Home"
+				? 0
+				: event.key === "End"
+					? items.length - 1
+					: (current + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
+		items[next]?.focus();
+	};
+
 	return (
 		<>
 			<button
 				ref={triggerRef}
 				type="button"
+				aria-expanded={open}
+				aria-haspopup="menu"
 				onClick={() => setOpen(value => !value)}
 				title={t("input.approval.title", { mode: t(`input.approval.${mode}`) })}
 				className={cx(
@@ -77,12 +103,27 @@ export function ApprovalControl() {
 				<ChevronDown size={12} className="shrink-0 text-[var(--omp-dim)]" />
 			</button>
 
+			<ConfirmDialog
+				confirmLabel={t("input.approval.yoloConfirmAction")}
+				message={t("input.approval.yoloConfirmBody")}
+				onCancel={() => setPendingYolo(false)}
+				onConfirm={() => {
+					setPendingYolo(false);
+					void setApprovalMode("yolo");
+				}}
+				open={pendingYolo}
+				title={t("input.approval.yoloConfirmTitle")}
+				warning={t("input.approval.yoloConfirmWarning")}
+			/>
+
 			{mounted && pos
 				? createPortal(
 						<div
 							ref={menuRef}
 							style={{ left: pos.left, bottom: pos.bottom }}
 							aria-hidden={closing || undefined}
+							role="menu"
+							onKeyDown={moveMenuFocus}
 							inert={closing}
 							className={cx(
 								"fixed z-[100] w-56 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-panel-bg)] p-1 shadow-[var(--omp-shadow-md)]",
@@ -95,9 +136,15 @@ export function ApprovalControl() {
 									<button
 										key={option}
 										type="button"
+										role="menuitemradio"
+										aria-checked={active}
 										onClick={() => {
 											setOpen(false);
-											setApprovalMode(option);
+											// Dropping to a stricter mode is safe at any time; opening
+											// full access removes every remaining prompt for a session that
+											// may be mid-run, so it asks first.
+											if (option === "yolo" && mode !== "yolo") setPendingYolo(true);
+											else void setApprovalMode(option);
 										}}
 										className="omp-pressable flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--omp-selected-bg)]"
 									>

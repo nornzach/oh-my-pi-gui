@@ -152,7 +152,9 @@ export function ImportForeignDialog() {
 			}
 			toast({ variant: "success", message: t("import.imported", { count: importedCount }) });
 			setSelected(failed);
-			// Refresh the list: imported sessions were copies, the sources are unchanged.
+			// Refresh the list after a batch so newly available source sessions and
+			// completion markers are reconciled instead of leaving a stale snapshot.
+			await load(source, true);
 		} catch (cause) {
 			setImportError(String(cause));
 		} finally {

@@ -7,6 +7,8 @@ type MainTextKey =
 	| "dialog.openProject"
 	| "menu.about"
 	| "menu.addToDictionary"
+	| "menu.closeTab"
+	| "menu.closeWindow"
 	| "menu.documentation"
 	| "menu.edit"
 	| "menu.exportHtml"
@@ -23,6 +25,15 @@ type MainTextKey =
 	| "menu.togglePanel"
 	| "menu.toggleSidebar"
 	| "menu.view"
+	| "menu.window"
+	| "quit.keepWorking"
+	| "quit.quitAnyway"
+	| "quit.workingBody"
+	| "quit.workingTitle"
+	| "restart.body"
+	| "restart.later"
+	| "restart.now"
+	| "restart.title"
 	| "updates.downloadFailed"
 	| "updates.hashMismatch"
 	| "updates.installerMissing"
@@ -34,6 +45,8 @@ const TEXT: Record<MainTextKey, Record<MainLanguage, string>> = {
 	"dialog.openProject": { en: "Open project", zh: "打开项目" },
 	"menu.about": { en: "About omp", zh: "关于 omp" },
 	"menu.addToDictionary": { en: "Add to dictionary", zh: "添加到词典" },
+	"menu.closeTab": { en: "Close Tab", zh: "关闭标签页" },
+	"menu.closeWindow": { en: "Close Window", zh: "关闭窗口" },
 	"menu.documentation": { en: "Documentation", zh: "文档" },
 	"menu.edit": { en: "Edit", zh: "编辑" },
 	"menu.exportHtml": { en: "Export HTML", zh: "导出 HTML" },
@@ -50,6 +63,21 @@ const TEXT: Record<MainTextKey, Record<MainLanguage, string>> = {
 	"menu.togglePanel": { en: "Toggle Panel", zh: "显示或隐藏面板" },
 	"menu.toggleSidebar": { en: "Toggle Sidebar", zh: "显示或隐藏侧边栏" },
 	"menu.view": { en: "View", zh: "视图" },
+	"menu.window": { en: "Window", zh: "窗口" },
+	"quit.keepWorking": { en: "Keep working", zh: "继续工作" },
+	"quit.quitAnyway": { en: "Quit anyway", zh: "仍要退出" },
+	"quit.workingBody": {
+		en: "{working} of {total} sessions are still working in {windows} window(s). Quitting stops them and their agents.",
+		zh: "仍有 {working}/{total} 个会话正在 {windows} 个窗口中工作。退出会中止它们及其代理。",
+	},
+	"quit.workingTitle": { en: "Sessions are still running", zh: "仍有会话在运行" },
+	"restart.body": {
+		en: "omp's installed files were replaced while it was running, so this window can no longer load them reliably. {working} of {total} sessions are still working.",
+		zh: "omp 运行期间安装文件已被替换，窗口无法可靠地加载它们。仍有 {working}/{total} 个会话正在工作。",
+	},
+	"restart.later": { en: "Later", zh: "稍后再说" },
+	"restart.now": { en: "Restart now", zh: "立即重启" },
+	"restart.title": { en: "Restart to finish updating", zh: "重启以完成更新" },
 	"updates.downloadFailed": {
 		en: "The installer download failed.",
 		zh: "安装程序下载失败。",
@@ -84,6 +112,13 @@ export function getMainLanguage(): MainLanguage {
 	return app.getLocale().toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
-export function mainT(key: MainTextKey, language = getMainLanguage()): string {
-	return TEXT[key][language];
+export function mainT(
+	key: MainTextKey,
+	language = getMainLanguage(),
+	params?: Record<string, string | number>,
+): string {
+	if (!params) return TEXT[key][language];
+	return TEXT[key][language].replace(/\{(\w+)\}/g, (match, name: string) =>
+		name in params ? String(params[name]) : match,
+	);
 }

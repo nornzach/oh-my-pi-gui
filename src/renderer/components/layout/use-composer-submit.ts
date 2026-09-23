@@ -84,6 +84,7 @@ export function useComposerSubmit({
 
 			const originMessages = sessionRuntimeStore<MessagesStore>(originTabId, "messages") ?? useMessagesStore;
 			const originSessionId = originSession?.getState().sessionId ?? useSessionStore.getState().sessionId;
+			const originCwd = (originSession?.getState() ?? useSessionStore.getState()).cwd;
 			const originStillActive = () =>
 				originSession
 					? sessionRuntimeStore<ComposerStore>(originTabId, "composer") === originComposer
@@ -118,9 +119,12 @@ export function useComposerSubmit({
 				? expandEmoticons(expandPasteMarkers(message))
 				: expandPasteMarkers(message);
 
+			// ↑ history is a record of what the model received, so it is written only
+			// once delivery is confirmed. Recording up front left every failed or
+			// blocked send in the list, and a recalled entry replays a prompt that
+			// never ran.
 			const parsed = parseComposerMode(expandedMessage);
 			if (parsed?.mode === "bash" && parsed.body) {
-				useInputHistoryStore.getState().record(message);
 				const previousImages = images;
 				setText("");
 				setImages([]);
@@ -146,6 +150,7 @@ export function useComposerSubmit({
 							return;
 						}
 						accepted = true;
+						useInputHistoryStore.getState().record(message, originCwd);
 						if (!originStillActive()) return;
 						dropReferencedPastes(message);
 						await hydrateTabSession(originTabId);
@@ -171,7 +176,6 @@ export function useComposerSubmit({
 			// lands. Language is left to the sidecar — interactive eval is python-only
 			// today and the GUI tracks no kernel state to source it from.
 			if (parsed?.mode === "python" && parsed.body) {
-				useInputHistoryStore.getState().record(message);
 				const previousImages = images;
 				setText("");
 				setImages([]);
@@ -196,6 +200,7 @@ export function useComposerSubmit({
 							return;
 						}
 						accepted = true;
+						useInputHistoryStore.getState().record(message, originCwd);
 						if (!originStillActive()) return;
 						dropReferencedPastes(message);
 						await hydrateTabSession(originTabId);
@@ -230,7 +235,6 @@ export function useComposerSubmit({
 					toast({ variant: "warning", message: t("input.queue.usage") });
 					return;
 				}
-				useInputHistoryStore.getState().record(message);
 				const previousImages = images;
 				setText("");
 				setImages([]);
@@ -273,6 +277,10 @@ export function useComposerSubmit({
 							}
 							sent += 1;
 						}
+						// Only a fully dispatched shorthand enters history. A partial run
+						// restores the unsent remainder as the draft, so recording the
+						// original would offer ↑ a list whose first items already ran.
+						useInputHistoryStore.getState().record(message, originCwd);
 						if (originStillActive()) dropReferencedPastes(message);
 					} catch (error) {
 						if (deliveryPending) markUncertain();
@@ -306,8 +314,6 @@ export function useComposerSubmit({
 				return;
 			}
 
-			useInputHistoryStore.getState().record(message);
-
 			// Routing/guarding/hydration policy lives in lib/composer-submit:
 			// slash commands always go through prompt (server parses them even
 			// while streaming), session-replacing commands are blocked while
@@ -323,6 +329,7 @@ export function useComposerSubmit({
 			});
 			if (submit.kind === "blocked") return;
 			if (submit.kind === "handled") {
+				useInputHistoryStore.getState().record(message, originCwd);
 				setText("");
 				setImages([]);
 				setMenu(null);
@@ -338,6 +345,7 @@ export function useComposerSubmit({
 				setMenu(null);
 				void clearSessionContext(rpc, () => hydrateTabSession(originTabId)).then(cleared => {
 					if (cleared) {
+						useInputHistoryStore.getState().record(message, originCwd);
 						if (originStillActive()) dropReferencedPastes(message);
 						return;
 					}
@@ -386,6 +394,7 @@ export function useComposerSubmit({
 							return;
 						}
 						accepted = true;
+						useInputHistoryStore.getState().record(message, originCwd);
 						if (!originStillActive()) return;
 						dropReferencedPastes(message);
 						await settleComposerResponse(response, () => hydrateTabSession(originTabId));

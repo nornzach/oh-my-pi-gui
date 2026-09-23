@@ -18,7 +18,7 @@ import { nextSnowflake } from "./snowflake";
 export type SpawnTabDeps = {
 	sidecarPool: Pick<SidecarPool, "sessionOwner" | "atCap" | "acquire">;
 	sessionIndex: Pick<SessionIndex, "kindFor">;
-	/** Caller's cwd resolution (ipc.ts's cwdFor with process.cwd() fallback). */
+	/** Caller's cwd resolution (ipc.ts's cwdFor, falling back to the app's initial cwd). */
 	fallbackCwd: () => string;
 	/** GUI-owned Work workspace, created on demand. */
 	defaultWorkspace: () => string;

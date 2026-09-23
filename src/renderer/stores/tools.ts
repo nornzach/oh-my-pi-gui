@@ -5,7 +5,13 @@ import { createScopedStoreHook } from "./session-runtime-context";
 export interface ToolEntry {
 	toolName: string;
 	args: Record<string, unknown>;
-	status: "pending" | "running" | "done" | "error";
+	/**
+	 * `aborted` is the terminal state of a call that never reported a result:
+	 * the turn was interrupted, or the process died before execution finished.
+	 * History rebuilds must never leave such a call `running` — the card would
+	 * spin forever and keep a live clock subscribed.
+	 */
+	status: "pending" | "running" | "done" | "error" | "aborted";
 	partialResult: unknown;
 	/** Accumulated raw args JSON string during streaming (before execution starts). */
 	streamingArgs: string;
@@ -17,7 +23,12 @@ export interface ToolEntry {
 
 export interface ToolsStore {
 	activeTools: Map<string, ToolEntry>;
-	hydrateMessages: (messages: AgentMessage[]) => void;
+	/**
+	 * Rebuild the map from a transcript. `turnIsLive` marks the trailing
+	 * unanswered calls of the streaming turn as still running; every other
+	 * unanswered call is terminal `aborted`.
+	 */
+	hydrateMessages: (messages: AgentMessage[], options?: { turnIsLive?: boolean }) => void;
 	applyEvents: (events: AgentSessionEvent[]) => void;
 	reset: () => void;
 }
@@ -91,13 +102,17 @@ export const createToolsStore = () => {
 
 		const latest = latestEntryKeyByCallId.get(callId);
 		const latestEntry = latest ? tools.get(latest) : undefined;
-		if (latest && (latestEntry?.status === "pending" || latestEntry?.status === "running")) return latest;
+		// Claim any call that has not reported a result yet — including the
+		// `aborted` placeholders a history rebuild leaves behind, so a late
+		// `tool_execution_start` promotes that card instead of opening a second
+		// one for the same invocation.
+		if (latest && latestEntry && latestEntry.status !== "done" && latestEntry.status !== "error") return latest;
 		return allocateEntryKey(callId);
 	};
 
 	return createStore<ToolsStore>()((set, get) => ({
 		activeTools: new Map(),
-		hydrateMessages: messages => {
+		hydrateMessages: (messages, options) => {
 			const now = Date.now();
 			resetEntryKeyTracking();
 
@@ -112,8 +127,14 @@ export const createToolsStore = () => {
 			const resultIndexes = new Map<string, number>();
 
 			const tools = new Map<string, ToolEntry>();
+			// A committed assistant message whose calls were never answered is a
+			// dead letter — unless the turn that produced it is still running and
+			// nothing was committed after it. Only that trailing case stays live.
+			let trailingUnanswered: string[] = [];
+			let trailingMessage: AgentMessage | null = null;
 			for (const message of messages) {
 				if (message.role !== "assistant" || !Array.isArray(message.content)) continue;
+				const unanswered: string[] = [];
 				for (const block of message.content) {
 					if (block.type !== "toolCall") continue;
 					const key = allocateEntryKey(block.id);
@@ -122,10 +143,11 @@ export const createToolsStore = () => {
 					const result = results.get(block.id)?.[resultIndex];
 					resultIndexes.set(block.id, resultIndex + 1);
 					const startTime = timestampMs(message.timestamp, now);
+					if (!result) unanswered.push(key);
 					tools.set(key, {
 						toolName: block.name,
 						args: block.arguments,
-						status: result ? (result.isError ? "error" : "done") : "running",
+						status: result ? (result.isError ? "error" : "done") : "aborted",
 						partialResult: null,
 						streamingArgs: "",
 						// Keep the same `{content, details}` envelope as the live path so
@@ -136,6 +158,16 @@ export const createToolsStore = () => {
 						startTime,
 						endTime: result ? timestampMs(result.timestamp, startTime) : null,
 					});
+				}
+				if (unanswered.length > 0) {
+					trailingUnanswered = unanswered;
+					trailingMessage = message;
+				}
+			}
+			if (options?.turnIsLive && trailingMessage === messages[messages.length - 1]) {
+				for (const key of trailingUnanswered) {
+					const entry = tools.get(key);
+					if (entry) tools.set(key, { ...entry, status: "running" });
 				}
 			}
 			set({ activeTools: tools });

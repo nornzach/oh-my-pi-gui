@@ -7,11 +7,11 @@
  *   release-metadata SHA-512, and hand replacement to Finder.
  *
  * Downloads remain user-initiated and report progress through one shared
- * renderer state machine.
+ * renderer state machine. An interrupted transfer keeps its `.partial` and
+ * continues from that offset on the next attempt.
  */
 
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { app, BrowserWindow, ipcMain, net, shell } from "electron";
@@ -22,10 +22,14 @@ import { IPC_COMMANDS, IPC_EVENTS } from "../shared/ipc-types";
 import { mainT } from "./i18n";
 import {
 	hasStableMacSigningIdentity,
+	installerPartialPath,
 	type MacInstallerArchitecture,
 	type MacInstallerAsset,
+	planInstallerTransfer,
 	selectMacInstaller,
 	settleIncompleteUpdateCheck,
+	sha512FileBase64,
+	sweepInstallerPartials,
 } from "./updater-state";
 
 const { autoUpdater } = pkg;
@@ -87,6 +91,14 @@ function availableDownloadPath(fileName: string): string {
 	return candidate;
 }
 
+async function fileSize(filePath: string): Promise<number> {
+	try {
+		return (await fs.promises.stat(filePath)).size;
+	} catch {
+		return 0;
+	}
+}
+
 async function openManualInstaller(filePath: string): Promise<void> {
 	shell.showItemInFolder(filePath);
 	const openError = await shell.openPath(filePath);
@@ -95,27 +107,40 @@ async function openManualInstaller(filePath: string): Promise<void> {
 
 async function downloadManualInstaller(version: string, asset: MacInstallerAsset): Promise<void> {
 	const destinationPath = availableDownloadPath(asset.name);
-	const partialPath = `${destinationPath}.download-${process.pid}`;
+	const partialPath = installerPartialPath(destinationPath);
 	const assetUrl = `${RELEASE_DOWNLOAD_BASE}v${encodeURIComponent(version)}/${encodeURIComponent(asset.name)}`;
-	const response = await net.fetch(assetUrl);
+	// Partials of releases this one superseded can never be continued.
+	await sweepInstallerPartials(path.dirname(partialPath), partialPath);
+
+	let existing = await fileSize(partialPath);
+	if (asset.size !== undefined && existing > asset.size) {
+		await fs.promises.rm(partialPath, { force: true });
+		existing = 0;
+	}
+	const response = await net.fetch(assetUrl, existing > 0 ? { headers: { range: `bytes=${existing}-` } } : undefined);
+	const plan = planInstallerTransfer(existing, {
+		status: response.status,
+		contentRange: response.headers.get("content-range") ?? undefined,
+	});
 	if (!response.ok || !response.body) {
+		// A 416 means the offset is past the release's bytes, so the partial could
+		// never complete; everything else leaves it for the next attempt.
+		if (response.status === 416) await fs.promises.rm(partialPath, { force: true });
 		throw new Error(`${mainT("updates.downloadFailed")} (${response.status})`);
 	}
 
 	const contentLength = Number(response.headers.get("content-length"));
-	const total = asset.size ?? (Number.isFinite(contentLength) ? contentLength : 0);
-	const hash = createHash("sha512");
+	const total = asset.size ?? (Number.isFinite(contentLength) ? contentLength + plan.offset : 0);
 	const startedAt = performance.now();
-	let transferred = 0;
+	let transferred = plan.offset;
 	let lastProgressAt = 0;
-	const file = await fs.promises.open(partialPath, "wx");
+	const file = await fs.promises.open(partialPath, plan.append ? "a" : "w");
 
 	try {
 		const reader = response.body.getReader();
 		for (;;) {
 			const { done, value } = await reader.read();
 			if (done) break;
-			hash.update(value);
 			let offset = 0;
 			while (offset < value.byteLength) {
 				const { bytesWritten } = await file.write(value, offset, value.byteLength - offset);
@@ -138,14 +163,12 @@ async function downloadManualInstaller(version: string, asset: MacInstallerAsset
 			}
 		}
 		await file.sync();
-	} catch (error) {
-		await fs.promises.rm(partialPath, { force: true });
-		throw error;
 	} finally {
+		// Bytes already written stay: an interrupted transfer resumes from here.
 		await file.close();
 	}
 
-	if (hash.digest("base64") !== asset.sha512) {
+	if ((await sha512FileBase64(partialPath)) !== asset.sha512) {
 		await fs.promises.rm(partialPath, { force: true });
 		throw new Error(mainT("updates.hashMismatch"));
 	}
@@ -176,6 +199,10 @@ function notesOf(info: { releaseNotes?: unknown }): string | undefined {
 
 export function setupUpdater(): void {
 	installMode = detectInstallMode();
+	// Installs interrupted by older builds keyed the partial by process id, which
+	// nothing could ever continue — those orphans are the only debris a startup
+	// sweep can identify for sure.
+	if (process.platform === "darwin") void sweepInstallerPartials(app.getPath("downloads"));
 	autoUpdater.autoDownload = false;
 	autoUpdater.autoInstallOnAppQuit = installMode === "automatic";
 	// Dev/preview verification gate: electron-updater skips unpackaged apps

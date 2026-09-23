@@ -24,6 +24,10 @@ Object.assign(globalThis as Record<string, unknown>, {
 	HTMLElement,
 	Element,
 	Node,
+	requestAnimationFrame: (callback: () => void) => {
+		callback();
+		return 0;
+	},
 	IS_REACT_ACT_ENVIRONMENT: true,
 });
 
@@ -67,11 +71,23 @@ async function mount(element: ReactElement): Promise<void> {
 	await act(async () => {});
 }
 
-function installRpc() {
-	const getModelRoles = vi.fn(async () => ({ success: true, data: { roles: ROLES } }));
-	const setModelRole = vi.fn(async () => ({ success: true }));
-	(window as unknown as { omp?: unknown }).omp = { rpc: { getModelRoles, setModelRole } };
-	return { getModelRoles, setModelRole };
+function installRpc(getModelRoles?: (...args: unknown[]) => Promise<unknown>) {
+	const rpc = {
+		getModelRoles: vi.fn(getModelRoles ?? (async () => ({ success: true, data: { roles: ROLES } }))),
+		setModelRole: vi.fn(async () => ({ success: true })),
+	};
+	(window as unknown as { omp?: unknown }).omp = { rpc };
+	return rpc;
+}
+
+function bodyText(): string {
+	return document.body.textContent ?? "";
+}
+
+function buttonWithLabel(label: string): HTMLButtonElement | undefined {
+	return [...document.body.querySelectorAll("button")].find(button => (button.textContent ?? "").trim() === label) as
+		| HTMLButtonElement
+		| undefined;
 }
 
 afterEach(async () => {
@@ -114,14 +130,74 @@ describe("ModelRolesWindow", () => {
 
 		await mount(<ModelRolesWindow />);
 
-		const selects = [...document.body.querySelectorAll("select")];
-		const defaultSelect = selects[0] as unknown as HTMLSelectElement;
-		expect(defaultSelect.value).toBe("anthropic/claude");
-		const groupLabels = [...defaultSelect.querySelectorAll("optgroup")].map(g => g.getAttribute("label"));
-		expect(groupLabels).toContain("Chat");
-		const optionTexts = [...defaultSelect.querySelectorAll("option")].map(o => o.textContent);
-		expect(optionTexts.some(text => text?.includes("Claude — anthropic/claude"))).toBe(true);
-		expect(optionTexts.some(text => text?.includes("GPT — openai/gpt"))).toBe(true);
+		const trigger = [...document.body.querySelectorAll("button")].find(
+			button => button.getAttribute("aria-label") === "Model for Default",
+		);
+		expect(trigger?.textContent).toContain("Claude — anthropic/claude");
+		await act(async () => trigger?.click());
+
+		const listbox = document.body.querySelector('[role="listbox"]');
+		expect(listbox).not.toBeNull();
+		expect(listbox?.textContent).toContain("Chat");
+		expect(listbox?.textContent).toContain("Claude");
+		expect(listbox?.textContent).toContain("openai/gpt");
+	});
+
+	it("says why the list cannot refresh instead of claiming no roles are configured", async () => {
+		const { getModelRoles } = installRpc();
+		// No ready sidecar: the read never happens, which is a different answer
+		// from an empty one.
+		useUiStore.getState().openModelRoles();
+
+		await mount(<ModelRolesWindow />);
+
+		expect(getModelRoles).not.toHaveBeenCalled();
+		expect(bodyText()).toContain("Sidecar not connected");
+		expect(bodyText()).not.toContain("No model roles configured.");
+	});
+
+	it("shows the load failure with a retry instead of an empty role list", async () => {
+		const { getModelRoles } = installRpc(async () => ({ success: false, error: "rpc socket closed" }));
+		useSessionStore.getState().setStatus("ready", "/repo");
+		useUiStore.getState().openModelRoles();
+
+		await mount(<ModelRolesWindow />);
+
+		expect(bodyText()).toContain("Could not load model roles.");
+		expect(bodyText()).toContain("rpc socket closed");
+		expect(bodyText()).not.toContain("No model roles configured.");
+
+		const retry = buttonWithLabel("Retry");
+		expect(retry).toBeDefined();
+		await act(async () => {
+			retry?.click();
+		});
+		expect(getModelRoles).toHaveBeenCalledTimes(2);
+	});
+
+	it("keeps the last good roles on screen under a failed refresh", async () => {
+		installRpc()
+			.getModelRoles.mockResolvedValueOnce({ success: true, data: { roles: ROLES } })
+			.mockResolvedValue({ success: false, error: "timeout" });
+		useSessionStore.getState().setStatus("ready", "/repo");
+		useUiStore.getState().openModelRoles();
+
+		await mount(<ModelRolesWindow />);
+		expect(bodyText()).toContain("Default");
+
+		// Re-opening the window re-reads; the second read fails and must degrade to
+		// a banner over the rows the user is already looking at.
+		await act(async () => {
+			useUiStore.getState().closeModelRoles();
+		});
+		await act(async () => {
+			useUiStore.getState().openModelRoles();
+		});
+		await act(async () => {});
+
+		expect(bodyText()).toContain("Default");
+		expect(bodyText()).toContain("Showing the last roles that loaded successfully.");
+		expect(bodyText()).toContain("timeout");
 	});
 
 	it("issues set_model_role with the canonical selector when a role's model is switched", async () => {
@@ -131,18 +207,15 @@ describe("ModelRolesWindow", () => {
 
 		await mount(<ModelRolesWindow />);
 
-		const selects = [...document.body.querySelectorAll("select")];
-		const defaultSelect = selects[0] as unknown as HTMLSelectElement;
-		const options = [...defaultSelect.querySelectorAll("option")];
-		expect(options.some(option => option.getAttribute("value") === "openai/gpt")).toBe(true);
-		await act(async () => {
-			// linkedom's select.value getter ignores selectedIndex; shadow it with an
-			// own property so React's change value-tracker sees a real transition and
-			// reads the new selector from e.target.value.
-			Object.defineProperty(defaultSelect, "value", { configurable: true, get: () => "openai/gpt" });
-			defaultSelect.dispatchEvent(new Event("change", { bubbles: true }));
-		});
-		await act(async () => {});
+		const trigger = [...document.body.querySelectorAll("button")].find(
+			button => button.getAttribute("aria-label") === "Model for Default",
+		);
+		await act(async () => trigger?.click());
+		const option = [...document.body.querySelectorAll('[role="option"]')].find(button =>
+			(button.textContent ?? "").includes("openai/gpt"),
+		);
+		expect(option).toBeDefined();
+		await act(async () => option?.dispatchEvent(new Event("click", { bubbles: true })));
 
 		expect(setModelRole).toHaveBeenCalledWith("default", "openai/gpt");
 	});

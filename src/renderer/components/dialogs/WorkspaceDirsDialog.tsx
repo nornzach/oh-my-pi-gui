@@ -20,7 +20,7 @@ import {
 } from "../../lib/workspace-dirs";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Button, Modal, Spinner } from "../common";
+import { AsyncSection, Badge, Button, Modal } from "../common";
 
 export function WorkspaceDirsDialog() {
 	const tabRpc = useTabRpc();
@@ -98,16 +98,17 @@ export function WorkspaceDirsDialog() {
 			<div className="flex flex-col gap-3">
 				<div className="text-xs text-(--omp-dim)">{t("workspaceDirs.subtitle")}</div>
 				<div className="max-h-[38vh] min-h-16 overflow-y-auto rounded-md border border-(--omp-border-muted)">
-					{error ? (
-						<div className="p-4 text-xs text-[var(--omp-error)]">{error}</div>
-					) : loading ? (
-						<div className="flex items-center justify-center gap-2 p-6 text-xs text-(--omp-dim)">
-							<Spinner size="sm" /> {t("workspaceDirs.loading")}
-						</div>
-					) : directories.length === 0 ? (
-						<div className="p-6 text-center text-xs text-(--omp-dim)">{t("workspaceDirs.empty")}</div>
-					) : (
-						directories.map(directory => (
+					<AsyncSection
+						className="min-h-24"
+						empty={directories.length === 0}
+						emptyLabel={t("workspaceDirs.empty")}
+						error={error}
+						hasData={directories.length > 0}
+						loading={loading}
+						loadingLabel={t("workspaceDirs.loading")}
+						onRetry={() => void reload()}
+					>
+						{directories.map(directory => (
 							<div
 								className="flex items-center gap-2 border-b border-(--omp-border-muted) px-3 py-2 last:border-b-0"
 								key={directory.path}
@@ -151,8 +152,8 @@ export function WorkspaceDirsDialog() {
 									/>
 								)}
 							</div>
-						))
-					)}
+						))}
+					</AsyncSection>
 				</div>
 				<div className="flex items-center justify-between gap-2">
 					<Button

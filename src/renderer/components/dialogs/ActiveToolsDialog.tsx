@@ -1,10 +1,10 @@
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcActiveTool, RpcActiveToolsResult, RpcToolSource } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Input, Modal, Spinner } from "../common";
+import { AsyncSection, Badge, Input, Modal } from "../common";
 
 const SOURCE_ORDER: RpcToolSource[] = ["builtin", "mcp", "extension", "plugin"];
 
@@ -23,30 +23,26 @@ export function ActiveToolsDialog() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
+	const reload = useCallback(async (): Promise<void> => {
+		setLoading(true);
+		setError(null);
+		try {
+			const response = await tabRpc.getActiveTools();
+			if (response.success) setTools((response.data as RpcActiveToolsResult).tools);
+			else setError(response.error);
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : String(cause));
+		} finally {
+			setLoading(false);
+		}
+	}, [tabRpc.getActiveTools]);
+
 	useEffect(() => {
 		if (!open) return;
-		let cancelled = false;
 		setTools([]);
 		setQuery("");
-		setError(null);
-		setLoading(true);
-		void tabRpc
-			.getActiveTools()
-			.then(response => {
-				if (cancelled) return;
-				if (response.success) setTools((response.data as RpcActiveToolsResult).tools);
-				else setError(response.error);
-			})
-			.catch(cause => {
-				if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
-			})
-			.finally(() => {
-				if (!cancelled) setLoading(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [open, tabRpc.getActiveTools]);
+		void reload();
+	}, [open, reload]);
 
 	const groups = useMemo(() => {
 		const q = query.trim().toLowerCase();
@@ -73,44 +69,46 @@ export function ActiveToolsDialog() {
 						value={query}
 					/>
 				</div>
-				{loading ? (
-					<div className="flex items-center justify-center gap-2 py-8 text-sm text-(--omp-dim)">
-						<Spinner size="sm" /> {t("activeTools.loading")}
-					</div>
-				) : error ? (
-					<div className="py-4 text-sm text-(--omp-error)">
-						{t("activeTools.error")}: {error}
-					</div>
-				) : tools.length === 0 ? (
-					<div className="py-4 text-sm text-(--omp-dim)">{t("activeTools.empty")}</div>
-				) : groups.length === 0 ? (
-					<div className="py-4 text-sm text-(--omp-dim)">{t("activeTools.noMatch")}</div>
-				) : (
-					<div className="space-y-4">
-						{groups.map(group => (
-							<section key={group.source}>
-								<div className="mb-1.5 flex items-center gap-2">
-									<span className="text-xs font-semibold text-(--omp-text)">
-										{t(`activeTools.source.${group.source}`)}
-									</span>
-									<Badge variant="muted">{group.tools.length}</Badge>
-								</div>
-								<div className="divide-y divide-(--omp-border-muted) rounded-lg border border-(--omp-border-muted)">
-									{group.tools.map(tool => (
-										<div className="px-3 py-2" key={`${group.source}:${tool.name}`}>
-											<div className="font-mono text-xs font-medium text-(--omp-text)">{tool.name}</div>
-											{tool.description ? (
-												<div className="mt-0.5 line-clamp-2 text-xs text-(--omp-dim)">
-													{tool.description}
-												</div>
-											) : null}
-										</div>
-									))}
-								</div>
-							</section>
-						))}
-					</div>
-				)}
+				<AsyncSection
+					className="py-8"
+					empty={tools.length === 0}
+					emptyLabel={t("activeTools.empty")}
+					error={error}
+					errorTitle={t("activeTools.error")}
+					hasData={tools.length > 0}
+					loading={loading}
+					loadingLabel={t("activeTools.loading")}
+					onRetry={() => void reload()}
+				>
+					{groups.length === 0 ? (
+						<div className="py-4 text-sm text-(--omp-dim)">{t("activeTools.noMatch")}</div>
+					) : (
+						<div className="space-y-4">
+							{groups.map(group => (
+								<section key={group.source}>
+									<div className="mb-1.5 flex items-center gap-2">
+										<span className="text-xs font-semibold text-(--omp-text)">
+											{t(`activeTools.source.${group.source}`)}
+										</span>
+										<Badge variant="muted">{group.tools.length}</Badge>
+									</div>
+									<div className="divide-y divide-(--omp-border-muted) rounded-lg border border-(--omp-border-muted)">
+										{group.tools.map(tool => (
+											<div className="px-3 py-2" key={`${group.source}:${tool.name}`}>
+												<div className="font-mono text-xs font-medium text-(--omp-text)">{tool.name}</div>
+												{tool.description ? (
+													<div className="mt-0.5 line-clamp-2 text-xs text-(--omp-dim)">
+														{tool.description}
+													</div>
+												) : null}
+											</div>
+										))}
+									</div>
+								</section>
+							))}
+						</div>
+					)}
+				</AsyncSection>
 			</div>
 		</Modal>
 	);
