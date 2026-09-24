@@ -11,6 +11,7 @@ import Store from "electron-store";
 import { nativeAccelerator } from "../shared/hotkeys";
 import type { SessionKind } from "../shared/ipc-types";
 import { installQuitGuard, requestQuit } from "./app-quit";
+import { bundledOmpFilename, resolveOmpCandidate } from "./bundled-omp-path";
 import { setupDeepLinks } from "./deep-link";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { firstUsableCwd } from "./initial-cwd";
@@ -66,17 +67,21 @@ app.setName("omp");
 function resolveBundledOmp(): string | null {
 	const override = process.env.OMP_BUNDLED_OMP;
 	if (override && existsSync(override)) return override;
+	const name = bundledOmpFilename();
 	if (process.resourcesPath) {
-		const packaged = join(process.resourcesPath, "omp");
-		if (existsSync(packaged)) return packaged;
+		const packaged =
+			resolveOmpCandidate(process.resourcesPath, name) ?? resolveOmpCandidate(process.resourcesPath, "omp");
+		if (packaged) return packaged;
 	}
 	for (const start of [app.getAppPath(), process.cwd()]) {
 		let dir = start;
 		for (let i = 0; i < 8; i++) {
-			const direct = join(dir, "resources", "omp");
-			if (existsSync(direct)) return direct;
-			const nested = join(dir, "packages", "gui", "resources", "omp");
-			if (existsSync(nested)) return nested;
+			const direct = resolveOmpCandidate(dir, "resources", name) ?? resolveOmpCandidate(dir, "resources", "omp");
+			if (direct) return direct;
+			const nested =
+				resolveOmpCandidate(dir, "packages", "gui", "resources", name) ??
+				resolveOmpCandidate(dir, "packages", "gui", "resources", "omp");
+			if (nested) return nested;
 			const parent = join(dir, "..");
 			if (parent === dir) break;
 			dir = parent;

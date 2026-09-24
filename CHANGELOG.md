@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-09-24
+
+### Added
+
+- **Windows x64 packaging**: download an NSIS installer or portable executable with the bundled `omp/18.3.0` sidecar.
+
+### Changed
+
+- **Cross-platform sidecar startup**: Windows resolves `omp.exe`, keeps the inherited tool environment, hides sidecar consoles, and registers the `omp://` protocol in installed builds.
+- **Windows release metadata**: NSIS update metadata and blockmaps are generated alongside the installer and portable artifact.
+
+### Fixed
+
+- **Cross-platform icon generation**: Windows `.ico` output no longer requires macOS `iconutil`; macOS `.icns` generation remains unchanged.
+
 ## [0.9.9] - 2026-09-24
 
 ### Added

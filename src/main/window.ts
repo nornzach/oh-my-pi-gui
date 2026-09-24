@@ -120,6 +120,7 @@ export class WindowManager {
 			minWidth: MIN_WIDTH,
 			minHeight: MIN_HEIGHT,
 			show: false,
+			autoHideMenuBar: process.platform === "win32",
 			webPreferences: {
 				contextIsolation: true,
 				nodeIntegration: false,

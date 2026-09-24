@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>omp GUI — One window. Every session in parallel.</title>
-<meta name="description" content="A responsive desktop GUI for the omp coding agent: parallel sessions plus native Skills, MCP, security, SSH host, and update management. macOS arm64 / x64." />
+<meta name="description" content="A responsive desktop GUI for the omp coding agent: parallel sessions plus native Skills, MCP, security, SSH host, and update management. macOS arm64 / x64 and Windows x64." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -381,21 +381,22 @@
       <a href="#install">Install</a>
       <a href="https://github.com/nornzach/oh-my-pi-gui">GitHub</a>
     </div>
-    <a class="btn btn-primary btn-sm" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9-arm64.dmg">Download <span data-omp-version>v0.9.9</span></a>
+    <a class="btn btn-primary btn-sm" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-arm64.dmg">Download <span data-omp-version>v0.9.10</span></a>
   </div>
 </nav>
 
 <header class="hero" id="top">
   <div class="container">
-    <div class="hero-badge rise d1"><span class="dot"></span><span data-omp-version>v0.9.9</span> · <span data-omp-release-date>Sep 2026</span> — bundled agent, Apple Silicon &amp; Intel</div>
+    <div class="hero-badge rise d1"><span class="dot"></span><span data-omp-version>v0.9.10</span> · <span data-omp-release-date>Sep 2026</span> — bundled agent, Apple Silicon, Intel &amp; Windows</div>
     <h1 class="rise d2">One window.<br /><span class="grad">Every session in parallel.</span></h1>
     <p class="sub rise d3">The desktop GUI for the omp coding agent. Every session tab runs its own agent process — your work keeps moving in the background while you switch. All of the TUI's power, none of its walls.</p>
     <div class="hero-cta rise d4">
-      <a class="btn btn-primary" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9-arm64.dmg">
+      <a class="btn btn-primary" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-arm64.dmg">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for macOS <span class="btn-sub">Apple Silicon</span>
       </a>
-      <a class="btn btn-ghost" data-omp-dmg="x64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9.dmg">Intel build <span class="btn-sub">macOS x64</span></a>
+      <a class="btn btn-ghost" data-omp-dmg="x64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10.dmg">Intel build <span class="btn-sub">macOS x64</span></a>
+      <a class="btn btn-ghost" data-omp-win href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-setup.exe">Windows build <span class="btn-sub">x64 installer</span></a>
     </div>
     <p class="hero-fine rise d5">Bundled sidecar — no agent, bun, or Node to install · <a href="https://github.com/nornzach/oh-my-pi-gui/releases">All releases</a> · <a href="#install">Build from source</a></p>
     <div class="hero-shot-wrap rise d5">
@@ -583,12 +584,12 @@
     <div class="center reveal">
       <span class="eyebrow">Updates</span>
       <h2>Know when a new build lands</h2>
-      <p class="lead" style="max-width: 560px;">The app checks GitHub and keeps release progress visible. Current builds are not notarized, so macOS may require a manual DMG replacement.</p>
+      <p class="lead" style="max-width: 560px;">The app checks GitHub and keeps release progress visible. Current builds are unsigned, so macOS and Windows may require a manual confirmation on first launch.</p>
     </div>
     <div class="steps">
       <div class="step reveal"><div class="n">01</div><h3>Banner appears</h3><p>A new release on GitHub shows up as a quiet banner — no modal, no interruption.</p></div>
-      <div class="step reveal reveal-late"><div class="n">02</div><h3>Get the matching DMG</h3><p>Choose the Apple Silicon or Intel build from the latest GitHub Release.</p></div>
-      <div class="step reveal reveal-later"><div class="n">03</div><h3>Replace safely</h3><p>Quit omp, drag the new app into Applications, choose Replace, and reopen it.</p></div>
+      <div class="step reveal reveal-late"><div class="n">02</div><h3>Get the matching build</h3><p>Choose the Apple Silicon, Intel, or Windows x64 build from the latest GitHub Release.</p></div>
+      <div class="step reveal reveal-later"><div class="n">03</div><h3>Install and reopen</h3><p>Install the matching package for your platform, then reopen omp with your existing sessions and settings.</p></div>
     </div>
   </div>
 </section>
@@ -598,18 +599,19 @@
     <div class="install-panel reveal">
       <span class="eyebrow" style="justify-content: center; display: inline-flex;">Install</span>
       <h2>Up and running in a minute</h2>
-      <p class="lead" style="margin-left: auto; margin-right: auto;">Grab the DMG for your Mac. The agent, its runtime and everything else are already inside.</p>
+      <p class="lead" style="margin-left: auto; margin-right: auto;">Grab the build for your platform. The agent, its runtime and everything else are already inside.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9-arm64.dmg">
+        <a class="btn btn-primary" data-omp-dmg="arm64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-arm64.dmg">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Apple Silicon <span class="btn-sub">arm64</span>
         </a>
-        <a class="btn btn-ghost" data-omp-dmg="x64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9.dmg">Intel <span class="btn-sub">x64</span></a>
+        <a class="btn btn-ghost" data-omp-dmg="x64" href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10.dmg">Intel <span class="btn-sub">x64</span></a>
+        <a class="btn btn-ghost" data-omp-win href="https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-setup.exe">Windows <span class="btn-sub">x64 installer</span></a>
         <a class="btn btn-ghost" href="https://github.com/nornzach/oh-my-pi-gui/releases">All releases</a>
       </div>
       <div class="install-note">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>Builds are ad-hoc signed but not notarized. On first launch macOS may quarantine the app — right-click → <b>Open</b> once, or use System Settings → Privacy &amp; Security → Open Anyway.</span>
+        <span>macOS builds are ad-hoc signed but not notarized; Windows builds are unsigned. On first launch, macOS may require right-click → <b>Open</b> or System Settings → Privacy &amp; Security → Open Anyway, and Windows may require More info → <b>Run anyway</b>.</span>
       </div>
       <div class="src">
         <h3>Prefer building it yourself?</h3>
@@ -711,7 +713,7 @@ bun --cwd packages/gui run package:mac:arm64 -- --publish never <span class="c">
 </script>
 
 <script>
-  // The release is the source of truth for the version string and the DMG links, so the
+  // The release is the source of truth for the version string and platform installer links, so the
   // page cannot advertise a stale build between releases. The markup ships the current
   // release as the no-JS / rate-limited fallback; any failure simply leaves it in place.
   const installerUrl = (assets, tag, architecture) => {
@@ -719,6 +721,7 @@ bun --cwd packages/gui run package:mac:arm64 -- --publish never <span class="c">
     const name = `omp-${version}${architecture === "arm64" ? "-arm64" : ""}.dmg`;
     return assets.find((asset) => asset.name === name)?.browser_download_url;
   };
+  const windowsInstallerUrl = (assets) => assets.find((asset) => asset.name.endsWith("-setup.exe"))?.browser_download_url;
 
   fetch("https://api.github.com/repos/nornzach/oh-my-pi-gui/releases/latest", {
     headers: { accept: "application/vnd.github+json" },
@@ -733,6 +736,8 @@ bun --cwd packages/gui run package:mac:arm64 -- --publish never <span class="c">
         if (!url) continue;
         document.querySelectorAll(`[data-omp-dmg="${architecture}"]`).forEach((element) => { element.href = url; });
       }
+      const windowsUrl = windowsInstallerUrl(release.assets);
+      if (windowsUrl) document.querySelectorAll("[data-omp-win]").forEach((element) => { element.href = windowsUrl; });
     })
     .catch(() => {});
 </script>

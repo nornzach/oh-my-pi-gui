@@ -73,6 +73,12 @@ export function resetLoginShellEnvCache(): void {
 /** Probe `$SHELL -ilc 'env'` once and cache; on failure every field is empty. */
 export function resolveLoginShellEnv(): Promise<LoginShellEnv> {
 	if (cached) return Promise.resolve(cached);
+	// Windows has no login-shell probe. Keep the inherited environment and add
+	// the well-known per-user tool directories through fallbackBinDirs().
+	if (process.platform === "win32") {
+		cached = PROBE_FAILED;
+		return Promise.resolve(PROBE_FAILED);
+	}
 	const { promise, resolve } = Promise.withResolvers<LoginShellEnv>();
 	const finish = (env: LoginShellEnv) => {
 		cached = env;
@@ -117,6 +123,18 @@ function compareVersionDirs(a: string, b: string): number {
 /** Existing well-known user bin dirs, used when the shell probe fails. */
 function fallbackBinDirs(): string[] {
 	const home = homedir();
+	if (process.platform === "win32") {
+		const local = process.env.LOCALAPPDATA || join(home, "AppData", "Local");
+		const roaming = process.env.APPDATA || join(home, "AppData", "Roaming");
+		return [
+			join(home, ".bun", "bin"),
+			join(home, ".cargo", "bin"),
+			join(home, ".local", "bin"),
+			join(local, "Programs", "bun"),
+			join(roaming, "npm"),
+			join(local, "Microsoft", "WindowsApps"),
+		].filter(dir => existsSync(dir));
+	}
 	const candidates = [
 		join(home, ".local", "bin"),
 		join(home, ".bun", "bin"),

@@ -5,6 +5,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import sharp from "sharp";
@@ -27,6 +28,7 @@ const ICONSET: [string, number][] = [
 	["icon_512x512@2x.png", 1024],
 ];
 const LINUX_SIZES = [16, 32, 48, 64, 128, 256, 512, 1024];
+const ICO_SIZES = [16, 32, 48, 64, 128, 256];
 
 async function render(svg: Buffer, size: number): Promise<Buffer> {
 	// High density so the vector mark stays crisp when resized down.
@@ -34,6 +36,28 @@ async function render(svg: Buffer, size: number): Promise<Buffer> {
 		.resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
 		.png()
 		.toBuffer();
+}
+
+function writeIco(frames: { size: number; data: Buffer }[], outPath: string): void {
+	const header = Buffer.alloc(6);
+	header.writeUInt16LE(0, 0);
+	header.writeUInt16LE(1, 2);
+	header.writeUInt16LE(frames.length, 4);
+	const entries = Buffer.alloc(16 * frames.length);
+	const blobs: Buffer[] = [];
+	let offset = header.length + entries.length;
+	for (const [index, frame] of frames.entries()) {
+		const width = frame.size >= 256 ? 0 : frame.size;
+		entries.writeUInt8(width, index * 16);
+		entries.writeUInt8(width, index * 16 + 1);
+		entries.writeUInt16LE(1, index * 16 + 4);
+		entries.writeUInt16LE(32, index * 16 + 6);
+		entries.writeUInt32LE(frame.data.length, index * 16 + 8);
+		entries.writeUInt32LE(offset, index * 16 + 12);
+		blobs.push(frame.data);
+		offset += frame.data.length;
+	}
+	writeFileSync(outPath, Buffer.concat([header, entries, ...blobs]));
 }
 
 async function main(): Promise<void> {
@@ -48,7 +72,9 @@ async function main(): Promise<void> {
 	for (const [name, px] of ICONSET) {
 		await Bun.write(path.join(iconset, name), await render(svg, px));
 	}
-	execFileSync("iconutil", ["-c", "icns", iconset, "-o", path.join(resources, "icon.icns")], { stdio: "inherit" });
+	if (process.platform === "darwin") {
+		execFileSync("iconutil", ["-c", "icns", iconset, "-o", path.join(resources, "icon.icns")], { stdio: "inherit" });
+	}
 	await fs.rm(iconset, { recursive: true, force: true });
 
 	// Linux PNG set.
@@ -58,7 +84,10 @@ async function main(): Promise<void> {
 		await Bun.write(path.join(linuxDir, `${px}x${px}.png`), await render(svg, px));
 	}
 
-	console.log("Generated icon.png, icon.icns, and resources/icons/*.png");
+	const icoFrames = await Promise.all(ICO_SIZES.map(async size => ({ size, data: await render(svg, size) })));
+	writeIco(icoFrames, path.join(resources, "icon.ico"));
+
+	console.log("Generated icon.png, icon.icns (mac), icon.ico, and resources/icons/*.png");
 }
 
 await main();

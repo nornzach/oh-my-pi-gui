@@ -14,8 +14,10 @@ import { parse } from "yaml";
 
 interface BuilderConfig {
 	afterPack?: string;
+	extraResources?: { from: string; to: string }[];
 	protocols?: { name: string; schemes?: string[] }[];
 	mac?: { extendInfo?: Record<string, unknown> };
+	win?: { target?: { target?: string; arch?: string[] }[] };
 }
 
 const PACKAGE_ROOT = path.join(__dirname, "..", "..");
@@ -37,7 +39,8 @@ function macConfigs(): { file: string; config: BuilderConfig }[] {
 		.map(file => ({
 			file,
 			config: parse(fs.readFileSync(path.join(PACKAGE_ROOT, file), "utf8")) as BuilderConfig,
-		}));
+		}))
+		.filter(entry => entry.config.mac);
 }
 
 describe("mac bundle configs", () => {
@@ -121,6 +124,19 @@ describe("mac bundle configs", () => {
 		} finally {
 			await fs.promises.rm(directory, { recursive: true, force: true });
 		}
+	});
+});
+
+describe("Windows package config", () => {
+	it("ships a Windows sidecar and both x64 installer targets", () => {
+		const file = "electron-builder.win.yml";
+		const config = parse(fs.readFileSync(path.join(PACKAGE_ROOT, file), "utf8")) as BuilderConfig;
+		expect(config.protocols?.flatMap(protocol => protocol.schemes ?? []), `${file} ships no URL scheme`).toContain("omp");
+		expect(config.extraResources).toContainEqual({ from: "resources/omp.exe", to: "omp.exe" });
+		expect(config.win?.target).toEqual([
+			{ target: "nsis", arch: ["x64"] },
+			{ target: "portable", arch: ["x64"] },
+		]);
 	});
 });
 

@@ -33,6 +33,7 @@
  *   bun run build:omp                                       # host arch → resources/omp
  *   bun run build:omp:x64                                   # Intel cross-build → resources/omp.x64
  *   bun scripts/build-bundled-omp.ts --target bun-darwin-x64 --out custom/path
+ *   bun scripts/build-bundled-omp.ts --target bun-windows-x64-baseline # → resources/omp.exe
  *
  * After upgrading the monorepo (upstream sync), run scripts/sync-upstream.sh
  * instead — it merges upstream and re-runs this end-to-end.
@@ -116,25 +117,35 @@ function addonFilenamesFor(platformTag: string): readonly string[] {
 		: [`pi_natives.${platformTag}.node`];
 }
 
+function sidecarOutName(osName: string, arch: string): string {
+	if (osName === "win32" || osName === "windows") return "omp.exe";
+	return arch === "x64" ? `omp.${arch}` : "omp";
+}
+
 function resolveTarget(): SidecarTarget {
 	const targetFlag = argValue("--target");
 	if (!targetFlag || targetFlag === `bun-${process.platform}-${process.arch}`) {
 		const platformTag = `${process.platform}-${process.arch}`;
 		return {
 			platformTag,
-			out: path.join(guiRoot, "resources", "omp"),
+			out: path.join(guiRoot, "resources", process.platform === "win32" ? "omp.exe" : "omp"),
 			addonFilenames: addonFilenamesFor(platformTag),
 		};
 	}
-	const match = /^bun-(darwin|linux|win32)-(arm64|x64)(?:-.*)?$/.exec(targetFlag);
+	const match = /^bun-(darwin|linux|win32|windows)-(arm64|x64)(?:-.*)?$/.exec(targetFlag);
 	if (!match) {
-		throw new Error(`Unsupported --target '${targetFlag}'. Expected bun-<os>-<arch> (e.g. bun-darwin-x64).`);
+		throw new Error(
+			`Unsupported --target '${targetFlag}'. Expected bun-<os>-<arch> (e.g. bun-windows-x64-baseline).`,
+		);
 	}
-	const platformTag = `${match[1]}-${match[2]}`;
+	const osName = match[1] === "windows" ? "win32" : match[1]!;
+	const arch = match[2]!;
+	const platformTag = `${osName}-${arch}`;
+	const bunTarget = targetFlag.replace("bun-win32-", "bun-windows-") as Bun.Build.CompileTarget;
 	return {
-		target: targetFlag as Bun.Build.CompileTarget,
+		target: bunTarget,
 		platformTag,
-		out: path.join(guiRoot, "resources", `omp.${match[2]}`),
+		out: path.join(guiRoot, "resources", sidecarOutName(osName, arch)),
 		addonFilenames: addonFilenamesFor(platformTag),
 	};
 }

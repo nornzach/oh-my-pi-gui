@@ -1,0 +1,49 @@
+appId: sh.omp.gui
+productName: omp
+afterPack: scripts/after-pack.cjs
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**/*
+  - "!node_modules/**/*"
+extraResources:
+  - from: resources/omp.exe
+    to: omp.exe
+protocols:
+  - name: omp
+    schemes:
+      - omp
+asar: true
+compression: maximum
+
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  # Windows packages are currently unsigned; electron-updater must not require
+  # a stable certificate identity for an update check.
+  verifyUpdateCodeSignature: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: omp
+  artifactName: ${productName}-${version}-setup.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+publish:
+  provider: github
+  owner: nornzach
+  repo: oh-my-pi-gui
+
+electronLanguages:
+  - en

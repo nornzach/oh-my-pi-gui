@@ -8,7 +8,7 @@
 <a href="https://github.com/nornzach/oh-my-pi-gui/releases"><img src="https://img.shields.io/github/v/release/nornzach/oh-my-pi-gui?style=flat&colorA=222222&colorB=3FB950" alt="Release"></a>
 <a href="https://github.com/nornzach/oh-my-pi-gui/releases"><img src="https://img.shields.io/github/downloads/nornzach/oh-my-pi-gui/total?style=flat&colorA=222222&colorB=58A6FF" alt="Downloads"></a>
 <a href="./LICENSE"><img src="https://img.shields.io/github/license/nornzach/oh-my-pi-gui?style=flat&colorA=222222&colorB=BE185D" alt="License"></a>
-<img src="https://img.shields.io/badge/platform-macOS-222222?style=flat" alt="Platform: macOS">
+<img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-222222?style=flat" alt="Platform: macOS | Windows">
 <img src="https://img.shields.io/badge/Electron-35-47848F?style=flat&logo=electron&logoColor=white" alt="Electron">
 <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=white" alt="React">
 
@@ -22,11 +22,11 @@
 
 Keep the conversation, code changes, and agent activity in one place. Review a diff while another session works in its own Git worktree, compare two sessions in a split view, or open a tool-free Chat to think through an idea.
 
-Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **DMG users do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
+Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [What's new in 0.9.9](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+[Features](#en-features) · [What's new in 0.9.10](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
 
-> **v0.9.9 showcase.** The improvements below are included in v0.9.9, with the bundled agent updated to omp 18.3.0. [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+> **v0.9.10 showcase.** The improvements below are included in v0.9.10, with the bundled agent updated to omp 18.3.0. [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -62,9 +62,9 @@ The distinctive part is not just a chat window: it is being able to **separate p
 Model requests still go to the providers you configure. The bundled agent removes the separate runtime install, not the need to configure credentials, project dependencies, external Git/OpenSSH/MCP tools, or optional services. Only connect tools and services you trust.
 
 <a id="en-recent"></a>
-### What's new in 0.9.9
+### What's new in 0.9.10
 
-v0.9.9 includes these GUI improvements and a bundled agent update:
+v0.9.10 includes these GUI improvements and a bundled agent update:
 
 | In daily use | What has improved |
 |---|---|
@@ -149,14 +149,21 @@ Search with `⌘K`. Supported commands lead to native controls; pass-through and
 <a id="en-install"></a>
 ### Install & start
 
-**Documented install baseline: [v0.9.9](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.9).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
+**Documented install baseline: [v0.9.10](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.10).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
 
-| Mac | v0.9.9 download |
+| Mac | v0.9.10 download |
 |---|---|
-| Apple Silicon | [omp-0.9.9-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9-arm64.dmg) |
-| Intel | [omp-0.9.9.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9.dmg) |
+| Apple Silicon | [omp-0.9.10-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-arm64.dmg) |
+| Intel | [omp-0.9.10.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10.dmg) |
+
+| Windows x64 | v0.9.10 download |
+|---|---|
+| Installer | [omp-0.9.10-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-setup.exe) |
+| Portable | [omp-0.9.10-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-portable.exe) |
 
 Open the DMG and drag **omp** into **Applications**. The build is ad-hoc signed but not notarized. If macOS blocks the first launch, use **right-click → Open**, or **System Settings → Privacy & Security → Open Anyway**, after confirming the download's source.
+
+Windows packages are currently unsigned. Windows SmartScreen may require **More info → Run anyway** on first launch after confirming the download's source.
 
 1. **Connect a provider:** open **Providers & login** from the sidebar and use the authentication method it supports.
 2. **Choose your work:** open a project Agent tab with `⌘T`, or a tool-free Chat with `⇧⌘T`; select an available model.
@@ -210,7 +217,7 @@ Never stage `packages/gui/` into the monorepo: its untracked status there is int
 
 #### Build from source
 
-**Prerequisites:** macOS, Git, and [Bun](https://bun.sh) **≥ 1.4**. The dual-architecture build commands below assume an **Apple Silicon Mac**: `build:omp` uses the host architecture, and `build:omp:x64` cross-builds Intel.
+**Prerequisites:** Git and [Bun](https://bun.sh) **≥ 1.4**. macOS is required for the macOS sidecar and DMG commands; Windows x64 can be cross-built from macOS or Linux when the neighboring monorepo is available.
 
 ```bash
 # Clone the monorepo fork, then nest the GUI repository inside it.
@@ -231,11 +238,15 @@ bun run build:omp                              # arm64 host -> resources/omp
 bun run build:omp:x64                          # Intel -> resources/omp.x64
 bun run package:mac:arm64 -- --publish never    # dist/omp-<version>-arm64.dmg
 bun run package:mac:x64 -- --publish never      # dist/omp-<version>.dmg
+bun run build:omp:win                           # Windows x64 -> resources/omp.exe
+bun run package:win -- --publish never           # Windows NSIS + portable installers
 ```
 
 `build:omp` compiles the neighboring monorepo agent source and embeds the native addon. It stages the matching `pi_natives` version, downloads the published package when needed, replaces stale addons, and restores temporary staging afterwards. Sidecars at `resources/omp*` are ignored build artifacts: **never commit them**.
 
 Packaging rebuilds the Electron app, **not the agent sidecar**. Re-run the matching `build:omp*` after agent/RPC changes or upstream updates. The arm64 config uses `resources/omp`; the Intel config uses `resources/omp.x64`. Always use `package:mac:x64` for Intel—using the default config can package the wrong architecture.
+
+The Windows configuration targets x64 and bundles `resources/omp.exe`. It produces an NSIS installer and a portable executable. Windows packages are currently unsigned; production distribution should add a Windows code-signing certificate before treating SmartScreen warnings as resolved.
 
 **A standalone GUI clone cannot compile the sidecar.** It must occupy `packages/gui/` in the layout above. For artifact assembly without monorepo sources, supply trusted, compatible prebuilt sidecars at `resources/omp` and/or `resources/omp.x64`, then run `build` and the matching packaging command. A packaged app uses its bundled agent; installing a system `omp` is not a fallback for a missing sidecar.
 
@@ -270,7 +281,8 @@ The capture script renders the actual Electron GUI using a fresh temporary HOME,
 | Symptom | What to check |
 |---|---|
 | macOS blocks the first launch | Confirm the download came from the release page, then right-click → Open or use Privacy & Security → Open Anyway. The baseline build is ad-hoc signed, not notarized. |
-| A screenshot shows something absent from the installed app | The showcase covers v0.9.9. Check the installed version and its release notes; earlier releases may not include these improvements. |
+| Windows SmartScreen blocks the first launch | Confirm the download came from the release page, then choose More info → Run anyway. The Windows package is currently unsigned. |
+| A screenshot shows something absent from the installed app | The showcase covers v0.9.10. Check the installed version and its release notes; earlier releases may not include these improvements. |
 | `Built-in omp not found` | In a source checkout, build the sidecar or supply a compatible prebuilt one. In an installed app, reinstall the correct official DMG; a separate system `omp` will not fix a missing bundle resource. |
 | `build:omp` cannot find the monorepo | Put the GUI checkout at the monorepo's `packages/gui/`, alongside `packages/coding-agent/` and `packages/natives/`. |
 | `replacing stale addon … version sentinel ≠ …` | Informational: the builder detected and replaced a mismatched native addon. |
@@ -282,7 +294,7 @@ The capture script renders the actual Electron GUI using a fresh temporary HOME,
 ### Release process (maintainers)
 
 <details>
-<summary><b>Sync, build both architectures, smoke-test the mounted DMGs, then publish</b></summary>
+<summary><b>Sync, build all targets, smoke-test the installers, then publish</b></summary>
 
 Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh-my-pi-gui/releases). Preserve the two-repository boundary throughout:
 
@@ -290,9 +302,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 2. **Prepare the GUI release.** In `packages/gui/`, bump `package.json`, write the release's `CHANGELOG.md` entry, and update both language sections' install links and source/release notes.
 3. **Verify the GUI:** `bunx vitest run && bun run check:types && bun run build`; check touched supported files with Biome.
 4. **Record the release source.** Commit GUI release changes in the GUI repository, tag `vX.Y.Z`, and push `main` plus the tag to its `origin`. Keep both checkouts clean before producing release artifacts.
-5. **Build both sidecars:** `bun run build:omp && bun run build:omp:x64`. Run `resources/omp --smoke-test` and `resources/omp.x64 --smoke-test` on compatible hosts. Cross-compilation alone is not runtime verification.
-6. **Build and inspect both DMGs:** `bun run package:mac:arm64 -- --publish never` and `bun run package:mac:x64 -- --publish never`. Mount each DMG; verify its app seal with `codesign --verify --deep --strict --verbose=2 "<path-to-omp.app>"` and its bundled sidecar architecture with `file "<path-to-omp.app>/Contents/Resources/omp"`. On a compatible host, launch each mounted app, confirm sidecar `ready`, a successful `get_settings` RPC, and a settings toggle that persists.
-7. **Publish only verified artifacts.** Publish a GitHub Release with both DMGs and the changelog. Record the monorepo commit used for the sidecar, especially when it differs from upstream `main`. Never commit sidecar binaries or push to `upstream`.
+5. **Build all sidecars:** `bun run build:omp && bun run build:omp:x64 && bun run build:omp:win`. Run the two macOS sidecars and the Windows sidecar's `--smoke-test` on compatible hosts. Cross-compilation alone is not runtime verification.
+6. **Build and inspect installers:** build both DMGs with the macOS commands and Windows installers with `bun run package:win -- --publish never`. Mount each DMG; verify its app seal with `codesign --verify --deep --strict --verbose=2 "<path-to-omp.app>"`, its bundled sidecar architecture with `file "<path-to-omp.app>/Contents/Resources/omp"`, and the Windows package's `win-unpacked/resources/omp.exe` with `file`. On compatible hosts, launch each package, confirm sidecar `ready`, a successful `get_settings` RPC, and a settings toggle that persists.
+7. **Publish only verified artifacts.** Publish a GitHub Release with both DMGs, the Windows NSIS and portable installers, generated update metadata, and the changelog. Record the monorepo commit used for the sidecars, especially when it differs from upstream `main`. Never commit sidecar binaries or push to `upstream`.
 
 </details>
 
@@ -302,11 +314,11 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 把对话、代码变更与 Agent 执行状态放在同一视野中。一边审查 diff，一边让另一段会话在独立 Git worktree 中推进任务；需要对照时打开双会话分屏，只想讨论思路时则切换到无工具 Chat。
 
-这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG 安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
+这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG、NSIS 或便携版安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [0.9.9 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.10 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.9 功能展示。** 下文改进均纳入 v0.9.9，内置 Agent 更新至 omp 18.3.0。可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.10 功能展示。** 下文改进均纳入 v0.9.10，内置 Agent 更新至 omp 18.3.0。可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -342,9 +354,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 模型请求仍会发送到你配置的 Provider。内置 Agent 省去了单独安装运行时的步骤，但不替你配置凭据、项目依赖、外部 Git/OpenSSH/MCP 工具或可选服务。请只连接你信任的工具与服务。
 
 <a id="zh-recent"></a>
-### 0.9.9 更新内容
+### 0.9.10 更新内容
 
-v0.9.9 包含以下 GUI 改进与内置 Agent 更新：
+v0.9.10 包含以下 GUI 改进与内置 Agent 更新：
 
 | 日常场景 | 改进内容 |
 |---|---|
@@ -429,14 +441,21 @@ v0.9.9 包含以下 GUI 改进与内置 Agent 更新：
 <a id="zh-install"></a>
 ### 安装与开始使用
 
-**本文安装基线：[v0.9.9](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.9)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+**本文安装基线：[v0.9.10](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.10)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
-| Mac | v0.9.9 下载 |
+| Mac | v0.9.10 下载 |
 |---|---|
-| Apple Silicon | [omp-0.9.9-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9-arm64.dmg) |
-| Intel | [omp-0.9.9.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.9/omp-0.9.9.dmg) |
+| Apple Silicon | [omp-0.9.10-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-arm64.dmg) |
+| Intel | [omp-0.9.10.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10.dmg) |
+
+| Windows x64 | v0.9.10 下载 |
+|---|---|
+| 安装程序 | [omp-0.9.10-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-setup.exe) |
+| 便携版 | [omp-0.9.10-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.10/omp-0.9.10-portable.exe) |
 
 打开 DMG，把 **omp** 拖入**应用程序**。构建采用 ad-hoc 签名，未经 Apple 公证。如果 macOS 拦截首次启动，请先确认下载来源，再使用**右键 → 打开**，或**系统设置 → 隐私与安全性 → 仍要打开**。
+
+Windows 包当前未签名。首次启动前请确认下载来源；Windows SmartScreen 可能需要点击**更多信息 → 仍要运行**。
 
 1. **连接 Provider：**从侧栏打开**提供商与登录**，使用该服务支持的认证方式。
 2. **选择工作方式：**`⌘T` 新建项目 Agent 标签页，或 `⇧⌘T` 打开无工具 Chat；选择可用模型。
@@ -490,7 +509,7 @@ omp-monorepo/                    # nornzach/oh-my-pi：fork 与 sidecar 构建�
 
 #### 从源码构建
 
-**前置条件：**macOS、Git、[Bun](https://bun.sh) **≥ 1.4**。以下双架构构建命令以 **Apple Silicon Mac** 为宿主：`build:omp` 使用宿主架构，`build:omp:x64` 交叉构建 Intel。
+**前置条件：**Git、[Bun](https://bun.sh) **≥ 1.4**。macOS sidecar 与 DMG 命令需要 macOS；Windows x64 sidecar 可以在 macOS 或 Linux 上交叉构建，但仍需相邻的 monorepo。
 
 ```bash
 # 克隆 monorepo fork，再将 GUI 仓库嵌套其中。
@@ -511,11 +530,15 @@ bun run build:omp                              # arm64 宿主 -> resources/omp
 bun run build:omp:x64                          # Intel -> resources/omp.x64
 bun run package:mac:arm64 -- --publish never    # dist/omp-<版本>-arm64.dmg
 bun run package:mac:x64 -- --publish never      # dist/omp-<版本>.dmg
+bun run build:omp:win                           # Windows x64 -> resources/omp.exe
+bun run package:win -- --publish never           # Windows NSIS + portable 安装包
 ```
 
 `build:omp` 编译相邻的 monorepo Agent 源码并嵌入原生插件。它会准备匹配版本的 `pi_natives`，需要时下载已发布的包，替换旧插件，并在结束后还原临时准备的文件。`resources/omp*` 是被忽略的构建产物，**绝不能提交入库**。
 
 打包会重新构建 Electron 应用，**不会重新构建 Agent sidecar**。Agent/RPC 源码或上游更新后，先运行匹配的 `build:omp*`。arm64 配置使用 `resources/omp`，Intel 配置使用 `resources/omp.x64`。Intel 必须使用 `package:mac:x64`，默认配置可能装入错误架构。
+
+Windows 配置目标为 x64，并将 `resources/omp.exe` 放入应用包；它会生成 NSIS 安装程序与便携版可执行文件。Windows 包当前未签名，正式分发前应配置 Windows 代码签名证书。
 
 **单独克隆 GUI 仓库无法编译 sidecar。**它必须位于上述结构的 `packages/gui/`。如仅组装产物、没有 monorepo 源码，可在 `resources/omp` 和/或 `resources/omp.x64` 放入可信且兼容的预编译 sidecar，再执行 `build` 与对应的打包命令。已打包应用使用内置 Agent；另装系统 `omp` 不能替代缺失的 sidecar。
 
@@ -550,7 +573,8 @@ bun scripts/capture-showcase.ts
 | 现象 | 检查方式 |
 |---|---|
 | macOS 拦截首次启动 | 确认来自发布页后，右键 → 打开，或通过隐私与安全性 → 仍要打开。基线版本为 ad-hoc 签名，未经公证。 |
-| 截图中的功能在已安装应用中不存在 | 本展示对应 v0.9.9；请检查已安装版本及其发布说明，较早版本可能不包含这些改进。 |
+| Windows SmartScreen 拦截首次启动 | 确认来自发布页后，点击更多信息 → 仍要运行。Windows 包当前未签名。 |
+| 截图中的功能在已安装应用中不存在 | 本展示对应 v0.9.10；请检查已安装版本及其发布说明，较早版本可能不包含这些改进。 |
 | `Built-in omp not found` | 源码检出中需构建或放入兼容 sidecar；已安装应用请重新安装正确的官方 DMG。另装系统 `omp` 无法补齐包内资源。 |
 | `build:omp` 找不到 monorepo | 将 GUI 放在 monorepo 的 `packages/gui/`，与 `packages/coding-agent/`、`packages/natives/` 同级。 |
 | `replacing stale addon … version sentinel ≠ …` | 提示信息：构建器发现并替换了版本不匹配的原生插件。 |
@@ -562,7 +586,7 @@ bun scripts/capture-showcase.ts
 ### 发布流程（维护者）
 
 <details>
-<summary><b>同步、构建双架构、烟测挂载后的 DMG，再发布</b></summary>
+<summary><b>同步、构建全部目标、烟测安装包，再发布</b></summary>
 
 发布只属于 [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh-my-pi-gui/releases)，全程保持两个仓库的边界：
 
@@ -570,9 +594,9 @@ bun scripts/capture-showcase.ts
 2. **准备 GUI 发布。**在 `packages/gui/` 提升 `package.json` 版本，撰写本次发布的 `CHANGELOG.md`，更新两种语言的安装链接与源码/发布说明。
 3. **验证 GUI：**`bunx vitest run && bun run check:types && bun run build`，并用 Biome 检查修改过且受其支持的文件。
 4. **记录发布源码。**GUI 发布改动在 GUI 仓库提交，打 `vX.Y.Z` 标签，向它的 `origin` 推送 `main` 与标签。生成发布产物前保持两个检出干净。
-5. **构建两个 sidecar：**`bun run build:omp && bun run build:omp:x64`。在兼容宿主上分别运行 `resources/omp --smoke-test` 与 `resources/omp.x64 --smoke-test`；交叉编译成功不等于运行验证通过。
-6. **构建并检查两个 DMG：**`bun run package:mac:arm64 -- --publish never` 与 `bun run package:mac:x64 -- --publish never`。逐个挂载 DMG，用 `codesign --verify --deep --strict --verbose=2 "<path-to-omp.app>"` 验证应用签名封装，用 `file "<path-to-omp.app>/Contents/Resources/omp"` 检查内置 sidecar 架构。在兼容宿主上分别启动挂载的应用，确认 sidecar `ready`、`get_settings` RPC 成功，以及设置开关可以持久化。
-7. **只发布验证过的产物。**GitHub Release 附带两个 DMG 和 changelog，并记录构建 sidecar 使用的 monorepo commit，尤其在其不同于上游 `main` 时。绝不提交 sidecar 二进制，也不向 `upstream` 推送。
+5. **构建全部 sidecar：**`bun run build:omp && bun run build:omp:x64 && bun run build:omp:win`。在兼容宿主上运行两个 macOS sidecar 与 Windows sidecar 的 `--smoke-test`；交叉编译成功不等于运行验证通过。
+6. **构建并检查安装包：**按 macOS 命令构建两个 DMG，按 `bun run package:win -- --publish never` 构建 Windows 安装包。逐个挂载 DMG，用 `codesign --verify --deep --strict --verbose=2 "<path-to-omp.app>"` 验证应用签名封装，用 `file "<path-to-omp.app>/Contents/Resources/omp"` 检查内置 sidecar 架构，并用 `file` 检查 Windows 包的 `win-unpacked/resources/omp.exe`。在兼容宿主上启动各平台应用，确认 sidecar `ready`、`get_settings` RPC 成功，以及设置开关可以持久化。
+7. **只发布验证过的产物。**GitHub Release 附带两个 DMG、Windows NSIS 与便携版安装包、更新元数据和 changelog，并记录构建 sidecar 使用的 monorepo commit，尤其在其不同于上游 `main` 时。绝不提交 sidecar 二进制，也不向 `upstream` 推送。
 
 </details>
 
