@@ -20,6 +20,8 @@ const { EvalRenderer } = await import("./EvalRenderer");
 const { HubRenderer } = await import("./HubRenderer");
 const { ImageRenderer } = await import("./ImageRenderer");
 const { ReadRenderer } = await import("./ReadRenderer");
+const { WaitRenderer } = await import("./CoordinationRenderer");
+const { WriteRenderer } = await import("./WriteRenderer");
 
 let container: HTMLElement;
 let root: Root;
@@ -149,5 +151,88 @@ describe("read preview", () => {
 
 		expect(container.textContent).toContain("INITIAL_RENDER_ROWS");
 		expect(container.querySelector("button[title='Copy code']")).not.toBeNull();
+	});
+});
+
+describe("omp 18.3.0 coordination protocol renderers", () => {
+	it("renders wait snapshots as compact job and agent rows", async () => {
+		await mount(
+			<WaitRenderer
+				args={{}}
+				result={{
+					content: [{ type: "text", text: "Waiting on background work" }],
+					details: {
+						jobs: [
+							{ id: "build-42", type: "bash", status: "running", label: "bun test", durationMs: 1_200 },
+							{ id: "lint-7", type: "bash", status: "completed", label: "bun lint", durationMs: 800 },
+						],
+						agents: [{ id: "Scout", live: false, activity: "reviewing changes", ageMs: 5_000 }],
+					},
+				}}
+			/>,
+		);
+
+		expect(container.textContent).toContain("build-42");
+		expect(container.textContent).toContain("lint-7");
+		expect(container.textContent).toContain("Scout");
+		expect(container.textContent).toContain("stale");
+	});
+
+	it("renders proc reads with structured job details instead of a file preview", async () => {
+		await mount(
+			<ReadRenderer
+				args={{ path: "proc://build-42" }}
+				result={{
+					content: [{ type: "text", text: "build-42 [bash] — running" }],
+					details: {
+						proc: {
+							job: { id: "build-42", type: "bash", status: "running", label: "bun test", durationMs: 2_400 },
+							log: "18 tests running",
+						},
+					},
+				}}
+			/>,
+		);
+
+		expect(container.textContent).toContain("Process build-42");
+		expect(container.textContent).toContain("18 tests running");
+		expect(container.querySelector("a")).toBeNull();
+	});
+
+	it("renders agent messages and proc cancellation as protocol operations", async () => {
+		await mount(
+			<WriteRenderer
+				args={{ path: "agent://Scout", content: "please recheck the API" }}
+				result={{
+					content: [{ type: "text", text: "Delivered to Scout." }],
+					details: { message: { to: "Scout", receipts: [{ to: "Scout", outcome: "injected" }] } },
+				}}
+			/>,
+		);
+		expect(container.textContent).toContain("Scout");
+		expect(container.textContent).toContain("please recheck the API");
+		expect(container.textContent).toContain("injected");
+
+		await act(async () => root.unmount());
+		await mount(
+			<WriteRenderer
+				args={{ path: "proc://build-42/kill" }}
+				result={{
+					content: [{ type: "text", text: "Cancelled build-42" }],
+					details: {
+						proc: {
+							op: "cancel",
+							jobs: [
+								{ id: "build-42", type: "bash", status: "cancelled", label: "bun test", durationMs: 2_500 },
+							],
+							cancelled: [{ id: "build-42", status: "cancelled" }],
+						},
+					},
+				}}
+			/>,
+		);
+		expect(container.textContent).toContain("Process kill");
+		expect(container.textContent).toContain("build-42");
+		expect(container.textContent).toContain("cancelled");
 	});
 });

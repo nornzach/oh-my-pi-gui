@@ -5,6 +5,7 @@ import { basename, cx, dirname, headLines, languageFromPath, resultDetails, resu
 import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_LG } from "../../lib/preview";
 import { CodeBlock } from "../chat/CodeBlock";
+import { ProtocolWriteRenderer } from "./CoordinationRenderer";
 import { PathLink } from "./PathLink";
 import type { ToolRendererProps } from "./ToolCard";
 
@@ -35,11 +36,25 @@ function diffStats(diff: string): { added: number; removed: number } {
  */
 /** Preview ceiling for diff-less write content (lines entered into the DOM). */
 const WRITE_PREVIEW_LINES = 500;
-export function WriteRenderer({ args, result, isError }: ToolRendererProps) {
+export function WriteRenderer({ args, result, isError, isPartial, partialResult, interrupted }: ToolRendererProps) {
 	const t = useT();
 	const [open, setOpen] = useState(false);
 	const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : "";
 	const content = typeof args.content === "string" ? args.content : "";
+	if (/^(?:agent|proc):\/\//i.test(path)) {
+		return (
+			<ProtocolWriteRenderer
+				args={args}
+				content={content}
+				interrupted={interrupted}
+				isError={isError}
+				isPartial={isPartial}
+				partialResult={partialResult}
+				result={result}
+				target={path}
+			/>
+		);
+	}
 	const lineCount = content ? content.split("\n").length : 0;
 	// Preview ceiling: the full written file must not enter the DOM — the
 	// height class only clips after layout. Copy stays available via the file.

@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, ChevronRight, LoaderCircle } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -63,18 +63,26 @@ export function ExecutionGroup({
 				className="omp-execution-group-header omp-pressable flex w-full min-w-0 items-center gap-2 text-left"
 				onClick={() => onExpandedChange(!expanded)}
 				type="button"
+				aria-label={`${t("chat.process.title")}: ${summary}`}
 			>
-				{active ? (
-					<LoaderCircle aria-hidden="true" className="shrink-0 animate-spin text-[var(--omp-link)]" size={14} />
-				) : failed > 0 ? (
-					<AlertCircle aria-hidden="true" className="shrink-0 text-[var(--omp-error)]" size={14} />
-				) : (
-					<CheckCircle2 aria-hidden="true" className="shrink-0 text-[var(--omp-dim)]" size={14} />
+				{active && (
+					<span
+						aria-hidden="true"
+						className="omp-execution-group-live-dot h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--omp-accent)]"
+					/>
 				)}
+				<span className="omp-execution-group-title shrink-0 text-omp-sm font-medium text-[var(--omp-text)]">
+					{t("chat.process.title")}
+				</span>
 				<span
 					aria-atomic="true"
 					aria-live="polite"
-					className="min-w-0 flex-1 truncate text-omp-md font-medium text-[var(--omp-muted)]"
+					className={cx(
+						"omp-execution-group-summary min-w-0 flex-1 truncate text-omp-xs",
+						state === "running" && "text-[var(--omp-accent)]",
+						state === "failed" && "text-[var(--omp-error)]",
+						state === "complete" && "text-[var(--omp-muted)]",
+					)}
 					role="status"
 				>
 					{summary}

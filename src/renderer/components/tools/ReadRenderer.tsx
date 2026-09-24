@@ -11,6 +11,7 @@ import {
 import { useT } from "../../lib/i18n";
 import { PREVIEW_HEIGHT_LG, PREVIEW_SCROLL_LG, READ_PREVIEW_LINES } from "../../lib/preview";
 import { CodeBlock } from "../chat/CodeBlock";
+import { ProcReadRenderer } from "./CoordinationRenderer";
 import { PathLink } from "./PathLink";
 import type { ToolRendererProps } from "./ToolCard";
 
@@ -25,6 +26,7 @@ interface ReadToolDetails {
 	url?: string;
 	finalUrl?: string;
 	displayContent?: { text: string; startLine: number; lineNumbers?: Array<number | null> };
+	proc?: unknown;
 }
 
 /** Strip a trailing read selector (`file.ts:50-100`, `db.sqlite:users`) for
@@ -40,6 +42,19 @@ export function ReadRenderer({ args, result, isError, isPartial, partialResult }
 	const path = typeof args.path === "string" ? args.path : "";
 	const effective = isPartial ? partialResult : result;
 	const details = (resultDetails(effective) ?? {}) as ReadToolDetails;
+	if (/^proc:\/\//i.test(path) || details.proc !== undefined) {
+		return (
+			<ProcReadRenderer
+				args={args}
+				id={path.replace(/^proc:\/\//i, "")}
+				isError={isError}
+				isPartial={isPartial}
+				partialResult={partialResult}
+				procDetails={details.proc}
+				result={result}
+			/>
+		);
+	}
 	const structuredPath = details.resolvedPath ?? details.finalUrl ?? details.url;
 	const basePath = typeof structuredPath === "string" && structuredPath ? structuredPath : stripReadSelector(path);
 	const display = details.displayContent;

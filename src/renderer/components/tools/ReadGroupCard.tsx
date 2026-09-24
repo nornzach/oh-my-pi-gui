@@ -119,28 +119,6 @@ export function ReadGroupCard({
 					{rows.length === 1 ? rows[0]!.path : t("readGroup.files", { count: rows.length })}
 				</span>
 			</button>
-			{/* Tree preview rows (always visible, TUI parity) */}
-			<div className="omp-read-group-preview ml-6 mt-0.5 font-mono text-omp-sm leading-[1.6] text-(--omp-muted)">
-				{rows.map((row, index) => (
-					<div key={`${row.path}:${index}`} className="flex items-baseline gap-2 truncate">
-						<span className="shrink-0 text-(--omp-dim)">{index === rows.length - 1 ? "└─" : "├─"}</span>
-						<span className="truncate text-(--omp-accent)">{row.path}</span>
-						{row.selector && <span className="shrink-0 text-(--omp-dim)">:{row.selector}</span>}
-						{row.toolKeys.some(key => statuses.get(key) === "pending") && (
-							<span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--omp-accent)" />
-						)}
-						{!row.toolKeys.some(key => statuses.get(key) === "pending") &&
-							row.toolKeys.some(key => statuses.get(key) === "error") && (
-								<span className="shrink-0 text-(--omp-error)">✗</span>
-							)}
-						{!row.toolKeys.some(key => statuses.get(key) === "pending") &&
-							!row.toolKeys.some(key => statuses.get(key) === "error") &&
-							row.toolKeys.some(key => statuses.get(key) === "aborted") && (
-								<span className="shrink-0 text-(--omp-warning)">⊘</span>
-							)}
-					</div>
-				))}
-			</div>
 			{open && (
 				<div className="omp-read-group-body ml-6 mt-1 space-y-1.5">
 					{entries.map(entry => (

@@ -189,6 +189,7 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 			<button
 				type="button"
 				aria-expanded={open}
+				aria-label={t(open ? "chat.thinking.hide" : "chat.thinking.show")}
 				onClick={() => setOpen(v => !v)}
 				className="omp-thinking-header flex w-full items-center gap-1.5 px-2 py-1 text-left text-omp-sm text-[var(--omp-muted)] transition-colors hover:bg-[var(--omp-bg-tertiary)]"
 			>
@@ -205,14 +206,6 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 						{t("chat.thinking.done")}
 					</span>
 				)}
-				{!isLive ? (
-					<span className="omp-thinking-fold-state" style={{ color: `var(--omp-thinking-${tokenLevel})` }}>
-						{t(open ? "chat.thinking.expanded" : "chat.thinking.collapsed")}
-					</span>
-				) : null}
-				<span className="omp-thinking-hint text-[var(--omp-muted)]">
-					{t(open ? "chat.thinking.hide" : "chat.thinking.show")}
-				</span>
 				<span className="omp-thinking-level text-[var(--omp-dim)]">{LEVEL_LABEL[resolvedLevel]}</span>
 				{showGauge && (
 					<span className="omp-thinking-gauge contents">

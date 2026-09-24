@@ -428,7 +428,7 @@
 .omp-workspace-main,
 .settings-main-canvas {
 	--omp-column-pad: clamp(16px, 3vw, 40px);
-	--omp-column-reading: 72rem;
+	--omp-column-reading: 60rem;
 	--omp-column-workspace: 104rem;
 }
 
@@ -454,7 +454,6 @@
 }
 
 .omp-transcript-editorial {
-	--omp-editorial-rail-x: calc(var(--omp-column-pad) / 2);
 	--omp-editorial-inset: var(--omp-column-pad);
 	--omp-editorial-edge: var(--omp-column-pad);
 }
@@ -640,66 +639,25 @@
 	content: none;
 }
 
-.omp-transcript-editorial .omp-timeline-marker {
-	position: absolute;
-	z-index: 1;
-	left: calc(var(--omp-editorial-rail-x) - 7px);
-	top: 17px;
-	display: flex;
-	width: 14px;
-	align-items: center;
-	justify-content: center;
-	color: var(--omp-muted);
-}
-
-.omp-transcript-editorial .omp-timeline-dot {
-	display: grid;
-	width: 14px;
-	height: 14px;
-	place-items: center;
-	border: 0;
-	background: transparent;
-	color: var(--omp-dim);
-	box-shadow: none;
-}
-
-.omp-transcript-editorial .omp-timeline-marker--running .omp-timeline-dot {
-	background: transparent;
-	color: var(--omp-accent);
-}
-
-.omp-transcript-editorial .omp-timeline-marker--launch .omp-timeline-dot {
-	background: transparent;
-	color: var(--omp-transcript-launch);
-}
-
-.omp-transcript-editorial .omp-timeline-marker--error .omp-timeline-dot {
-	background: transparent;
-	color: var(--omp-error);
-}
-
-.omp-transcript-editorial .omp-timeline-marker time {
-	display: none;
-}
-
 .omp-transcript-editorial .omp-user-turn {
 	justify-content: flex-start;
-	padding: 24px var(--omp-editorial-edge) 16px var(--omp-editorial-inset) !important;
+	padding: 18px var(--omp-editorial-edge) 12px var(--omp-editorial-inset) !important;
 }
 
 .omp-transcript-editorial .omp-user-bubble {
-	border: 1px solid var(--omp-transcript-user-border);
-	border-radius: 12px;
-	background: var(--omp-transcript-user-bg);
+	border: 0;
+	border-left: 2px solid var(--omp-transcript-user-border);
+	border-radius: 0;
+	background: color-mix(in srgb, var(--omp-transcript-user-bg) 28%, transparent);
 	box-shadow: none !important;
-	padding: 12px 15px;
+	padding: 8px 0 8px 12px;
 }
 
 .omp-transcript-editorial .omp-user-bubble-layout {
 	display: grid;
-	grid-template-columns: 34px minmax(0, 1fr);
+	grid-template-columns: 24px minmax(0, 1fr);
 	align-items: start;
-	gap: 14px;
+	gap: 10px;
 }
 
 .omp-transcript-editorial .omp-user-bubble-author {
@@ -733,16 +691,16 @@
 }
 
 .omp-transcript-editorial .omp-assistant-turn {
-	padding: 12px var(--omp-editorial-edge) 16px var(--omp-editorial-inset) !important;
+	padding: 8px var(--omp-editorial-edge) 12px var(--omp-editorial-inset) !important;
 }
 
 .omp-transcript-editorial .omp-assistant-turn--compact {
-	padding: 2px var(--omp-editorial-edge) 2px var(--omp-editorial-inset) !important;
+	padding: 1px var(--omp-editorial-edge) 1px var(--omp-editorial-inset) !important;
 }
 
 .omp-transcript-editorial .omp-process-group {
 	position: relative;
-	padding-block: 2px 4px;
+	padding-block: 1px 3px;
 }
 
 .omp-execution-group {
@@ -752,9 +710,9 @@
 }
 
 .omp-execution-group-header {
-	min-height: 30px;
+	min-height: 24px;
 	border-radius: 7px;
-	padding: 4px 2px;
+	padding: 2px 0;
 	transition: color var(--omp-motion-fast) var(--omp-ease), background-color var(--omp-motion-fast) var(--omp-ease);
 }
 
@@ -763,8 +721,16 @@
 }
 
 .omp-execution-group-body {
-	margin-top: 1px;
-	padding: 0 0 4px 20px;
+	margin-top: 0;
+	padding: 0 0 2px 10px;
+}
+
+.omp-transcript-editorial .omp-execution-group-title {
+	display: none;
+}
+
+.omp-transcript-editorial .omp-execution-group-summary {
+	font-size: calc(var(--gui-font-size, 15px) * 11 / 15);
 }
 
 .omp-goal-dock {
@@ -804,10 +770,14 @@
 	display: none;
 }
 
+.omp-transcript-editorial .omp-tool-status-icon {
+	display: none;
+}
+
 .omp-transcript-editorial .omp-tool-header {
-	min-height: 30px;
-	padding: 4px 0;
-	font-size: calc(var(--gui-font-size, 15px) * 12 / 15);
+	min-height: 24px;
+	padding: 2px 0;
+	font-size: calc(var(--gui-font-size, 15px) * 11 / 15);
 }
 
 .omp-transcript-editorial .omp-tool-header:hover {
@@ -815,14 +785,14 @@
 }
 
 .omp-transcript-editorial .omp-tool-name {
-	min-width: 42px;
-	font-size: calc(var(--gui-font-size, 15px) * 12 / 15);
+	min-width: 34px;
+	font-size: calc(var(--gui-font-size, 15px) * 11 / 15);
 	font-weight: 700;
 	letter-spacing: 0;
 }
 
 .omp-transcript-editorial .omp-tool-summary {
-	font-size: calc(var(--gui-font-size, 15px) * 11.5 / 15);
+	font-size: calc(var(--gui-font-size, 15px) * 10 / 15);
 	color: var(--omp-muted);
 }
 
@@ -832,24 +802,26 @@
 	background: transparent;
 	padding: 0;
 	text-align: right;
-	font-size: calc(var(--gui-font-size, 15px) * 10.5 / 15);
+	font-size: calc(var(--gui-font-size, 15px) * 9.5 / 15);
 	color: var(--omp-muted);
 }
 
 .omp-transcript-editorial .omp-tool-chevron {
-	opacity: 0;
+	opacity: 0.58;
 }
 
 .omp-transcript-editorial .omp-tool-header:hover .omp-tool-chevron,
 .omp-transcript-editorial .omp-tool-header:focus-visible .omp-tool-chevron {
-	opacity: 1;
+	opacity: 0.95;
 }
 
 .omp-transcript-editorial .omp-tool-body {
 	border-top: 0;
 	min-width: 0;
-	overflow-x: auto;
-	padding: 8px 0 12px 22px;
+	max-height: min(18rem, 34vh);
+	overflow: auto;
+	overscroll-behavior: contain;
+	padding: 4px 0 7px 12px;
 }
 
 .omp-transcript-editorial .omp-execution-turn,
@@ -872,28 +844,25 @@
 
 .omp-transcript-editorial .omp-read-group {
 	position: relative;
-	padding: 6px var(--omp-editorial-edge) 8px var(--omp-editorial-inset) !important;
+	padding: 4px var(--omp-editorial-edge) 6px var(--omp-editorial-inset) !important;
 }
 
 .omp-transcript-editorial .omp-read-group-header {
-	min-height: 28px;
+	min-height: 26px;
 	border: 0 !important;
 	border-radius: 0;
 	background: transparent !important;
-	padding: 4px 0;
+	padding: 3px 0;
+	font-size: calc(var(--gui-font-size, 15px) * 11.5 / 15);
 }
 
 .omp-transcript-editorial .omp-read-group-header:hover {
 	background: transparent !important;
 }
 
-.omp-transcript-editorial .omp-read-group-preview {
-	margin-left: 21px;
-	color: var(--omp-muted);
-}
-
 .omp-transcript-editorial .omp-read-group-body {
-	margin-left: 21px;
+	margin-left: 16px;
+	margin-top: 2px;
 }
 
 .omp-transcript-editorial .omp-streaming-turn > * {
@@ -911,9 +880,9 @@
 }
 
 .omp-transcript-editorial .omp-thinking-header {
-	min-height: 30px;
-	padding: 5px 0;
-	font-size: calc(var(--gui-font-size, 15px) * 11.5 / 15);
+	min-height: 24px;
+	padding: 2px 0;
+	font-size: calc(var(--gui-font-size, 15px) * 10.5 / 15);
 	letter-spacing: 0.01em;
 }
 
@@ -922,12 +891,12 @@
 }
 
 .omp-transcript-editorial .omp-thinking-body {
-	max-height: 19rem;
-	margin-left: 4px;
+	max-height: min(12rem, 30vh);
+	margin-left: 0;
 	border-left: 0;
-	padding: 6px 0 10px 20px;
-	font-size: calc(var(--gui-font-size, 15px) * 12 / 15);
-	line-height: 1.55;
+	padding: 4px 0 6px 12px;
+	font-size: calc(var(--gui-font-size, 15px) * 10.5 / 15);
+	line-height: 1.42;
 }
 
 .omp-transcript-editorial .omp-thinking-brain,
@@ -944,8 +913,18 @@
 }
 
 .omp-transcript-editorial .omp-thinking-hint {
-	margin-left: 8px;
-	font-weight: 400;
+	display: none;
+}
+
+.omp-transcript-editorial .omp-thinking-fold-state {
+	display: none;
+}
+
+.omp-transcript-editorial .omp-thinking-count {
+	display: inline;
+	margin-left: 4px;
+	font-size: calc(var(--gui-font-size, 15px) * 9.5 / 15);
+	color: var(--omp-dim);
 }
 
 .omp-transcript-editorial .omp-thinking-block--pulse {
@@ -954,23 +933,40 @@
 
 .omp-transcript-editorial .omp-assistant-turn .markdown-body,
 .omp-transcript-editorial .omp-assistant-turn .omp-streaming-tail,
-.omp-transcript-editorial .omp-assistant-turn--compact > .min-w-0 > .markdown-body,
 .omp-transcript-editorial .omp-streaming-turn > .markdown-body {
-	font-size: calc(var(--gui-font-size, 15px) * 15 / 15);
-	line-height: 1.65;
+	font-size: calc(var(--gui-font-size, 15px) * 13 / 15);
+	line-height: 1.52;
 	color: var(--omp-text);
+}
+
+.omp-transcript-editorial .omp-assistant-turn--compact > .min-w-0 > .markdown-body {
+	font-size: calc(var(--gui-font-size, 15px) * 11.5 / 15);
+	line-height: 1.4;
 }
 
 /* Reasoning stays visually subordinate to the assistant response. */
 .omp-transcript-editorial .omp-thinking-body .markdown-body {
-	font-size: var(--text-omp-sm);
-	line-height: 1.55;
+	font-size: calc(var(--gui-font-size, 15px) * 10.5 / 15);
+	line-height: 1.42;
 	color: var(--omp-dim);
 }
 
 .omp-transcript-editorial .omp-thinking-body .markdown-body :is(h1, h2, h3, h4, h5, h6, strong) {
 	color: var(--omp-dim);
 	font-weight: 400;
+}
+
+.omp-transcript-editorial .omp-thinking-body .markdown-body p {
+	margin: 0.42em 0;
+}
+
+.omp-transcript-editorial .omp-thinking-body .markdown-body :is(table, thead, tbody, tr, th, td) {
+	border: 0;
+	background: transparent;
+}
+
+.omp-transcript-editorial .omp-thinking-body .markdown-body :is(th, td) {
+	padding: 0.2em 0.45em;
 }
 
 .omp-transcript-editorial .markdown-body p {
@@ -1095,11 +1091,6 @@
 @container omp-workspace (max-width: 900px) {
 	.omp-transcript-editorial {
 		--omp-editorial-inset: calc(var(--omp-column-pad) + 30px);
-		--omp-editorial-rail-x: calc(var(--omp-column-pad) + 6px);
-	}
-
-	.omp-transcript-editorial .omp-timeline-marker time {
-		display: none;
 	}
 
 	.omp-conversation-nav {
@@ -1165,10 +1156,6 @@
 
 	.omp-transcript-editorial {
 		--omp-editorial-inset: calc(var(--omp-column-pad) + 24px);
-		--omp-editorial-rail-x: calc(var(--omp-column-pad) + 4px);
-	}
-	.omp-transcript-editorial .omp-timeline-marker time {
-		display: none;
 	}
 	.omp-transcript-editorial .omp-user-bubble-actions {
 		opacity: 1;

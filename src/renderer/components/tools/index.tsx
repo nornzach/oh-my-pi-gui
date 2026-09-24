@@ -7,6 +7,7 @@ import { AstGrepRenderer } from "./AstGrepRenderer";
 import { BashRenderer } from "./BashRenderer";
 import { BrowserRenderer } from "./BrowserRenderer";
 import { ComputerRenderer } from "./ComputerRenderer";
+import { WaitRenderer } from "./CoordinationRenderer";
 import { DebugRenderer } from "./DebugRenderer";
 import { EditRenderer } from "./EditRenderer";
 import { EvalRenderer } from "./EvalRenderer";
@@ -120,6 +121,7 @@ const REGISTRY: Record<string, ComponentType<ToolRendererProps>> = {
 	github: GithubRenderer,
 	gh: GithubRenderer,
 	hub: HubRenderer,
+	wait: WaitRenderer,
 	ask: AskRenderer,
 	computer: ComputerRenderer,
 	generate_image: ImageRenderer,
@@ -202,6 +204,7 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>) => string> = {
 	debug: args => [argLine(args, ["action"]), argLine(args, ["program", "file", "symbol"])].filter(Boolean).join(" "),
 	github: args => argLine(args, ["action", "repo", "url"]),
 	hub: args => argLine(args, ["op", "agent"]),
+	wait: () => "background activity",
 	ask: args => argLine(args, ["question", "i"]),
 	goal: args => argLine(args, ["objective", "op"]),
 	checkpoint: args => argLine(args, ["goal"]),

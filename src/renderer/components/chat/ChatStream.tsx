@@ -3,7 +3,6 @@ import {
 	ArrowDown,
 	BookOpen,
 	Bug,
-	Check,
 	ChevronRight,
 	Code2,
 	Languages,
@@ -11,7 +10,6 @@ import {
 	ListTodo,
 	Loader2,
 	PenLine,
-	Rocket,
 	SearchCode,
 	Sparkles,
 	X,
@@ -19,7 +17,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useDisplayPreference } from "../../lib/display-preferences";
-import { cx, formatClock, formatShortClock } from "../../lib/format";
+import { cx, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isRenderableMessageText } from "../../lib/messages";
 import { collapsibleReadTarget, groupReadRows, type ReadGroupEntry } from "../../lib/read-group";
@@ -35,12 +33,11 @@ import { type ToolEntry, toolEntryKey, useToolsStore } from "../../stores/tools"
 import { useUiStore } from "../../stores/ui";
 import { PiLogo } from "../common";
 import { ReadGroupCard } from "../tools/ReadGroupCard";
-import { type RunningIndicator, ToolCard } from "../tools/ToolCard";
+import { ToolCard } from "../tools/ToolCard";
 import { ConversationNavigator } from "./ConversationNavigator";
 import {
 	buildConversationAnchors,
 	buildHistoryRows,
-	buildTimelineMarkers,
 	buildTranscriptRowKeys,
 	claimRowEntrances,
 	createRowEntranceState,
@@ -54,7 +51,6 @@ import {
 	messageTimestampMs,
 	type Row,
 	shouldRePinTranscript,
-	type TimelineMarkerSeed,
 } from "./chat-stream-utils";
 import { ExecutionGroup } from "./ExecutionGroup";
 import { MessageBubble } from "./MessageBubble";
@@ -171,53 +167,38 @@ function SessionTranscript() {
 	const queued = useQueuedMessages();
 
 	// Streaming deltas rerender this component for the live row, but they do not
-	// change finalized history. Keep the O(history) row/key/timeline projection
-	// stable so a long transcript does not get rebuilt for every token.
-	const historyMarkers = useMemo(() => buildTimelineMarkers(historyRows), [historyRows]);
-	const { rows, timelineMarkers, rowKeys } = useMemo(() => {
+	// change finalized history. Keep the O(history) row/key projection stable so
+	// a long transcript does not get rebuilt for every token.
+	const { rows, rowKeys } = useMemo(() => {
 		const nextRows: Row[] = [];
-		const nextMarkers: Array<TimelineMarkerSeed | null> = [];
 		if (hiddenCount > 0) {
 			nextRows.push({ kind: "expander", count: hiddenCount });
-			nextMarkers.push(null);
 		}
 		nextRows.push(...historyRows);
-		nextMarkers.push(...historyMarkers);
 		if (hasStreamedContent && streamingMessage) {
 			nextRows.push({ kind: "streaming", message: streamingMessage });
-			// Full detail has no execution-group header, so its timeline owns the
-			// one live spinner. Compact detail delegates that status to the group.
-			nextMarkers.push(transcriptDetail === "full" ? { state: "running", toolIds: [] } : null);
 		}
 		if (showStatusRow) {
 			nextRows.push({ kind: "pending" });
-			// TurnStatusRow owns the visible loader. A running timeline marker
-			// here would render a second adjacent spinner for the same wait.
-			nextMarkers.push(null);
 		}
 		for (const item of queued.steering) {
 			nextRows.push({ kind: "queued", item, lane: "steering" });
-			nextMarkers.push(null);
 		}
 		for (const item of queued.followUp) {
 			nextRows.push({ kind: "queued", item, lane: "followUp" });
-			nextMarkers.push(null);
 		}
 		return {
 			rows: nextRows,
-			timelineMarkers: nextMarkers,
 			rowKeys: buildTranscriptRowKeys(nextRows),
 		};
 	}, [
 		hiddenCount,
 		historyRows,
-		historyMarkers,
 		hasStreamedContent,
 		showStatusRow,
 		queued.steering,
 		queued.followUp,
 		streamingMessage,
-		transcriptDetail,
 	]);
 
 	const parentRef = useRef<HTMLDivElement>(null);
@@ -617,10 +598,6 @@ function SessionTranscript() {
 									}}
 								>
 									<div className="omp-transcript-row w-full">
-										<TimelineMarker
-											seed={timelineMarkers[item.index] ?? null}
-											runningIndicator={row.kind === "process" ? "dot" : "spinner"}
-										/>
 										{row.kind === "message" ? (
 											<MessageBubble message={row.message} reaction={row.reaction} runningIndicator="dot" />
 										) : row.kind === "readGroup" ? (
@@ -679,50 +656,6 @@ function SessionTranscript() {
 	);
 }
 
-function TimelineMarker({
-	seed,
-	runningIndicator,
-}: {
-	seed: TimelineMarkerSeed | null;
-	runningIndicator: RunningIndicator;
-}) {
-	// Primitive selector over this marker's tools only: unrelated tool events
-	// (partial results on other cards) must not re-render every mounted marker.
-	const liveState = useToolsStore(s => {
-		let derived: "" | "error" | "running" = "";
-		for (const id of seed?.toolIds ?? []) {
-			const entry = s.activeTools.get(id);
-			if (entry?.status === "error" || entry?.isError) return "error";
-			if (entry?.status === "pending" || entry?.status === "running") derived = "running";
-		}
-		return derived;
-	});
-	if (!seed) return null;
-	let state = seed.state;
-	if (liveState === "error") state = "error";
-	else if (liveState === "running") state = "running";
-
-	const time = formatShortClock(seed.timestamp);
-	return (
-		<div aria-hidden className={cx("omp-timeline-marker", `omp-timeline-marker--${state}`)}>
-			<span className="omp-timeline-dot">
-				{state === "running" && runningIndicator === "spinner" ? (
-					<Loader2 className="animate-spin" size={11} />
-				) : state === "running" ? (
-					<span className="h-1.5 w-1.5 rounded-full bg-current" />
-				) : state === "error" ? (
-					<X size={11} />
-				) : state === "launch" ? (
-					<Rocket size={10} />
-				) : (
-					<Check size={11} />
-				)}
-			</span>
-			{time ? <time>{time}</time> : null}
-		</div>
-	);
-}
-
 function ProcessGroup({
 	expanded,
 	onExpandedChange,
@@ -777,7 +710,7 @@ export function StreamingRows({
 	const hasText = useMessagesStore(s => isRenderableMessageText(s.streamingText));
 	// Full-map subscription is intentional here: this ONE live row legitimately
 	// watches the whole active set (it renders every pending/running card).
-	// Per-row isolation lives in TimelineMarker/ExecutionGroup/ToolCard.
+	// Per-row isolation lives in ExecutionGroup/ToolCard.
 	const activeTools = useToolsStore(s => s.activeTools);
 	const transcriptDetail = useUiStore(s => s.transcriptDetail);
 	if (!streamingMessage) return null;
