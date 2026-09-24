@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-09-24
+
+### Added
+
+- **Coordination tool views**: `wait`, `read proc://…`, `write agent://…`, and process control writes now render as compact, structured cards instead of generic text or file operations.
+
+### Changed
+
+- **Bundled agent upgraded to omp 18.3.0**, including background-job coordination, wait/protocol support, explicit process cancellation, and Apple Foundation Models discovery on supported Apple Silicon systems.
+- **Execution details stay bounded**: coordination cards summarize status and expose focused scrollable details without taking over the transcript.
+
+### Fixed
+
+- **Upstream protocol parity**: GUI tool dispatch now recognizes the current `wait` and internal `proc://`/`agent://` protocols while retaining legacy `hub` transcript rendering.
+
 ## [0.9.8] - 2026-09-22
 
 ### Added
