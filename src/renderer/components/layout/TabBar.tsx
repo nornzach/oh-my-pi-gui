@@ -15,6 +15,7 @@ import {
 	GitBranchPlus,
 	MessageCircle,
 	MessageCirclePlus,
+	MoreHorizontal,
 	Plus,
 	Rows2,
 	X,
@@ -358,6 +359,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 		compacting: liveCompacting,
 	};
 	const protectedFromBatchClose = (tab: SessionTab) => tab.worktree != null || tabNeedsCloseConfirm(tab, liveRuntime);
+	const actionTabId = activeTabId ?? tabs[0]?.id;
 
 	return (
 		<>
@@ -405,6 +407,26 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 						/>
 					);
 				})}
+				{actionTabId && (
+					<button
+						type="button"
+						aria-label={t("tabs.actions")}
+						title={t("tabs.actions")}
+						onClick={event => {
+							const rect = event.currentTarget.getBoundingClientRect();
+							setTabMenu({
+								anchor: {
+									x: Number.isFinite(rect.left) ? rect.left : 8,
+									y: (Number.isFinite(rect.bottom) ? rect.bottom : 40) + 4,
+								},
+								tabId: actionTabId,
+							});
+						}}
+						className="no-drag omp-pressable flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+					>
+						<MoreHorizontal aria-hidden="true" size={14} />
+					</button>
+				)}
 				<NewTabMenu />
 			</div>
 			{tabMenu &&

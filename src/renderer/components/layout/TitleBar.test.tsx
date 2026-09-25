@@ -6,9 +6,11 @@ import { I18nProvider } from "../../lib/i18n";
 import { useMessagesStore } from "../../stores/messages";
 import { useSessionStore } from "../../stores/session";
 import { useToolsStore } from "../../stores/tools";
+import { useUiStore } from "../../stores/ui";
 import { TitleBar } from "./TitleBar";
 
 const { document, window, Event, HTMLElement, Element, Node } = parseHTML("<html><body></body></html>");
+Object.assign(window as unknown as Record<string, number>, { innerHeight: 768, innerWidth: 1024 });
 Object.assign(globalThis, { document, window, Event, HTMLElement, Element, Node, IS_REACT_ACT_ENVIRONMENT: true });
 
 interface TestButton {
@@ -78,6 +80,7 @@ afterEach(async () => {
 	useSessionStore.getState().reset();
 	useMessagesStore.getState().reset();
 	useToolsStore.getState().reset();
+	useUiStore.getState().closeSessionOverlays();
 	getSessionStats.mockRestore();
 	vi.clearAllMocks();
 });
@@ -190,5 +193,27 @@ describe("TitleBar", () => {
 		} finally {
 			delete (HTMLElement.prototype as unknown as { select?: () => void }).select;
 		}
+	});
+
+	it("opens the command center and session actions from visible toolbar buttons", async () => {
+		useSessionStore.setState({ status: "ready", sessionId: "session-1", cwd: "/tmp/project" });
+		await mount();
+
+		const buttons = container.querySelectorAll("button");
+		const commands = buttons.find(button => button.title === "Commands");
+		expect(commands).toBeDefined();
+		await act(async () => commands?.click());
+		expect(useUiStore.getState().commandPaletteOpen).toBe(true);
+		useUiStore.getState().closeCommandPalette();
+
+		const actions = buttons.find(button => button.title === "Session actions");
+		expect(actions).toBeDefined();
+		await act(async () => actions?.click());
+		const importItem = Array.from(document.querySelectorAll("[data-menu-item]")).find(item =>
+			item.textContent?.includes("Import External Session"),
+		) as unknown as TestButton | undefined;
+		expect(importItem).toBeDefined();
+		await act(async () => importItem?.click());
+		expect(useUiStore.getState().importDialogOpen).toBe(true);
 	});
 });

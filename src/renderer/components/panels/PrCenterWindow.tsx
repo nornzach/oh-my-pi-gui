@@ -76,6 +76,11 @@ export function PrCenterWindow() {
 	const selected = usePrCenterStore(state => state.selected);
 	const error = usePrCenterStore(state => state.error);
 	const [createOpen, setCreateOpen] = useState(false);
+	const createDisabledReason = !repo
+		? t("prCenter.probing")
+		: !repo.available
+			? t(`prCenter.unavailable.${repo.reason}`)
+			: undefined;
 
 	useEffect(() => {
 		if (open) void usePrCenterStore.getState().probe();
@@ -113,7 +118,13 @@ export function PrCenterWindow() {
 						>
 							<RefreshCw size={12} className={listLoading ? "animate-spin" : undefined} />
 						</Button>
-						<Button variant="primary" size="sm" onClick={() => setCreateOpen(true)} disabled={!repo?.available}>
+						<Button
+							variant="primary"
+							size="sm"
+							onClick={() => setCreateOpen(true)}
+							disabled={!repo?.available}
+							title={createDisabledReason}
+						>
 							<Plus size={12} /> {t("prCenter.create")}
 						</Button>
 					</div>

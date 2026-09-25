@@ -36,6 +36,7 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import type { RpcDebugAction, RpcDebugParams } from "../../../shared/rpc-types";
 import { cx, resultDetails, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
 import { Badge, type BadgeVariant, Button, Modal, Spinner, TextArea } from "../common";
 
@@ -505,6 +506,7 @@ function ResultBody({ result, t }: { result: DebugResultData; t: TranslateFn }) 
 export function DebugConsoleDialog() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const open = useUiStore(state => state.debugOpen);
 	const close = useUiStore(state => state.closeDebug);
 	const [sessions, setSessions] = useState<DebugSessionSummary[] | null>(null);
@@ -519,6 +521,7 @@ export function DebugConsoleDialog() {
 
 	const execDebug = useCallback(
 		async (params: RpcDebugParams): Promise<unknown> => {
+			if (!sidecarReady) throw new Error(t("common.notConnected"));
 			setPending(value => value + 1);
 			try {
 				const response = await tabRpc.debug(params);
@@ -528,7 +531,7 @@ export function DebugConsoleDialog() {
 				setPending(value => Math.max(0, value - 1));
 			}
 		},
-		[tabRpc.debug],
+		[sidecarReady, t, tabRpc.debug],
 	);
 
 	const refreshSessions = useCallback(async () => {
@@ -596,11 +599,12 @@ export function DebugConsoleDialog() {
 					<div className="mb-1 flex items-center justify-between">
 						<span className="text-xs font-medium text-(--omp-text)">{t("debug.sessions")}</span>
 						<Button
-							disabled={pending > 0}
+							disabled={!sidecarReady || pending > 0}
 							icon={<RefreshCw size={12} />}
 							onClick={() => void refreshSessions()}
 							size="sm"
 							variant="ghost"
+							title={!sidecarReady ? t("common.notConnected") : undefined}
 						>
 							{t("debug.refresh")}
 						</Button>
@@ -610,10 +614,12 @@ export function DebugConsoleDialog() {
 							<div className="flex flex-col items-center gap-2 rounded-lg border border-(--omp-border-muted) px-4 py-6 text-center">
 								<span className="text-omp-sm break-all text-(--omp-error)">{sessionsError}</span>
 								<Button
+									disabled={!sidecarReady}
 									icon={<RefreshCw size={12} />}
 									onClick={() => void refreshSessions()}
 									size="sm"
 									variant="secondary"
+									title={!sidecarReady ? t("common.notConnected") : undefined}
 								>
 									{t("debug.refresh")}
 								</Button>
@@ -671,12 +677,13 @@ export function DebugConsoleDialog() {
 				<div className="flex flex-wrap gap-2">
 					{ACTION_DEFS.map(def => (
 						<Button
-							disabled={pending > 0 || !def.enabled(activeSession)}
+							disabled={!sidecarReady || pending > 0 || !def.enabled(activeSession)}
 							icon={def.icon}
 							key={def.action}
 							onClick={() => void runAction({ action: def.action })}
 							size="sm"
 							variant={def.danger ? "danger" : "secondary"}
+							title={!sidecarReady ? t("common.notConnected") : undefined}
 						>
 							{t(def.labelKey)}
 						</Button>
@@ -719,10 +726,12 @@ export function DebugConsoleDialog() {
 							<div className="flex flex-wrap gap-2">
 								{PRESETS.map(preset => (
 									<Button
+										disabled={!sidecarReady}
 										key={preset.labelKey}
 										onClick={() => void runAction(preset.params)}
 										size="sm"
 										variant="secondary"
+										title={!sidecarReady ? t("common.notConnected") : undefined}
 									>
 										{t(preset.labelKey)}
 									</Button>
@@ -742,7 +751,11 @@ export function DebugConsoleDialog() {
 								/>
 							</div>
 							<div className="flex items-center justify-end">
-								<Button disabled={pending > 0} onClick={() => void runRaw()}>
+								<Button
+									disabled={!sidecarReady || pending > 0}
+									onClick={() => void runRaw()}
+									title={!sidecarReady ? t("common.notConnected") : undefined}
+								>
 									<Bug size={14} /> {t("debug.run")}
 								</Button>
 							</div>

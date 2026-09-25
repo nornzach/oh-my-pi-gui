@@ -11,6 +11,7 @@ import { Wrench, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcActiveTool, RpcActiveToolsResult, RpcForceToolState } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Badge, Button, Input, Modal, Spinner } from "../common";
@@ -20,6 +21,7 @@ export function ForceToolDialog() {
 	const t = useT();
 	const open = useUiStore(state => state.forceToolOpen);
 	const close = useUiStore(state => state.closeForceTool);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const [tools, setTools] = useState<RpcActiveTool[]>([]);
 	const [current, setCurrent] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -30,6 +32,10 @@ export function ForceToolDialog() {
 	const [busy, setBusy] = useState(false);
 
 	const refresh = useCallback(async () => {
+		if (!sidecarReady) {
+			setLoadError(t("modelPicker.notConnected"));
+			return;
+		}
 		setLoading(true);
 		setLoadError(null);
 		try {
@@ -43,7 +49,7 @@ export function ForceToolDialog() {
 		} finally {
 			setLoading(false);
 		}
-	}, [tabRpc.getForceTool, tabRpc.getActiveTools]);
+	}, [sidecarReady, t, tabRpc.getForceTool, tabRpc.getActiveTools]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -62,7 +68,7 @@ export function ForceToolDialog() {
 	}, [tools, filter]);
 
 	const apply = async () => {
-		if (!selected || busy) return;
+		if (!sidecarReady || !selected || busy) return;
 		setBusy(true);
 		try {
 			const response = await tabRpc.setForceTool({ tool: selected });
@@ -92,7 +98,7 @@ export function ForceToolDialog() {
 	};
 
 	const clear = async () => {
-		if (busy) return;
+		if (!sidecarReady || busy) return;
 		setBusy(true);
 		try {
 			const response = await tabRpc.setForceTool({ clear: true });
@@ -124,7 +130,13 @@ export function ForceToolDialog() {
 						)}
 					</div>
 					{current ? (
-						<Button disabled={busy} icon={<X className="h-3.5 w-3.5" />} onClick={() => void clear()} size="sm">
+						<Button
+							disabled={busy || !sidecarReady}
+							icon={<X className="h-3.5 w-3.5" />}
+							onClick={() => void clear()}
+							size="sm"
+							title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
+						>
 							{t("forceTool.clear")}
 						</Button>
 					) : null}
@@ -178,7 +190,13 @@ export function ForceToolDialog() {
 
 				<div className="flex justify-end gap-2">
 					<Button onClick={close}>{t("common.cancel")}</Button>
-					<Button disabled={!selected || busy} loading={busy} onClick={() => void apply()} variant="primary">
+					<Button
+						disabled={!selected || busy || !sidecarReady}
+						loading={busy}
+						onClick={() => void apply()}
+						title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
+						variant="primary"
+					>
 						{t("forceTool.apply")}
 					</Button>
 				</div>

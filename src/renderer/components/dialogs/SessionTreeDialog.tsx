@@ -160,6 +160,7 @@ export function SessionTreeDialog() {
 	const close = useUiStore(state => state.closeSessionTree);
 	const sessionName = useSessionStore(state => state.sessionName);
 	const sessionId = useSessionStore(state => state.sessionId);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const sessionKey = sessionId || "session";
 
 	const [model, setModel] = useState<SessionTreeModel | null>(null);
@@ -197,6 +198,12 @@ export function SessionTreeDialog() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: retry re-reads by bump
 	useEffect(() => {
 		if (!open) return;
+		if (!sidecarReady) {
+			setModel(null);
+			setError(t("sessionTree.notConnected"));
+			setLoading(false);
+			return;
+		}
 		setLoading(true);
 		setError(null);
 		setBranching(null);
@@ -223,7 +230,7 @@ export function SessionTreeDialog() {
 		return () => {
 			cancelled = true;
 		};
-	}, [attempt, open, sessionKey, tabRpc]);
+	}, [attempt, open, sessionKey, sidecarReady, t, tabRpc]);
 
 	const filteredEntries = useMemo(
 		() => (model ? filterTreeEntries(model.entries, filterMode) : []),
@@ -429,7 +436,7 @@ export function SessionTreeDialog() {
 	};
 
 	const branchFrom = async (entryId: string) => {
-		if (branching !== null) return;
+		if (!sidecarReady || branching !== null) return;
 		// The sidecar only branches from USER entries — refuse anything else
 		// (Enter key / stale affordances), matching the hidden branch buttons.
 		const entry = model?.entries.find(candidate => candidate.entryId === entryId);
@@ -453,7 +460,7 @@ export function SessionTreeDialog() {
 	// TUI tree-selector Enter parity). Works on ANY node; the target's draft
 	// text restores into the composer, and a hook veto is not a failure.
 	const switchToLeaf = async (entryId: string, summarize = false) => {
-		if (branching !== null) return;
+		if (!sidecarReady || branching !== null) return;
 		// F-OWN belt guard: switch_leaf mutates the attached session file. When
 		// a DIFFERENT tab owns that file (diverged state), defer to the owner
 		// instead of navigating a session this tab no longer owns.
@@ -512,7 +519,7 @@ export function SessionTreeDialog() {
 	// file containing only the path to this node and opens it in a NEW WINDOW —
 	// the attached session stays untouched, so the dialog stays open.
 	const forkFromNode = async (entryId: string) => {
-		if (branching !== null) return;
+		if (!sidecarReady || branching !== null) return;
 		setBranching(entryId);
 		try {
 			const response = await tabRpc.forkFrom(entryId);
@@ -536,6 +543,7 @@ export function SessionTreeDialog() {
 	};
 
 	const startLabelEdit = (entryId: string) => {
+		if (!sidecarReady) return;
 		const entry = model?.entries.find(candidate => candidate.entryId === entryId);
 		setLabelEditId(entryId);
 		setLabelDraft(entry?.label ?? "");
@@ -550,7 +558,7 @@ export function SessionTreeDialog() {
 	// reverts on failure. TUI tree-selector Shift+L parity.
 	const commitLabelEdit = async () => {
 		const entryId = labelEditId;
-		if (!entryId || savingLabel) return;
+		if (!sidecarReady || !entryId || savingLabel) return;
 		const label = labelDraft.trim() || undefined;
 		setLabelEditId(null);
 		setLabelDraft("");
@@ -764,9 +772,11 @@ export function SessionTreeDialog() {
 							{error}
 						</p>
 						<Button
+							disabled={!sidecarReady}
 							icon={<RotateCw size={12} />}
 							onClick={() => setAttempt(count => count + 1)}
 							size="sm"
+							title={!sidecarReady ? t("sessionTree.notConnected") : undefined}
 							variant="secondary"
 						>
 							{t("common.retry")}
@@ -864,6 +874,7 @@ export function SessionTreeDialog() {
 												else void forkFromNode(entryId);
 											}}
 											selected={node.id === selectedId}
+											ready={sidecarReady}
 											x={pos.x}
 											y={pos.y}
 										/>
@@ -914,7 +925,14 @@ export function SessionTreeDialog() {
 								placeholder={t("sessionTree.labelPlaceholder")}
 								value={labelDraft}
 							/>
-							<Button loading={savingLabel} onClick={() => void commitLabelEdit()} size="sm" variant="secondary">
+							<Button
+								disabled={!sidecarReady}
+								loading={savingLabel}
+								onClick={() => void commitLabelEdit()}
+								size="sm"
+								title={!sidecarReady ? t("sessionTree.notConnected") : undefined}
+								variant="secondary"
+							>
 								{t("common.save")}
 							</Button>
 							<Button disabled={savingLabel} onClick={cancelLabelEdit} size="sm" variant="ghost">
@@ -955,21 +973,23 @@ export function SessionTreeDialog() {
 							<div className="flex shrink-0 flex-col gap-1">
 								{selectedEntry.role === "user" && (
 									<Button
-										disabled={branching !== null}
+										disabled={!sidecarReady || branching !== null}
 										icon={<GitBranch size={11} />}
 										loading={branching === selectedEntry.entryId}
 										onClick={() => void branchFrom(selectedEntry.entryId)}
 										size="sm"
+										title={!sidecarReady ? t("sessionTree.notConnected") : undefined}
 										variant="secondary"
 									>
 										{t("sessionTree.branch")}
 									</Button>
 								)}
 								<Button
-									disabled={model?.source !== "tree" || savingLabel}
+									disabled={!sidecarReady || model?.source !== "tree" || savingLabel}
 									icon={<Tag size={11} />}
 									onClick={() => startLabelEdit(selectedEntry.entryId)}
 									size="sm"
+									title={!sidecarReady ? t("sessionTree.notConnected") : undefined}
 									variant="ghost"
 								>
 									{t("sessionTree.editLabel")}

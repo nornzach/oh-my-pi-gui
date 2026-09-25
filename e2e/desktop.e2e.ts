@@ -58,9 +58,10 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-	if (app) await app.close();
+	// Test teardown bypasses the production quit confirmation.
+	if (app) await app.evaluate(({ app }) => app.exit(0));
 	if (record) await fs.copyFile(record, "test-results/desktop-rpc.jsonl").catch(() => {});
-	if (profile) await fs.rm(profile, { recursive: true, force: true });
+	if (profile) await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 test("initially closed modal receives focus and Escape closes it", async () => {

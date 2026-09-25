@@ -181,9 +181,29 @@ function SearchBox({
 	);
 }
 
-function RefreshButton({ loading, onRefresh, label }: { loading: boolean; onRefresh: () => void; label: string }) {
+function RefreshButton({
+	loading,
+	onRefresh,
+	label,
+	ready = true,
+	disabledReason,
+}: {
+	loading: boolean;
+	onRefresh: () => void;
+	label: string;
+	ready?: boolean;
+	disabledReason?: string;
+}) {
 	return (
-		<Button size="sm" variant="ghost" icon={<RefreshCw size={12} />} loading={loading} onClick={onRefresh}>
+		<Button
+			disabled={!ready}
+			size="sm"
+			variant="ghost"
+			icon={<RefreshCw size={12} />}
+			loading={loading}
+			onClick={onRefresh}
+			title={disabledReason}
+		>
 			{label}
 		</Button>
 	);
@@ -199,6 +219,8 @@ function ListToolbar({
 	onRefresh,
 	t,
 	showSearch = true,
+	ready,
+	disabledReason,
 }: {
 	query: string;
 	onQuery: (value: string) => void;
@@ -209,6 +231,8 @@ function ListToolbar({
 	onRefresh: () => void;
 	t: TFn;
 	showSearch?: boolean;
+	ready: boolean;
+	disabledReason: string;
 }) {
 	return (
 		<div className="flex items-center gap-2">
@@ -220,7 +244,13 @@ function ListToolbar({
 			<span className="text-omp-xs whitespace-nowrap tabular-nums text-(--omp-dim)">
 				{t("invPanel.count", { shown, total })}
 			</span>
-			<RefreshButton loading={loading} onRefresh={onRefresh} label={t("invPanel.refresh")} />
+			<RefreshButton
+				disabledReason={!ready ? disabledReason : undefined}
+				loading={loading}
+				onRefresh={onRefresh}
+				label={t("invPanel.refresh")}
+				ready={ready}
+			/>
 		</div>
 	);
 }
@@ -275,7 +305,14 @@ function ResourceGate<T>({ resource, children }: { resource: RpcResource<T>; chi
 					<div className="max-w-full rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md break-words text-[var(--omp-error)]">
 						{resource.error}
 					</div>
-					<Button size="sm" variant="ghost" icon={<RefreshCw size={12} />} onClick={() => void resource.reload()}>
+					<Button
+						disabled={!resource.ready}
+						size="sm"
+						variant="ghost"
+						icon={<RefreshCw size={12} />}
+						onClick={() => void resource.reload()}
+						title={!resource.ready ? t("invPanel.notConnected") : t("invPanel.retry")}
+					>
 						{t("invPanel.retry")}
 					</Button>
 				</div>
@@ -436,6 +473,7 @@ function PluginsTab({
 
 	/** Optimistic toggle: overlay → set_plugin_enabled → re-fetch on success, revert + toast on error. */
 	const handleToggle = async (plugin: RpcPluginInfo): Promise<void> => {
+		if (!resource.ready) return;
 		const origin = capturePluginActivationOrigin();
 		if (!origin) {
 			toast({ variant: "warning", message: t("pluginActivation.routePending") });
@@ -489,6 +527,8 @@ function PluginsTab({
 				total={total}
 				loading={resource.loading}
 				onRefresh={() => void resource.reload()}
+				ready={resource.ready}
+				disabledReason={t("invPanel.notConnected")}
 				t={t}
 				showSearch={externalQuery === undefined}
 			/>
@@ -516,7 +556,7 @@ function PluginsTab({
 								return (
 									<PluginRow
 										busy={busyKey === key}
-										disabled={busyKey !== null}
+										disabled={busyKey !== null || !resource.ready}
 										enabled={overrides[key] ?? p.enabled}
 										key={key}
 										onOpenDetail={() => onOpenDetail(p)}
@@ -566,13 +606,15 @@ function MarketplacesTab({
 				total={total}
 				loading={resource.loading}
 				onRefresh={() => void resource.reload()}
+				ready={resource.ready}
+				disabledReason={t("invPanel.notConnected")}
 				t={t}
 				showSearch={externalQuery === undefined}
 			/>
 			<ResourceGate resource={resource}>
 				{() => (
 					<>
-						<AddMarketplaceForm onAdded={resource.reload} />
+						<AddMarketplaceForm onAdded={resource.reload} ready={resource.ready} />
 						{marketplaces.length === 0 ? (
 							total === 0 ? (
 								<EmptyNote description={t("invPanel.marketplaces.emptyHint")} icon={Store}>
@@ -584,7 +626,12 @@ function MarketplacesTab({
 						) : (
 							<div className="flex flex-col gap-2">
 								{marketplaces.map(m => (
-									<MarketplaceCard key={m.name} marketplace={m} reload={resource.reload} />
+									<MarketplaceCard
+										key={m.name}
+										marketplace={m}
+										ready={resource.ready}
+										reload={resource.reload}
+									/>
 								))}
 							</div>
 						)}
@@ -645,6 +692,8 @@ function TemplatesTab({
 				total={total}
 				loading={resource.loading}
 				onRefresh={() => void resource.reload()}
+				ready={resource.ready}
+				disabledReason={t("invPanel.notConnected")}
 				t={t}
 				showSearch={externalQuery === undefined}
 			/>
@@ -749,9 +798,11 @@ function MemoryTab({ resource, visible }: { resource: RpcResource<RpcMemoryRepor
 					)}
 				</span>
 				<RefreshButton
+					disabledReason={!resource.ready ? t("invPanel.notConnected") : undefined}
 					loading={resource.loading}
 					onRefresh={() => void resource.reload()}
 					label={t("invPanel.refresh")}
+					ready={resource.ready}
 				/>
 			</div>
 			<ResourceGate resource={resource}>

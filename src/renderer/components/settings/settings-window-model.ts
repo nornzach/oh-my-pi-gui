@@ -53,6 +53,11 @@ export const MANAGEMENT_TAB_IDS = new Set([
 	UPDATES_TAB_ID,
 ]);
 
+export function isAgentSchemaTab(tab: string, schema: { tabs: { id: string }[] } | null): boolean {
+	if (schema?.tabs.some(schemaTab => schemaTab.id === tab)) return true;
+	return !MANAGEMENT_TAB_IDS.has(tab) && tab !== GUI_TAB_ID && tab !== CAPABILITIES_TAB_ID && tab !== ADVANCED_TAB_ID;
+}
+
 export const SEARCHABLE_MANAGEMENT_TAB_IDS = new Set([
 	SKILLS_TAB_ID,
 	MCP_TAB_ID,

@@ -1,5 +1,6 @@
 import { Copy, ExternalLink, LogOut, Radio, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useStore } from "zustand";
 import type { RpcCollabState } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
 import { copyText } from "../../lib/format";
@@ -16,7 +17,8 @@ const EMPTY: RpcCollabState = { role: null, readOnly: false, participants: [] };
 export function CollabDialog() {
 	const tabRpc = useTabRpc();
 	const originTabId = useRuntimeTabId();
-	const sessionStore = originTabId ? sessionRuntimeStore<SessionStore>(originTabId, "session")! : useSessionStore;
+	const sessionStore = originTabId ? sessionRuntimeStore<SessionStore>(originTabId, "session") : null;
+	const sidecarReady = useStore(sessionStore ?? useSessionStore, state => state.status) === "ready";
 	const generation = useRef(0);
 	const mutation = useRef(0);
 	const busyRef = useRef(false);
@@ -32,7 +34,7 @@ export function CollabDialog() {
 	const confirm = useCallback(
 		(value: RpcCollabState) => {
 			setState(value);
-			sessionStore.setState({ collab: value });
+			(sessionStore ?? useSessionStore).setState({ collab: value });
 		},
 		[sessionStore],
 	);
@@ -40,7 +42,7 @@ export function CollabDialog() {
 	const join = useCallback(
 		async (link: string) => {
 			const trimmed = link.trim();
-			if (!trimmed) return;
+			if (!sidecarReady || !trimmed) return;
 			const version = generation.current;
 			mutation.current++;
 			busyRef.current = true;
@@ -62,7 +64,7 @@ export function CollabDialog() {
 				}
 			}
 		},
-		[tabRpc.collabJoin, originTabId, confirm],
+		[sidecarReady, tabRpc.collabJoin, originTabId, confirm],
 	);
 
 	useEffect(() => {
@@ -99,6 +101,7 @@ export function CollabDialog() {
 	}, [open, initialJoinLink, tabRpc, confirm]);
 
 	const host = async () => {
+		if (!sidecarReady) return;
 		const version = generation.current;
 		mutation.current++;
 		busyRef.current = true;
@@ -120,6 +123,7 @@ export function CollabDialog() {
 	};
 
 	const leave = async () => {
+		if (!sidecarReady) return;
 		const version = generation.current;
 		mutation.current++;
 		busyRef.current = true;
@@ -166,7 +170,13 @@ export function CollabDialog() {
 									? t("collab.viewing")
 									: t("collab.joined")}
 						</div>
-						<Button disabled={busy} onClick={() => void leave()} size="sm" variant="danger">
+						<Button
+							disabled={busy || !sidecarReady}
+							onClick={() => void leave()}
+							size="sm"
+							title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
+							variant="danger"
+						>
 							<LogOut size={13} /> {t("collab.leave")}
 						</Button>
 					</div>
@@ -218,7 +228,11 @@ export function CollabDialog() {
 							placeholder={t("collab.relayPlaceholder")}
 							value={relay}
 						/>
-						<Button disabled={busy} onClick={() => void host()}>
+						<Button
+							disabled={busy || !sidecarReady}
+							onClick={() => void host()}
+							title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
+						>
 							{busy ? <Spinner size="sm" /> : <Radio size={14} />} {t("collab.start")}
 						</Button>
 					</section>
@@ -230,7 +244,11 @@ export function CollabDialog() {
 							placeholder={t("collab.joinPlaceholder")}
 							value={joinLink}
 						/>
-						<Button disabled={busy || !joinLink.trim()} onClick={() => void join(joinLink)}>
+						<Button
+							disabled={busy || !joinLink.trim() || !sidecarReady}
+							onClick={() => void join(joinLink)}
+							title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
+						>
 							{busy ? <Spinner size="sm" /> : <Users size={14} />} {t("collab.join")}
 						</Button>
 					</section>

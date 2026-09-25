@@ -208,6 +208,24 @@ export async function runSessionCommand(
 	}
 }
 
+/** Restart the focused tab's sidecar without interrupting an active turn. */
+export async function restartSidecarFromGui(): Promise<void> {
+	const runtime = focusedSessionRuntime();
+	const session = runtime
+		? sessionRuntimeStore<SessionStore>(runtime.tabId, "session")?.getState()
+		: useSessionStore.getState();
+	if (session?.isStreaming || session?.isCompacting) {
+		toast({ variant: "warning", message: translate("sessionSwitch.busyBlocked") });
+		return;
+	}
+	try {
+		await window.omp.sidecar.restart({ tabId: runtime?.tabId, sessionPath: session?.sessionFile ?? undefined });
+		toast({ variant: "info", message: translate("settings.launch.restarting") });
+	} catch (cause) {
+		toast({ variant: "error", title: translate("app.actionFailed"), message: String(cause) });
+	}
+}
+
 export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[] {
 	const { t } = ctx;
 	const runtime = focusedSessionRuntime();
@@ -260,14 +278,6 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		affordance: { kind: "window", open },
 	});
 
-	/** Helper to build a disabled submenu item whose reason replaces the prompt affordance. */
-	const subUnavailable = (name: string, reason: string): CommandMenuItem => ({
-		name,
-		label: t(`cmd.${keyOf(name)}`),
-		category: "extensions",
-		affordance: { kind: "unavailable", reason },
-	});
-
 	/** Read a single setting for status toasts; RPC failures throw for the palette to surface. */
 	const readSetting = async (path: string): Promise<unknown> => {
 		const res = await boundRpc.getSettings([path]);
@@ -284,6 +294,8 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		if (!res.success) throw new Error(res.error);
 		toast({ variant: "success", message });
 	};
+
+	const restartSidecar = restartSidecarFromGui;
 
 	/** /advisor on|off — set_setting live-applies advisor.enabled and reports activation state. */
 	const setAdvisor = async (enabled: boolean): Promise<void> => {
@@ -551,6 +563,13 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		description: t("cmd.close.desc"),
 		category: "session",
 		affordance: { kind: "action", run: () => window.close() },
+	});
+	add({
+		name: "restart",
+		label: t("cmd.restart"),
+		description: t("cmd.restart.desc"),
+		category: "other",
+		affordance: { kind: "action", run: restartSidecar },
 	});
 	add({
 		// `window.close()` used to hide behind this name, which left every other
@@ -871,6 +890,7 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		label: t("cmd.providers"),
 		description: t("cmd.providers.desc"),
 		category: "providers",
+		aliases: ["setup"],
 		affordance: { kind: "window", open: ctx.openProviders },
 	});
 	add({
@@ -1099,12 +1119,10 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		affordance: {
 			kind: "submenu",
 			items: [
-				// No native SSH hosts surface exists in the GUI (hosts live in
-				// ssh.json capability files; no RPC or fs-write bridge), so these
-				// show disabled-with-reason instead of faking a prompt round-trip.
-				subUnavailable("ssh list", t("ssh.noSurface")),
-				subUnavailable("ssh add", t("ssh.noSurface")),
-				subUnavailable("ssh remove", t("ssh.noSurface")),
+				// The native page owns host selection, validation, and confirmation.
+				subWindow("ssh list", () => ctx.openSettings("ssh")),
+				subWindow("ssh add", () => ctx.openSettings("ssh")),
+				subWindow("ssh remove", () => ctx.openSettings("ssh")),
 				sub("ssh help", "/ssh help"),
 			],
 		},
@@ -1213,6 +1231,13 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		category: "workspace",
 		affordance: { kind: "window", open: () => useUiStore.getState().openWorkspaceDirs() },
 	});
+	add({
+		name: "git",
+		label: t("cmd.git"),
+		description: t("cmd.git.desc"),
+		category: "workspace",
+		affordance: { kind: "window", open: () => useUiStore.getState().setPanelTab("diff") },
+	});
 
 	// ═══════════════════════════════════════════════════════════════════
 	// VIEW
@@ -1281,6 +1306,13 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		description: t("cmd.agents.desc"),
 		category: "view",
 		affordance: { kind: "window", open: () => ctx.openAgentHub() },
+	});
+	add({
+		name: "hub",
+		label: t("cmd.hub"),
+		description: t("cmd.hub.desc"),
+		category: "view",
+		affordance: { kind: "window", open: () => ctx.openAgentHub("hub") },
 	});
 	add({
 		name: "prs",
@@ -1416,13 +1448,15 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 	// and `/modes` must not appear as dead rows next to the working picker.
 	for (const cmd of ctx.availableCommands) {
 		if (claimed.has(cmd.name)) continue;
+		// Keep terminal-only commands visible as disabled rows. The palette is
+		// the GUI's command index; hiding a command makes its client limitation opaque.
 		if (cmd.textModeExecutable === false) {
 			add({
 				name: cmd.name,
 				label: `/${cmd.name}`,
 				description: cmd.description,
 				category: "other",
-				affordance: { kind: "unavailable", reason: t("unavailable.tuiOnly") },
+				affordance: { kind: "unavailable", reason: t("palette.tuiOnly") },
 			});
 			continue;
 		}

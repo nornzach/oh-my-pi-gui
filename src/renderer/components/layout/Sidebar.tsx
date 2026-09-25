@@ -25,6 +25,7 @@ import {
 	RefreshCw,
 	Search,
 	Settings,
+	Sparkles,
 	SquarePen,
 	SquareTerminal,
 	Trash2,
@@ -37,7 +38,7 @@ import { dropSessionNow } from "../../hooks/use-session-switch";
 import { basename, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
-import { onEscape } from "../../lib/keymap";
+import { compileKeymap, KEYMAP_ACTIONS, onEscape } from "../../lib/keymap";
 import { sessionDisplayTitle } from "../../lib/session-title";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { tabSignalPresentation } from "../../lib/tab-signal";
@@ -103,6 +104,15 @@ function SidebarRowTitle({ className, title }: { className?: string; title: stri
 export function Sidebar() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const keymapOverrides = useUiStore(state => state.keymapOverrides);
+	const paletteShortcut = useMemo(
+		() =>
+			[...compileKeymap(KEYMAP_ACTIONS, keymapOverrides)]
+				.filter(([, action]) => action === "palette")
+				.map(([chord]) => chord)
+				.join(" / "),
+		[keymapOverrides],
+	);
 	const [mode, setMode] = useState<SidebarMode>("code");
 	const [navigationExpanded, setNavigationExpanded] = useState(true);
 	const [defaultWorkspace, setDefaultWorkspace] = useState<string | null>(null);
@@ -590,7 +600,16 @@ export function Sidebar() {
 									id: "commands",
 									icon: Search,
 									label: t("titlebar.commands"),
+									shortcut: paletteShortcut,
+									title: t("titlebar.commandsHint", { shortcut: paletteShortcut }),
 									onClick: () => useUiStore.getState().openCommandPalette(),
+								},
+								{
+									id: "capabilities",
+									icon: Sparkles,
+									label: t("settings.capabilities.title"),
+									title: t("settings.capabilities.description"),
+									onClick: () => useUiStore.getState().openSettings("capabilities"),
 								},
 								{
 									id: "agents",
@@ -647,10 +666,17 @@ export function Sidebar() {
 										key={item.id}
 										type="button"
 										onClick={item.onClick}
+										data-command-center-entry={item.id === "commands" ? true : undefined}
+										title={item.title}
 										className="omp-pressable flex h-8 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-omp-md text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
 									>
 										<Icon aria-hidden="true" className="shrink-0" size={15} />
 										<span className="min-w-0 flex-1 truncate">{item.label}</span>
+										{item.shortcut && (
+											<kbd className="shrink-0 rounded border border-[var(--omp-border-muted)] px-1 text-omp-xxs text-[var(--omp-dim)]">
+												{item.shortcut}
+											</kbd>
+										)}
 									</button>
 								);
 							})}

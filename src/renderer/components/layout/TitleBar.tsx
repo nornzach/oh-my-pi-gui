@@ -1,4 +1,18 @@
-import { ChevronRight, Clock3, Coins, Database, FolderOpen, Gauge, PanelLeft } from "lucide-react";
+import {
+	ChevronRight,
+	Clock3,
+	Coins,
+	Database,
+	FolderOpen,
+	Gauge,
+	GitBranch,
+	Info,
+	MoreHorizontal,
+	PanelLeft,
+	Search,
+	Share2,
+	Wrench,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { SessionStats } from "../../../shared/rpc-types";
 import { useSessionList } from "../../hooks/use-session-list";
@@ -14,6 +28,7 @@ import { useActiveTabKind } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useToolsStore } from "../../stores/tools";
 import { useUiStore } from "../../stores/ui";
+import { ContextMenu, type ContextMenuAnchor, type ContextMenuItem } from "../common/ContextMenu";
 import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
 import { sessionCacheHitPercent, sessionExecutionDurationMs } from "./session-metrics";
 
@@ -41,11 +56,22 @@ export function TitleBar() {
 	const tools = useToolsStore(s => s.activeTools);
 	const sidebarVisible = useUiStore(s => s.sidebarVisible);
 	const toggleSidebar = useUiStore(s => s.toggleSidebar);
+	const openCommandPalette = useUiStore(s => s.openCommandPalette);
+	const openUsage = useUiStore(s => s.openUsage);
+	const openStatsDashboard = useUiStore(s => s.openStatsDashboard);
+	const openImportDialog = useUiStore(s => s.openImportDialog);
+	const openContextReport = useUiStore(s => s.openContextReport);
+	const openActiveTools = useUiStore(s => s.openActiveTools);
+	const openShareSession = useUiStore(s => s.openShareSession);
+	const openSessionInfo = useUiStore(s => s.openSessionInfo);
+	const openBranchPicker = useUiStore(s => s.openBranchPicker);
+	const openSessionTree = useUiStore(s => s.openSessionTree);
 	const { sessions } = useSessionList("local");
 	const projectName = !isChat && cwd ? basename(cwd) : t("titlebar.openProject");
 
 	const [editingName, setEditingName] = useState(false);
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);
+	const [actionsMenu, setActionsMenu] = useState<ContextMenuAnchor | null>(null);
 	const [draft, setDraft] = useState("");
 	const [stats, setStats] = useState<SessionStats | null>(null);
 	const [now, setNow] = useState(() => Date.now());
@@ -156,10 +182,119 @@ export function TitleBar() {
 				? "var(--omp-error)"
 				: "var(--omp-warning)";
 
+	const actionMenuItems: ContextMenuItem[] = [
+		{
+			id: "import",
+			label: t("cmd.import"),
+			description: t("cmd.import.desc"),
+			icon: FolderOpen,
+			onSelect: () => {
+				setActionsMenu(null);
+				openImportDialog();
+			},
+		},
+		{
+			id: "branch",
+			label: t("cmd.branch"),
+			description: t("cmd.branch.desc"),
+			icon: GitBranch,
+			onSelect: () => {
+				setActionsMenu(null);
+				openBranchPicker();
+			},
+		},
+		{
+			id: "tree",
+			label: t("cmd.tree"),
+			description: t("cmd.tree.desc"),
+			disabled: isChat,
+			icon: GitBranch,
+			onSelect: () => {
+				setActionsMenu(null);
+				openSessionTree();
+			},
+		},
+		{
+			id: "session-info",
+			label: t("cmd.session"),
+			description: t("cmd.session.desc"),
+			icon: Info,
+			onSelect: () => {
+				setActionsMenu(null);
+				openSessionInfo();
+			},
+		},
+		{
+			id: "share",
+			label: t("cmd.share"),
+			description: t("cmd.share.desc"),
+			icon: Share2,
+			onSelect: () => {
+				setActionsMenu(null);
+				openShareSession();
+			},
+		},
+		{
+			id: "context",
+			label: t("cmd.context"),
+			description: t("cmd.context.desc"),
+			icon: Gauge,
+			onSelect: () => {
+				setActionsMenu(null);
+				openContextReport();
+			},
+		},
+		{
+			id: "tools",
+			label: t("cmd.tools"),
+			description: t("cmd.tools.desc"),
+			icon: Wrench,
+			onSelect: () => {
+				setActionsMenu(null);
+				openActiveTools();
+			},
+		},
+		{
+			id: "usage",
+			label: t("cmd.usage"),
+			description: t("cmd.usage.desc"),
+			icon: Gauge,
+			onSelect: () => {
+				setActionsMenu(null);
+				openUsage();
+			},
+		},
+		{
+			id: "stats",
+			label: t("cmd.stats"),
+			description: t("cmd.stats.desc"),
+			icon: Database,
+			onSelect: () => {
+				setActionsMenu(null);
+				openStatsDashboard();
+			},
+		},
+	];
+
 	return (
 		<header className="omp-titlebar drag-region flex h-12 min-w-0 shrink-0 items-center gap-1 overflow-hidden border-b border-[var(--omp-border-muted)] bg-[var(--omp-titlebar-bg)] px-2.5">
-			<button type="button" onClick={toggleSidebar} title={t("titlebar.toggleSidebar")} className={iconButton}>
+			<button
+				type="button"
+				aria-label={t("titlebar.toggleSidebar")}
+				onClick={toggleSidebar}
+				title={t("titlebar.toggleSidebar")}
+				className={iconButton}
+			>
 				<PanelLeft size={18} className={cx(sidebarVisible && "text-[var(--omp-text)]")} />
+			</button>
+			<button
+				type="button"
+				aria-label={t("titlebar.commands")}
+				title={t("titlebar.commands")}
+				onClick={openCommandPalette}
+				className={iconButton}
+			>
+				<Search aria-hidden="true" size={16} />
 			</button>
 
 			<div className="omp-titlebar-identity no-drag flex min-w-0 items-center gap-1.5">
@@ -248,6 +383,31 @@ export function TitleBar() {
 					{executionDuration > 0 ? formatDuration(executionDuration) : t("time.secondsShort", { count: 0 })}
 				</span>
 			</div>
+			<button
+				type="button"
+				aria-label={t("titlebar.actions")}
+				aria-expanded={actionsMenu !== null}
+				aria-haspopup="menu"
+				title={t("titlebar.actions")}
+				onClick={event => {
+					const rect = event.currentTarget.getBoundingClientRect();
+					setActionsMenu({
+						x: Number.isFinite(rect.left) ? rect.left : 8,
+						y: (Number.isFinite(rect.bottom) ? rect.bottom : 40) + 4,
+					});
+				}}
+				className={iconButton}
+			>
+				<MoreHorizontal aria-hidden="true" size={17} />
+			</button>
+			{actionsMenu && (
+				<ContextMenu
+					x={actionsMenu.x}
+					y={actionsMenu.y}
+					onClose={() => setActionsMenu(null)}
+					items={actionMenuItems}
+				/>
+			)}
 			<WorkspaceDialog open={workspaceOpen} onClose={() => setWorkspaceOpen(false)} />
 		</header>
 	);

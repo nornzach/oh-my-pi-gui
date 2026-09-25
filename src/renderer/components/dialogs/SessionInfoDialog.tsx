@@ -10,6 +10,7 @@ import type { SessionStats } from "../../../shared/rpc-types";
 import { contextUsageView } from "../../lib/context-usage";
 import { basename, formatCost, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
 import { AsyncSection, Modal, ProgressBar } from "../common";
 
@@ -44,6 +45,7 @@ function formatCredit(value: number): string {
 export function SessionInfoDialog() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const open = useUiStore(state => state.sessionInfoOpen);
 	const close = useUiStore(state => state.closeSessionInfo);
 
@@ -52,6 +54,11 @@ export function SessionInfoDialog() {
 	const [error, setError] = useState<string | null>(null);
 
 	const reload = useCallback(async () => {
+		if (!sidecarReady) {
+			setStats(null);
+			setError(t("common.notConnected"));
+			return;
+		}
 		setLoading(true);
 		setError(null);
 		try {
@@ -63,7 +70,7 @@ export function SessionInfoDialog() {
 		} finally {
 			setLoading(false);
 		}
-	}, [tabRpc.getSessionStats]);
+	}, [sidecarReady, t, tabRpc.getSessionStats]);
 
 	useEffect(() => {
 		if (!open) return;

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcActiveTool, RpcActiveToolsResult, RpcToolSource } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
 import { AsyncSection, Badge, Input, Modal } from "../common";
 
@@ -16,6 +17,7 @@ const SOURCE_ORDER: RpcToolSource[] = ["builtin", "mcp", "extension", "plugin"];
 export function ActiveToolsDialog() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const open = useUiStore(state => state.activeToolsOpen);
 	const close = useUiStore(state => state.closeActiveTools);
 	const [tools, setTools] = useState<RpcActiveTool[]>([]);
@@ -24,6 +26,11 @@ export function ActiveToolsDialog() {
 	const [error, setError] = useState<string | null>(null);
 
 	const reload = useCallback(async (): Promise<void> => {
+		if (!sidecarReady) {
+			setError(t("common.notConnected"));
+			setTools([]);
+			return;
+		}
 		setLoading(true);
 		setError(null);
 		try {
@@ -35,7 +42,7 @@ export function ActiveToolsDialog() {
 		} finally {
 			setLoading(false);
 		}
-	}, [tabRpc.getActiveTools]);
+	}, [sidecarReady, t, tabRpc.getActiveTools]);
 
 	useEffect(() => {
 		if (!open) return;

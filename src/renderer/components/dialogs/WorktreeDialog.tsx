@@ -33,6 +33,7 @@ export function WorktreeDialog() {
 	const dialog = useUiStore(state => state.worktreeDialog);
 	const close = useUiStore(state => state.closeWorktreeDialog);
 	const sessionCwd = useSessionStore(state => state.cwd);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 
 	const [name, setName] = useState("");
 	const [baseRef, setBaseRef] = useState<"HEAD" | "default">("HEAD");
@@ -57,7 +58,7 @@ export function WorktreeDialog() {
 		if (!creating) close();
 	};
 	const submit = async () => {
-		if (!validName || creating) return;
+		if (!sidecarReady || !validName || creating) return;
 		setCreating(true);
 		setError(null);
 		try {
@@ -147,7 +148,13 @@ export function WorktreeDialog() {
 					<Button type="button" variant="ghost" onClick={requestClose} disabled={creating}>
 						{t("common.cancel")}
 					</Button>
-					<Button type="submit" variant="primary" loading={creating} disabled={!validName}>
+					<Button
+						type="submit"
+						variant="primary"
+						loading={creating}
+						disabled={!validName || !sidecarReady}
+						title={!sidecarReady ? t("sidecar.notResponding") : undefined}
+					>
 						{t(created ? "worktree.retryOpen" : "worktree.submit")}
 					</Button>
 				</div>

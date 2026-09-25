@@ -39,6 +39,7 @@ export function ModelPicker() {
 	// Live session usage: models whose window is smaller render with an
 	// over-context warning and compact-first on pick (TUI markOverContext parity).
 	const contextUsage = useSessionStore(state => state.contextUsage);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 
 	const [query, setQuery] = useState("");
 	const [providers, setProviders] = useState<LoginProvider[]>([]);
@@ -62,6 +63,11 @@ export function ModelPicker() {
 			const version = ++requestVersion.current;
 			setLoading(true);
 			setError(null);
+			if (!sidecarReady) {
+				setError(t("modelPicker.notConnected"));
+				setLoading(false);
+				return;
+			}
 			const [providersResult, modelsResult] = await Promise.allSettled([
 				tabRpc.getLoginProviders(),
 				refreshAvailableModels(forceRefresh),
@@ -83,7 +89,7 @@ export function ModelPicker() {
 			};
 			setError(failedCopy ?? reason(providersResult) ?? reason(modelsResult) ?? t("modelPicker.notResponding"));
 		},
-		[refreshAvailableModels, t, tabRpc],
+		[refreshAvailableModels, sidecarReady, t, tabRpc],
 	);
 
 	useEffect(() => {
@@ -148,6 +154,7 @@ export function ModelPicker() {
 	};
 
 	const select = async (provider: string, modelId: string) => {
+		if (!sidecarReady) return;
 		const key = `${provider}/${modelId}`;
 		setSwitching(key);
 		try {
@@ -259,6 +266,8 @@ export function ModelPicker() {
 								type="button"
 								className="rounded-md border border-[var(--omp-border-muted)] px-3 py-1 text-omp-sm font-medium text-[var(--omp-text)] hover:bg-[var(--omp-selected-bg)]"
 								onClick={() => void load(true, t("modelPicker.stillNotResponding"))}
+								disabled={!sidecarReady}
+								title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
 							>
 								{t("modelPicker.retry")}
 							</button>
@@ -322,7 +331,8 @@ export function ModelPicker() {
 													isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"
 												}`}
 												data-option-index={optionIndex}
-												disabled={switching !== null}
+												disabled={switching !== null || !sidecarReady}
+												title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
 												id={`${listboxId}-option-${optionIndex}`}
 												key={key}
 												onClick={() => void select(provider, model.id)}

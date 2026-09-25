@@ -532,6 +532,14 @@ describe("InputArea prompt history", () => {
 		expect(followUp).toHaveBeenCalledTimes(1);
 		expect(useInputHistoryStore.getState().entries).toEqual([]);
 	});
+
+	it("opens history search from the visible composer toolbar", async () => {
+		await mount();
+		const history = document.querySelector('button[aria-label="History"]') as unknown as TestElement | null;
+		expect(history).not.toBeNull();
+		await click(history as TestElement);
+		expect(document.querySelector('[role="dialog"][aria-label="History"]')).not.toBeNull();
+	});
 });
 
 describe("InputArea draft editor", () => {

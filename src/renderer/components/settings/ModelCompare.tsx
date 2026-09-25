@@ -385,7 +385,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 			// The unusable check belongs here rather than only on the controls: the
 			// whole row is a click target, so a disabled "Use" button alone would not
 			// keep an off or signed-out provider from becoming the session model.
-			if (busyKey !== null || isCurrent(row) || unusableReason(row) !== null) return;
+			if (!sidecarReady || busyKey !== null || isCurrent(row) || unusableReason(row) !== null) return;
 			setBusyKey(row.key);
 			try {
 				const res = await tabRpc.setModel(row.provider, row.id);
@@ -400,13 +400,13 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 				setBusyKey(null);
 			}
 		},
-		[busyKey, isCurrent, t, tabRpc.setModel],
+		[busyKey, isCurrent, sidecarReady, t, tabRpc.setModel],
 	);
 
 	const assignRole = useCallback(
 		async (row: Row, roleId: string) => {
 			const currentRoleId = row.roles[0]?.id ?? "";
-			if (roleId === currentRoleId || busyKey !== null) return;
+			if (!sidecarReady || roleId === currentRoleId || busyKey !== null) return;
 			setBusyKey(row.key);
 			try {
 				const res = roleId
@@ -429,7 +429,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 				setBusyKey(null);
 			}
 		},
-		[busyKey, reloadRoles, t, tabRpc.setModelRole],
+		[busyKey, reloadRoles, sidecarReady, t, tabRpc.setModelRole],
 	);
 
 	/** Roles offered in the per-row picker: non-hidden, plus any hidden role already on this row (so it can be cleared). */
@@ -612,8 +612,9 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 											<select
 												aria-label={t("modelCompare.assignRole")}
 												className="h-6 max-w-[140px] rounded border border-(--omp-border-muted) bg-(--omp-input-bg) px-1.5 text-omp-xs text-(--omp-text) focus:border-(--omp-border-accent) focus:outline-none disabled:opacity-45"
-												disabled={busy || roles === null}
+												disabled={busy || roles === null || !sidecarReady}
 												onChange={event => void assignRole(row, event.target.value)}
+												title={!sidecarReady ? t("modelCompare.notConnected") : undefined}
 												value={row.roles[0]?.id ?? ""}
 											>
 												<option value="">{t("modelCompare.noRole")}</option>
@@ -629,11 +630,12 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 												</span>
 											) : (
 												<Button
-													disabled={busyKey !== null || blocked !== null}
+													disabled={!sidecarReady || busyKey !== null || blocked !== null}
 													icon={<Check size={12} />}
 													loading={busy}
 													onClick={() => void assignSession(row)}
 													size="sm"
+													title={!sidecarReady ? t("modelCompare.notConnected") : undefined}
 													variant="ghost"
 												>
 													{t("modelCompare.use")}
@@ -692,10 +694,12 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 						{t("modelCompare.authOnly")}
 					</button>
 					<Button
+						disabled={!sidecarReady}
 						icon={<RefreshCw size={12} />}
 						loading={loading}
 						onClick={() => void load()}
 						size="sm"
+						title={!sidecarReady ? t("modelCompare.notConnected") : t("modelCompare.refresh")}
 						variant="ghost"
 					>
 						{t("modelCompare.refresh")}

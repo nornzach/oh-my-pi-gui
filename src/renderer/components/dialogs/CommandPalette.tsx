@@ -36,6 +36,14 @@ import { isTopmostDialog, registerDialogLayer } from "../common/dialog-layer";
 const RECENT_KEY = "omp.palette.recent";
 const RECENT_LIMIT = 5;
 
+function sidecarBlocked(item: CommandMenuItem, ready: boolean): boolean {
+	if (ready) return false;
+	if (item.name === "new-tab" || item.name === "new-chat-tab" || item.name === "close" || item.name === "quit") {
+		return false;
+	}
+	return item.affordance.kind === "action" || item.affordance.kind === "toggle" || item.affordance.kind === "prompt";
+}
+
 function loadRecent(): string[] {
 	try {
 		const raw = localStorage.getItem(RECENT_KEY);
@@ -164,6 +172,7 @@ export function CommandPalette() {
 	const interruptMode = useSettingsStore(s => s.interruptMode);
 	const planModeEnabled = useSessionStore(s => s.planModeEnabled);
 	const prewalkArmed = useSessionStore(s => s.prewalkArmed);
+	const sidecarReady = useSessionStore(s => s.status) === "ready";
 
 	const [query, setQuery] = useState("");
 	const [availableCommands, setAvailableCommands] = useState<AvailableCommand[]>([]);
@@ -182,6 +191,12 @@ export function CommandPalette() {
 
 	const refreshCommands = useCallback(() => {
 		const seq = ++fetchSeq.current;
+		if (!sidecarReady) {
+			setAvailableCommands([]);
+			setCommandsError(t("common.notConnected"));
+			setLoading(false);
+			return;
+		}
 		setLoading(true);
 		setCommandsError(null);
 		tabRpc
@@ -202,7 +217,7 @@ export function CommandPalette() {
 			.finally(() => {
 				if (seq === fetchSeq.current) setLoading(false);
 			});
-	}, [tabRpc.getAvailableCommands]);
+	}, [sidecarReady, t, tabRpc.getAvailableCommands]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -258,6 +273,10 @@ export function CommandPalette() {
 
 	/** Retry the last FAILED turn via the retry RPC (TUI /retry parity). */
 	const retryTurn = useCallback(async () => {
+		if (!sidecarReady) {
+			toast({ variant: "warning", message: t("common.notConnected") });
+			return;
+		}
 		const response = await tabRpc.retry();
 		if (!response.success) {
 			toast({ variant: "error", title: t("palette.failed"), message: response.error });
@@ -267,7 +286,7 @@ export function CommandPalette() {
 		if (!data?.retried) {
 			toast({ variant: "warning", title: t("palette.retryNothing"), message: t("palette.retryNothingDesc") });
 		}
-	}, [t, tabRpc.retry]);
+	}, [sidecarReady, t, tabRpc.retry]);
 
 	const menuItems = useMemo(
 		() =>
@@ -448,6 +467,10 @@ export function CommandPalette() {
 				toast({ variant: "warning", message: `${item.label}: ${item.affordance.reason}` });
 				return;
 			}
+			if (sidecarBlocked(item, sidecarReady)) {
+				toast({ variant: "warning", message: `${item.label}: ${t("common.notConnected")}` });
+				return;
+			}
 			if (item.affordance.kind === "submenu") {
 				setSubmenu(item);
 				setQuery("");
@@ -467,7 +490,7 @@ export function CommandPalette() {
 			recordRecent(item.name);
 			void runAffordance(item.affordance, close, t, tabRpc);
 		},
-		[recordRecent, close, t, tabRpc],
+		[recordRecent, close, sidecarReady, t, tabRpc],
 	);
 
 	/** Move the selection by `delta`, skipping disabled rows. */
@@ -475,12 +498,12 @@ export function CommandPalette() {
 		(delta: number) => {
 			setActiveIndex(current => {
 				for (let i = current + delta; i >= 0 && i < flatList.length; i += delta) {
-					if (flatList[i].affordance.kind !== "unavailable") return i;
+					if (!sidecarBlocked(flatList[i], sidecarReady)) return i;
 				}
 				return current;
 			});
 		},
-		[flatList],
+		[flatList, sidecarReady],
 	);
 
 	// Bound to the dialog panel, not the input: after clicking a row, focus sits
@@ -529,12 +552,12 @@ export function CommandPalette() {
 		setActiveIndex(current => {
 			if (resultCount === 0) return 0;
 			const clamped = Math.min(Math.max(current, 0), resultCount - 1);
-			if (flatList[clamped].affordance.kind !== "unavailable") return clamped;
+			if (!sidecarBlocked(flatList[clamped], sidecarReady)) return clamped;
 			// Never rest on a disabled row: Enter would otherwise be a no-op.
-			const first = flatList.findIndex(item => item.affordance.kind !== "unavailable");
+			const first = flatList.findIndex(item => !sidecarBlocked(item, sidecarReady));
 			return first === -1 ? clamped : first;
 		});
-	}, [resultCount, flatList, open]);
+	}, [resultCount, flatList, open, sidecarReady]);
 
 	useEffect(() => {
 		listRef.current?.querySelector(`[data-palette-index="${activeIndex}"]`)?.scrollIntoView({ block: "nearest" });
@@ -548,7 +571,8 @@ export function CommandPalette() {
 		flatIndex++;
 		const index = flatIndex;
 		const isActive = index === activeIndex;
-		const disabled = item.affordance.kind === "unavailable";
+		const blocked = sidecarBlocked(item, sidecarReady);
+		const disabled = item.affordance.kind === "unavailable" || blocked;
 		const isSubmenu = item.affordance.kind === "submenu";
 		const toggleOn = item.affordance.kind === "toggle" ? item.affordance.get() : null;
 
@@ -559,6 +583,9 @@ export function CommandPalette() {
 					isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"
 				} ${disabled ? "opacity-45" : ""}`}
 				data-palette-index={index}
+				data-command-name={item.name}
+				data-command-aliases={JSON.stringify(item.aliases ?? [])}
+				data-command-kind={item.affordance.kind}
 				disabled={disabled}
 				key={item.name}
 				onClick={() => execute(item)}
@@ -589,7 +616,11 @@ export function CommandPalette() {
 						)}
 					</span>
 					<span className="block truncate text-omp-xs text-(--omp-muted)">
-						{disabled && item.affordance.kind === "unavailable" ? item.affordance.reason : item.description}
+						{disabled
+							? item.affordance.kind === "unavailable"
+								? item.affordance.reason
+								: t("common.notConnected")
+							: item.description}
 					</span>
 				</span>
 				{options?.categoryLabel && (

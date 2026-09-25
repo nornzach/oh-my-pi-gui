@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronDown, Mic, MoreHorizontal, Paperclip, Square, SquarePen, X, Zap } from "lucide-react";
+import { ArrowUp, ChevronDown, History, Mic, MoreHorizontal, Paperclip, Square, SquarePen, X, Zap } from "lucide-react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -972,6 +972,16 @@ export function InputArea() {
 								className="omp-pressable flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
 							>
 								<SquarePen size={16} />
+							</button>
+							<button
+								type="button"
+								disabled={collabReadOnly}
+								aria-label={t("input.history.title")}
+								title={t("input.history.title")}
+								onClick={() => setHistorySearchOpen(true)}
+								className="omp-pressable flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+							>
+								<History aria-hidden="true" size={16} />
 							</button>
 
 							{sttEnabled && (

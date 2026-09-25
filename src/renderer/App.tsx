@@ -44,7 +44,7 @@ import { useRpcEvents } from "./hooks/use-rpc-events";
 import { newSessionNow, requestSessionSwitch } from "./hooks/use-session-switch";
 import { useSidebarRecency } from "./hooks/use-sidebar-recency";
 import { useTraySync } from "./hooks/use-tray-sync";
-import { retryFailedTurn, runSessionCommand } from "./lib/command-registry";
+import { restartSidecarFromGui, retryFailedTurn, runSessionCommand } from "./lib/command-registry";
 import {
 	hydrateDisplayPreferences,
 	readDisplayPreference,
@@ -559,19 +559,118 @@ export function App() {
 				void useTabsStore.getState().openTab({ kind: "chat" });
 				return;
 			}
-			// Menu commands below read or mutate the selected sidecar. Ignore the
-			// short selected-vs-routed gap instead of sending them to the old tab.
-			if (!acceptsActiveTabEvents()) return;
-			if (action === "close-tab") {
-				closeActiveTab();
-				return;
-			}
+			// Window-only surfaces do not require a live sidecar. Keep these actions
+			// usable while the agent is starting, asleep, or recovering.
 			if (action === "open-settings") {
 				ui.openSettings();
 				return;
 			}
 			if (action === "open-usage") {
 				ui.openUsage();
+				return;
+			}
+			if (action === "open-model-picker") {
+				ui.openModelPicker();
+				return;
+			}
+			if (action === "open-import") {
+				ui.openImportDialog();
+				return;
+			}
+			if (action === "open-branch-picker") {
+				ui.openBranchPicker();
+				return;
+			}
+			if (action === "open-session-tree") {
+				ui.openSessionTree();
+				return;
+			}
+			if (action === "open-capabilities") {
+				ui.openSettings("capabilities");
+				return;
+			}
+			if (action === "open-git") {
+				const active = useTabsStore.getState().tabs.find(tab => tab.id === useTabsStore.getState().activeTabId);
+				if (active?.kind === "chat") {
+					toast({ variant: "warning", message: t("unavailable.chatSession") });
+					return;
+				}
+				ui.setPanelTab("diff");
+				return;
+			}
+			if (action === "restart-sidecar") {
+				void restartSidecarFromGui();
+				return;
+			}
+			if (action === "open-command-center") {
+				ui.openCommandPalette();
+				return;
+			}
+			if (action === "open-context-report") {
+				ui.openContextReport();
+				return;
+			}
+			if (action === "open-jobs") {
+				ui.openJobs();
+				return;
+			}
+			if (action === "open-stats") {
+				ui.openStatsDashboard();
+				return;
+			}
+			if (action === "open-hotkeys") {
+				ui.openHotkeys();
+				return;
+			}
+			if (action === "open-session-info") {
+				ui.openSessionInfo();
+				return;
+			}
+			if (action === "open-share-session") {
+				ui.openShareSession();
+				return;
+			}
+			if (action === "open-workspace-dirs") {
+				ui.openWorkspaceDirs();
+				return;
+			}
+			if (action === "open-agent-hub") {
+				ui.openAgentHub();
+				return;
+			}
+			if (action === "open-modes") {
+				ui.openModes();
+				return;
+			}
+			if (action === "open-providers") {
+				ui.openProviders();
+				return;
+			}
+			if (action === "open-model-roles") {
+				ui.openModelRoles();
+				return;
+			}
+			if (action === "open-extensions") {
+				ui.openExtensions();
+				return;
+			}
+			if (action === "open-inventory") {
+				ui.openInventory();
+				return;
+			}
+			if (action === "open-pr-center") {
+				ui.openPrCenter();
+				return;
+			}
+			if (action === "open-debug") {
+				ui.openDebug();
+				return;
+			}
+			// Menu commands below read or mutate the selected sidecar. Ignore the
+			// short selected-vs-routed gap instead of sending them to the old tab.
+			if (!acceptsActiveTabEvents()) return;
+			if (action === "close-tab") {
+				closeActiveTab();
 				return;
 			}
 			if (action === "toggle-fast") {

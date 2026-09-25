@@ -67,6 +67,10 @@ export function FirstRunOnboardingDialog() {
 
 	const checkReadiness = useCallback(
 		async (manual: boolean) => {
+			if (sidecarStatus !== "ready") {
+				setError(t("common.notConnected"));
+				return;
+			}
 			const version = ++requestVersion.current;
 			setChecking(true);
 			if (manual) setError(null);
@@ -119,7 +123,7 @@ export function FirstRunOnboardingDialog() {
 				if (version === requestVersion.current) setChecking(false);
 			}
 		},
-		[t, tabRpc.getProviders],
+		[sidecarStatus, t, tabRpc.getProviders],
 	);
 
 	useEffect(() => {
@@ -250,8 +254,10 @@ export function FirstRunOnboardingDialog() {
 						</Button>
 						<Button
 							icon={<RefreshCw size={13} />}
+							disabled={sidecarStatus !== "ready"}
 							loading={checking}
 							onClick={() => void checkReadiness(true)}
+							title={sidecarStatus !== "ready" ? t("common.notConnected") : undefined}
 							variant="primary"
 						>
 							{t("onboarding.recheck")}

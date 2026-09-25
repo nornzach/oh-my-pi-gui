@@ -18,6 +18,7 @@ export function RenameSessionDialog() {
 	const open = useUiStore(state => state.renameDialogOpen);
 	const close = useUiStore(state => state.closeRenameDialog);
 	const sessionName = useSessionStore(state => state.sessionName);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 
 	const [name, setName] = useState("");
 	const [saving, setSaving] = useState(false);
@@ -35,7 +36,7 @@ export function RenameSessionDialog() {
 
 	const submit = async () => {
 		const trimmed = name.trim();
-		if (!trimmed || saving) return;
+		if (!sidecarReady || !trimmed || saving) return;
 		setSaving(true);
 		try {
 			const response = await tabRpc.setSessionName(trimmed);
@@ -74,7 +75,13 @@ export function RenameSessionDialog() {
 					<Button type="button" variant="ghost" onClick={close}>
 						{t("common.cancel")}
 					</Button>
-					<Button type="submit" variant="primary" loading={saving} disabled={name.trim().length === 0}>
+					<Button
+						type="submit"
+						variant="primary"
+						loading={saving}
+						disabled={name.trim().length === 0 || !sidecarReady}
+						title={!sidecarReady ? t("sidecar.notResponding") : undefined}
+					>
 						{t("rename.submit")}
 					</Button>
 				</div>

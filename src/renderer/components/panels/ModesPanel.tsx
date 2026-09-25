@@ -63,6 +63,8 @@ interface ModeRpc<T> {
 	loading: boolean;
 	/** A mutation is in flight (inputs disable while it settles). */
 	busy: boolean;
+	/** The attached sidecar can accept reads and mutations. */
+	ready: boolean;
 	/** Loud re-fetch: spinner while loading, inline error on failure. */
 	refresh: () => void;
 	/** Silent re-fetch: updates state on success, leaves the UI alone on failure. */
@@ -117,7 +119,8 @@ function useModeRpc<T>(
 		async (silent: boolean) => {
 			const version = ++generation.current;
 			if (!sidecarReady) {
-				if (!silent) setError(t("modesPanel.notConnected"));
+				setError(t("modesPanel.notConnected"));
+				setLoading(false);
 				return;
 			}
 			if (!silent) {
@@ -180,6 +183,10 @@ function useModeRpc<T>(
 
 	const mutate = useCallback(
 		async (action: (client: TabRpc) => Promise<RpcResponse>) => {
+			if (!sidecarReady) {
+				setError(t("modesPanel.notConnected"));
+				return;
+			}
 			const version = ++generation.current;
 			setBusy(true);
 			setError(null);
@@ -198,7 +205,7 @@ function useModeRpc<T>(
 				if (version === generation.current) setBusy(false);
 			}
 		},
-		[client, fetcher, pick, t, setBoth],
+		[client, fetcher, pick, sidecarReady, t, setBoth],
 	);
 
 	useEffect(
@@ -208,7 +215,7 @@ function useModeRpc<T>(
 		[],
 	);
 
-	return { state, error, loading, busy, refresh, sync, apply, mutate };
+	return { state, error, loading, busy, ready: sidecarReady, refresh, sync, apply, mutate };
 }
 
 // ---------------------------------------------------------------------------
@@ -261,11 +268,12 @@ interface ModeFrameProps {
 	loading: boolean;
 	loaded: boolean;
 	error: string | null;
+	ready: boolean;
 	onRefresh: () => void;
 	children: ReactNode;
 }
 
-function ModeFrame({ loading, loaded, error, onRefresh, children }: ModeFrameProps) {
+function ModeFrame({ loading, loaded, error, ready, onRefresh, children }: ModeFrameProps) {
 	const t = useT();
 
 	let body: ReactNode = null;
@@ -281,7 +289,14 @@ function ModeFrame({ loading, loaded, error, onRefresh, children }: ModeFramePro
 				<div className="m-auto flex max-w-md flex-col items-center gap-2 rounded-lg border border-(--omp-border-muted) px-4 py-6 text-center">
 					<span className="text-omp-md font-medium text-(--omp-error)">{t("modesPanel.loadFailed")}</span>
 					<span className="text-omp-sm break-all text-(--omp-dim)">{error}</span>
-					<Button icon={<RefreshCw size={12} />} onClick={onRefresh} size="sm" variant="secondary">
+					<Button
+						disabled={!ready}
+						icon={<RefreshCw size={12} />}
+						onClick={onRefresh}
+						size="sm"
+						title={!ready ? t("modesPanel.notConnected") : undefined}
+						variant="secondary"
+					>
 						{t("modesPanel.retry")}
 					</Button>
 				</div>
@@ -294,7 +309,15 @@ function ModeFrame({ loading, loaded, error, onRefresh, children }: ModeFramePro
 	return (
 		<div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
 			<div className="flex shrink-0 items-center justify-end">
-				<Button icon={<RefreshCw size={12} />} loading={loading} onClick={onRefresh} size="sm" variant="ghost">
+				<Button
+					disabled={!ready}
+					icon={<RefreshCw size={12} />}
+					loading={loading}
+					onClick={onRefresh}
+					size="sm"
+					title={!ready ? t("modesPanel.notConnected") : t("modesPanel.refresh")}
+					variant="ghost"
+				>
 					{t("modesPanel.refresh")}
 				</Button>
 			</div>
@@ -310,12 +333,14 @@ function Toggle({
 	label,
 	description,
 	disabled,
+	title,
 }: {
 	checked: boolean;
 	onChange: (value: boolean) => void;
 	label: string;
 	description?: string;
 	disabled?: boolean;
+	title?: string;
 }) {
 	return (
 		<label className="flex cursor-pointer items-start justify-between gap-4 rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
@@ -333,6 +358,7 @@ function Toggle({
 				disabled={disabled}
 				onClick={() => onChange(!checked)}
 				role="switch"
+				title={title}
 				type="button"
 			>
 				<span
@@ -359,7 +385,13 @@ function VibeTab({ rpc }: { rpc: ModeRpc<RpcVibeModeState> }) {
 	const t = useT();
 	const state = rpc.state;
 	return (
-		<ModeFrame error={rpc.error} loaded={state !== null} loading={rpc.loading} onRefresh={rpc.refresh}>
+		<ModeFrame
+			error={rpc.error}
+			loaded={state !== null}
+			loading={rpc.loading}
+			onRefresh={rpc.refresh}
+			ready={rpc.ready}
+		>
 			{state && (
 				<div className="flex flex-col gap-4">
 					<p className="text-omp-sm leading-relaxed text-(--omp-muted)">{t("modesPanel.vibe.desc")}</p>
@@ -367,9 +399,10 @@ function VibeTab({ rpc }: { rpc: ModeRpc<RpcVibeModeState> }) {
 						<Toggle
 							checked={state.enabled}
 							description={t("modesPanel.vibe.toggleDesc")}
-							disabled={rpc.busy}
+							disabled={rpc.busy || !rpc.ready}
 							label={t("modesPanel.vibe.toggleLabel")}
 							onChange={next => void rpc.mutate(client => client.setVibeMode(next))}
+							title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
 						/>
 					</div>
 					{!state.enabled && typeof state.killedWorkers === "number" && state.killedWorkers > 0 && (
@@ -433,7 +466,13 @@ function GoalEnabledView({ rpc, state }: { rpc: ModeRpc<RpcGoalState>; state: Rp
 					value={objectiveDraft}
 				/>
 				<div className="flex justify-end">
-					<Button disabled={!objectiveDirty || rpc.busy} onClick={saveObjective} size="sm" variant="secondary">
+					<Button
+						disabled={!objectiveDirty || rpc.busy || !rpc.ready}
+						onClick={saveObjective}
+						size="sm"
+						title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
+						variant="secondary"
+					>
 						{t("modesPanel.goal.saveObjective")}
 					</Button>
 				</div>
@@ -463,20 +502,33 @@ function GoalEnabledView({ rpc, state }: { rpc: ModeRpc<RpcGoalState>; state: Rp
 
 			<div className="flex items-center gap-2">
 				{state.status === "paused" ? (
-					<Button disabled={rpc.busy} onClick={() => runAction("resume")} size="sm" variant="primary">
+					<Button
+						disabled={rpc.busy || !rpc.ready}
+						onClick={() => runAction("resume")}
+						size="sm"
+						title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
+						variant="primary"
+					>
 						{t("modesPanel.goal.resume")}
 					</Button>
 				) : (
 					<Button
-						disabled={rpc.busy || state.status !== "active"}
+						disabled={rpc.busy || !rpc.ready || state.status !== "active"}
 						onClick={() => runAction("pause")}
 						size="sm"
+						title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
 						variant="secondary"
 					>
 						{t("modesPanel.goal.pause")}
 					</Button>
 				)}
-				<Button disabled={rpc.busy} onClick={() => runAction("drop")} size="sm" variant="danger">
+				<Button
+					disabled={rpc.busy || !rpc.ready}
+					onClick={() => runAction("drop")}
+					size="sm"
+					title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
+					variant="danger"
+				>
 					{t("modesPanel.goal.drop")}
 				</Button>
 			</div>
@@ -523,7 +575,14 @@ function GoalStartForm({ rpc }: { rpc: ModeRpc<RpcGoalState> }) {
 				value={budget}
 			/>
 			<div>
-				<Button disabled={!trimmed || rpc.busy} loading={rpc.busy} onClick={start} size="sm" variant="primary">
+				<Button
+					disabled={!trimmed || rpc.busy || !rpc.ready}
+					loading={rpc.busy}
+					onClick={start}
+					size="sm"
+					title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
+					variant="primary"
+				>
 					{t("modesPanel.goal.start")}
 				</Button>
 			</div>
@@ -535,7 +594,13 @@ function GoalTab({ rpc }: { rpc: ModeRpc<RpcGoalState> }) {
 	const t = useT();
 	const state = rpc.state;
 	return (
-		<ModeFrame error={rpc.error} loaded={state !== null} loading={rpc.loading} onRefresh={rpc.refresh}>
+		<ModeFrame
+			error={rpc.error}
+			loaded={state !== null}
+			loading={rpc.loading}
+			onRefresh={rpc.refresh}
+			ready={rpc.ready}
+		>
 			{state && (
 				<div className="flex flex-col gap-4">
 					<p className="text-omp-sm leading-relaxed text-(--omp-muted)">{t("modesPanel.goal.desc")}</p>
@@ -564,7 +629,13 @@ function LoopTab({ rpc }: { rpc: ModeRpc<RpcLoopModeState> }) {
 	const limit = state ? parseLoopLimit(state.limit) : null;
 
 	return (
-		<ModeFrame error={rpc.error} loaded={state !== null} loading={rpc.loading} onRefresh={rpc.refresh}>
+		<ModeFrame
+			error={rpc.error}
+			loaded={state !== null}
+			loading={rpc.loading}
+			onRefresh={rpc.refresh}
+			ready={rpc.ready}
+		>
 			{state && (
 				<div className="flex flex-col gap-4">
 					<p className="text-omp-sm leading-relaxed text-(--omp-muted)">{t("modesPanel.loop.desc")}</p>
@@ -572,9 +643,10 @@ function LoopTab({ rpc }: { rpc: ModeRpc<RpcLoopModeState> }) {
 						<Toggle
 							checked={state.enabled}
 							description={t("modesPanel.loop.toggleDesc")}
-							disabled={rpc.busy}
+							disabled={rpc.busy || !rpc.ready}
 							label={t("modesPanel.loop.toggleLabel")}
 							onChange={toggle}
+							title={!rpc.ready ? t("modesPanel.notConnected") : undefined}
 						/>
 					</div>
 

@@ -27,6 +27,7 @@ import {
 } from "@dnd-kit/sortable";
 import { ArrowLeftRight, Check, ChevronDown, ChevronUp, GripVertical, ListX, Pencil, X } from "lucide-react";
 import { memo, useCallback, useEffect, useState } from "react";
+import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
@@ -34,6 +35,7 @@ import { isImeKeyEvent } from "../../lib/ime";
 import { onEscape } from "../../lib/keymap";
 import { optimisticWrite } from "../../lib/optimistic";
 import { type QueueLane, type QueueStore, useQueuedMessages, useQueueStore } from "../../stores/queue";
+import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { Badge } from "../common";
@@ -69,6 +71,7 @@ interface SortableQueuedRowProps {
 	onMoveToLane: (lane: QueueLane, id: string) => void;
 	onRemove: (lane: QueueLane, id: string) => void;
 	removeLabel: string;
+	ready: boolean;
 }
 
 /** Optimistically move an entry to the END of the other lane (queue_move with
@@ -108,12 +111,13 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 	onMoveToLane,
 	onRemove,
 	removeLabel,
+	ready,
 }: SortableQueuedRowProps) {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(item.text);
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
 		id: item.id,
-		disabled: editing,
+		disabled: !ready || editing,
 	});
 	const t = useT();
 	const targetLane: QueueLane = lane === "steering" ? "followUp" : "steering";
@@ -142,6 +146,8 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 				aria-label={t("queuePanel.drag")}
 				className="omp-pressable mt-0.5 flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text) active:cursor-grabbing"
 				type="button"
+				disabled={!ready}
+				title={!ready ? t("common.notConnected") : undefined}
 			>
 				<GripVertical size={14} />
 			</button>
@@ -182,7 +188,7 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 						<button
 							aria-label={t("queuePanel.saveEdit")}
 							className="omp-pressable rounded-sm p-1 text-(--omp-accent) hover:bg-(--omp-bg-tertiary) disabled:cursor-not-allowed disabled:opacity-40"
-							disabled={draft.trim().length === 0}
+							disabled={!ready || draft.trim().length === 0}
 							onClick={saveEdit}
 							title={t("queuePanel.saveEditHint")}
 							type="button"
@@ -199,7 +205,8 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 					<button
 						aria-label={t("queuePanel.moveUp")}
 						className="omp-pressable mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text) disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-(--omp-dim)"
-						disabled={index === 0}
+						disabled={!ready || index === 0}
+						title={!ready ? t("common.notConnected") : undefined}
 						onClick={() => onMove(lane, item.id, index - 1)}
 						type="button"
 					>
@@ -208,7 +215,8 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 					<button
 						aria-label={t("queuePanel.moveDown")}
 						className="omp-pressable mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text) disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-(--omp-dim)"
-						disabled={index === count - 1}
+						disabled={!ready || index === count - 1}
+						title={!ready ? t("common.notConnected") : undefined}
 						onClick={() => onMove(lane, item.id, index + 1)}
 						type="button"
 					>
@@ -218,6 +226,7 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 						<button
 							aria-label={t("queuePanel.edit")}
 							className="omp-pressable mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)"
+							disabled={!ready}
 							onClick={() => setEditing(true)}
 							title={t("queuePanel.edit")}
 							type="button"
@@ -228,8 +237,13 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 					<button
 						aria-label={t("queuePanel.moveToLane", { lane: t(`queuePanel.lane.${targetLane}`) })}
 						className="omp-pressable mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)"
+						disabled={!ready}
 						onClick={() => onMoveToLane(lane, item.id)}
-						title={t("queuePanel.moveToLane", { lane: t(`queuePanel.lane.${targetLane}`) })}
+						title={
+							!ready
+								? t("common.notConnected")
+								: t("queuePanel.moveToLane", { lane: t(`queuePanel.lane.${targetLane}`) })
+						}
 						type="button"
 					>
 						<ArrowLeftRight size={14} />
@@ -237,7 +251,9 @@ const SortableQueuedRow = memo(function SortableQueuedRow({
 					<button
 						aria-label={removeLabel}
 						className="omp-pressable mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-error)"
+						disabled={!ready}
 						onClick={() => onRemove(lane, item.id)}
+						title={!ready ? t("common.notConnected") : removeLabel}
 						type="button"
 					>
 						<X size={14} />
@@ -256,6 +272,7 @@ function LaneSection({
 	onClear,
 	onMove,
 	onMoveToLane,
+	ready,
 }: {
 	lane: QueueLane;
 	items: RpcQueuedMessage[];
@@ -264,6 +281,7 @@ function LaneSection({
 	onClear: (lane: QueueLane) => void;
 	onMove: (lane: QueueLane, id: string, toIndex: number) => void;
 	onMoveToLane: (lane: QueueLane, id: string) => void;
+	ready: boolean;
 }) {
 	const t = useT();
 	const sensors = useSensors(
@@ -274,13 +292,13 @@ function LaneSection({
 	const onDragEnd = useCallback(
 		(event: DragEndEvent) => {
 			const { active, over } = event;
-			if (!over || active.id === over.id) return;
+			if (!ready || !over || active.id === over.id) return;
 			const from = items.findIndex(item => item.id === active.id);
 			const to = items.findIndex(item => item.id === over.id);
 			if (from < 0 || to < 0) return;
 			onMove(lane, String(active.id), to);
 		},
-		[items, lane, onMove],
+		[items, lane, onMove, ready],
 	);
 
 	return (
@@ -293,8 +311,10 @@ function LaneSection({
 				{items.length > 0 && (
 					<button
 						aria-label={t("queuePanel.clearLane")}
-						className="omp-pressable flex items-center gap-1 rounded-md px-2 py-1 text-omp-xs text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-error)"
+						className="omp-pressable flex items-center gap-1 rounded-md px-2 py-1 text-omp-xs text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-error) disabled:opacity-40"
+						disabled={!ready}
 						onClick={() => onClear(lane)}
+						title={!ready ? t("common.notConnected") : undefined}
 						type="button"
 					>
 						<ListX size={12} />
@@ -317,6 +337,7 @@ function LaneSection({
 								onMoveToLane={onMoveToLane}
 								onRemove={onRemove}
 								removeLabel={t("queuePanel.remove")}
+								ready={ready}
 							/>
 						))}
 						{items.length === 0 && (
@@ -334,11 +355,14 @@ export function QueuePanel() {
 	const tabId = useRuntimeTabId();
 	const queueStore = sessionRuntimeStore<QueueStore>(tabId, "queue") ?? useQueueStore;
 	const t = useT();
+	const sessionStore = sessionRuntimeStore<SessionStore>(tabId, "session");
+	const sidecarReady = useStore(sessionStore ?? useSessionStore, state => state.status) === "ready";
 	const { steering, followUp } = useQueuedMessages();
 	const total = steering.length + followUp.length;
 
 	const removeItem = useCallback(
 		(lane: QueueLane, id: string) => {
+			if (!sidecarReady) return;
 			void applyLaneMutation(
 				queueStore,
 				lane,
@@ -348,11 +372,12 @@ export function QueuePanel() {
 				t,
 			);
 		},
-		[t, tabRpc.queueRemove, queueStore],
+		[sidecarReady, t, tabRpc.queueRemove, queueStore],
 	);
 
 	const editItem = useCallback(
 		(lane: QueueLane, id: string, text: string) => {
+			if (!sidecarReady) return;
 			void applyLaneMutation(
 				queueStore,
 				lane,
@@ -367,11 +392,12 @@ export function QueuePanel() {
 				t,
 			);
 		},
-		[t, tabRpc.queueEdit, queueStore],
+		[sidecarReady, t, tabRpc.queueEdit, queueStore],
 	);
 
 	const moveItem = useCallback(
 		(lane: QueueLane, id: string, toIndex: number) => {
+			if (!sidecarReady) return;
 			void applyLaneMutation(
 				queueStore,
 				lane,
@@ -389,18 +415,20 @@ export function QueuePanel() {
 				t,
 			);
 		},
-		[t, tabRpc.queueMove, queueStore],
+		[sidecarReady, t, tabRpc.queueMove, queueStore],
 	);
 
 	const moveToLane = useCallback(
 		(lane: QueueLane, id: string) => {
+			if (!sidecarReady) return;
 			void applyCrossLaneMove(queueStore, tabRpc, lane, id, t);
 		},
-		[t, tabRpc, queueStore],
+		[sidecarReady, t, tabRpc, queueStore],
 	);
 
 	const clearLane = useCallback(
 		(lane: QueueLane) => {
+			if (!sidecarReady) return;
 			void applyLaneMutation(
 				queueStore,
 				lane,
@@ -415,11 +443,19 @@ export function QueuePanel() {
 				t,
 			);
 		},
-		[t, tabRpc.queueClear, queueStore],
+		[sidecarReady, t, tabRpc.queueClear, queueStore],
 	);
 
 	return (
 		<div className="flex h-full flex-col">
+			{!sidecarReady && (
+				<div
+					className="mx-2 mt-2 rounded-md border border-(--omp-border-muted) px-2.5 py-2 text-omp-xs text-(--omp-muted)"
+					role="status"
+				>
+					{t("common.notConnected")}
+				</div>
+			)}
 			<div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 				{total === 0 ? (
 					<div className="px-3 py-8 text-center text-omp-sm leading-relaxed text-(--omp-dim)">
@@ -437,6 +473,7 @@ export function QueuePanel() {
 							onMove={moveItem}
 							onMoveToLane={moveToLane}
 							onRemove={removeItem}
+							ready={sidecarReady}
 						/>
 						<LaneSection
 							items={followUp}
@@ -446,6 +483,7 @@ export function QueuePanel() {
 							onMove={moveItem}
 							onMoveToLane={moveToLane}
 							onRemove={removeItem}
+							ready={sidecarReady}
 						/>
 					</>
 				)}

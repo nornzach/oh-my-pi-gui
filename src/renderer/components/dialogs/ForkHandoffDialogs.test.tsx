@@ -8,7 +8,7 @@
 import { parseHTML } from "linkedom";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
 import { closeHandoffDialog, openHandoffDialog, useForkHandoffStore } from "../../stores/fork-handoff";
@@ -76,6 +76,10 @@ function installMockOmp(overrides: Partial<MockRpc> = {}): MockRpc {
 
 let container: TestElement;
 let root: Root;
+
+beforeEach(() => {
+	useSessionStore.setState({ status: "ready" });
+});
 
 async function flush(): Promise<void> {
 	await act(async () => {

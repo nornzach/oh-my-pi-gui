@@ -20,6 +20,8 @@ const SIDECAR_COMMANDS: AvailableCommand[] = [
 	// Both names are claimed by a native row (model picker, run-modes window).
 	{ name: "models", description: "List models", textModeExecutable: true },
 	{ name: "modes", description: "Run modes", textModeExecutable: true },
+	// A terminal-only command stays visible so the palette explains its client limit.
+	{ name: "terminal-only", description: "Terminal helper", textModeExecutable: false },
 ];
 
 function seedTab(kind: "agent" | "chat"): void {
@@ -51,7 +53,7 @@ describe("chat-tab availability", () => {
 		expect(menuItem("security").affordance.kind).toBe("submenu");
 
 		seedTab("chat");
-		for (const name of ["plan", "security", "goal", "vibe"]) {
+		for (const name of ["plan", "security", "goal", "vibe", "tree"]) {
 			const affordance = menuItem(name).affordance;
 			if (affordance.kind !== "unavailable") throw new Error(`${name} is still executable in a chat tab`);
 			expect(affordance.reason, name).toBe(CHAT_REASON);
@@ -76,6 +78,23 @@ describe("chat-tab availability", () => {
 });
 
 describe("native rows vs sidecar-advertised duplicates", () => {
+	it("keeps a terminal-only sidecar command visible but disabled", () => {
+		seedTab("agent");
+		const item = menuItem("terminal-only");
+		if (item.affordance.kind !== "unavailable") throw new Error("terminal-only command is executable");
+		expect(item.affordance.reason).toBe(translate("palette.tuiOnly"));
+	});
+
+	it("exposes repository changes through the native git row", () => {
+		seedTab("agent");
+		expect(menuItem("git").affordance.kind).toBe("window");
+
+		seedTab("chat");
+		const affordance = menuItem("git").affordance;
+		if (affordance.kind !== "unavailable") throw new Error("git is executable in a chat tab");
+		expect(affordance.reason).toBe(CHAT_REASON);
+	});
+
 	it("drops a sidecar row whose name is a native alias instead of listing a dead duplicate", () => {
 		seedTab("agent");
 		const items = buildCurrentCommandMenu(SIDECAR_COMMANDS);

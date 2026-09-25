@@ -33,11 +33,13 @@ function RoleRow({
 	role,
 	onChange,
 	busy,
+	sidecarReady,
 	t,
 }: {
 	role: ModelRoleEntry;
 	onChange: (role: string, modelId: string | null) => void;
 	busy: boolean;
+	sidecarReady: boolean;
 	t: (k: string, p?: Record<string, string | number>) => string;
 }) {
 	const color = COLOR_MAP[role.color ?? "default"] ?? COLOR_MAP.default;
@@ -111,6 +113,10 @@ function RoleRow({
 		return () => document.removeEventListener("pointerdown", onPointerDown);
 	}, [open]);
 
+	useEffect(() => {
+		if (!sidecarReady) setOpen(false);
+	}, [sidecarReady]);
+
 	const filteredGroups = [...groups.entries()]
 		.map(([kind, models]) => [
 			kind,
@@ -164,12 +170,13 @@ function RoleRow({
 					aria-haspopup="listbox"
 					aria-label={t("modelRoles.select", { role: role.name })}
 					className="flex h-7 w-full items-center gap-1 rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-input-bg)] px-2 text-left text-omp-sm text-[var(--omp-text)] focus:border-[var(--omp-border-accent)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-					disabled={busy}
+					disabled={busy || !sidecarReady}
 					onClick={() => {
 						setQuery("");
 						setOpen(value => !value);
 					}}
 					ref={triggerRef}
+					title={!sidecarReady ? t("modelRoles.notConnected") : undefined}
 					type="button"
 				>
 					<span className="min-w-0 flex-1 truncate font-mono">{currentLabel}</span>
@@ -207,6 +214,7 @@ function RoleRow({
 						<button
 							aria-selected={!role.model}
 							className="flex w-full items-center rounded px-2 py-1.5 text-left text-omp-sm hover:bg-[var(--omp-selected-bg)]"
+							disabled={!sidecarReady}
 							onClick={() => {
 								closePicker();
 								onChange(role.id, null);
@@ -214,6 +222,7 @@ function RoleRow({
 							role="option"
 							onKeyDown={handleOptionKeyDown}
 							tabIndex={-1}
+							title={!sidecarReady ? t("modelRoles.notConnected") : undefined}
 							type="button"
 						>
 							{t("modelRoles.default")}
@@ -222,6 +231,7 @@ function RoleRow({
 							<button
 								aria-selected
 								className="flex w-full items-center rounded px-2 py-1.5 text-left text-omp-sm hover:bg-[var(--omp-selected-bg)]"
+								disabled={!sidecarReady}
 								onClick={() => {
 									closePicker();
 									onChange(role.id, role.model ?? null);
@@ -229,6 +239,7 @@ function RoleRow({
 								role="option"
 								onKeyDown={handleOptionKeyDown}
 								tabIndex={-1}
+								title={!sidecarReady ? t("modelRoles.notConnected") : undefined}
 								type="button"
 							>
 								{t("modelRoles.savedSelector", { model: role.model! })}
@@ -246,6 +257,7 @@ function RoleRow({
 											key={value}
 											aria-selected={value === role.model}
 											className="flex w-full items-center rounded px-2 py-1.5 text-left text-omp-sm hover:bg-[var(--omp-selected-bg)]"
+											disabled={!sidecarReady}
 											onClick={() => {
 												closePicker();
 												onChange(role.id, value);
@@ -253,6 +265,7 @@ function RoleRow({
 											onKeyDown={handleOptionKeyDown}
 											role="option"
 											tabIndex={-1}
+											title={!sidecarReady ? t("modelRoles.notConnected") : undefined}
 											type="button"
 										>
 											<span className="min-w-0 flex-1 truncate">{model.name}</span>
@@ -322,6 +335,7 @@ export function ModelRolesWindow() {
 	}, [roles]);
 
 	const handleChange = async (role: string, modelId: string | null) => {
+		if (!sidecarReady) return;
 		setBusyRole(role);
 		try {
 			const res = await tabRpc.setModelRole(role, modelId);
@@ -353,7 +367,9 @@ export function ModelRolesWindow() {
 						variant="ghost"
 						icon={<RefreshCw size={12} />}
 						onClick={() => void load()}
+						disabled={!sidecarReady}
 						loading={loading}
+						title={!sidecarReady ? t("modelRoles.notConnected") : t("modelRoles.refresh")}
 					>
 						{t("modelRoles.refresh")}
 					</Button>
@@ -376,7 +392,14 @@ export function ModelRolesWindow() {
 								{t(`modelRoles.section.${section.key}`)}
 							</span>
 							{section.roles.map(role => (
-								<RoleRow key={role.id} role={role} onChange={handleChange} busy={busyRole === role.id} t={t} />
+								<RoleRow
+									key={role.id}
+									role={role}
+									onChange={handleChange}
+									busy={busyRole === role.id}
+									sidecarReady={sidecarReady}
+									t={t}
+								/>
 							))}
 						</div>
 					))}

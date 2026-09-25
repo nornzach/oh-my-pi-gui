@@ -52,6 +52,9 @@ export const en: Record<string, string> = {
 	"tools.ask.chatRedirect": "Continued as a conversation.",
 	// TitleBar
 	"titlebar.commands": "Commands",
+	"titlebar.commandsHint": "Open Command Center ({shortcut})",
+	"titlebar.actions": "Session actions",
+	"settings.restoreUnset": "Remove global override",
 	"titlebar.stats": "Session stats",
 	"titlebar.workspace": "Open workspace",
 	"titlebar.hotkeys": "Keyboard shortcuts",
@@ -81,6 +84,7 @@ export const en: Record<string, string> = {
 	"titlebar.openProjectFailed": "Could not open project",
 	"titlebar.renameFailed": "Rename failed",
 
+	"tabs.actions": "Tab actions",
 	// Session tab strip (TabBar)
 	"tabs.strip": "Session tabs",
 	"tabs.new": "New tab",
@@ -140,6 +144,7 @@ export const en: Record<string, string> = {
 	"worktreeClose.dirtyBody":
 		"Uncommitted changes: {staged} staged, {unstaged} unstaged, {untracked} untracked. Force-deleting discards them.",
 	"worktreeClose.statusUnknown": "Could not check the worktree status. You can keep it and close the tab.",
+	"worktreeClose.notConnected": "The sidecar is not connected. Keep the worktree and close the tab, or cancel.",
 	"worktreeClose.delete": "Delete & close",
 	"worktreeClose.forceDelete": "Force delete (discard changes)",
 	"worktreeClose.keep": "Keep & close",
@@ -304,6 +309,7 @@ export const en: Record<string, string> = {
 	"contextUsage.windowUnknown": "Context window unknown",
 	"contextUsage.progress": "Context is {percent}% used",
 	"contextUsage.loading": "Loading breakdown…",
+	"contextUsage.fullReport": "Open full context report",
 	"contextUsage.unavailable": "The detailed breakdown is temporarily unavailable.",
 	"contextUsage.category.system": "System context",
 	"contextUsage.category.tools": "Tools",
@@ -405,6 +411,7 @@ export const en: Record<string, string> = {
 	"palette.searchSubmenu": "Search {name}…",
 	"palette.noCommands": "No commands available.",
 	"palette.noMatch": "No matching commands.",
+	"palette.tuiOnly": "Available in the terminal client only",
 	"palette.commandsFailed": "Could not load this session's commands.",
 	"palette.recent": "Recent",
 
@@ -656,6 +663,12 @@ export const en: Record<string, string> = {
 	"cmd.extensions.desc": "Skills, hooks, MCP servers, and custom commands",
 	"cmd.agents": "Agents",
 	"cmd.agents.desc": "Subagent definitions and activity hub",
+	"cmd.git": "Git Changes",
+	"cmd.git.desc": "Open repository changes, staging, and commit tools",
+	"cmd.restart": "Restart OMP Core",
+	"cmd.restart.desc": "Restart the bundled agent and resume this session",
+	"cmd.hub": "Agent Hub",
+	"cmd.hub.desc": "Monitor active subagents and open their sessions",
 	"cmd.prCenter": "PR Center",
 	"cmd.prCenter.desc": "Browse, review, and create pull requests",
 	"cmd.collab": "Collab Session",
@@ -996,6 +1009,7 @@ export const en: Record<string, string> = {
 	"common.delete": "Delete",
 	"common.edit": "Edit",
 	"common.retry": "Retry",
+	"common.notConnected": "Sidecar not connected",
 
 	// Language switcher
 	"lang.switch": "Switch language",
@@ -1168,6 +1182,7 @@ export const en: Record<string, string> = {
 	"sessionTree.forkCount": "{count} fork{plural}",
 	"sessionTree.lineageView": "lineage view",
 	"sessionTree.loading": "Loading lineage…",
+	"sessionTree.notConnected": "Sidecar not connected",
 	"sessionTree.empty": "No messages in this session yet.",
 	"sessionTree.canvasAria": "Session tree canvas",
 	"sessionTree.branchFailed": "Branch failed",
@@ -1197,6 +1212,7 @@ export const en: Record<string, string> = {
 	"import.importN": "Import {count}",
 	"import.imported": "Imported {count} sessions",
 	"import.failed": "Import failed",
+	"import.notConnected": "Sidecar not connected",
 	"import.sourceUnavailable": "Cannot read {source} sessions",
 
 	// Composer editor dialog (Ctrl+G)
@@ -1488,6 +1504,13 @@ export const en: Record<string, string> = {
 	"settings.capabilities.title": "Start with what makes OMP different",
 	"settings.capabilities.description":
 		"These controls change how work is executed, not how the settings page looks: intervene mid-stream, fan work out, route model roles, and keep project memory.",
+	"settings.capabilities.commandCenter": "Command Center",
+	"settings.capabilities.commandCenterDesc":
+		"Browse every GUI command, mode, provider action, extension action, and shortcut from one searchable palette.",
+	"settings.capabilities.openCommandCenter": "Browse all commands",
+	"settings.capabilities.quickActions": "Quick actions",
+	"settings.capabilities.quickActionsDesc":
+		"Start side questions, background work, recurring-behavior rules, guided goals, or queued follow-ups without remembering slash-command syntax.",
 	"settings.capabilities.enabled": "Enabled",
 	"settings.capabilities.disabled": "Off",
 	"settings.capabilities.loading": "Loading…",
@@ -2028,6 +2051,7 @@ export const en: Record<string, string> = {
 	"modelPicker.searchLabel": "Search models",
 	"modelPicker.placeholder": "Search models…",
 	"modelPicker.notResponding": "Agent not responding",
+	"modelPicker.notConnected": "Sidecar not connected",
 	"modelPicker.notRespondingHint": "The agent process may not be responding.",
 	"modelPicker.stillNotResponding": "Still not responding. Try restarting the agent.",
 	"modelPicker.stillNotRespondingShort": "Still not responding.",
@@ -2727,6 +2751,9 @@ export const en: Record<string, string> = {
 	"agentHub.defs.detail.output": "Output schema",
 	"agentHub.defs.footerNote": "Changes write task.* settings over RPC and apply to newly spawned agents immediately.",
 	"agentHub.hub.abortTurn": "Abort turn",
+	"agentHub.hub.pauseAgents": "Pause all agents",
+	"agentHub.hub.resumeAgents": "Resume all agents",
+	"agentHub.hub.pauseFailed": "Failed to change agent pause state",
 	"agentHub.hub.abortFailed": "Abort failed",
 	"agentHub.hub.gapNote":
 		"Per-agent abort and revive act on the live subagent (TUI hub parity); abort turn stops the whole active turn.",
@@ -2980,6 +3007,9 @@ export const en: Record<string, string> = {
 	"security.scan.repository": "Scan repository",
 	"security.scan.diff": "Scan revision diff",
 	"security.scan.scope": "Scan scope",
+	"security.scanDisabled.running": "A security scan is already running.",
+	"security.scanDisabled.repository": "Open a Git repository before scanning.",
+	"security.scanDisabled.model": "Select a security model before scanning.",
 	"security.enableScanTitle": "Enable security review?",
 	"security.enableScanBody":
 		"Security is currently off. This scan turns it on, which keeps scan planning and execution enabled after this run.",
@@ -3138,6 +3168,13 @@ export const en: Record<string, string> = {
 	"settings.schemaLoadFailed": "Failed to load settings",
 	"settings.schemaLoading": "Loading settings schema…",
 	"settings.schemaUnavailable": "The agent process may not be responding. Runtime and GUI tabs remain available.",
+	"settings.connection.connecting": "Waiting for the agent process",
+	"settings.connection.unavailable": "Agent settings are unavailable",
+	"settings.connection.waiting": "The settings schema will return when the agent reconnects.",
+	"settings.connection.retryHint": "Reconnect the agent before editing these settings.",
+	"settings.connection.cached": "Cached values are shown for navigation only and are locked until reconnect.",
+	"settings.connection.noSchema": "No settings values are available until the agent reconnects.",
+	"settings.connection.restartFailed": "Could not restart the agent",
 	"settings.sectionEmpty": "No settings in this section.",
 	"shake.success": "Context cleanup complete.",
 	"time.daysAgo": "{count}d ago",

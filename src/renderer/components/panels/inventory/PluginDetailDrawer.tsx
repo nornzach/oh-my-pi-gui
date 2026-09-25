@@ -27,6 +27,7 @@ import {
 	handlePluginActivation,
 	isPluginActivationOriginActive,
 } from "../../../lib/plugin-activation";
+import { useSessionStore } from "../../../stores/session";
 import { toast } from "../../../stores/toast";
 import { Badge, Button, Input, Spinner, TextArea } from "../../common";
 import { ArrayChipEditor } from "../../settings/editors/ArrayChipEditor";
@@ -293,6 +294,7 @@ export function PluginDetailDrawer({
 }) {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const pluginId = plugin.id ?? plugin.name;
 	const [detail, setDetail] = useState<RpcPluginDetail | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -322,6 +324,12 @@ export function PluginDetailDrawer({
 
 	const load = useCallback(async (): Promise<void> => {
 		setLoadError(null);
+		if (!sidecarReady) {
+			setDetail(null);
+			setLoadError(t("common.notConnected"));
+			setLoading(false);
+			return;
+		}
 		try {
 			const res = await tabRpc.getPluginDetail(pluginId);
 			if (res.success) {
@@ -334,7 +342,7 @@ export function PluginDetailDrawer({
 		} finally {
 			setLoading(false);
 		}
-	}, [pluginId, tabRpc.getPluginDetail]);
+	}, [pluginId, sidecarReady, t, tabRpc.getPluginDetail]);
 
 	useEffect(() => {
 		void load();
@@ -364,6 +372,7 @@ export function PluginDetailDrawer({
 
 	// ---- enabled (set_plugin_enabled — same RPC as the list-row toggle) ----
 	const toggleEnabled = async (next: boolean): Promise<void> => {
+		if (!sidecarReady) return;
 		const origin = capturePluginActivationOrigin();
 		if (!origin) {
 			toast({ variant: "warning", message: t("pluginActivation.routePending") });
@@ -407,6 +416,7 @@ export function PluginDetailDrawer({
 	};
 
 	const saveFeatures = async (): Promise<void> => {
+		if (!sidecarReady) return;
 		const origin = capturePluginActivationOrigin();
 		if (!origin) {
 			setFeaturesError(t("pluginActivation.routePending"));
@@ -487,7 +497,7 @@ export function PluginDetailDrawer({
 	};
 
 	const saveSettings = async (): Promise<void> => {
-		if (!detail || saving || dirtyKeys.length === 0) return;
+		if (!sidecarReady || !detail || saving || dirtyKeys.length === 0) return;
 		setSaving(true);
 		const failures: Record<string, string> = {};
 		const succeeded: string[] = [];
@@ -532,6 +542,7 @@ export function PluginDetailDrawer({
 	};
 
 	const resetField = async (field: SettingField): Promise<void> => {
+		if (!sidecarReady) return;
 		setResetBusy(true);
 		try {
 			const res = await tabRpc.deletePluginSetting(pluginId, field.key);
@@ -585,12 +596,14 @@ export function PluginDetailDrawer({
 					<div className="flex flex-col items-center gap-2.5 py-8">
 						<CopyableError className="w-full" copyLabel={t("pluginDetail.copyError")} message={loadError} />
 						<Button
+							disabled={!sidecarReady}
 							icon={<RefreshCw size={12} />}
 							onClick={() => {
 								setLoading(true);
 								void load();
 							}}
 							size="sm"
+							title={!sidecarReady ? t("common.notConnected") : undefined}
 							variant="ghost"
 						>
 							{t("invPanel.retry")}
@@ -606,151 +619,157 @@ export function PluginDetailDrawer({
 									<span className="font-semibold">{t("pluginDetail.stale")}</span> {loadError}
 								</div>
 								<Button
+									disabled={!sidecarReady}
 									icon={<RefreshCw size={12} />}
 									onClick={() => {
 										setLoading(true);
 										void load();
 									}}
 									size="sm"
+									title={!sidecarReady ? t("common.notConnected") : undefined}
 									variant="ghost"
 								>
 									{t("invPanel.retry")}
 								</Button>
 							</div>
 						)}
-						<section>
-							<Toggle
-								checked={detail.enabled}
-								description={t("pluginDetail.enabledHint")}
-								disabled={enabledBusy}
-								label={t("pluginDetail.enabled")}
-								onChange={next => void toggleEnabled(next)}
-							/>
-						</section>
-						<section>
-							<div className="mb-1.5 text-omp-sm font-semibold tracking-wide text-(--omp-dim) uppercase">
-								{t("pluginDetail.features")}
-							</div>
-							{detail.features.length === 0 ? (
-								<div className="rounded-md border border-(--omp-border-muted) px-3 py-3 text-omp-sm text-(--omp-dim)">
-									{t("pluginDetail.featuresEmpty")}
+						<fieldset className="contents" disabled={!sidecarReady}>
+							<section>
+								<Toggle
+									checked={detail.enabled}
+									description={t("pluginDetail.enabledHint")}
+									disabled={enabledBusy}
+									label={t("pluginDetail.enabled")}
+									onChange={next => void toggleEnabled(next)}
+								/>
+							</section>
+							<section>
+								<div className="mb-1.5 text-omp-sm font-semibold tracking-wide text-(--omp-dim) uppercase">
+									{t("pluginDetail.features")}
 								</div>
-							) : (
-								<>
-									<div className="flex flex-col rounded-lg border border-(--omp-border-muted) bg-transparent">
-										{detail.features.map(feature => (
-											<label
-												className="flex cursor-pointer items-start gap-2.5 border-b border-(--omp-border-muted) px-3 py-2 last:border-0 hover:bg-(--omp-selected-bg)"
-												key={feature.id}
-											>
-												<input
-													checked={currentFeatures.includes(feature.id)}
-													className="mt-0.5"
-													disabled={featuresBusy}
-													onChange={event => toggleFeature(feature.id, event.target.checked)}
-													type="checkbox"
-												/>
-												<span className="min-w-0 flex-1">
-													<span className="block text-omp-md font-medium text-(--omp-text)">
-														{feature.id}
-													</span>
-													{feature.description && (
-														<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-dim)">
-															{feature.description}
+								{detail.features.length === 0 ? (
+									<div className="rounded-md border border-(--omp-border-muted) px-3 py-3 text-omp-sm text-(--omp-dim)">
+										{t("pluginDetail.featuresEmpty")}
+									</div>
+								) : (
+									<>
+										<div className="flex flex-col rounded-lg border border-(--omp-border-muted) bg-transparent">
+											{detail.features.map(feature => (
+												<label
+													className="flex cursor-pointer items-start gap-2.5 border-b border-(--omp-border-muted) px-3 py-2 last:border-0 hover:bg-(--omp-selected-bg)"
+													key={feature.id}
+												>
+													<input
+														checked={currentFeatures.includes(feature.id)}
+														className="mt-0.5"
+														disabled={featuresBusy}
+														onChange={event => toggleFeature(feature.id, event.target.checked)}
+														type="checkbox"
+													/>
+													<span className="min-w-0 flex-1">
+														<span className="block text-omp-md font-medium text-(--omp-text)">
+															{feature.id}
 														</span>
-													)}
-												</span>
-											</label>
-										))}
-									</div>
-									{featuresError && (
-										<CopyableError
-											className="mt-2"
-											copyLabel={t("pluginDetail.copyError")}
-											message={featuresError}
-										/>
-									)}
-									<div className="mt-2 flex justify-end">
-										<Button
-											disabled={!featuresDirty || featuresBusy}
-											loading={featuresBusy}
-											onClick={() => void saveFeatures()}
-											size="sm"
-										>
-											{t("pluginDetail.saveFeatures")}
-										</Button>
-									</div>
-								</>
-							)}
-						</section>
-						<section>
-							<div className="mb-1.5 text-omp-sm font-semibold tracking-wide text-(--omp-dim) uppercase">
-								{t("pluginDetail.settings")}
-							</div>
-							{fields.length === 0 ? (
-								<div className="rounded-md border border-(--omp-border-muted) px-3 py-3 text-omp-sm text-(--omp-dim)">
-									{t("pluginDetail.settingsEmpty")}
-								</div>
-							) : (
-								<>
-									<div className="flex flex-col rounded-lg border border-(--omp-border-muted) bg-transparent">
-										{fields.map(field => (
-											<SettingFieldRow
-												draft={drafts[field.key]}
-												error={fieldErrors[field.key]}
-												field={field}
-												hasDraft={field.key in drafts}
-												hasStoredValue={detail.configuredKeys.includes(field.key)}
-												key={field.key}
-												onCancelReplace={() => {
-													setReplacingKey(null);
-													clearDraft(field.key);
-												}}
-												onDraft={value => setDraft(field.key, value)}
-												onReplace={() => {
-													setReplacingKey(field.key);
-													setDraft(field.key, "");
-												}}
-												onResetAsk={() => setResetKey(field.key)}
-												onResetCancel={() => setResetKey(null)}
-												onResetConfirm={() => void resetField(field)}
-												replacing={replacingKey === field.key}
-												resetState={resetKey === field.key ? (resetBusy ? "busy" : "confirming") : "idle"}
-												saving={saving}
-												value={
-													// Unset non-secret settings show their declared default. Secret
-													// values never cross the RPC boundary and are always write-only.
-													field.secret ? undefined : (detail.values[field.key] ?? field.default)
-												}
+														{feature.description && (
+															<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-dim)">
+																{feature.description}
+															</span>
+														)}
+													</span>
+												</label>
+											))}
+										</div>
+										{featuresError && (
+											<CopyableError
+												className="mt-2"
+												copyLabel={t("pluginDetail.copyError")}
+												message={featuresError}
 											/>
-										))}
-									</div>
-									{failedCount > 0 && (
-										<CopyableError
-											className="mt-2"
-											copyLabel={t("pluginDetail.copyError")}
-											message={t("pluginDetail.someFailed", { count: failedCount })}
-										/>
-									)}
-									<div className="mt-2 flex items-center justify-end gap-2">
-										{savedTick && (
-											<span className="flex items-center gap-1 text-omp-sm text-(--omp-success)">
-												<Check size={11} />
-												{t("pluginDetail.saved")}
-											</span>
 										)}
-										<Button
-											disabled={dirtyKeys.length === 0 || saving}
-											loading={saving}
-											onClick={() => void saveSettings()}
-											size="sm"
-										>
-											{t("pluginDetail.saveSettings")}
-										</Button>
+										<div className="mt-2 flex justify-end">
+											<Button
+												disabled={!sidecarReady || !featuresDirty || featuresBusy}
+												loading={featuresBusy}
+												onClick={() => void saveFeatures()}
+												size="sm"
+											>
+												{t("pluginDetail.saveFeatures")}
+											</Button>
+										</div>
+									</>
+								)}
+							</section>
+							<section>
+								<div className="mb-1.5 text-omp-sm font-semibold tracking-wide text-(--omp-dim) uppercase">
+									{t("pluginDetail.settings")}
+								</div>
+								{fields.length === 0 ? (
+									<div className="rounded-md border border-(--omp-border-muted) px-3 py-3 text-omp-sm text-(--omp-dim)">
+										{t("pluginDetail.settingsEmpty")}
 									</div>
-								</>
-							)}
-						</section>
+								) : (
+									<>
+										<div className="flex flex-col rounded-lg border border-(--omp-border-muted) bg-transparent">
+											{fields.map(field => (
+												<SettingFieldRow
+													draft={drafts[field.key]}
+													error={fieldErrors[field.key]}
+													field={field}
+													hasDraft={field.key in drafts}
+													hasStoredValue={detail.configuredKeys.includes(field.key)}
+													key={field.key}
+													onCancelReplace={() => {
+														setReplacingKey(null);
+														clearDraft(field.key);
+													}}
+													onDraft={value => setDraft(field.key, value)}
+													onReplace={() => {
+														setReplacingKey(field.key);
+														setDraft(field.key, "");
+													}}
+													onResetAsk={() => setResetKey(field.key)}
+													onResetCancel={() => setResetKey(null)}
+													onResetConfirm={() => void resetField(field)}
+													replacing={replacingKey === field.key}
+													resetState={
+														resetKey === field.key ? (resetBusy ? "busy" : "confirming") : "idle"
+													}
+													saving={saving}
+													value={
+														// Unset non-secret settings show their declared default. Secret
+														// values never cross the RPC boundary and are always write-only.
+														field.secret ? undefined : (detail.values[field.key] ?? field.default)
+													}
+												/>
+											))}
+										</div>
+										{failedCount > 0 && (
+											<CopyableError
+												className="mt-2"
+												copyLabel={t("pluginDetail.copyError")}
+												message={t("pluginDetail.someFailed", { count: failedCount })}
+											/>
+										)}
+										<div className="mt-2 flex items-center justify-end gap-2">
+											{savedTick && (
+												<span className="flex items-center gap-1 text-omp-sm text-(--omp-success)">
+													<Check size={11} />
+													{t("pluginDetail.saved")}
+												</span>
+											)}
+											<Button
+												disabled={!sidecarReady || dirtyKeys.length === 0 || saving}
+												loading={saving}
+												onClick={() => void saveSettings()}
+												size="sm"
+											>
+												{t("pluginDetail.saveSettings")}
+											</Button>
+										</div>
+									</>
+								)}
+							</section>
+						</fieldset>
 					</>
 				) : null}
 			</div>

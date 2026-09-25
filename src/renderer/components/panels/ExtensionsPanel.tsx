@@ -61,6 +61,7 @@ interface TabRpc<T> {
 	data: T | null;
 	error: string | null;
 	loading: boolean;
+	ready: boolean;
 	/** Re-fetch; awaited by row mutations so fresh state replaces optimistic overlays. */
 	refresh: () => Promise<void>;
 }
@@ -137,7 +138,7 @@ function useTabRpc<T>(
 		await load();
 	}, [load]);
 
-	return { data, error, loading, refresh };
+	return { data, error, loading, ready: sidecarReady && routeReady, refresh };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +268,7 @@ interface RowMutation {
 	run: (key: string, next: boolean | null, action: () => Promise<RpcResponse>, errorTitle: string) => Promise<void>;
 }
 
-function useRowMutation(refresh: () => Promise<void>): RowMutation {
+function useRowMutation(refresh: () => Promise<void>, ready = true): RowMutation {
 	const [busyKey, setBusyKey] = useState<string | null>(null);
 	const [overrides, setOverrides] = useState<Readonly<Record<string, boolean>>>({});
 
@@ -275,6 +276,7 @@ function useRowMutation(refresh: () => Promise<void>): RowMutation {
 
 	const run = useCallback(
 		async (key: string, next: boolean | null, action: () => Promise<RpcResponse>, errorTitle: string) => {
+			if (!ready) return;
 			setBusyKey(key);
 			if (next !== null) setOverrides(prev => ({ ...prev, [key]: next }));
 			const clearOverride = (): void =>
@@ -301,7 +303,7 @@ function useRowMutation(refresh: () => Promise<void>): RowMutation {
 				setBusyKey(null);
 			}
 		},
-		[refresh],
+		[ready, refresh],
 	);
 
 	return { busyKey, effective, run };
@@ -316,6 +318,7 @@ interface TabFrameProps {
 	loading: boolean;
 	loaded: boolean;
 	error: string | null;
+	ready: boolean;
 	onRefresh: () => void;
 	query: string;
 	onQueryChange: (query: string) => void;
@@ -335,6 +338,7 @@ function TabFrame({
 	loading,
 	loaded,
 	error,
+	ready,
 	onRefresh,
 	query,
 	onQueryChange,
@@ -363,7 +367,14 @@ function TabFrame({
 				<div className="m-auto flex max-w-md flex-col items-center gap-2 rounded-lg border border-(--omp-border-muted) px-4 py-6 text-center">
 					<span className="text-omp-md font-medium text-(--omp-error)">{t("extPanel.loadFailed")}</span>
 					<span className="text-omp-sm break-all text-(--omp-dim)">{error}</span>
-					<Button icon={<RefreshCw size={12} />} onClick={onRefresh} size="sm" variant="secondary">
+					<Button
+						disabled={!ready}
+						icon={<RefreshCw size={12} />}
+						onClick={onRefresh}
+						size="sm"
+						title={!ready ? t("extPanel.notConnected") : t("extPanel.retry")}
+						variant="secondary"
+					>
 						{t("extPanel.retry")}
 					</Button>
 				</div>
@@ -404,7 +415,15 @@ function TabFrame({
 				)}
 				{countText && <span className="shrink-0 text-omp-sm tabular-nums text-(--omp-dim)">{countText}</span>}
 				{actions}
-				<Button icon={<RefreshCw size={12} />} loading={loading} onClick={onRefresh} size="sm" variant="ghost">
+				<Button
+					disabled={!ready}
+					icon={<RefreshCw size={12} />}
+					loading={loading}
+					onClick={onRefresh}
+					size="sm"
+					title={!ready ? t("extPanel.notConnected") : t("extPanel.refresh")}
+					variant="ghost"
+				>
 					{t("extPanel.refresh")}
 				</Button>
 			</div>
@@ -472,7 +491,7 @@ function HooksTab({
 }) {
 	const tabRpc = useSessionRpc();
 	const t = useT();
-	const mutation = useRowMutation(rpc.refresh);
+	const mutation = useRowMutation(rpc.refresh, rpc.ready);
 	const { groups, visibleCount } = useMemo(() => {
 		const visible = filterList(rpc.data, query, hook => [hook.name, hook.event, hook.source]);
 		return { groups: groupHooksByTool(visible), visibleCount: visible.length };
@@ -483,6 +502,7 @@ function HooksTab({
 			error={rpc.error}
 			loaded={rpc.data !== null}
 			loading={rpc.loading}
+			ready={rpc.ready}
 			onQueryChange={onQueryChange}
 			onRefresh={rpc.refresh}
 			query={query}
@@ -505,7 +525,7 @@ function HooksTab({
 							return (
 								<HookRow
 									busy={mutation.busyKey === hook.id}
-									disabled={mutation.busyKey !== null}
+									disabled={mutation.busyKey !== null || !rpc.ready}
 									enabled={enabled}
 									hook={hook}
 									key={hook.id}
@@ -552,7 +572,7 @@ function McpTab({
 }) {
 	const tabRpc = useSessionRpc();
 	const t = useT();
-	const mutation = useRowMutation(rpc.refresh);
+	const mutation = useRowMutation(rpc.refresh, rpc.ready);
 	const [menuFor, setMenuFor] = useState<string | null>(null);
 	const [confirmRemoveFor, setConfirmRemoveFor] = useState<string | null>(null);
 	const [wizardOpen, setWizardOpen] = useState(false);
@@ -609,6 +629,7 @@ function McpTab({
 	};
 
 	const runTest = async (server: RpcMcpServerInfo): Promise<void> => {
+		if (!rpc.ready) return;
 		setTests(prev => ({ ...prev, [server.name]: { testing: true, view: null } }));
 		let view: McpTestView;
 		try {
@@ -621,6 +642,7 @@ function McpTab({
 	};
 
 	const runReauth = async (server: RpcMcpServerInfo): Promise<void> => {
+		if (!rpc.ready) return;
 		setReauthPhase(server.name, "running");
 		try {
 			// Long-timeout call; the extension_ui open_url/input dialogs render the
@@ -656,6 +678,7 @@ function McpTab({
 	};
 
 	const runReauthCancel = async (server: RpcMcpServerInfo): Promise<void> => {
+		if (!rpc.ready) return;
 		setReauthPhase(server.name, "cancelling");
 		const restore = (): void => {
 			// Cancel failed: the flow is presumably still alive — re-arm the button.
@@ -684,6 +707,7 @@ function McpTab({
 	};
 
 	const handleMenuAction = (server: RpcMcpServerInfo, action: McpCardAction): void => {
+		if (!rpc.ready) return;
 		setMenuFor(null);
 		if (action === "remove") {
 			// Destructive: confirm inline inside the card before dispatching.
@@ -703,6 +727,7 @@ function McpTab({
 	};
 
 	const handleConfirmRemove = (server: RpcMcpServerInfo): void => {
+		if (!rpc.ready) return;
 		setConfirmRemoveFor(null);
 		// Drop any inline test/reauth state so nothing survives onto a re-add.
 		setTests(prev => {
@@ -725,13 +750,21 @@ function McpTab({
 			<TabFrame
 				embedded={embedded}
 				actions={
-					<Button icon={<Plus size={12} />} onClick={() => setWizardOpen(true)} size="sm" variant="secondary">
+					<Button
+						disabled={!rpc.ready}
+						icon={<Plus size={12} />}
+						onClick={() => setWizardOpen(true)}
+						size="sm"
+						title={!rpc.ready ? t("extPanel.notConnected") : undefined}
+						variant="secondary"
+					>
 						{t("mcp.add")}
 					</Button>
 				}
 				error={rpc.error}
 				loaded={rpc.data !== null}
 				loading={rpc.loading}
+				ready={rpc.ready}
 				onQueryChange={onQueryChange}
 				onRefresh={rpc.refresh}
 				query={query}
@@ -745,7 +778,8 @@ function McpTab({
 						<McpServerCard
 							busy={mutation.busyKey === server.name}
 							confirmingRemove={confirmRemoveFor === server.name}
-							disabled={mutation.busyKey !== null}
+							disabled={mutation.busyKey !== null || !rpc.ready}
+							disabledReason={!rpc.ready ? t("extPanel.notConnected") : undefined}
 							enabled={mutation.effective(server.name, server.enabled)}
 							key={server.name}
 							menuOpen={menuFor === server.name}
@@ -833,6 +867,7 @@ function CommandsTab({
 			error={rpc.error}
 			loaded={rpc.data !== null}
 			loading={rpc.loading}
+			ready={rpc.ready}
 			onQueryChange={onQueryChange}
 			onRefresh={rpc.refresh}
 			query={query}

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vite
 import type { SessionKind } from "../../../shared/ipc-types";
 import type { AvailableCommand } from "../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { useTabsStore } from "../../stores/tabs";
 import { useUiStore } from "../../stores/ui";
 import { CommandPalette } from "./CommandPalette";
@@ -129,6 +130,7 @@ function selectedIndex(): number {
 }
 
 beforeEach(() => {
+	useSessionStore.setState({ status: "ready" });
 	sidecarCommands = [];
 	prefills = [];
 	rpc = {
@@ -145,6 +147,7 @@ afterEach(async () => {
 	container?.remove();
 	document.body.innerHTML = "";
 	useUiStore.setState({ commandPaletteOpen: false });
+	useSessionStore.getState().reset();
 	useTabsStore.setState({ tabs: [], activeTabId: null });
 });
 

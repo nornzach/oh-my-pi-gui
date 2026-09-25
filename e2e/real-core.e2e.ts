@@ -13,7 +13,15 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 	const desktop = path.join(profile, "desktop");
 	const agent = path.join(profile, "agent");
 	await Promise.all([fs.mkdir(project), fs.mkdir(desktop), fs.mkdir(agent)]);
-	await fs.writeFile(path.join(desktop, "prefs.json"), JSON.stringify({ language: "en", firstRunComplete: true }));
+	await fs.writeFile(
+		path.join(desktop, "prefs.json"),
+		JSON.stringify({
+			language: "en",
+			launchProfiles: {
+				[project]: { noExtensions: true, noSkills: true, noRules: true },
+			},
+		}),
+	);
 	await fs.writeFile(path.join(project, "README.md"), "# Local ARM audit\n");
 	const env = {
 		...process.env,
@@ -38,6 +46,13 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 	const page = await app.firstWindow();
 	const errors: string[] = [];
 	page.on("pageerror", error => errors.push(error.message));
+	const closeWelcomeIfPresent = async (title: string, closeLabel: string) => {
+		const welcome = page.getByRole("dialog", { name: title, exact: true });
+		if ((await welcome.count()) === 0) return;
+		await expect(welcome).toBeVisible();
+		await welcome.getByRole("button", { name: closeLabel, exact: true }).click();
+		await expect(welcome).toHaveCount(0);
+	};
 	try {
 		await expect
 			.poll(async () => (await page.evaluate(() => window.omp.sidecar.getStatus())).status, { timeout: 60_000 })
@@ -133,12 +148,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		}, original.sessionFile!);
 		await page.reload();
 		await expect(page.locator("[data-transcript-kind]")).toContainText(["arm audit ok"]);
-		await expect(page.getByRole("dialog", { name: "Welcome to omp" })).toBeVisible();
-		await page
-			.getByRole("dialog", { name: "Welcome to omp" })
-			.getByRole("button", { name: "Close", exact: true })
-			.click();
-		await expect(page.getByRole("dialog")).toHaveCount(0);
+		await closeWelcomeIfPresent("Welcome to omp", "Close");
 		await page.getByRole("button", { name: "Session stats", exact: true }).click();
 		const stats = page.getByRole("dialog");
 		await expect(stats).toBeVisible();
@@ -165,12 +175,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		});
 		await page.reload();
 		await expect(page.getByRole("button", { name: "设置", exact: true })).toBeVisible();
-		await expect(page.getByRole("dialog", { name: "欢迎使用 omp", exact: true })).toBeVisible();
-		await page
-			.getByRole("dialog", { name: "欢迎使用 omp", exact: true })
-			.getByRole("button", { name: "关闭", exact: true })
-			.click();
-		await expect(page.getByRole("dialog")).toHaveCount(0);
+		await closeWelcomeIfPresent("欢迎使用 omp", "关闭");
 		await page.getByRole("button", { name: "设置", exact: true }).click();
 		await expect(page.getByRole("dialog")).toContainText("权限与安全");
 		await expect(page.getByRole("dialog").locator(".settings-nav-group-label")).toHaveCount(8);
@@ -257,10 +262,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		await page.reload();
 		await expect.poll(() => app.evaluate(() => Reflect.get(globalThis, "auditPrefsRequested"))).toBe(true);
 		await expect(page.getByRole("button", { name: "选择主题", exact: true })).toBeVisible();
-		const welcome = page.getByRole("dialog", { name: "欢迎使用 omp", exact: true });
-		await expect(welcome).toBeVisible();
-		await welcome.getByRole("button", { name: "关闭", exact: true }).click();
-		await expect(welcome).toHaveCount(0);
+		await closeWelcomeIfPresent("欢迎使用 omp", "关闭");
 		await page.getByRole("button", { name: "选择主题", exact: true }).click();
 		const freshPicker = page.getByRole("dialog", { name: "选择主题", exact: true });
 		await freshPicker.getByPlaceholder("搜索主题…").fill("瓷白");
@@ -297,7 +299,9 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		expect(errors).toEqual([]);
 	} finally {
 		await fs.writeFile("test-results/main-process.log", mainOutput.join(""));
-		await app.close();
+		// The production quit guard intentionally blocks `app.quit()` while a
+		// sidecar is active; test teardown must bypass that user confirmation.
+		await app.evaluate(({ app }) => app.exit(0));
 		await fs.rm(profile, { recursive: true, force: true });
 	}
 });

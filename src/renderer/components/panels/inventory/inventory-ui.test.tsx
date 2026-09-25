@@ -67,7 +67,13 @@ function installOmpMock(overrides: Partial<OmpMock> = {}): OmpMock {
 		activeTabId: "t1",
 		bundles: new Map(),
 	});
-	useSessionStore.setState({ sessionId: "s1", sessionFile: "/s1.json", isStreaming: false, isCompacting: false });
+	useSessionStore.setState({
+		status: "ready",
+		sessionId: "s1",
+		sessionFile: "/s1.json",
+		isStreaming: false,
+		isCompacting: false,
+	});
 	const mock: OmpMock = {
 		marketplaceAction: vi.fn(async () => ok({ ok: true })),
 		getPluginDetail: vi.fn(async () => ok(null)),

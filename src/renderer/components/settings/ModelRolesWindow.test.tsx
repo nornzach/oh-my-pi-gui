@@ -200,6 +200,26 @@ describe("ModelRolesWindow", () => {
 		expect(bodyText()).toContain("timeout");
 	});
 
+	it("locks role changes when the sidecar disconnects after a successful load", async () => {
+		const { getModelRoles, setModelRole } = installRpc();
+		useSessionStore.getState().setStatus("ready", "/repo");
+		useUiStore.getState().openModelRoles();
+
+		await mount(<ModelRolesWindow />);
+		await act(async () => {
+			useSessionStore.getState().setStatus("exited", "/repo");
+		});
+
+		const trigger = [...document.body.querySelectorAll("button")].find(
+			button => button.getAttribute("aria-label") === "Model for Default",
+		) as HTMLButtonElement | undefined;
+		expect(trigger?.disabled).toBe(true);
+		expect(trigger?.getAttribute("title")).toBe("Sidecar not connected");
+		expect(getModelRoles).toHaveBeenCalledTimes(1);
+		await act(async () => trigger?.click());
+		expect(setModelRole).not.toHaveBeenCalled();
+	});
+
 	it("issues set_model_role with the canonical selector when a role's model is switched", async () => {
 		const { setModelRole } = installRpc();
 		useSessionStore.getState().setStatus("ready", "/repo");

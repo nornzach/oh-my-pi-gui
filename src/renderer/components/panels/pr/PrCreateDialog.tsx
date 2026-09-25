@@ -13,12 +13,14 @@ import type { RpcPrCreateResult, RpcPrDraftResult } from "../../../../shared/rpc
 import { useGitStatus } from "../../../hooks/use-git-status";
 import { useT } from "../../../lib/i18n";
 import { usePrCenterStore } from "../../../stores/pr-center";
+import { useSessionStore } from "../../../stores/session";
 import { toast } from "../../../stores/toast";
 import { Button, Input, Modal, TextArea } from "../../common";
 
 export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const repo = usePrCenterStore(state => state.repo);
 	const { status: git } = useGitStatus();
 	const [title, setTitle] = useState("");
@@ -40,7 +42,7 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 	const base = repo?.available ? (repo.defaultBranch ?? undefined) : undefined;
 
 	const aiDraft = async () => {
-		if (drafting) return;
+		if (!sidecarReady || drafting) return;
 		setDrafting(true);
 		try {
 			const response = await tabRpc.prDraft({ base, head });
@@ -62,7 +64,7 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 	};
 
 	const submit = async () => {
-		if (!title.trim() || creating) return;
+		if (!sidecarReady || !title.trim() || creating) return;
 		setCreating(true);
 		try {
 			const response = await tabRpc.prCreate({ title: title.trim(), body, base, head, draft });
@@ -107,7 +109,14 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 							autoFocus
 						/>
 					</div>
-					<Button type="button" variant="secondary" onClick={() => void aiDraft()} loading={drafting}>
+					<Button
+						disabled={!sidecarReady}
+						loading={drafting}
+						onClick={() => void aiDraft()}
+						title={!sidecarReady ? t("common.notConnected") : undefined}
+						type="button"
+						variant="secondary"
+					>
 						<Sparkles size={12} /> {t("prCenter.aiDraft")}
 					</Button>
 				</div>
@@ -131,7 +140,13 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 					<Button type="button" variant="ghost" onClick={onClose}>
 						{t("common.cancel")}
 					</Button>
-					<Button type="submit" variant="primary" loading={creating} disabled={title.trim().length === 0}>
+					<Button
+						disabled={!sidecarReady || title.trim().length === 0}
+						loading={creating}
+						title={!sidecarReady ? t("common.notConnected") : undefined}
+						type="submit"
+						variant="primary"
+					>
 						{t("prCenter.createSubmit")}
 					</Button>
 				</div>

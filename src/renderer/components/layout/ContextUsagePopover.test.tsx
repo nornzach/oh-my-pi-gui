@@ -6,6 +6,7 @@ import type { RpcContextReportResult, RpcResponse } from "../../../shared/rpc-ty
 import { OVERLAY_EXIT_MS } from "../../hooks/use-overlay-presence";
 import { I18nProvider } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
+import { useUiStore } from "../../stores/ui";
 
 const reportWithoutWindow: RpcContextReportResult = {
 	contextWindow: 0,
@@ -90,6 +91,7 @@ afterEach(async () => {
 	container?.remove();
 	getContextReport.mockReset();
 	useSessionStore.getState().reset();
+	useUiStore.getState().closeSessionOverlays();
 });
 
 describe("ContextUsagePopover", () => {
@@ -229,5 +231,25 @@ describe("ContextUsagePopover", () => {
 		expect(dialog?.textContent).toContain("Context used 64%");
 		expect(dialog?.textContent).toContain("~173.7k / 272.0k");
 		expect(dialog?.textContent).toContain("The detailed breakdown is temporarily unavailable.");
+	});
+
+	it("opens the full context report from the compact usage popover", async () => {
+		useSessionStore.setState({
+			contextUsage: { contextWindow: 1_000_000, percent: 16.19, tokens: 161_900 },
+			sessionId: "session-report-link",
+			status: "ready",
+		});
+		await mount();
+		await act(async () => {
+			(container.querySelector("button") as unknown as HTMLButtonElement).click();
+			await Promise.resolve();
+		});
+
+		const reportButton = Array.from(document.querySelectorAll("button")).find(button =>
+			button.textContent?.includes("Open full context report"),
+		);
+		expect(reportButton).toBeDefined();
+		await act(async () => reportButton?.click());
+		expect(useUiStore.getState().contextReportOpen).toBe(true);
 	});
 });

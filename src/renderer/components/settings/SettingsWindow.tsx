@@ -20,6 +20,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
  */
 
 import {
+	AlertTriangle,
 	Blocks,
 	BookOpen,
 	Braces,
@@ -27,6 +28,7 @@ import {
 	ChevronRight,
 	HardDriveDownload,
 	Network,
+	RefreshCw,
 	Search,
 	Server,
 	ShieldCheck,
@@ -43,12 +45,17 @@ import {
 	parseLaunchProfile,
 	profileToFlags,
 } from "../../../shared/launch-profile";
-import type { SettingEntry, SettingsSchemaResult } from "../../../shared/rpc-types";
+import type { SettingEntry, SettingsSchemaResult, SidecarStatus } from "../../../shared/rpc-types";
+import { forkSessionFromGui, prefillComposer, retryFailedTurn } from "../../lib/command-registry";
+import { exportSessionHtml } from "../../lib/export-session";
 import { useLang, useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { setCodeLineNumbersPref } from "../../lib/markdown";
+import { clearSessionContext, retryLastTurn as retryLastTurnShared } from "../../lib/messages";
+import { dumpTranscriptToClipboard } from "../../lib/transcript-copy";
 import { en } from "../../locales/en";
 import { zh } from "../../locales/zh";
+import { openHandoffDialog } from "../../stores/fork-handoff";
 import { useMessagesStore } from "../../stores/messages";
 import { useSessionStore } from "../../stores/session";
 import { focusedSessionRuntime, sessionRuntime, withSessionRuntime } from "../../stores/session-runtime-context";
@@ -64,7 +71,7 @@ import { RadioGroup } from "./editors/RadioGroup";
 import { Section } from "./editors/Section";
 import { Toggle } from "./editors/Toggle";
 import { AdvancedTab } from "./pages/AdvancedTab";
-import { CapabilitiesHome } from "./pages/CapabilitiesHome";
+import { CapabilitiesHome, type CapabilityTarget } from "./pages/CapabilitiesHome";
 import { SchemaTabContent } from "./pages/SchemaTabContent";
 import { SecuritySettingsPage } from "./SecuritySettingsPage";
 import { SkillsSettingsPage } from "./SkillsSettingsPage";
@@ -79,6 +86,7 @@ import {
 	GUI_SETTING_SEARCH_ITEMS,
 	GUI_TAB_ID,
 	HOOKS_TAB_ID,
+	isAgentSchemaTab,
 	LAUNCH_TEXT_FIELDS,
 	LAUNCH_VERBATIM_FIELDS,
 	type LaunchTextField,
@@ -126,6 +134,50 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 	);
 }
 
+export function SettingsConnectionNotice({
+	status,
+	error,
+	hasCachedSchema,
+	busy,
+	onRetry,
+}: {
+	status: SidecarStatus;
+	error: string | null;
+	hasCachedSchema: boolean;
+	busy: boolean;
+	onRetry: () => void;
+}) {
+	const t = useT();
+	const waiting = status === "starting" || status === "restarting";
+	const title = waiting ? t("settings.connection.connecting") : t("settings.connection.unavailable");
+	const detail = error ?? (waiting ? t("settings.connection.waiting") : t("settings.connection.retryHint"));
+	return (
+		<div
+			className="mb-4 flex items-start gap-3 rounded-lg border border-[var(--omp-warning)]/35 bg-[var(--omp-warning)]/10 px-3 py-2.5"
+			data-settings-connection-notice="true"
+			role={waiting ? "status" : "alert"}
+		>
+			<AlertTriangle className="mt-0.5 shrink-0 text-[var(--omp-warning)]" size={15} />
+			<div className="min-w-0 flex-1">
+				<div className="text-omp-sm font-medium text-(--omp-text)">{title}</div>
+				<div className="mt-0.5 text-omp-xs text-(--omp-muted)">{detail}</div>
+				<div className="mt-1 text-omp-xs text-(--omp-dim)">
+					{hasCachedSchema ? t("settings.connection.cached") : t("settings.connection.noSchema")}
+				</div>
+			</div>
+			<Button
+				disabled={busy || waiting}
+				icon={<RefreshCw size={12} />}
+				onClick={onRetry}
+				size="sm"
+				variant="secondary"
+			>
+				{t("common.retry")}
+			</Button>
+		</div>
+	);
+}
+
 export function SettingsWindow() {
 	const tabRpc = useTabRpc();
 	const t = useT();
@@ -150,7 +202,10 @@ export function SettingsWindow() {
 	const notifications = useUiStore(state => state.notifications);
 	const thinkingExpanded = useUiStore(state => state.thinkingExpanded);
 	const transcriptDetail = useUiStore(state => state.transcriptDetail);
-	const sidecarReady = useSessionStore(state => state.status === "ready");
+	const sidecarStatus = useSessionStore(state => state.status);
+	const sidecarReady = sidecarStatus === "ready";
+	const sidecarError = useUiStore(state => state.sidecarError);
+	const clearSidecarError = useUiStore(state => state.clearSidecarError);
 
 	const [tab, setTab] = useState(CAPABILITIES_TAB_ID);
 	const [resourceTab, setResourceTab] = useState<InventoryTabId>("plugins");
@@ -186,6 +241,19 @@ export function SettingsWindow() {
 	const sidecarBusy = sessionBusy || executionBusy;
 	const [reloadToken, setReloadToken] = useState(0);
 	const [advisorActive, setAdvisorActive] = useState<boolean>();
+	const retrySettingsConnection = useCallback(() => {
+		clearSidecarError();
+		setReloadToken(token => token + 1);
+		if (sidecarBusy || sidecarStatus === "ready" || sidecarStatus === "starting" || sidecarStatus === "restarting")
+			return;
+		const runtime = focusedSessionRuntime();
+		const sessionFile = useSessionStore.getState().sessionFile;
+		void window.omp.sidecar
+			.restart({ tabId: runtime?.tabId, sessionPath: sessionFile ?? undefined })
+			.catch(error =>
+				toast({ variant: "error", title: t("settings.connection.restartFailed"), message: String(error) }),
+			);
+	}, [clearSidecarError, sidecarBusy, sidecarStatus, t]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -245,6 +313,14 @@ export function SettingsWindow() {
 			cancelled = true;
 		};
 	}, [open, reloadToken, sidecarReady, t, tabRpc]);
+
+	useEffect(() => {
+		if (!open || sidecarReady) return;
+		// Keep cached schema data for navigation, but never leave the page in a
+		// state that looks editable while the RPC owner is unavailable.
+		setLoadState("loading");
+		setLoadError(null);
+	}, [open, sidecarReady]);
 
 	const handleCommitted = useCallback((path: string, value: unknown) => {
 		settingsVersion.current++;
@@ -498,6 +574,7 @@ export function SettingsWindow() {
 	}, [launchProfile, launchDrafts]);
 
 	const isSchemaTab = schema?.tabs.some(schemaTab => schemaTab.id === tab) === true;
+	const isAgentSettingsTab = isAgentSchemaTab(tab, schema);
 	const managementTab = MANAGEMENT_TAB_IDS.has(tab);
 	const showGlobalSearch = true;
 
@@ -521,7 +598,7 @@ export function SettingsWindow() {
 	const searchGroups = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		if (!q) return null;
-		const matches = (schema?.entries ?? []).filter(entry => {
+		const matches = (sidecarReady ? (schema?.entries ?? []) : []).filter(entry => {
 			if (!isSettingVisibleInGui(entry, values)) return false;
 			return matchesSettingSearch(entry, q);
 		});
@@ -533,7 +610,7 @@ export function SettingsWindow() {
 			byTab.set(key, list);
 		}
 		return byTab;
-	}, [query, schema, values]);
+	}, [query, schema, sidecarReady, values]);
 
 	const guiSearchResults = useMemo(() => {
 		const q = query.trim().normalize("NFKC").toLowerCase();
@@ -621,6 +698,200 @@ export function SettingsWindow() {
 		document.addEventListener("keydown", onKey, true);
 		return () => document.removeEventListener("keydown", onKey, true);
 	}, [open, close]);
+
+	const openCapabilityTarget = useCallback(
+		(target: CapabilityTarget) => {
+			const external = (openWindow: () => void) => {
+				close();
+				openWindow();
+			};
+			const settingsPage = (nextTab: string) => {
+				setTab(nextTab);
+				setQuery("");
+				setFocusedSetting(null);
+			};
+			const runAsync = (action: () => Promise<unknown>) => {
+				close();
+				void action().catch(error =>
+					toast({ variant: "error", title: t("palette.failed"), message: String(error) }),
+				);
+			};
+			const prefill = (text: string) => {
+				close();
+				prefillComposer(text);
+			};
+			switch (target) {
+				case "model":
+					external(() => useUiStore.getState().openModelPicker());
+					return;
+				case "modelRoles":
+					external(() => useUiStore.getState().openModelRoles());
+					return;
+				case "modelCompare":
+					external(() => useUiStore.getState().openModelCompare());
+					return;
+				case "benchmark":
+					external(() => useUiStore.getState().openBenchmark());
+					return;
+				case "providers":
+					external(() => useUiStore.getState().openProviders());
+					return;
+				case "providerConfig":
+					external(() => useUiStore.getState().openProviderConfig());
+					return;
+				case "usage":
+					external(() => useUiStore.getState().openUsage());
+					return;
+				case "agents":
+					external(() => useUiStore.getState().openAgentHub());
+					return;
+				case "skills":
+					settingsPage(SKILLS_TAB_ID);
+					return;
+				case "mcp":
+					settingsPage(MCP_TAB_ID);
+					return;
+				case "resources":
+					setResourceTab("plugins");
+					settingsPage(RESOURCES_TAB_ID);
+					return;
+				case "marketplaces":
+					setResourceTab("marketplaces");
+					settingsPage(RESOURCES_TAB_ID);
+					return;
+				case "templates":
+					setResourceTab("templates");
+					settingsPage(RESOURCES_TAB_ID);
+					return;
+				case "memoryResources":
+					setResourceTab("memory");
+					settingsPage(RESOURCES_TAB_ID);
+					return;
+				case "hooks":
+					settingsPage(HOOKS_TAB_ID);
+					return;
+				case "commands":
+					settingsPage(COMMANDS_TAB_ID);
+					return;
+				case "security":
+					settingsPage(SECURITY_TAB_ID);
+					return;
+				case "ssh":
+					settingsPage(SSH_TAB_ID);
+					return;
+				case "updates":
+					settingsPage(UPDATES_TAB_ID);
+					return;
+				case "modes":
+					external(() => useUiStore.getState().openModes());
+					return;
+				case "vibe":
+					external(() => useUiStore.getState().openModes("vibe"));
+					return;
+				case "collab":
+					external(() => useUiStore.getState().openCollab());
+					return;
+				case "live":
+					external(() => useUiStore.getState().openLive());
+					return;
+				case "debug":
+					external(() => useUiStore.getState().openDebug());
+					return;
+				case "clear":
+					runAsync(() => clearSessionContext());
+					return;
+				case "import":
+					external(() => useUiStore.getState().openImportDialog());
+					return;
+				case "sessionInfo":
+					external(() => useUiStore.getState().openSessionInfo());
+					return;
+				case "sessionTree":
+					external(() => useUiStore.getState().openSessionTree());
+					return;
+				case "share":
+					external(() => useUiStore.getState().openShareSession());
+					return;
+				case "handoff":
+					external(() => openHandoffDialog());
+					return;
+				case "export":
+					runAsync(() => exportSessionHtml());
+					return;
+				case "dump":
+					runAsync(() => dumpTranscriptToClipboard());
+					return;
+				case "fork":
+					runAsync(() => forkSessionFromGui());
+					return;
+				case "retry":
+					runAsync(() => retryFailedTurn());
+					return;
+				case "resend":
+					runAsync(() =>
+						retryLastTurnShared(() =>
+							toast({
+								variant: "warning",
+								title: t("palette.retryNothing"),
+								message: t("palette.retryNothingDesc"),
+							}),
+						),
+					);
+					return;
+				case "btw":
+					prefill("/btw ");
+					return;
+				case "tan":
+					prefill("/tan ");
+					return;
+				case "omfg":
+					prefill("/omfg ");
+					return;
+				case "guidedGoal":
+					prefill("/guided-goal ");
+					return;
+				case "queue":
+					prefill("-> ");
+					return;
+				case "workspaceDirs":
+					external(() => useUiStore.getState().openWorkspaceDirs());
+					return;
+				case "prCenter":
+					external(() => useUiStore.getState().openPrCenter());
+					return;
+				case "context":
+					external(() => useUiStore.getState().openContextReport());
+					return;
+				case "tools":
+					external(() => useUiStore.getState().openActiveTools());
+					return;
+				case "stats":
+					external(() => useUiStore.getState().openStatsDashboard());
+					return;
+				case "jobs":
+					external(() => useUiStore.getState().openJobs());
+					return;
+				case "hotkeys":
+					external(() => useUiStore.getState().openHotkeys());
+					return;
+				case "theme":
+					external(() => useUiStore.getState().openThemePicker());
+					return;
+				case "settings":
+					settingsPage(GUI_TAB_ID);
+					return;
+				case "changelog":
+					external(() => useUiStore.getState().openChangelog());
+					return;
+				case "copy":
+					external(() => useUiStore.getState().openCopySelector());
+					return;
+				case "force":
+					external(() => useUiStore.getState().openForceTool());
+			}
+		},
+		[close, t],
+	);
 
 	if (!open) return null;
 
@@ -741,6 +1012,15 @@ export function SettingsWindow() {
 						</button>
 					</header>
 					<div className="settings-content omp-column omp-column-workspace min-h-0 flex-1 overflow-y-auto py-4 min-[1080px]:py-5">
+						{!sidecarReady && isAgentSettingsTab && (
+							<SettingsConnectionNotice
+								busy={sidecarBusy}
+								error={sidecarError}
+								hasCachedSchema={schema !== null}
+								onRetry={retrySettingsConnection}
+								status={sidecarStatus}
+							/>
+						)}
 						{searchGroups === null ? (
 							<>
 								{tab === SKILLS_TAB_ID && <SkillsSettingsPage query={query} />}
@@ -786,6 +1066,11 @@ export function SettingsWindow() {
 											setTab("tools");
 											setQuery("");
 										}}
+										onOpenCommandCenter={() => {
+											close();
+											useUiStore.getState().openCommandPalette();
+										}}
+										onOpenTarget={openCapabilityTarget}
 										onOpenModelRoles={() => {
 											close();
 											useUiStore.getState().openModelRoles();
@@ -1139,13 +1424,13 @@ export function SettingsWindow() {
 									</>
 								)}
 
-								{(isSchemaTab || tab === ADVANCED_TAB_ID) && loadState === "loading" && (
+								{isAgentSettingsTab && sidecarReady && loadState === "loading" && (
 									<div className="flex items-center justify-center gap-2 py-10">
 										<Spinner size="sm" />
 										<span className="text-xs text-(--omp-muted)">{t("settings.schemaLoading")}</span>
 									</div>
 								)}
-								{(isSchemaTab || tab === ADVANCED_TAB_ID) && loadState === "error" && (
+								{isAgentSettingsTab && sidecarReady && loadState === "error" && (
 									<div className="flex flex-col items-center gap-3 py-10">
 										<span className="text-xs text-(--omp-error)">
 											{loadError ?? t("settings.schemaLoadFailed")}
@@ -1161,7 +1446,7 @@ export function SettingsWindow() {
 										</Button>
 									</div>
 								)}
-								{loadState === "ready" && schema && isSchemaTab && (
+								{loadState === "ready" && sidecarReady && schema && isSchemaTab && (
 									<SchemaTabContent
 										entries={schema.entries}
 										groups={schema.tabs.find(schemaTab => schemaTab.id === tab)?.groups ?? []}
@@ -1170,7 +1455,7 @@ export function SettingsWindow() {
 										values={values}
 									/>
 								)}
-								{loadState === "ready" && schema && tab === ADVANCED_TAB_ID && (
+								{loadState === "ready" && sidecarReady && schema && tab === ADVANCED_TAB_ID && (
 									<AdvancedTab entries={schema.entries} onCommitted={handleCommitted} values={values} />
 								)}
 							</>

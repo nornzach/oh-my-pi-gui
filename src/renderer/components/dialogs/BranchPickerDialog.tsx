@@ -10,6 +10,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, us
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { branchSessionFromEntry } from "../../lib/messages";
+import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner } from "../common";
@@ -24,6 +25,7 @@ export function BranchPickerDialog() {
 	const t = useT();
 	const open = useUiStore(state => state.branchPickerOpen);
 	const close = useUiStore(state => state.closeBranchPicker);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 
 	const [query, setQuery] = useState("");
 	const [entries, setEntries] = useState<BranchEntry[]>([]);
@@ -46,6 +48,11 @@ export function BranchPickerDialog() {
 		setLoading(true);
 		setError(null);
 		setBranching(null);
+		if (!sidecarReady) {
+			setError(t("modelPicker.notConnected"));
+			setLoading(false);
+			return;
+		}
 		setActiveIndex(0);
 		requestAnimationFrame(() => inputRef.current?.focus());
 		let cancelled = false;
@@ -69,7 +76,7 @@ export function BranchPickerDialog() {
 		return () => {
 			cancelled = true;
 		};
-	}, [attempt, open, tabRpc.getBranchMessages]);
+	}, [attempt, open, sidecarReady, t, tabRpc.getBranchMessages]);
 
 	// Newest first — the RPC returns entries in session order.
 	const filtered = useMemo(() => {
@@ -88,7 +95,7 @@ export function BranchPickerDialog() {
 	}, [activeIndex]);
 
 	const select = async (entry: BranchEntry) => {
-		if (branching !== null) return;
+		if (!sidecarReady || branching !== null) return;
 		setBranching(entry.entryId);
 		try {
 			const result = await branchSessionFromEntry(entry.entryId);
@@ -177,8 +184,10 @@ export function BranchPickerDialog() {
 							</p>
 							<Button
 								icon={<RotateCw size={12} />}
+								disabled={!sidecarReady}
 								onClick={() => setAttempt(count => count + 1)}
 								size="sm"
+								title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
 								variant="secondary"
 							>
 								{t("common.retry")}
@@ -203,7 +212,8 @@ export function BranchPickerDialog() {
 										isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"
 									}`}
 									data-option-index={index}
-									disabled={branching !== null}
+									disabled={branching !== null || !sidecarReady}
+									title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
 									id={`${listboxId}-option-${index}`}
 									key={entry.entryId}
 									onClick={() => void select(entry)}

@@ -7,9 +7,10 @@
 import { parseHTML } from "linkedom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RpcResponse, RpcSecurityDashboardResult } from "../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { SecuritySettingsPage } from "./SecuritySettingsPage";
 
 const { document, window, Event, HTMLElement, Element, Node } = parseHTML("<html><body></body></html>");
@@ -59,6 +60,10 @@ Object.assign(window as unknown as Record<string, unknown>, {
 
 const roots: Root[] = [];
 
+beforeEach(() => {
+	useSessionStore.setState({ status: "ready" });
+});
+
 async function mount(): Promise<void> {
 	const root = createRoot(document.body as unknown as Element);
 	await act(async () => {
@@ -96,6 +101,7 @@ afterEach(async () => {
 	getSecurityDashboard.mockResolvedValue(ok("get_security_dashboard", dashboard()));
 	setSetting.mockClear();
 	securityStart.mockClear();
+	useSessionStore.getState().reset();
 });
 
 describe("SecuritySettingsPage scan", () => {

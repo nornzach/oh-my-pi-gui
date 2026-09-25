@@ -17,9 +17,10 @@ import {
 	isSettingVisibleInGui,
 	resolveSettingsTarget,
 	SchemaTabContent,
+	SettingsConnectionNotice,
 	SettingsWindow,
 } from "./SettingsWindow";
-import { buildSettingsNavGroups } from "./settings-window-model";
+import { buildSettingsNavGroups, isAgentSchemaTab } from "./settings-window-model";
 
 function entry(partial: Partial<SettingEntry> & { path: string }): SettingEntry {
 	return { type: "boolean", value: false, default: false, ...partial };
@@ -65,6 +66,8 @@ describe("CapabilitiesHome", () => {
 					onOpenMemory={noop}
 					onOpenModelRoles={noop}
 					onOpenTools={noop}
+					onOpenCommandCenter={noop}
+					onOpenTarget={noop}
 					ready
 					ttsrEnabled
 				/>
@@ -82,7 +85,14 @@ describe("CapabilitiesHome", () => {
 		expect(html).toContain("Configure memory");
 		expect(html).toContain("Configure tool access");
 		expect(html).toContain("Backend: local");
-		expect(html).toContain("Enabled, not running");
+		expect(html).toContain("Switch Model");
+		expect(html).toContain("MCP Servers");
+		expect(html).toContain("Collab Session");
+		expect(html).toContain("Debug Tools");
+		expect(html).toContain("Side Question");
+		expect(html).toContain("Export HTML");
+		expect(html).toContain("Plugin Marketplace");
+		expect(html).toContain("Updates");
 	});
 
 	// (The pending-toggle lock test was removed with the toggle buttons —
@@ -154,6 +164,14 @@ describe("GUI settings visibility", () => {
 			"spelling.typoDetection",
 			"spelling.autocomplete",
 			"spelling.autocorrect",
+			"tui.vimModeDisplay",
+			"tui.mouse",
+			"tui.maxInlineImageColumns",
+			"tui.maxInlineImageRows",
+			"tui.maxInlineImages",
+			"statusLine.leftSegments",
+			"statusLine.rightSegments",
+			"statusLine.segmentOptions",
 		].map(path => entry({ path, tab: "terminal-display" }));
 		expect(unsupported.filter(item => isSettingVisibleInGui(item, {}))).toEqual([]);
 		const groups = buildSettingsNavGroups({
@@ -161,6 +179,32 @@ describe("GUI settings visibility", () => {
 			entries: unsupported,
 		});
 		expect(groups.flatMap(group => group.items).some(item => item.id === "terminal-display")).toBe(false);
+	});
+
+	it("keeps an unknown schema tab behind the sidecar connection gate", () => {
+		expect(isAgentSchemaTab("model", null)).toBe(true);
+		expect(isAgentSchemaTab("model", { tabs: [{ id: "model" }] })).toBe(true);
+		expect(isAgentSchemaTab("gui", null)).toBe(false);
+		expect(isAgentSchemaTab("capabilities", null)).toBe(false);
+		expect(isAgentSchemaTab("skills", null)).toBe(false);
+	});
+
+	it("explains why cached schema controls are locked while the sidecar is down", () => {
+		const html = renderToStaticMarkup(
+			<I18nProvider>
+				<SettingsConnectionNotice
+					busy={false}
+					error="connection lost"
+					hasCachedSchema
+					onRetry={() => {}}
+					status="error"
+				/>
+			</I18nProvider>,
+		);
+		expect(html).toContain('data-settings-connection-notice="true"');
+		expect(html).toContain("Agent settings are unavailable");
+		expect(html).toContain("Cached values are shown for navigation only");
+		expect(html).toContain('type="button"');
 	});
 
 	it("omits TUI-only rows and groups from a schema tab", () => {

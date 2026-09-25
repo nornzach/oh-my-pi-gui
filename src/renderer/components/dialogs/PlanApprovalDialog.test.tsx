@@ -9,10 +9,11 @@
 import { parseHTML } from "linkedom";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { AgentSessionEvent, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
 import { usePlanApprovalStore } from "../../stores/plan-approval";
+import { useSessionStore } from "../../stores/session";
 import { useToastStore } from "../../stores/toast";
 import { PlanApprovalDialog } from "./PlanApprovalDialog";
 
@@ -104,6 +105,10 @@ function proposal(content: string, overrides: Partial<Extract<AgentSessionEvent,
 let container: TestElement;
 let root: Root;
 
+beforeEach(() => {
+	useSessionStore.setState({ status: "ready" });
+});
+
 async function flush(): Promise<void> {
 	await act(async () => {
 		const { promise, resolve } = Promise.withResolvers<void>();
@@ -154,6 +159,7 @@ afterEach(async () => {
 	usePlanApprovalStore.getState().clearProposal();
 	useToastStore.setState({ toasts: [] });
 	batchListener = null;
+	useSessionStore.getState().reset();
 });
 
 describe("plan-approval store", () => {

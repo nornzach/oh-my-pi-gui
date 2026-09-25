@@ -7,9 +7,10 @@
 import { parseHTML } from "linkedom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RpcResponse, RpcSshHostInfo, RpcSshHostsResult } from "../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { useToastStore } from "../../stores/toast";
 import { SshSettingsPage } from "./SshSettingsPage";
 
@@ -55,6 +56,10 @@ Object.assign(window as unknown as Record<string, unknown>, {
 
 const roots: Root[] = [];
 
+beforeEach(() => {
+	useSessionStore.setState({ status: "ready" });
+});
+
 async function mount(): Promise<void> {
 	const root = createRoot(document.body as unknown as Element);
 	await act(async () => {
@@ -98,6 +103,7 @@ afterEach(async () => {
 	getSshHosts.mockReset();
 	getSshHosts.mockResolvedValue(ok("get_ssh_hosts", hostsResult([host({ name: "builder" })])));
 	sshManage.mockClear();
+	useSessionStore.getState().reset();
 });
 
 describe("SshSettingsPage", () => {

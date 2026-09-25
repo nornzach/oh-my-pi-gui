@@ -861,4 +861,15 @@ describe("TabBar chip labels (F-HYDRATE)", () => {
 
 		expect(tabWorkspaces()).toEqual(["Production API"]);
 	});
+
+	it("shows tab actions without requiring a context click", async () => {
+		useTabsStore.setState({
+			tabs: [{ kind: "agent", id: "t0", cwd: "/work/gui", status: "ready", unreadDone: false }],
+			activeTabId: "t0",
+			bundles: new Map(),
+		});
+		await mount(<TabBar />);
+
+		expect(container.querySelector('[aria-label="Tab actions"]')).not.toBeNull();
+	});
 });

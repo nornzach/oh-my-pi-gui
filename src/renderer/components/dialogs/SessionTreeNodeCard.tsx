@@ -43,6 +43,7 @@ const SessionTreeNodeCard = memo(function SessionTreeNodeCard({
 	menuOpen,
 	onToggleMenu,
 	onAction,
+	ready = true,
 }: {
 	entry: SessionTreeEntry;
 	head: boolean;
@@ -54,9 +55,12 @@ const SessionTreeNodeCard = memo(function SessionTreeNodeCard({
 	menuOpen: boolean;
 	onToggleMenu: () => void;
 	onAction: (action: "switch" | "branch" | "fork", entryId: string) => void;
+	ready?: boolean;
 }) {
 	const t = useT();
 	const meta = roleMeta(entry.role);
+	const actionDisabled = !ready || branching !== null;
+	const unavailableTitle = !ready ? t("sessionTree.notConnected") : undefined;
 	return (
 		<div
 			className={cx(
@@ -122,6 +126,8 @@ const SessionTreeNodeCard = memo(function SessionTreeNodeCard({
 					<button
 						type="button"
 						className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-omp-sm text-(--omp-text) hover:bg-(--omp-selected-bg)"
+						disabled={actionDisabled}
+						title={unavailableTitle}
 						onClick={() => onAction("switch", entry.entryId)}
 					>
 						<CornerDownLeft size={11} className="shrink-0 text-(--omp-dim)" />
@@ -130,8 +136,10 @@ const SessionTreeNodeCard = memo(function SessionTreeNodeCard({
 					<button
 						type="button"
 						className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-omp-sm text-(--omp-text) hover:bg-(--omp-selected-bg) disabled:cursor-not-allowed disabled:opacity-40"
-						disabled={entry.role !== "user"}
-						title={entry.role !== "user" ? t("sessionTree.branchUserOnly") : undefined}
+						disabled={actionDisabled || entry.role !== "user"}
+						title={
+							!ready ? unavailableTitle : entry.role !== "user" ? t("sessionTree.branchUserOnly") : undefined
+						}
 						onClick={() => onAction("branch", entry.entryId)}
 					>
 						<GitBranch size={11} className="shrink-0 text-(--omp-dim)" />
@@ -140,6 +148,8 @@ const SessionTreeNodeCard = memo(function SessionTreeNodeCard({
 					<button
 						type="button"
 						className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-omp-sm text-(--omp-text) hover:bg-(--omp-selected-bg)"
+						disabled={actionDisabled}
+						title={unavailableTitle}
 						onClick={() => onAction("fork", entry.entryId)}
 					>
 						<ExternalLink size={11} className="shrink-0 text-(--omp-dim)" />

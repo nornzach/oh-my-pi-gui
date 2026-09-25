@@ -10,6 +10,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { I18nProvider } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { useToastStore } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { ForceToolDialog } from "./ForceToolDialog";
@@ -99,6 +100,7 @@ async function mount(): Promise<void> {
 }
 
 beforeEach(() => {
+	useSessionStore.setState({ status: "ready" });
 	rpc = {
 		getForceTool: vi.fn(async () => ok({ tool: null })),
 		getActiveTools: vi.fn(async () =>
@@ -123,6 +125,7 @@ afterEach(async () => {
 	}
 	container?.remove();
 	useUiStore.setState({ forceToolOpen: false });
+	useSessionStore.getState().reset();
 });
 
 describe("ForceToolDialog", () => {

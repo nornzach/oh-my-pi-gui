@@ -120,8 +120,9 @@ test("streaming with 50k history preserves the reading anchor, supports five tas
 		await page.screenshot({ path: "test-results/runtime-recovered.png", scale: "css", animations: "disabled" });
 		expect(errors).toEqual([]);
 	} finally {
-		await app.close();
-		await fs.rm(profile, { recursive: true, force: true });
+		// Test teardown bypasses the production quit confirmation.
+		await app.evaluate(({ app }) => app.exit(0));
+		await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });
 
@@ -180,7 +181,7 @@ test("an older real core reports unavailable capabilities and retains the editab
 		await fs.writeFile("test-results/legacy.json", JSON.stringify({ responses, errors }, null, 2));
 		expect(errors).toEqual([]);
 	} finally {
-		await app.close();
-		await fs.rm(profile, { recursive: true, force: true });
+		await app.evaluate(({ app }) => app.exit(0));
+		await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });

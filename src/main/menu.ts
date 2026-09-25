@@ -122,6 +122,27 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 			label: mainT("menu.view", language),
 			submenu: [
 				{
+					label: mainT("menu.commandCenter", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-command-center"),
+				},
+				{
+					label: mainT("menu.contextReport", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-context-report"),
+				},
+				{
+					label: mainT("menu.stats", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-stats"),
+				},
+				{
+					label: mainT("menu.jobs", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-jobs"),
+				},
+				{
+					label: mainT("menu.hotkeys", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-hotkeys"),
+				},
+				{ type: "separator" },
+				{
 					label: mainT("menu.toggleSidebar", language),
 					// No accelerator: ⌘B/⌃B belong to the renderer keymap.
 					click: () => sendMenuAction(windowManager, spawnWindow, "toggle-sidebar"),
@@ -171,6 +192,27 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 			label: mainT("menu.session", language),
 			submenu: [
 				{
+					label: mainT("menu.importSession", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-import"),
+				},
+				{
+					label: mainT("menu.branchPicker", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-branch-picker"),
+				},
+				{
+					label: mainT("menu.sessionTree", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-session-tree"),
+				},
+				{ type: "separator" },
+				{
+					label: mainT("menu.sessionInfo", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-session-info"),
+				},
+				{
+					label: mainT("menu.shareSession", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-share-session"),
+				},
+				{
 					label: mainT("menu.exportHtml", language),
 					accelerator: nativeAccelerator("session.exportHtml"),
 					click: () => sendMenuAction(windowManager, spawnWindow, "export-html"),
@@ -178,6 +220,69 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				{
 					label: mainT("menu.handoff", language),
 					click: () => sendMenuAction(windowManager, spawnWindow, "handoff"),
+				},
+			],
+		},
+		{
+			label: mainT("menu.tools", language),
+			submenu: [
+				{
+					label: mainT("menu.agentHub", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-agent-hub"),
+				},
+				{
+					label: mainT("menu.modes", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-modes"),
+				},
+				{
+					label: mainT("menu.providers", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-providers"),
+				},
+				{
+					label: mainT("menu.modelRoles", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-model-roles"),
+				},
+				{
+					label: mainT("menu.modelPicker", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-model-picker"),
+				},
+				{
+					label: mainT("menu.capabilities", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-capabilities"),
+				},
+				{
+					label: mainT("menu.usage", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-usage"),
+				},
+				{ type: "separator" },
+				{
+					label: mainT("menu.extensions", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-extensions"),
+				},
+				{
+					label: mainT("menu.inventory", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-inventory"),
+				},
+				{
+					label: mainT("menu.prCenter", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-pr-center"),
+				},
+				{
+					label: mainT("menu.workspaceDirs", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-workspace-dirs"),
+				},
+				{
+					label: mainT("menu.workspaceChanges", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-git"),
+				},
+				{
+					label: mainT("menu.restartCore", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "restart-sidecar"),
+				},
+				{ type: "separator" },
+				{
+					label: mainT("menu.debugConsole", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "open-debug"),
 				},
 			],
 		},

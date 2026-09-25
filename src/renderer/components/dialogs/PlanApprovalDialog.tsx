@@ -87,11 +87,12 @@ export function PlanApprovalDialog() {
 	const notice = usePlanApprovalStore(state => state.notice);
 	const submitting = usePlanApprovalStore(state => state.submitting);
 	const setSubmitting = usePlanApprovalStore(state => state.setSubmitting);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 
 	if (!pending) return null;
 
 	const respond = async (kind: SubmitKind, option?: PlanApprovalOption) => {
-		if (submitting !== null) return;
+		if (!sidecarReady || submitting !== null) return;
 		const target = pending;
 		const originTabId = useTabsStore.getState().activeTabId;
 		const originSessionId = useSessionStore.getState().sessionId;
@@ -224,17 +225,23 @@ export function PlanApprovalDialog() {
 					/>
 				)}
 				<div className="flex flex-wrap items-center justify-end gap-2">
-					<Button onClick={requestDismiss} size="sm" variant="ghost">
+					<Button
+						disabled={!sidecarReady}
+						onClick={requestDismiss}
+						size="sm"
+						title={!sidecarReady ? t("sidecar.notResponding") : undefined}
+						variant="ghost"
+					>
 						{t("planApproval.dismiss")}
 					</Button>
 					{showRefine && (
 						<Button
-							disabled={busy || feedback.trim().length === 0}
+							disabled={!sidecarReady || busy || feedback.trim().length === 0}
 							icon={<Send size={12} />}
 							loading={submitting?.kind === "refine"}
 							onClick={() => void respond("refine")}
 							size="sm"
-							title={t("planApproval.refineTitle")}
+							title={!sidecarReady ? t("sidecar.notResponding") : t("planApproval.refineTitle")}
 							variant="secondary"
 						>
 							{t("planApproval.refine")}
@@ -244,13 +251,13 @@ export function PlanApprovalDialog() {
 						const choice = APPROVE_CHOICES[option];
 						return (
 							<Button
-								disabled={busy}
+								disabled={!sidecarReady || busy}
 								icon={choice.icon}
 								key={option}
 								loading={submitting?.kind === "approve" && submitting.option === option}
 								onClick={() => void respond("approve", option)}
 								size="sm"
-								title={t(choice.hintKey)}
+								title={!sidecarReady ? t("sidecar.notResponding") : t(choice.hintKey)}
 								variant={index === 0 ? "primary" : "secondary"}
 							>
 								{t(choice.labelKey)}

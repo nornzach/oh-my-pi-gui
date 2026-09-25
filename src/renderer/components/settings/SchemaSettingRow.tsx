@@ -570,6 +570,13 @@ function SchemaSettingRow({
 	return (
 		<div>
 			{renderControl()}
+			{entry.default === undefined && value !== undefined && (
+				<div className="px-2 pb-2">
+					<Button disabled={saving} onClick={() => void commit(undefined)} size="sm" variant="ghost">
+						{t("settings.restoreUnset")}
+					</Button>
+				</div>
+			)}
 			{error && (
 				<p role="alert" className="px-2 pb-2 text-omp-xs text-(--omp-error)">
 					{error}

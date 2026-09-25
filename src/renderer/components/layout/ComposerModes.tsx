@@ -40,6 +40,7 @@ export function ComposerModes() {
 	const loopMode = useSessionStore(s => s.loopMode);
 	const loopActive = loopMode?.enabled === true;
 	const vibeModeEnabled = useSessionStore(s => s.vibeModeEnabled);
+	const prewalkArmed = useSessionStore(s => s.prewalkArmed);
 	const goalStatusInFooter = useDisplayPreference("goalStatusInFooter");
 	const autoCompaction = useSettingsStore(s => s.autoCompaction);
 	const autoRetry = useSettingsStore(s => s.autoRetry);
@@ -59,6 +60,7 @@ export function ComposerModes() {
 	const loopArgs = loopLimit ? loopLimitText(t, loopLimit) : t("modesPanel.loop.noLimit");
 	const activeModeLabels = [
 		planModeEnabled ? t("input.plan.label") : null,
+		prewalkArmed ? t("cmd.prewalk") : null,
 		goalStatusInFooter && goalActive ? t("modesPanel.tabs.goal") : null,
 		loopActive ? t("modesPanel.tabs.loop") : null,
 		vibeModeEnabled ? t("modesPanel.tabs.vibe") : null,
@@ -97,7 +99,7 @@ export function ComposerModes() {
 		};
 	}, [menuOpen]);
 
-	const update = async (action: () => Promise<RpcResponse>, mode: "settings" | "plan" = "settings") => {
+	const update = async (action: () => Promise<RpcResponse>, mode: "settings" | "plan" | "prewalk" = "settings") => {
 		if (pending) return;
 		const session = sessionRuntimeStore<SessionStore>(tabId, "session") ?? useSessionStore;
 		const settings = sessionRuntimeStore<SettingsStore>(tabId, "settings") ?? useSettingsStore;
@@ -109,6 +111,10 @@ export function ComposerModes() {
 			const plan = response.data as { enabled?: boolean } | undefined;
 			if (mode === "plan" && typeof plan?.enabled === "boolean") {
 				if (session.getState().sessionId === originSession) session.setState({ planModeEnabled: plan.enabled });
+				return;
+			}
+			if (mode === "prewalk" && typeof plan?.enabled === "boolean") {
+				if (session.getState().sessionId === originSession) session.setState({ prewalkArmed: plan.enabled });
 				return;
 			}
 			const current = await rpc.getState();
@@ -221,6 +227,11 @@ export function ComposerModes() {
 								onToggle={() => void update(() => rpc.setAutoRetry(!autoRetry))}
 							/>
 							<MoreRow
+								label={t("cmd.prewalk")}
+								checked={prewalkArmed}
+								onToggle={() => void update(() => rpc.setPrewalk(!prewalkArmed), "prewalk")}
+							/>
+							<MoreRow
 								label={t("input.more.steeringAll")}
 								checked={steeringMode === "all"}
 								onToggle={() => {
@@ -260,7 +271,7 @@ function ModeRow({
 	return (
 		<button
 			type="button"
-			aria-pressed={navigates ? undefined : checked}
+			aria-pressed={checked}
 			className="omp-pressable flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-omp-md font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
 			onClick={onSelect}
 			title={title}

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcForeignSessionInfo, RpcResponse } from "../../../shared/rpc-types";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useSessionStore } from "../../stores/session";
 import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
@@ -30,6 +31,7 @@ interface SourceState {
 export function ImportForeignDialog() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const close = useUiStore(s => s.closeImportDialog);
 	const [source, setSource] = useState<Source>("claude");
 	const [states, setStates] = useState<Partial<Record<Source, SourceState>>>({});
@@ -49,6 +51,7 @@ export function ImportForeignDialog() {
 
 	const load = useCallback(
 		async (target: Source, force = false) => {
+			if (!sidecarReady) return;
 			const existing = states[target];
 			if (!force && existing && (existing.sessions.length > 0 || existing.error !== null || existing.loading)) {
 				return;
@@ -75,14 +78,21 @@ export function ImportForeignDialog() {
 					setStates(current => ({ ...current, [target]: { loading: false, error: String(cause), sessions: [] } }));
 			}
 		},
-		[states, tabRpc.listForeignSessions],
+		[sidecarReady, states, tabRpc.listForeignSessions],
 	);
 
 	// Reload only when the source tab changes (load() closes over cached states).
 	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed reload by design
 	useEffect(() => {
+		if (!sidecarReady) {
+			setStates(current => ({
+				...current,
+				[source]: { loading: false, error: t("import.notConnected"), sessions: [] },
+			}));
+			return;
+		}
 		void load(source, true);
-	}, [source, tabRpc]);
+	}, [source, sidecarReady, tabRpc]);
 
 	const state = states[source];
 	const filtered = useMemo(() => {
@@ -108,6 +118,7 @@ export function ImportForeignDialog() {
 	};
 
 	const doImport = async () => {
+		if (!sidecarReady) return;
 		const sessions = (state?.sessions ?? []).filter(session => selected.has(`${source}:${session.id}`));
 		if (sessions.length === 0 || importing) return;
 		setImporting(true);
@@ -207,7 +218,12 @@ export function ImportForeignDialog() {
 					{importError}
 				</p>
 			)}
-			<Button size="sm" disabled={importing || state?.loading} onClick={() => void load(source, true)}>
+			<Button
+				disabled={!sidecarReady || importing || state?.loading}
+				onClick={() => void load(source, true)}
+				size="sm"
+				title={!sidecarReady ? t("import.notConnected") : undefined}
+			>
 				{t("common.refresh")}
 			</Button>
 			<div className="max-h-[46vh] min-h-[200px] overflow-y-auto rounded-lg border border-(--omp-border-muted)">
@@ -234,7 +250,8 @@ export function ImportForeignDialog() {
 						>
 							<input
 								type="checkbox"
-								disabled={importing || completed.has(`${source}:${session.id}`)}
+								disabled={!sidecarReady || importing || completed.has(`${source}:${session.id}`)}
+								title={!sidecarReady ? t("import.notConnected") : undefined}
 								checked={selected.has(`${source}:${session.id}`)}
 								onChange={() => toggle(session.id)}
 								className="mt-1"
@@ -267,10 +284,11 @@ export function ImportForeignDialog() {
 				<span className="text-omp-sm text-(--omp-dim)">{t("import.copyNote")}</span>
 				<span className="ml-auto">
 					<Button
-						disabled={selected.size === 0 || importing}
+						disabled={!sidecarReady || selected.size === 0 || importing}
 						icon={importing ? <Spinner size="sm" /> : <Download size={13} />}
 						onClick={() => void doImport()}
 						size="sm"
+						title={!sidecarReady ? t("import.notConnected") : undefined}
 					>
 						{selected.size > 0 ? t("import.importN", { count: selected.size }) : t("import.import")}
 					</Button>

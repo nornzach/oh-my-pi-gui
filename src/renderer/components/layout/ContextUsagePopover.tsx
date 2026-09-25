@@ -8,6 +8,7 @@ import { cx, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
+import { useUiStore } from "../../stores/ui";
 import { Button } from "../common";
 
 interface AnchorPosition {
@@ -42,6 +43,7 @@ export function ContextUsagePopover() {
 	const contextUsage = useSessionStore(state => state.contextUsage);
 	const sessionId = useSessionStore(state => state.sessionId);
 	const sidecarReady = useSessionStore(state => state.status) === "ready";
+	const openContextReport = useUiStore(state => state.openContextReport);
 	const [open, setOpen] = useState(false);
 	const [pinned, setPinned] = useState(false);
 	const [anchor, setAnchor] = useState<AnchorPosition | null>(null);
@@ -339,6 +341,17 @@ export function ContextUsagePopover() {
 								))}
 							</div>
 						)}
+						<Button
+							className="mt-3 w-full"
+							onClick={() => {
+								dismiss();
+								openContextReport();
+							}}
+							size="sm"
+							variant="ghost"
+						>
+							{t("contextUsage.fullReport")}
+						</Button>
 					</div>,
 					document.body,
 				)}

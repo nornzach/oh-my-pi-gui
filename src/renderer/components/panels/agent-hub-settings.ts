@@ -69,6 +69,7 @@ export interface AgentSettingsRpc {
 	error: string | null;
 	loading: boolean;
 	busy: boolean;
+	ready: boolean;
 	refresh: () => void;
 	/** Apply an optimistic settings write; the optimistic value is authoritative on success. */
 	mutate: (optimistic: AgentSettingsState, action: () => Promise<RpcResponse>) => Promise<void>;
@@ -98,7 +99,8 @@ export function useAgentSettings(open: boolean, active: boolean): AgentSettingsR
 	const load = useCallback(
 		async (silent: boolean) => {
 			if (!sidecarReady) {
-				if (!silent) setError(t("agentHub.notConnected"));
+				setError(t("agentHub.notConnected"));
+				setLoading(false);
 				return;
 			}
 			if (!silent) {
@@ -138,6 +140,10 @@ export function useAgentSettings(open: boolean, active: boolean): AgentSettingsR
 
 	const mutate = useCallback(
 		async (optimistic: AgentSettingsState, action: () => Promise<RpcResponse>) => {
+			if (!sidecarReady) {
+				setError(t("agentHub.notConnected"));
+				return;
+			}
 			const prev = stateRef.current;
 			setBoth(optimistic);
 			setBusy(true);
@@ -156,8 +162,8 @@ export function useAgentSettings(open: boolean, active: boolean): AgentSettingsR
 				setBusy(false);
 			}
 		},
-		[t, load, setBoth],
+		[sidecarReady, t, load, setBoth],
 	);
 
-	return { state, error, loading, busy, refresh, mutate };
+	return { state, error, loading, busy, ready: sidecarReady, refresh, mutate };
 }

@@ -26,6 +26,7 @@ import { type ReactNode, useState } from "react";
 import type { RpcMcpServerInput } from "../../../../shared/rpc-types";
 import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
+import { useSessionStore } from "../../../stores/session";
 import { toast } from "../../../stores/toast";
 import { Button, Input, Modal } from "../../common";
 import { ArrayChipEditor } from "../../settings/editors/ArrayChipEditor";
@@ -191,6 +192,7 @@ export interface McpServerWizardFormProps {
 export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpServerWizardFormProps) {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const [values, setValues] = useState<McpWizardValues>(() => ({ ...initialMcpWizardValues(), ...initialValues }));
 	const [errors, setErrors] = useState<McpWizardErrors>({});
 	const [submitError, setSubmitError] = useState<string | null>(null);
@@ -217,6 +219,7 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 					: null;
 
 	const handleTest = async (): Promise<void> => {
+		if (!sidecarReady) return;
 		const configErrors = validateMcpWizardConfig(values);
 		setErrors(configErrors);
 		if (Object.keys(configErrors).length > 0) return;
@@ -234,6 +237,7 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 	};
 
 	const handleSubmit = async (): Promise<void> => {
+		if (!sidecarReady) return;
 		const formErrors = validateMcpWizardForm(values);
 		setErrors(formErrors);
 		if (Object.keys(formErrors).length > 0) return;
@@ -259,6 +263,11 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 
 	return (
 		<div className="flex max-h-[70vh] flex-col">
+			{!sidecarReady && (
+				<p className="px-4 pt-3 text-omp-sm text-(--omp-warning)" role="status">
+					{t("common.notConnected")}
+				</p>
+			)}
 			<div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
 				<Input
 					autoFocus
@@ -383,10 +392,11 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 
 			<div className="flex shrink-0 items-center gap-2 border-t border-(--omp-border-muted) px-4 py-3">
 				<Button
-					disabled={submitting}
+					disabled={!sidecarReady || submitting}
 					loading={testing}
 					onClick={() => void handleTest()}
 					size="sm"
+					title={!sidecarReady ? t("common.notConnected") : undefined}
 					variant="secondary"
 				>
 					{t("mcp.wizard.test")}
@@ -396,10 +406,11 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 					{t("common.cancel")}
 				</Button>
 				<Button
-					disabled={testing}
+					disabled={!sidecarReady || testing}
 					loading={submitting}
 					onClick={() => void handleSubmit()}
 					size="sm"
+					title={!sidecarReady ? t("common.notConnected") : undefined}
 					variant="primary"
 				>
 					{t("mcp.wizard.submit")}

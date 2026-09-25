@@ -85,6 +85,8 @@ export interface McpServerCardProps {
 	busy: boolean;
 	/** Another row's mutation is in flight (one at a time). */
 	disabled: boolean;
+	/** Why the card actions are unavailable, when disabled by a connection state. */
+	disabledReason?: string;
 	menuOpen: boolean;
 	confirmingRemove: boolean;
 	/** mcpTest in flight for this server. */
@@ -108,6 +110,7 @@ export function McpServerCard({
 	enabled,
 	busy,
 	disabled,
+	disabledReason,
 	menuOpen,
 	confirmingRemove,
 	testing,
@@ -168,7 +171,7 @@ export function McpServerCard({
 						className="flex h-6 w-6 items-center justify-center rounded-md text-(--omp-muted) transition-colors hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text) disabled:cursor-not-allowed disabled:opacity-50"
 						disabled={disabled}
 						onClick={onMenuToggle}
-						title={t("extPanel.mcp.menu")}
+						title={disabledReason ?? t("extPanel.mcp.menu")}
 						type="button"
 					>
 						{busy ? <Spinner size="sm" /> : <MoreVertical size={14} />}

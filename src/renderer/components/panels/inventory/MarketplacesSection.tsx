@@ -34,7 +34,7 @@ import { listAvailablePlugins, mutationError } from "./rpc-result";
 // Add marketplace form
 // ============================================================================
 
-export function AddMarketplaceForm({ onAdded }: { onAdded: () => Promise<void> }) {
+export function AddMarketplaceForm({ onAdded, ready = true }: { onAdded: () => Promise<void>; ready?: boolean }) {
 	const tabRpc = useTabRpc();
 	const t = useT();
 	const [source, setSource] = useState("");
@@ -42,6 +42,7 @@ export function AddMarketplaceForm({ onAdded }: { onAdded: () => Promise<void> }
 	const [error, setError] = useState<string | null>(null);
 
 	const submit = async (): Promise<void> => {
+		if (!ready) return;
 		const trimmed = source.trim();
 		// Client-side parity with the agent's classifySource: a bare name is
 		// rejected inline before the RPC fires (same rule order, same verdict).
@@ -74,7 +75,7 @@ export function AddMarketplaceForm({ onAdded }: { onAdded: () => Promise<void> }
 				<input
 					aria-label={t("marketplace.addTitle")}
 					className="min-w-0 flex-1 rounded-md border border-(--omp-input-border) bg-(--omp-input-bg) px-2.5 py-1.5 font-mono text-omp-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:border-(--omp-input-focus-border) focus:outline-none disabled:opacity-50"
-					disabled={busy}
+					disabled={busy || !ready}
 					onChange={event => {
 						setSource(event.target.value);
 						setError(null);
@@ -89,11 +90,12 @@ export function AddMarketplaceForm({ onAdded }: { onAdded: () => Promise<void> }
 					value={source}
 				/>
 				<Button
-					disabled={source.trim() === ""}
+					disabled={source.trim() === "" || busy || !ready}
 					icon={<Plus size={12} />}
 					loading={busy}
 					onClick={() => void submit()}
 					size="sm"
+					title={!ready ? t("invPanel.notConnected") : undefined}
 				>
 					{t("marketplace.add")}
 				</Button>
@@ -232,10 +234,12 @@ function AvailablePluginRow({
 export function MarketplaceCard({
 	marketplace,
 	reload,
+	ready = true,
 }: {
 	marketplace: RpcMarketplaceInfo;
 	/** Refetch get_marketplaces (card data: name, source, plugin count, cache note). */
 	reload: () => Promise<void>;
+	ready?: boolean;
 }) {
 	const tabRpc = useTabRpc();
 	const t = useT();
@@ -252,6 +256,7 @@ export function MarketplaceCard({
 
 	/** list_available — lazy on first expand, then cached in component state. */
 	const fetchAvailable = useCallback(async (): Promise<void> => {
+		if (!ready) return;
 		setListLoading(true);
 		setListError(null);
 		try {
@@ -270,9 +275,10 @@ export function MarketplaceCard({
 		} finally {
 			setListLoading(false);
 		}
-	}, [marketplace.name, t, tabRpc.marketplaceAction]);
+	}, [marketplace.name, ready, t, tabRpc.marketplaceAction]);
 
 	const toggleExpanded = (): void => {
+		if (!ready) return;
 		const next = !expanded;
 		setExpanded(next);
 		if (next && available === null && !listLoading) void fetchAvailable();
@@ -280,6 +286,7 @@ export function MarketplaceCard({
 
 	/** Catalog refresh — long-running (clone/fetch), spinner for the duration. */
 	const refreshCatalog = async (): Promise<void> => {
+		if (!ready) return;
 		setBusyAction("update");
 		setCardError(null);
 		try {
@@ -301,6 +308,7 @@ export function MarketplaceCard({
 	};
 
 	const removeMarketplace = async (): Promise<void> => {
+		if (!ready) return;
 		setBusyAction("remove");
 		setCardError(null);
 		try {
@@ -321,6 +329,7 @@ export function MarketplaceCard({
 	};
 
 	const runPluginAction = (pluginName: string, action: MarketplacePluginAction): void => {
+		if (!ready) return;
 		// The catalog wire carries no omp manifest, so the GUI cannot know
 		// pre-install whether a plugin ships executable entry points — confirm
 		// every install (metadata is visible on the row).
@@ -332,6 +341,7 @@ export function MarketplaceCard({
 	};
 
 	const executePluginAction = async (pluginName: string, action: MarketplacePluginAction): Promise<void> => {
+		if (!ready) return;
 		const origin = capturePluginActivationOrigin();
 		if (!origin) {
 			setPluginErrors(prev => ({ ...prev, [pluginName]: t("pluginActivation.routePending") }));
@@ -392,8 +402,9 @@ export function MarketplaceCard({
 					aria-expanded={expanded}
 					aria-label={t("marketplace.browse")}
 					className="omp-pressable shrink-0 rounded p-0.5 text-(--omp-dim) hover:text-(--omp-text)"
+					disabled={!ready}
 					onClick={toggleExpanded}
-					title={t("marketplace.browse")}
+					title={!ready ? t("invPanel.notConnected") : t("marketplace.browse")}
 					type="button"
 				>
 					{expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -421,9 +432,9 @@ export function MarketplaceCard({
 				<button
 					aria-label={t("marketplace.refresh")}
 					className="omp-pressable flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-(--omp-muted) hover:bg-(--omp-selected-bg) hover:text-(--omp-accent) disabled:opacity-40"
-					disabled={busyAction !== null}
+					disabled={busyAction !== null || !ready}
 					onClick={() => void refreshCatalog()}
-					title={t("marketplace.refresh")}
+					title={!ready ? t("invPanel.notConnected") : t("marketplace.refresh")}
 					type="button"
 				>
 					{busyAction === "update" ? <Spinner size="sm" /> : <RefreshCw size={12} />}
@@ -433,9 +444,9 @@ export function MarketplaceCard({
 						<button
 							aria-label={t("marketplace.removeConfirm")}
 							className="omp-pressable flex h-6 w-6 items-center justify-center rounded-md border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent text-(--omp-error) disabled:opacity-40"
-							disabled={busyAction !== null}
+							disabled={busyAction !== null || !ready}
 							onClick={() => void removeMarketplace()}
-							title={t("marketplace.removeConfirm")}
+							title={!ready ? t("invPanel.notConnected") : t("marketplace.removeConfirm")}
 							type="button"
 						>
 							{busyAction === "remove" ? <Spinner size="sm" /> : <Check size={12} />}
@@ -443,7 +454,7 @@ export function MarketplaceCard({
 						<button
 							aria-label={t("common.cancel")}
 							className="omp-pressable flex h-6 w-6 items-center justify-center rounded-md text-(--omp-muted) hover:bg-(--omp-selected-bg) disabled:opacity-40"
-							disabled={busyAction !== null}
+							disabled={busyAction !== null || !ready}
 							onClick={() => setConfirmingRemove(false)}
 							title={t("common.cancel")}
 							type="button"
@@ -455,9 +466,9 @@ export function MarketplaceCard({
 					<button
 						aria-label={t("marketplace.remove")}
 						className="omp-pressable flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-(--omp-muted) hover:bg-(--omp-tool-error-bg) hover:text-(--omp-error) disabled:opacity-40"
-						disabled={busyAction !== null}
+						disabled={busyAction !== null || !ready}
 						onClick={() => setConfirmingRemove(true)}
-						title={t("marketplace.remove")}
+						title={!ready ? t("invPanel.notConnected") : t("marketplace.remove")}
 						type="button"
 					>
 						<Trash2 size={12} />
@@ -479,8 +490,10 @@ export function MarketplaceCard({
 							<div>
 								<Button
 									icon={<RefreshCw size={12} />}
+									disabled={!ready}
 									onClick={() => void fetchAvailable()}
 									size="sm"
+									title={!ready ? t("invPanel.notConnected") : t("invPanel.retry")}
 									variant="ghost"
 								>
 									{t("invPanel.retry")}
@@ -494,7 +507,7 @@ export function MarketplaceCard({
 							{(available ?? []).map(plugin => (
 								<div className="flex flex-col gap-1.5" key={plugin.name}>
 									<AvailablePluginRow
-										anyBusy={pluginBusy !== null}
+										anyBusy={pluginBusy !== null || !ready}
 										busyAction={pluginBusy?.name === plugin.name ? pluginBusy.action : null}
 										confirmingInstall={confirmInstall === plugin.name}
 										onAction={runPluginAction}

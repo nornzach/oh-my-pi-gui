@@ -6,6 +6,7 @@ import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner } from "../common";
@@ -13,6 +14,7 @@ import { Button, Modal, Spinner } from "../common";
 export function CopySelectorDialog() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const open = useUiStore(state => state.copySelectorOpen);
 	const close = useUiStore(state => state.closeCopySelector);
 	const [targets, setTargets] = useState<CopyTarget[]>([]);
@@ -29,6 +31,11 @@ export function CopySelectorDialog() {
 		setSelectedId(null);
 		setCopied(false);
 		setError(null);
+		if (!sidecarReady) {
+			setError(t("common.notConnected"));
+			setLoading(false);
+			return;
+		}
 		setLoading(true);
 		void tabRpc
 			.getCopyTargets()
@@ -52,7 +59,7 @@ export function CopySelectorDialog() {
 		return () => {
 			cancelled = true;
 		};
-	}, [open, tabRpc.getCopyTargets]);
+	}, [open, sidecarReady, t, tabRpc.getCopyTargets]);
 
 	const flat = useMemo(() => flattenCopyTargets(targets), [targets]);
 	const selectedIndex = Math.max(

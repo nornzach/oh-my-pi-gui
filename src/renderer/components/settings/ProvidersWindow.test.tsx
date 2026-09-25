@@ -181,6 +181,23 @@ describe("ProviderRow", () => {
 		expect(html).toContain("providers.edit");
 		expect(html).not.toContain("providers.logout");
 	});
+
+	it("locks sidecar login actions and explains a disconnected provider list", () => {
+		const html = renderToStaticMarkup(
+			<ProviderRow
+				busy={false}
+				customConfigs={[]}
+				onEdit={noop}
+				onLogin={noop}
+				onLogout={noop}
+				provider={provider("tavily", true, false)}
+				sidecarReady={false}
+				t={t}
+			/>,
+		);
+		expect(html).toContain("disabled");
+		expect(html).toContain('title="providers.notConnected"');
+	});
 });
 
 // ---------------------------------------------------------------------------

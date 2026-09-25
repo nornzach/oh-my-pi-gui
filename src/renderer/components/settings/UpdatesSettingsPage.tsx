@@ -4,6 +4,7 @@ import type { UpdateStatus } from "../../../shared/ipc-types";
 import type { RpcOmpUpdateResult } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { useSessionStore } from "../../stores/session";
 import { useUpdaterStore } from "../../stores/updater";
 import { Button, Spinner } from "../common";
 
@@ -35,6 +36,7 @@ export function updateOverviewState(
 export function UpdatesSettingsPage() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const status = useUpdaterStore(state => state.status);
 	const setStatus = useUpdaterStore(state => state.setStatus);
 	const [guiVersion, setGuiVersion] = useState<string>();
@@ -45,7 +47,10 @@ export function UpdatesSettingsPage() {
 	const check = useCallback(async () => {
 		setChecking(true);
 		setCoreError(undefined);
-		const [appResult, coreResult] = await Promise.allSettled([window.omp.updater.check(), tabRpc.getOmpUpdate()]);
+		const [appResult, coreResult] = await Promise.allSettled([
+			window.omp.updater.check(),
+			sidecarReady ? tabRpc.getOmpUpdate() : Promise.resolve(null),
+		]);
 		setStatus(
 			appResult.status === "fulfilled"
 				? appResult.value
@@ -54,19 +59,21 @@ export function UpdatesSettingsPage() {
 						message: appResult.reason instanceof Error ? appResult.reason.message : String(appResult.reason),
 					},
 		);
-		if (coreResult.status === "fulfilled" && coreResult.value.success) {
+		if (coreResult.status === "fulfilled" && coreResult.value !== null && coreResult.value.success) {
 			setCore(coreResult.value.data as RpcOmpUpdateResult);
 		} else {
 			setCoreError(
-				coreResult.status === "rejected"
-					? String(coreResult.reason)
-					: coreResult.value.success
-						? t("updates.core.checkFailed")
-						: coreResult.value.error,
+				!sidecarReady
+					? t("common.notConnected")
+					: coreResult.status === "rejected"
+						? String(coreResult.reason)
+						: coreResult.value === null || coreResult.value.success
+							? t("updates.core.checkFailed")
+							: coreResult.value.error,
 			);
 		}
 		setChecking(false);
-	}, [setStatus, t, tabRpc.getOmpUpdate]);
+	}, [setStatus, sidecarReady, t, tabRpc.getOmpUpdate]);
 
 	useEffect(() => {
 		void window.omp.updater.version().then(setGuiVersion);

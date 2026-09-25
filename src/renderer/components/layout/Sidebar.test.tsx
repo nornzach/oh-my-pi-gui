@@ -233,6 +233,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		const navigation = container.querySelector("[data-sidebar-navigation]");
 		for (const label of [
 			"Commands",
+			"Start with what makes OMP different",
 			"Agent Hub",
 			"Providers & login",
 			"Usage & quotas",
@@ -244,6 +245,19 @@ describe("Sidebar menus and pinned ordering", () => {
 		]) {
 			expect(navigation?.textContent).toContain(label);
 		}
+		const capabilities = [...navigation!.querySelectorAll("button")].find(button =>
+			(button.textContent ?? "").includes("Start with what makes OMP different"),
+		);
+		if (!capabilities) throw new Error("Capabilities navigation item missing");
+		await fire(capabilities, "onClick");
+		expect(useUiStore.getState().settingsOpen).toBe(true);
+		expect(useUiStore.getState().settingsTab).toBe("capabilities");
+		const commandCenter = navigation?.querySelector('button[data-command-center-entry="true"]');
+		expect(commandCenter?.textContent).toContain("⌘K / ⌃K");
+		await act(async () => useUiStore.setState({ keymapOverrides: { palette: ["⌘⇧K"] } }));
+		expect(commandCenter?.textContent).toContain("⇧⌘K");
+		expect(commandCenter?.textContent).not.toContain("⌃K");
+		await act(async () => useUiStore.setState({ keymapOverrides: {} }));
 
 		const hotkeys = [...navigation!.querySelectorAll("button")].find(button =>
 			(button.textContent ?? "").includes("Keyboard shortcuts"),

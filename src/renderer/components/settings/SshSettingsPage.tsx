@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSshHostInfo, RpcSshHostInput, RpcSshHostsResult, RpcSshTestResult } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { useSessionStore } from "../../stores/session";
 import { Button, ConfirmDialog, Input, Spinner, TextArea } from "../common";
 
 interface HostDraft extends RpcSshHostInput {
@@ -55,6 +56,7 @@ function errorMessage(error: unknown): string {
 export function SshSettingsPage() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const [data, setData] = useState<RpcSshHostsResult>();
 	const [selected, setSelected] = useState<RpcSshHostInfo>();
 	const selectionRef = useRef<{ name: string; scope: RpcSshHostInfo["scope"] } | undefined>(undefined);
@@ -74,6 +76,13 @@ export function SshSettingsPage() {
 
 	const load = useCallback(
 		async (preferred?: { name: string; scope: RpcSshHostInfo["scope"] }) => {
+			if (!sidecarReady) {
+				setData(undefined);
+				setError(t("common.notConnected"));
+				setLoadError(t("common.notConnected"));
+				setLoading(false);
+				return;
+			}
 			setLoading(true);
 			try {
 				const response = await tabRpc.getSshHosts();
@@ -102,7 +111,7 @@ export function SshSettingsPage() {
 				setLoading(false);
 			}
 		},
-		[tabRpc.getSshHosts],
+		[sidecarReady, t, tabRpc.getSshHosts],
 	);
 
 	useEffect(() => {
@@ -136,6 +145,7 @@ export function SshSettingsPage() {
 	};
 
 	const save = async () => {
+		if (!sidecarReady) return;
 		if (!draft.name.trim() || !draft.host.trim()) {
 			setError(t("ssh.validation.required"));
 			return;
@@ -172,6 +182,7 @@ export function SshSettingsPage() {
 	};
 
 	const test = async () => {
+		if (!sidecarReady) return;
 		if (!draft.name.trim() || !draft.host.trim()) {
 			setError(t("ssh.validation.required"));
 			return;
@@ -202,7 +213,7 @@ export function SshSettingsPage() {
 
 	const remove = async () => {
 		setConfirmDelete(false);
-		if (!selected?.editable) return;
+		if (!sidecarReady || !selected?.editable) return;
 		setDeleting(true);
 		try {
 			const response = await tabRpc.sshManage({
@@ -261,15 +272,25 @@ export function SshSettingsPage() {
 					<CheckCircle2 className="text-(--omp-success)" size={12} />{" "}
 					{t("ssh.ready.reachable", { count: reachable })}
 				</span>
-				<Button className="ml-auto" icon={<Plus size={13} />} onClick={addHost} size="sm" variant="primary">
+				<Button
+					className="ml-auto"
+					disabled={!sidecarReady}
+					icon={<Plus size={13} />}
+					onClick={addHost}
+					size="sm"
+					title={!sidecarReady ? t("common.notConnected") : undefined}
+					variant="primary"
+				>
 					{t("ssh.add")}
 				</Button>
 				<Button
 					aria-label={t("common.refresh")}
 					icon={<RefreshCw size={13} />}
 					loading={loading}
+					disabled={!sidecarReady}
 					onClick={() => void load()}
 					size="sm"
+					title={!sidecarReady ? t("common.notConnected") : undefined}
 					variant="ghost"
 				/>
 			</div>
@@ -335,7 +356,13 @@ export function SshSettingsPage() {
 								<Server className="text-(--omp-dim)" size={24} />
 								<div className="text-omp-md font-medium text-(--omp-text)">{t("ssh.empty.title")}</div>
 								<div className="text-omp-xs text-(--omp-dim)">{t("ssh.empty.description")}</div>
-								<Button icon={<Plus size={12} />} onClick={addHost} size="sm">
+								<Button
+									disabled={!sidecarReady}
+									icon={<Plus size={12} />}
+									onClick={addHost}
+									size="sm"
+									title={!sidecarReady ? t("common.notConnected") : undefined}
+								>
 									{t("ssh.add")}
 								</Button>
 							</div>
@@ -422,6 +449,7 @@ export function SshSettingsPage() {
 								/>
 								<Button
 									aria-label={t("ssh.chooseKey")}
+									disabled={!sidecarReady}
 									icon={<FolderOpen size={13} />}
 									onClick={() => void chooseKey()}
 									size="sm"
@@ -461,7 +489,7 @@ export function SshSettingsPage() {
 						{selected?.editable && !creating && (
 							<Button
 								aria-label={t("ssh.delete")}
-								disabled={saving || testing || loading}
+								disabled={!sidecarReady || saving || testing || loading}
 								icon={<Trash2 size={12} />}
 								loading={deleting}
 								onClick={() => setConfirmDelete(true)}
@@ -470,7 +498,7 @@ export function SshSettingsPage() {
 							/>
 						)}
 						<Button
-							disabled={saving || deleting || loading}
+							disabled={!sidecarReady || saving || deleting || loading}
 							icon={<FileKey2 size={12} />}
 							loading={testing}
 							onClick={() => void test()}
@@ -479,7 +507,7 @@ export function SshSettingsPage() {
 							{t("ssh.test")}
 						</Button>
 						<Button
-							disabled={testing || deleting || loading}
+							disabled={!sidecarReady || testing || deleting || loading}
 							loading={saving}
 							onClick={() => void save()}
 							size="sm"

@@ -30,6 +30,7 @@ export function HandoffDialog() {
 	const close = useForkHandoffStore(state => state.closeHandoffDialog);
 	const isStreaming = useSessionStore(state => state.isStreaming);
 	const messageCount = useSessionStore(state => state.messageCount);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 
 	const [prepared, setPrepared] = useState<{ sessionId: string; savedPath?: string; forkAttempted?: boolean } | null>(
 		null,
@@ -61,7 +62,7 @@ export function HandoffDialog() {
 			: null;
 
 	const submit = async () => {
-		if (running || blockedReason !== null) return;
+		if (!sidecarReady || running || blockedReason !== null) return;
 		setRunning(true);
 		setError(null);
 		try {
@@ -157,10 +158,10 @@ export function HandoffDialog() {
 						{t("common.cancel")}
 					</Button>
 					<Button
-						disabled={blockedReason !== null}
+						disabled={blockedReason !== null || !sidecarReady}
 						loading={running}
 						onClick={() => void submit()}
-						title={blockedReason ?? undefined}
+						title={blockedReason ?? (!sidecarReady ? t("sidecar.notResponding") : undefined)}
 						type="button"
 						variant="primary"
 					>

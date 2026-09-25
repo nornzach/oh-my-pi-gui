@@ -4,6 +4,7 @@ import type { RpcShareSessionPreview, RpcShareSessionResult } from "../../../sha
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner } from "../common";
@@ -16,11 +17,16 @@ export function ShareSessionDialog() {
 	const [uploading, setUploading] = useState(false);
 	const open = useUiStore(state => state.shareSessionOpen);
 	const close = useUiStore(state => state.closeShareSession);
+	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const [result, setResult] = useState<RpcShareSessionResult | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const prepare = useCallback(async () => {
+		if (!sidecarReady) {
+			setError(t("sidecar.notResponding"));
+			return;
+		}
 		const version = ++generation.current;
 		setPreview(null);
 		setUploading(false);
@@ -37,7 +43,7 @@ export function ShareSessionDialog() {
 		} finally {
 			if (version === generation.current) setLoading(false);
 		}
-	}, [rpc]);
+	}, [rpc, sidecarReady, t]);
 
 	useEffect(() => {
 		if (open) void prepare();
@@ -47,7 +53,7 @@ export function ShareSessionDialog() {
 	}, [open, prepare]);
 
 	const upload = async () => {
-		if (!preview || uploading) return;
+		if (!sidecarReady || !preview || uploading) return;
 		const version = generation.current;
 		setUploading(true);
 		setError(null);
@@ -133,10 +139,20 @@ export function ShareSessionDialog() {
 						{preview.preview}
 					</pre>
 					<div className="flex justify-end gap-2">
-						<Button variant="secondary" disabled={uploading} onClick={() => void prepare()}>
+						<Button
+							variant="secondary"
+							disabled={uploading || !sidecarReady}
+							onClick={() => void prepare()}
+							title={!sidecarReady ? t("sidecar.notResponding") : undefined}
+						>
 							{t("shareDialog.refreshPreview")}
 						</Button>
-						<Button loading={uploading} disabled={uploading} onClick={() => void upload()}>
+						<Button
+							loading={uploading}
+							disabled={uploading || !sidecarReady}
+							onClick={() => void upload()}
+							title={!sidecarReady ? t("sidecar.notResponding") : undefined}
+						>
 							{t("shareDialog.upload")}
 						</Button>
 					</div>
@@ -147,7 +163,12 @@ export function ShareSessionDialog() {
 					<p>
 						{t("shareDialog.error")}: {error}
 					</p>
-					<Button variant="secondary" disabled={uploading} onClick={() => void prepare()}>
+					<Button
+						variant="secondary"
+						disabled={uploading || !sidecarReady}
+						onClick={() => void prepare()}
+						title={!sidecarReady ? t("sidecar.notResponding") : undefined}
+					>
 						{t("shareDialog.refreshPreview")}
 					</Button>
 				</div>

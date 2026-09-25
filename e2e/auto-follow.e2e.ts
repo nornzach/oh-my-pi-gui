@@ -135,7 +135,8 @@ test("a bottom-pinned transcript rides the stream, and 'jump to latest' re-engag
 		await page.screenshot({ path: "test-results/auto-follow.png", scale: "css", animations: "disabled" });
 		expect(errors).toEqual([]);
 	} finally {
-		await app.close();
-		await fs.rm(profile, { recursive: true, force: true });
+		// Test teardown bypasses the production quit confirmation.
+		await app.evaluate(({ app }) => app.exit(0));
+		await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 	}
 });

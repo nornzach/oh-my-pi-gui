@@ -60,6 +60,7 @@ export function ProviderRow({
 	onLogout,
 	onEdit,
 	busy,
+	sidecarReady = true,
 	t,
 }: {
 	provider: ProviderInfo;
@@ -68,6 +69,7 @@ export function ProviderRow({
 	onLogout: (id: string) => void;
 	onEdit: (id: string) => void;
 	busy: boolean;
+	sidecarReady?: boolean;
 	t: (k: string, p?: Record<string, string | number>) => string;
 }) {
 	const editAction = resolveProviderEditAction(provider, customConfigs);
@@ -103,13 +105,14 @@ export function ProviderRow({
 						size="sm"
 						variant="ghost"
 						icon={<Edit size={12} />}
-						disabled={busy}
 						onClick={() => onEdit(provider.id)}
 						aria-label={
 							editAction.kind === "login"
 								? t("providers.updateCredentials", { provider: provider.name })
 								: t("providers.edit")
 						}
+						disabled={busy || (editAction.kind === "login" && !sidecarReady)}
+						title={!sidecarReady && editAction.kind === "login" ? t("providers.notConnected") : undefined}
 					/>
 				)}
 				{/* Login: any unauthenticated provider with a registered credential flow. */}
@@ -118,8 +121,9 @@ export function ProviderRow({
 						size="sm"
 						variant="primary"
 						icon={<LogIn size={12} />}
-						disabled={busy}
+						disabled={busy || !sidecarReady}
 						onClick={() => onLogin(provider.id)}
+						title={!sidecarReady ? t("providers.notConnected") : undefined}
 					>
 						{t("providers.login")}
 					</Button>
@@ -129,8 +133,9 @@ export function ProviderRow({
 						size="sm"
 						variant="ghost"
 						icon={<LogOut size={12} />}
-						disabled={busy}
+						disabled={busy || !sidecarReady}
 						onClick={() => onLogout(provider.id)}
+						title={!sidecarReady ? t("providers.notConnected") : undefined}
 					>
 						{t("providers.logout")}
 					</Button>
@@ -330,7 +335,9 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 								variant="ghost"
 								icon={<RefreshCw size={12} />}
 								onClick={() => void load(true)}
+								disabled={!sidecarReady}
 								loading={loading}
+								title={!sidecarReady ? t("providers.notConnected") : t("providers.refresh")}
 							>
 								{t("providers.refresh")}
 							</Button>
@@ -393,6 +400,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 									onLogout={requestLogout}
 									onEdit={handleEdit}
 									busy={busyProvider === p.id}
+									sidecarReady={sidecarReady}
 									t={t}
 								/>
 							))}
@@ -414,6 +422,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 										onLogout={requestLogout}
 										onEdit={handleEdit}
 										busy={busyProvider === p.id}
+										sidecarReady={sidecarReady}
 										t={t}
 									/>
 								))}

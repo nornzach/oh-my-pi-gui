@@ -32,6 +32,10 @@ export function WorktreeCloseDialog() {
 		if (!prompt) return;
 		setQuery({ phase: "loading" });
 		setBusy(false);
+		if (tab?.status !== "ready") {
+			setQuery({ phase: "error" });
+			return;
+		}
 		let cancelled = false;
 		window.omp.rpc
 			.commandForTab(prompt.tabId, { type: "get_git_status" })
@@ -45,10 +49,11 @@ export function WorktreeCloseDialog() {
 		return () => {
 			cancelled = true;
 		};
-	}, [prompt]);
+	}, [prompt, tab]);
 
 	if (!prompt || !tab?.worktree) return null;
 	const worktree = tab.worktree;
+	const sidecarReady = tab.status === "ready";
 	const status = query.phase === "ready" ? query.status : null;
 	const dirty = status !== null && (status.staged > 0 || status.unstaged > 0 || status.untracked > 0);
 
@@ -58,7 +63,7 @@ export function WorktreeCloseDialog() {
 	};
 
 	const removeAndClose = async (force: boolean) => {
-		if (busy) return;
+		if (!sidecarReady || busy) return;
 		setBusy(true);
 		try {
 			const response = await window.omp.rpc.commandForTab(
@@ -88,7 +93,9 @@ export function WorktreeCloseDialog() {
 			) : (
 				<div className="flex flex-col gap-4">
 					{query.phase === "error" ? (
-						<p className="text-omp-lg leading-relaxed text-(--omp-muted)">{t("worktreeClose.statusUnknown")}</p>
+						<p className="text-omp-lg leading-relaxed text-(--omp-muted)">
+							{sidecarReady ? t("worktreeClose.statusUnknown") : t("worktreeClose.notConnected")}
+						</p>
 					) : dirty && status ? (
 						<p className="text-omp-lg leading-relaxed text-(--omp-warning)">
 							{t("worktreeClose.dirtyBody", {

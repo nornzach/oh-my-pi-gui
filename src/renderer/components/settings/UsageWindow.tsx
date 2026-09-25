@@ -274,7 +274,9 @@ export function UsageWindow() {
 						variant="ghost"
 						icon={<RefreshCw size={12} />}
 						onClick={() => void loadQuotas()}
+						disabled={!sidecarReady}
 						loading={loading}
+						title={!sidecarReady ? t("usage.notConnected") : t("usage.refresh")}
 					>
 						{t("usage.refresh")}
 					</Button>

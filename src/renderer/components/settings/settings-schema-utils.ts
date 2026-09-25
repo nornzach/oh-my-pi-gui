@@ -52,6 +52,17 @@ const TERMINAL_DISPLAY_SETTINGS = new Set([
 	"spelling.typoDetection",
 	"spelling.autocomplete",
 	"spelling.autocorrect",
+	// Vim mode's indicator is rendered only by the TUI status line. Keeping the
+	// schema row out of the GUI prevents a control that can never affect this
+	// renderer from being advertised under a conditional gate.
+	"tui.vimModeDisplay",
+	"tui.mouse",
+	"tui.maxInlineImageColumns",
+	"tui.maxInlineImageRows",
+	"tui.maxInlineImages",
+	"statusLine.leftSegments",
+	"statusLine.rightSegments",
+	"statusLine.segmentOptions",
 ]);
 
 export function isSettingSupportedInGui(entry: { path?: string; tuiOnly?: boolean }): boolean {
