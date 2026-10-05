@@ -20,6 +20,7 @@ import { ImportForeignDialog } from "./components/dialogs/ImportForeignDialog";
 import { JobsDialog } from "./components/dialogs/JobsDialog";
 import { LiveVoiceDialog } from "./components/dialogs/LiveVoiceDialog";
 import { ModelPicker } from "./components/dialogs/ModelPicker";
+import { ModelRestoreDialog } from "./components/dialogs/ModelRestoreDialog";
 import { PlanApprovalDialog } from "./components/dialogs/PlanApprovalDialog";
 import { RenameSessionDialog } from "./components/dialogs/RenameSessionDialog";
 import { SessionInfoDialog } from "./components/dialogs/SessionInfoDialog";
@@ -748,6 +749,7 @@ export function App() {
 			<WorktreeCloseDialog />
 			<SessionPickerDialog />
 			<SessionSwitchDialog />
+			<ModelRestoreDialog />
 			<BranchPickerDialog />
 			<BtwDialog />
 			<CollabDialog />

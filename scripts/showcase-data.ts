@@ -26,7 +26,6 @@ import type {
 	RpcGuiThemesResult,
 	RpcHooksResult,
 	RpcJobsResult,
-	RpcLiveState,
 	RpcLoopModeState,
 	RpcMarketplacesResult,
 	RpcMcpServersResult,
@@ -806,13 +805,6 @@ export function createShowcaseData(
 			],
 		} satisfies RpcActiveToolsResult,
 		get_available_commands: { commands },
-		get_live_state: {
-			active: false,
-			phase: "connecting",
-			muted: false,
-			inputLevel: 0,
-			outputLevel: 0,
-		} satisfies RpcLiveState,
 		get_memory_report: {
 			backend: "off",
 			entryCount: 0,

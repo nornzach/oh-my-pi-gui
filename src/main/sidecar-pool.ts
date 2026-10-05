@@ -50,7 +50,7 @@ import {
 	type ModelCatalogUpdateFrame,
 	type PromptResultFrame,
 	type RpcCommand,
-	type RpcLiveUpdateFrame,
+	type RpcLiveFrame,
 	type RpcResponse,
 	type SessionInfoUpdateFrame,
 	type SessionSettledFrame,
@@ -377,8 +377,8 @@ export class SidecarPool {
 		wire("subagentFrame", (frame: SubagentFrame) => {
 			forwardActive(IPC_EVENTS.SUBAGENT_FRAME, frame);
 		});
-		wire("liveUpdate", (frame: RpcLiveUpdateFrame) => {
-			forwardActive(IPC_EVENTS.LIVE_UPDATE, frame);
+		wire("liveFrame", (frame: RpcLiveFrame) => {
+			forwardActive(IPC_EVENTS.LIVE_FRAME, frame);
 		});
 		wire("modelCatalogUpdate", (frame: ModelCatalogUpdateFrame) => {
 			forwardActive(IPC_EVENTS.MODEL_CATALOG_UPDATE, frame);

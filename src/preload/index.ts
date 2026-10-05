@@ -55,7 +55,7 @@ import type {
 	ModelCatalogUpdateFrame,
 	PromptResultFrame,
 	RpcCommand,
-	RpcLiveUpdateFrame,
+	RpcLiveFrame,
 	RpcResponse,
 	SessionInfoUpdateFrame,
 	SubagentFrame,
@@ -143,8 +143,8 @@ const api: OmpApi = {
 			subscribe<{ request: HostUriRequest }>(IPC_EVENTS.HOST_URI_REQUEST, data => callback(data.request)),
 		onSubagentFrame: (callback: (frame: SubagentFrame) => void) =>
 			subscribeActiveTab<SubagentFrame>(IPC_EVENTS.SUBAGENT_FRAME, callback),
-		onLiveUpdate: (callback: (frame: RpcLiveUpdateFrame) => void) =>
-			subscribeActiveTab<RpcLiveUpdateFrame>(IPC_EVENTS.LIVE_UPDATE, callback),
+		onLiveFrame: (callback: (frame: RpcLiveFrame) => void) =>
+			subscribeActiveTab<RpcLiveFrame>(IPC_EVENTS.LIVE_FRAME, callback),
 		onModelCatalogUpdate: (callback: (frame: ModelCatalogUpdateFrame) => void) =>
 			subscribeActiveTab<ModelCatalogUpdateFrame>(IPC_EVENTS.MODEL_CATALOG_UPDATE, callback),
 		onCommandsUpdate: (callback: (commands: AvailableCommand[]) => void) =>

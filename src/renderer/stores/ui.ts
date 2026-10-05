@@ -89,6 +89,9 @@ interface UiStore {
 	 * (streaming/compacting). Non-null shows the SessionSwitchDialog offering
 	 * a parallel new tab (recommended) / new window vs abort-and-switch. */
 	sessionSwitchPrompt: SessionInfo | null;
+	/** Session whose saved model could not be restored on switch; non-null shows
+	 * the ModelRestoreDialog offering to open it with the current model. */
+	modelRestorePrompt: { session: SessionInfo; missingModel: string } | null;
 	sidecarError: string | null;
 	/** Crash-loop progress carried by the status behind `sidecarError`: non-null
 	 * while the sidecar is respawning itself, and on the terminal error once the
@@ -208,6 +211,8 @@ interface UiStore {
 	closeSessionInfo: () => void;
 	requestSessionSwitch: (session: SessionInfo) => void;
 	closeSessionSwitch: () => void;
+	requestModelRestore: (prompt: { session: SessionInfo; missingModel: string }) => void;
+	closeModelRestore: () => void;
 	/** Close UI whose data or actions belong to the outgoing tab. */
 	closeSessionOverlays: () => void;
 	/** In-flight sidebar/picker session switch: keep the outgoing transcript painted. */
@@ -415,6 +420,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	sessionSwitchPrompt: null as SessionInfo | null,
 	requestSessionSwitch: session => set({ sessionSwitchPrompt: session }),
 	closeSessionSwitch: () => set({ sessionSwitchPrompt: null }),
+	modelRestorePrompt: null as { session: SessionInfo; missingModel: string } | null,
+	requestModelRestore: prompt => set({ modelRestorePrompt: prompt }),
+	closeModelRestore: () => set({ modelRestorePrompt: null }),
 	closeSessionOverlays: () =>
 		set({
 			commandPaletteOpen: false,
@@ -450,6 +458,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 			sessionTreeOpen: false,
 			sessionInfoOpen: false,
 			sessionSwitchPrompt: null,
+			modelRestorePrompt: null,
 		}),
 	sidecarError: null as string | null,
 	sidecarRestart: null as SidecarRestartProgress | null,

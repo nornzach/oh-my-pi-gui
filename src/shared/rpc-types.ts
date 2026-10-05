@@ -58,7 +58,7 @@ export type RpcCommand =
 	| { id?: string; type: "queue_clear"; lane?: "steering" | "followUp" }
 	| { id?: string; type: "get_session_stats" }
 	| { id?: string; type: "export_html"; outputPath?: string }
-	| { id?: string; type: "switch_session"; sessionPath: string }
+	| { id?: string; type: "switch_session"; sessionPath: string; provider?: string; modelId?: string }
 	| { id?: string; type: "branch"; entryId: string }
 	| { id?: string; type: "fork" }
 	| { id?: string; type: "get_branch_messages" }
@@ -226,10 +226,9 @@ export type RpcCommand =
 	| { id?: string; type: "set_plugin_features"; pluginId: string; features: string[] }
 	| { id?: string; type: "set_plugin_setting"; pluginId: string; key: string; value: unknown }
 	| { id?: string; type: "delete_plugin_setting"; pluginId: string; key: string }
-	| { id?: string; type: "live_start"; voice?: string }
-	| { id?: string; type: "live_toggle_mute" }
+	| { id?: string; type: "live_start"; voice?: string; instructions?: string }
 	| { id?: string; type: "live_stop" }
-	| { id?: string; type: "get_live_state" }
+	| { id?: string; type: "live_mute"; muted?: boolean }
 	| { id?: string; type: "debug"; params: RpcDebugParams }
 	| { id?: string; type: "collab_start"; relayUrl?: string; view?: boolean }
 	| { id?: string; type: "collab_join"; link: string }
@@ -456,26 +455,51 @@ export interface RpcDebugParams {
 	timeout?: number;
 }
 
-export interface RpcLiveTranscript {
+export type RpcLivePhase = "connecting" | "listening" | "working" | "speaking" | "muted" | "error";
+
+/** Live session phase change. */
+export interface RpcLivePhaseFrame {
+	type: "live_phase";
+	phase: RpcLivePhase;
+}
+
+/** Microphone/speaker RMS in [0, 1], at most one frame per 100 ms. */
+export interface RpcLiveLevelsFrame {
+	type: "live_levels";
+	input: number;
+	output: number;
+}
+
+/** Incremental (`final: false`) or final transcript of one realtime turn; coalesce on `role` + `turn`. */
+export interface RpcLiveTranscriptFrame {
+	type: "live_transcript";
 	role: "user" | "assistant";
-	text: string;
 	turn: number;
+	text: string;
 	final: boolean;
 }
 
-export interface RpcLiveState {
-	active: boolean;
-	phase: "connecting" | "listening" | "working" | "speaking" | "muted" | "error";
-	muted: boolean;
-	inputLevel: number;
-	outputLevel: number;
-	transcript?: RpcLiveTranscript;
+/** Emitted exactly once per live session when it has ended; `error` carries the failure cause. */
+export interface RpcLiveEndFrame {
+	type: "live_end";
 	error?: string;
 }
 
-export interface RpcLiveUpdateFrame {
-	type: "live_update";
-	state: RpcLiveState;
+export type RpcLiveFrame = RpcLivePhaseFrame | RpcLiveLevelsFrame | RpcLiveTranscriptFrame | RpcLiveEndFrame;
+
+export const LIVE_FRAME_TYPES: ReadonlySet<string> = new Set<RpcLiveFrame["type"]>([
+	"live_phase",
+	"live_levels",
+	"live_transcript",
+	"live_end",
+]);
+
+export interface RpcLiveStartResult {
+	voice: string;
+}
+
+export interface RpcLiveMuteResult {
+	muted: boolean;
 }
 
 export interface RpcCollabParticipant {
@@ -1858,7 +1882,7 @@ export type OutboundFrame =
 	| CommandOutputFrame
 	| SessionInfoUpdateFrame
 	| ConfigUpdateFrame
-	| RpcLiveUpdateFrame
+	| RpcLiveFrame
 	| ModelCatalogUpdateFrame
 	| ExtensionErrorFrame;
 
@@ -2046,4 +2070,6 @@ export interface SidecarStatusPayload {
 	message?: string;
 	cwd: string;
 	restart?: SidecarRestartProgress;
+	/** On `ready`: the saved session model that could not be restored; the session resumed on the default model. */
+	modelFallback?: string;
 }

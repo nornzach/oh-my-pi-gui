@@ -5,6 +5,14 @@
 ### Added
 
 - **Windows release CI** (`.github/workflows/release-windows.yml`): builds the NSIS installer, portable exe, and `latest.yml` on `windows-latest` at release publish — dispatchable for existing tags — smoke-tests the sidecar, verifies the PE architecture, guards the locale-pak set (issue #12 regression guard), and launches the packaged GUI to fail on a dying renderer. — thanks [@mwyborski](https://github.com/mwyborski) ([#14](https://github.com/nornzach/oh-my-pi-gui/pull/14))
+- **Session model recovery.** Upstream now refuses to resume a session on a different model when its saved model is gone (provider removed, signed out, model retired). Opening such a session from the sidebar, ⌘P picker, or a deep link shows a dialog naming the missing model and offering to reopen it bound to your current model, instead of a dead-end error. A sidecar restart onto such a session — which upstream now aborts at boot — respawns once on your default model (`--model @default`) with a warning toast, instead of crash-looping the tab.
+- **Live voice transcript history**: the Live Voice dialog keeps a scrolling transcript of the call (incremental turns shown dimmed until final) and shows the active voice, instead of only the latest line.
+
+### Changed
+
+- Bundled agent rebuilt from upstream `main` through v18.6.2 (monorepo merge `f8bcc259`): RPC `open_session`/`switch_session` accept an explicit `provider`/`modelId`, resumed sessions fail closed on an unavailable model, `/thinking` level picker, attachment-only session titles, `models.yml` `compat.statefulResponses`, and Windows bash cancellation fixes.
+- Live voice now speaks upstream's wire protocol (`live_phase`/`live_levels`/`live_transcript`/`live_end` frames, `live_mute`); the fork's `live_update` snapshots, `live_toggle_mute`, and `get_live_state` are retired. Cancelling while connecting ends the call without an error toast.
+- `build:omp` recognizes the natives addon's post-link version stamp through the loader's own `version-sentinel.js`, so a locally built or newly stamped addon is no longer mistaken for a stale one.
 
 ## [0.9.15] - 2026-10-02
 

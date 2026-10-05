@@ -93,7 +93,7 @@ interface MockOmp {
 		getLoopMode: Mock<() => Promise<RpcResponse>>;
 		getVibeMode: Mock<() => Promise<RpcResponse>>;
 		getQueue: Mock<() => Promise<RpcResponse>>;
-		switchSession: Mock<(sessionPath: string) => Promise<RpcResponse>>;
+		switchSession: Mock<(sessionPath: string, model?: { provider: string; modelId: string }) => Promise<RpcResponse>>;
 		setSubagentSubscription: Mock<(level: string) => Promise<RpcResponse>>;
 	};
 }
@@ -440,6 +440,46 @@ describe("switchSessionNow F-OWN owner guard", () => {
 		expect(omp.tabs.spawn).toHaveBeenCalledWith(
 			expect.objectContaining({ sessionPath: "/sessions/agent.jsonl", kind: "agent" }),
 		);
+	});
+
+	it("offers the model-restore dialog instead of a toast when the saved model is unavailable", async () => {
+		seedTabs();
+		omp.rpc.switchSession.mockResolvedValue({
+			type: "response",
+			command: "switch_session",
+			success: false,
+			error: "Could not restore model gone/model-x",
+		});
+
+		const result = await switchSessionNow(session("/sessions/x.jsonl"));
+
+		expect(result).toBe(false);
+		expect(useUiStore.getState().modelRestorePrompt).toEqual({
+			session: session("/sessions/x.jsonl"),
+			missingModel: "gone/model-x",
+		});
+		expect(useToastStore.getState().toasts).toEqual([]);
+		expect(useSessionStore.getState().switchPending).toBeNull();
+	});
+
+	it("binds the session to an explicit model and toasts if that still fails", async () => {
+		seedTabs();
+		const target = session("/sessions/x.jsonl");
+		const model = { provider: "anthropic", modelId: "claude-opus" };
+
+		await expect(switchSessionNow(target, model)).resolves.toBe(true);
+		expect(omp.rpc.switchSession).toHaveBeenCalledWith("/sessions/x.jsonl", model);
+
+		omp.rpc.switchSession.mockResolvedValue({
+			type: "response",
+			command: "switch_session",
+			success: false,
+			error: "Could not restore model gone/model-x",
+		});
+		await expect(switchSessionNow(target, model)).resolves.toBe(false);
+		// No dialog loop: an explicit binding that fails is an ordinary error.
+		expect(useUiStore.getState().modelRestorePrompt).toBeNull();
+		expect(useToastStore.getState().toasts.some(toast => toast.variant === "error")).toBe(true);
 	});
 
 	it("switches in place when the file kind matches the active tab", async () => {

@@ -340,6 +340,14 @@ export const en: Record<string, string> = {
 	"sidebar.stats": "Stats",
 	"sidebar.delete": "Delete session",
 	"sidebar.deleteConfirm": "Delete this session permanently?",
+	"modelRestore.title": "Session model unavailable",
+	"modelRestore.message":
+		"This session last used {model}, which isn't available right now — its provider may have been removed or signed out.",
+	"modelRestore.offer":
+		"Open it with your current model, {model}? Earlier turns stay as they are; new replies come from {model}.",
+	"modelRestore.noCurrent": "Pick or configure a model first, then open the session again.",
+	"modelRestore.openWith": "Open with {model}",
+	"modelRestore.bootFallback": "Session model {model} is unavailable — resumed on your default model instead.",
 	"sidebar.openFailed": "Could not open session",
 	"sidebar.openInNewWindow": "Open in new window",
 	"sidebar.parallelCap": "Parallel limit reached (10) — close a window first",
@@ -1932,6 +1940,7 @@ export const en: Record<string, string> = {
 	"live.output": "Speaker",
 	"live.you": "You",
 	"live.assistant": "Assistant",
+	"live.voice": "Voice: {voice}",
 	"live.waiting": "Start speaking when the connection is ready.",
 	"live.mute": "Mute",
 	"live.unmute": "Unmute",

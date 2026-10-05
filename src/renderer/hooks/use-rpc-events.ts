@@ -586,6 +586,12 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 
 			if (payload.status === "ready") {
 				if (isFocused()) startHeartbeat();
+				if (payload.modelFallback) {
+					useToastStore.getState().push({
+						variant: "warning",
+						message: translate("modelRestore.bootFallback", { model: payload.modelFallback }),
+					});
+				}
 				// One-shot boot health check: verify the command loop is live.
 				void (async () => {
 					try {

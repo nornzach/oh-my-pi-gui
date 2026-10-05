@@ -1,4 +1,5 @@
 import type { OmpApi } from "./ipc-types";
+import type { SessionModelOverride } from "./model-restore";
 import type {
 	ImageContent,
 	MessagesPage,
@@ -97,7 +98,8 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		abortAndPrompt: (message: string) => rpcCommand({ type: "abort_and_prompt", message }),
 		newSession: (parentSession?: string) => rpcCommand({ type: "new_session", parentSession }),
 		dropSession: () => rpcCommand({ type: "drop_session" }),
-		switchSession: (sessionPath: string) => rpcCommand({ type: "switch_session", sessionPath }),
+		switchSession: (sessionPath: string, model?: SessionModelOverride) =>
+			rpcCommand({ type: "switch_session", sessionPath, ...model }),
 		branch: (entryId: string) => rpcCommand({ type: "branch", entryId }),
 		fork: () => rpcCommand({ type: "fork" }),
 		eval: (code: string, language?: "python" | "js" | "ruby" | "julia", excluded?: boolean) =>
@@ -176,10 +178,10 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		prCreate: (input: { title: string; body: string; base?: string; head?: string; draft?: boolean }) =>
 			rpcCommand({ type: "pr_create", ...input }, 120_000),
 		prCheckout: (number: number) => rpcCommand({ type: "pr_checkout", number }, 180_000),
-		liveStart: (voice?: string) => rpcCommand({ type: "live_start", voice }, 60_000),
-		liveToggleMute: () => rpcCommand({ type: "live_toggle_mute" }),
+		liveStart: (options?: { voice?: string; instructions?: string }) =>
+			rpcCommand({ type: "live_start", ...options }, 60_000),
+		liveMute: (muted?: boolean) => rpcCommand({ type: "live_mute", muted }),
 		liveStop: () => rpcCommand({ type: "live_stop" }, 30_000),
-		getLiveState: () => rpcCommand({ type: "get_live_state" }),
 		debug: (params: RpcDebugParams) => rpcCommand({ type: "debug", params }, 120_000),
 		collabStart: (relayUrl?: string, view?: boolean) => rpcCommand({ type: "collab_start", relayUrl, view }, 60_000),
 		collabJoin: (link: string) => rpcCommand({ type: "collab_join", link }, 120_000),

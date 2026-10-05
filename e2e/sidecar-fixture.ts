@@ -368,14 +368,17 @@ if (process.argv.includes("stats")) {
 			case "share_session":
 				ok({ url: "http://127.0.0.1/shared#local" });
 				break;
-			case "get_live_state":
-				ok({ active: false, phase: "connecting", muted: false, inputLevel: 0, outputLevel: 0 });
-				break;
 			case "live_start":
-				ok({ active: true, phase: "listening", muted: false, inputLevel: 0, outputLevel: 0 });
+				write({ type: "live_phase", phase: "connecting" });
+				write({ type: "live_phase", phase: "listening" });
+				ok({ voice: command.voice ?? "marin" });
+				break;
+			case "live_mute":
+				ok({ muted: command.muted ?? true });
 				break;
 			case "live_stop":
-				ok({ active: false, phase: "connecting", muted: false, inputLevel: 0, outputLevel: 0 });
+				write({ type: "live_end" });
+				ok();
 				break;
 			case "btw":
 				ok({ question: command.question, replyText: "Local side answer", canBranch: false });

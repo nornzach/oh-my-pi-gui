@@ -4,6 +4,7 @@
  */
 
 import type { LaunchProfile } from "./launch-profile";
+import type { SessionModelOverride } from "./model-restore";
 import type {
 	AgentSessionEvent,
 	AvailableCommand,
@@ -22,7 +23,7 @@ import type {
 	PromptResultFrame,
 	RpcCommand,
 	RpcDebugParams,
-	RpcLiveUpdateFrame,
+	RpcLiveFrame,
 	RpcMcpServerInput,
 	RpcResponse,
 	RpcSecurityDispositionStatus,
@@ -68,7 +69,7 @@ export const IPC_EVENTS = {
 	/** Extension runtime hook failed */
 	EXTENSION_ERROR: "extension:error",
 	/** Realtime voice session state/levels/transcript update. */
-	LIVE_UPDATE: "live:update",
+	LIVE_FRAME: "live:frame",
 	/** Model/provider discovery completed after a bounded listing response. */
 	MODEL_CATALOG_UPDATE: "model-catalog:update",
 	/** Session list changed */
@@ -902,7 +903,7 @@ export interface OmpApi {
 		abortAndPrompt(message: string): Promise<RpcResponse>;
 		newSession(parentSession?: string): Promise<RpcResponse>;
 		dropSession(): Promise<RpcResponse>;
-		switchSession(sessionPath: string): Promise<RpcResponse>;
+		switchSession(sessionPath: string, model?: SessionModelOverride): Promise<RpcResponse>;
 		branch(entryId: string): Promise<RpcResponse>;
 		fork(): Promise<RpcResponse>;
 		eval(code: string, language?: "python" | "js" | "ruby" | "julia", excluded?: boolean): Promise<RpcResponse>;
@@ -969,10 +970,9 @@ export interface OmpApi {
 			draft?: boolean;
 		}): Promise<RpcResponse>;
 		prCheckout(number: number): Promise<RpcResponse>;
-		liveStart(voice?: string): Promise<RpcResponse>;
-		liveToggleMute(): Promise<RpcResponse>;
+		liveStart(options?: { voice?: string; instructions?: string }): Promise<RpcResponse>;
+		liveMute(muted?: boolean): Promise<RpcResponse>;
 		liveStop(): Promise<RpcResponse>;
-		getLiveState(): Promise<RpcResponse>;
 		debug(params: RpcDebugParams): Promise<RpcResponse>;
 		collabStart(relayUrl?: string, view?: boolean): Promise<RpcResponse>;
 		collabJoin(link: string): Promise<RpcResponse>;
@@ -1109,7 +1109,7 @@ export interface OmpApi {
 		onExtensionUi(callback: (request: ExtensionUIRequest, tabId: string) => void): () => void;
 		onHostToolCall(callback: (request: HostToolCallRequest) => void): () => void;
 		onHostUriRequest(callback: (request: HostUriRequest) => void): () => void;
-		onLiveUpdate(callback: (frame: RpcLiveUpdateFrame) => void): () => void;
+		onLiveFrame(callback: (frame: RpcLiveFrame) => void): () => void;
 		onModelCatalogUpdate(callback: (frame: ModelCatalogUpdateFrame) => void): () => void;
 		onSubagentFrame(callback: (frame: SubagentFrame) => void): () => void;
 		onCommandsUpdate(callback: (commands: AvailableCommand[]) => void): () => void;

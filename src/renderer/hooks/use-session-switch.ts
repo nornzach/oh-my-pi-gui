@@ -20,6 +20,7 @@ import { useSubagentGraphStore } from "../stores/subagent-graph";
  */
 
 import type { IpcSessionOwner, SessionInfo } from "../../shared/ipc-types";
+import { parseModelRestoreFailure, type SessionModelOverride } from "../../shared/model-restore";
 import type { RpcResponse } from "../../shared/rpc-types";
 import { translate } from "../lib/i18n";
 import { useComposerStore } from "../stores/composer";
@@ -137,12 +138,16 @@ export async function routeToSessionOwner(owner: IpcSessionOwner, sessionPath: s
  * parallel session, it replaces the current one. Returns true when the
  * switch went through (false on RPC failure or extension-hook veto).
  *
+ * `model` binds the session to that model instead of its saved one. Without
+ * it, a session whose saved model is unavailable fails closed upstream; that
+ * failure opens the ModelRestoreDialog instead of a dead-end error toast.
+ *
  * F-OWN belt guard: when the file is already attached to a tab, route to the
  * owner instead of double-attaching. Main independently refuses raced
  * attaches with `session_owned_elsewhere` (handled below), so a failed
  * pre-check is safe to ignore.
  */
-export async function switchSessionNow(session: SessionInfo): Promise<boolean> {
+export async function switchSessionNow(session: SessionInfo, model?: SessionModelOverride): Promise<boolean> {
 	const runtime = focusedSessionRuntime();
 	const originStore = runtime ? sessionRuntimeStore<SessionStore>(runtime.tabId, "session")! : useSessionStore;
 	const originSessionId = originStore.getState().sessionId;
@@ -179,9 +184,15 @@ export async function switchSessionNow(session: SessionInfo): Promise<boolean> {
 		if (originStore.getState().switchPending === pending) originStore.getState().setSwitchPending(null);
 	};
 	try {
-		const response = await (runtime ? createTabRpc(runtime.command) : window.omp.rpc).switchSession(session.path);
+		const rpc = runtime ? createTabRpc(runtime.command) : window.omp.rpc;
+		const response = await (model ? rpc.switchSession(session.path, model) : rpc.switchSession(session.path));
 		if (!response.success) {
 			clearPending();
+			const missingModel = model ? null : parseModelRestoreFailure(response.error);
+			if (missingModel) {
+				useUiStore.getState().requestModelRestore({ session, missingModel });
+				return false;
+			}
 			// Cross-kind switch guard: refuse agent ↔ chat switches.
 			if (response.code === "session_kind_mismatch") {
 				toast({

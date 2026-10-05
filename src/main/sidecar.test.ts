@@ -403,6 +403,80 @@ describe("SidecarManager", () => {
 		);
 	});
 
+	it("resumes on the default model when the saved session model cannot be restored at boot", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-model-"));
+		const logPath = path.join(tempDir, "argv.json");
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		const sessionPath = path.join(tempDir, "session.jsonl");
+		await fs.writeFile(
+			binaryPath,
+			[
+				"#!/usr/bin/env bun",
+				'import * as fs from "node:fs/promises";',
+				"const argv = process.argv.slice(2);",
+				'if (!argv.includes("--model")) {',
+				'\tprocess.stderr.write("error: Could not restore model gone/model-x\\n      at createAgentSession (omp)\\n");',
+				"\tprocess.exit(1);",
+				"}",
+				`await fs.writeFile(${JSON.stringify(logPath)}, JSON.stringify(argv));`,
+				'process.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 1, supportedProtocolVersions: [1] }) + "\\n");',
+				"process.stdin.resume();",
+			].join("\n"),
+		);
+		await fs.chmod(binaryPath, 0o755);
+
+		const reportFailure = vi.fn();
+		const statuses: SidecarStatusPayload[] = [];
+		const sidecar = new SidecarManager({ binaryPath, cwd: tempDir, reportFailure });
+		sidecar.on("status", payload => statuses.push(payload));
+		try {
+			const firstReady = waitForReady(sidecar);
+			sidecar.start();
+			await firstReady;
+
+			const restarted = waitForReady(sidecar);
+			sidecar.restart(undefined, sessionPath);
+			await restarted;
+
+			const launch: unknown = JSON.parse(await fs.readFile(logPath, "utf8"));
+			expect(launch).toEqual(["--mode", "rpc-ui", "--session", sessionPath, "--model", "@default"]);
+			const ready = statuses.filter(payload => payload.status === "ready");
+			expect(ready.at(-1)?.modelFallback).toBe("gone/model-x");
+			// A recoverable boot failure is not a crash: no restart backoff, no crash report.
+			expect(statuses.some(payload => payload.status === "restarting")).toBe(false);
+			expect(reportFailure).not.toHaveBeenCalled();
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("falls back to the crash loop when the default-model respawn fails the same way", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-model-loop-"));
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		await fs.writeFile(
+			binaryPath,
+			`#!/usr/bin/env bun\nprocess.stderr.write("error: Could not restore model gone/model-x\\n");\nprocess.exit(1);\n`,
+		);
+		await fs.chmod(binaryPath, 0o755);
+
+		const statuses: SidecarStatusPayload[] = [];
+		const sidecar = new SidecarManager({ binaryPath, cwd: tempDir });
+		sidecar.on("status", payload => statuses.push(payload));
+		try {
+			sidecar.start();
+			await expect
+				.poll(() => statuses.some(payload => payload.status === "restarting"), { timeout: 9_000, interval: 50 })
+				.toBe(true);
+			expect(statuses.find(payload => payload.status === "restarting")?.message).toContain(
+				"Could not restore model gone/model-x",
+			);
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	}, 15_000);
+
 	it("carries the crashed spawn's stderr into the restart reason and the crash report", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-stderr-"));
 		const binaryPath = path.join(tempDir, "fake-sidecar.ts");

@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import Store from "electron-store";
 import { parseLaunchProfile, profileToFlags, stripDenylistedFlags } from "../shared/launch-profile";
+import { DEFAULT_ROLE_MODEL_SELECTOR, parseModelRestoreFailure } from "../shared/model-restore";
 import type {
 	AgentSessionEvent,
 	CommandOutputFrame,
@@ -20,7 +21,7 @@ import type {
 	ModelCatalogUpdateFrame,
 	OutboundFrame,
 	PromptResultFrame,
-	RpcLiveUpdateFrame,
+	RpcLiveFrame,
 	RpcReadyFrame,
 	RpcResponse,
 	SessionInfoUpdateFrame,
@@ -30,6 +31,7 @@ import type {
 	SidecarStatusPayload,
 	SubagentFrame,
 } from "../shared/rpc-types";
+import { LIVE_FRAME_TYPES } from "../shared/rpc-types";
 import { EventBatcher } from "./event-batcher";
 import { attachNdjsonParser, supportsRpcProtocolV2 } from "./rpc-bridge";
 import { RpcClient } from "./rpc-client";
@@ -195,7 +197,7 @@ export interface SidecarEvents {
 	hostToolCall: (request: HostToolCallRequest) => void;
 	hostUriRequest: (request: HostUriRequest) => void;
 	subagentFrame: (frame: SubagentFrame) => void;
-	liveUpdate: (frame: RpcLiveUpdateFrame) => void;
+	liveFrame: (frame: RpcLiveFrame) => void;
 	modelCatalogUpdate: (frame: ModelCatalogUpdateFrame) => void;
 	commandsUpdate: (commands: unknown[]) => void;
 	sessionSettled: (frame: SessionSettledFrame) => void;
@@ -231,6 +233,15 @@ export class SidecarManager extends EventEmitter {
 	#shellEnvVars: Record<string, string> = {};
 	#resumeSessionPath: string | null = null;
 	#freshLaunchPending: boolean;
+	/** Whether the current spawn cycle reached `ready`. */
+	#bootedThisSpawn = false;
+	/**
+	 * Saved session model that failed to restore at boot. The next spawn adds
+	 * `--model @default` so the session opens on the configured default model
+	 * instead of exiting (upstream resumes fail closed), and the ready status
+	 * carries it so the renderer can say so.
+	 */
+	#bootModelFallback: string | null = null;
 	#disposed = false;
 
 	constructor(options: SidecarOptions) {
@@ -294,11 +305,13 @@ export class SidecarManager extends EventEmitter {
 		}
 		this.#generation++;
 		this.#lastStderr = [];
+		this.#bootedThisSpawn = false;
 		const { binaryPath, sourceCli, cwd, extraFlags } = this.#options;
 
 		const args = ["--mode", "rpc-ui"];
 		if (this.#resumeSessionPath) args.push("--session", this.#resumeSessionPath);
 		else if (this.#freshLaunchPending) args.push("--no-auto-resume");
+		if (this.#bootModelFallback) args.push("--model", DEFAULT_ROLE_MODEL_SELECTOR);
 		if (this.#options.kind === "chat") args.push("--chat");
 		// User-controllable flags ride the extraFlags seam + the launch profile.
 		// Strip the code-controlled-flag denylist (pair-aware) over BOTH, then
@@ -380,6 +393,8 @@ export class SidecarManager extends EventEmitter {
 
 			if (code === 0) {
 				this.#setStatus("exited", "Normal shutdown");
+			} else if (this.#recoverBootModelRestore()) {
+				this.#spawn();
 			} else {
 				const msg = `Exit code ${code}${signal ? ` (signal: ${signal})` : ""}`;
 				this.#attemptRestart(msg);
@@ -479,8 +494,8 @@ export class SidecarManager extends EventEmitter {
 			this.emit("frame", obj);
 			return;
 		}
-		if (obj.type === "live_update") {
-			this.emit("liveUpdate", obj as unknown as RpcLiveUpdateFrame);
+		if (LIVE_FRAME_TYPES.has(obj.type as string)) {
+			this.emit("liveFrame", obj as unknown as RpcLiveFrame);
 			this.emit("frame", obj);
 			return;
 		}
@@ -498,6 +513,9 @@ export class SidecarManager extends EventEmitter {
 
 	#handleReady(ready: RpcReadyFrame): void {
 		this.#resumeSessionPath = null;
+		this.#bootedThisSpawn = true;
+		const modelFallback = this.#bootModelFallback ?? undefined;
+		this.#bootModelFallback = null;
 		// Freshness is a creation contract, not a restart policy. Once the new
 		// tab has booted successfully, later crash/manual restarts may auto-resume
 		// the session it has since created or opened.
@@ -511,7 +529,7 @@ export class SidecarManager extends EventEmitter {
 		const generation = this.#generation;
 		const announceReady = (): void => {
 			if (!this.#isLive(generation)) return;
-			this.#setStatus("ready");
+			this.#setStatus("ready", undefined, undefined, modelFallback);
 			this.#restartCount = 0;
 		};
 		const announceReadyWithEventFilter = (): void => {
@@ -569,9 +587,23 @@ export class SidecarManager extends EventEmitter {
 		}, delay);
 	}
 
-	#setStatus(status: SidecarStatus, message?: string, restart?: SidecarRestartProgress): void {
+	/**
+	 * A spawn that died before `ready` because its saved session model could not
+	 * be restored would fail identically on every retry. Arm one `--model @default`
+	 * respawn instead (outside the crash budget); true when armed.
+	 */
+	#recoverBootModelRestore(): boolean {
+		if (this.#bootedThisSpawn || this.#bootModelFallback) return false;
+		const missing = parseModelRestoreFailure(this.#lastStderr.join("\n"));
+		if (!missing) return false;
+		console.warn(`[sidecar] session model ${missing} unavailable at boot — resuming on the default model`);
+		this.#bootModelFallback = missing;
+		return true;
+	}
+
+	#setStatus(status: SidecarStatus, message?: string, restart?: SidecarRestartProgress, modelFallback?: string): void {
 		this.#status = status;
-		this.emit("status", { status, message, cwd: this.#options.cwd, restart });
+		this.emit("status", { status, message, cwd: this.#options.cwd, restart, modelFallback });
 	}
 
 	#cleanup(): void {
@@ -620,6 +652,7 @@ export class SidecarManager extends EventEmitter {
 		this.kill();
 		if (cwd) this.#options = { ...this.#options, cwd };
 		this.#resumeSessionPath = resumeSessionPath ?? null;
+		this.#bootModelFallback = null;
 		this.#restartCount = 0;
 		this.start();
 	}
