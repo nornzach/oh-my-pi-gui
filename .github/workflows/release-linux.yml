@@ -79,6 +79,26 @@ jobs:
         working-directory: oh-my-pi
         run: bun install
 
+      - name: Provision natives addon (source build when the npm leaf lags)
+        working-directory: oh-my-pi
+        shell: bash
+        # build:omp downloads @oh-my-pi/pi-natives-<platform>@<ver> from npm,
+        # but upstream's publish can lag the monorepo version bump — when the
+        # leaf is absent, compile the host addon from crates/pi-natives instead
+        # (rust-toolchain.toml pins the toolchain; rustup installs it on first
+        # cargo invocation). Both x64 ISA variants are built so the sidecar
+        # keeps the modern/baseline split it gets from the npm package.
+        run: |
+          VER=$(jq -r .version packages/natives/package.json)
+          LEAF="@oh-my-pi/pi-natives-linux-x64"
+          if npm view "$LEAF@$VER" version >/dev/null 2>&1; then
+            echo "npm leaf $LEAF@$VER published — build:omp will download it"
+          else
+            echo "$LEAF@$VER not on npm — building natives from source"
+            bun --cwd=packages/natives run build
+            PI_NATIVE_VARIANT=baseline bun --cwd=packages/natives run build
+          fi
+
       - name: Build the bundled Linux sidecar
         working-directory: oh-my-pi
         run: bun --cwd=packages/gui run build:omp
