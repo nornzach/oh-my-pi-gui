@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.16] - 2026-10-06
 
 ### Added
 
@@ -13,6 +13,7 @@
 - Bundled agent rebuilt from upstream `main` through v18.6.2 (monorepo merge `f8bcc259`): RPC `open_session`/`switch_session` accept an explicit `provider`/`modelId`, resumed sessions fail closed on an unavailable model, `/thinking` level picker, attachment-only session titles, `models.yml` `compat.statefulResponses`, and Windows bash cancellation fixes.
 - Live voice now speaks upstream's wire protocol (`live_phase`/`live_levels`/`live_transcript`/`live_end` frames, `live_mute`); the fork's `live_update` snapshots, `live_toggle_mute`, and `get_live_state` are retired. Cancelling while connecting ends the call without an error toast.
 - `build:omp` recognizes the natives addon's post-link version stamp through the loader's own `version-sentinel.js`, so a locally built or newly stamped addon is no longer mistaken for a stale one.
+- Windows and Linux release CI no longer depend on upstream publishing the `@oh-my-pi/pi-natives-*` npm leaf: when the pinned version is absent, the runner compiles the addon from `crates/pi-natives` (both x64 ISA variants) before building the sidecar.
 
 ## [0.9.15] - 2026-10-02
 
