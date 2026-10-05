@@ -161,16 +161,23 @@ const addedByUs: string[] = [];
 /** Pre-existing files we overwrote with the matching-version addon — restored after the build. */
 const replacedByUs: Record<string, Uint8Array> = {};
 
+/** The loader's own release-identity checks (post-link stamp, plus the pre-stamp export sentinel). */
+const versionSentinel = createRequire(import.meta.url)(path.join(nativesNativeDir, "version-sentinel.js")) as {
+	containsVersionStamp(bytes: Uint8Array, version: string): boolean;
+	containsLegacyVersionSentinel(bytes: Uint8Array, version: string): boolean;
+};
+
 /**
- * The loader rejects a .node whose exported version sentinel doesn't match the
- * package version, so a stale addon from an older release must be replaced
- * rather than reused. The sentinel string (`__piNativesV<underscored>`) is
- * emitted by the napi build into the binary.
+ * The loader rejects a .node whose release identity doesn't match the package
+ * version, so a stale addon from an older release must be replaced rather than
+ * reused. Uses the loader's own helpers so a stamp-format change can't drift.
  */
 async function addonMatchesVersion(filePath: string): Promise<boolean> {
-	const sentinel = `__piNativesV${nativesPkg.version.replace(/\./g, "_")}`;
-	const buffer = Buffer.from(await Bun.file(filePath).arrayBuffer());
-	return buffer.includes(sentinel);
+	const bytes = await Bun.file(filePath).bytes();
+	return (
+		versionSentinel.containsVersionStamp(bytes, nativesPkg.version) ||
+		versionSentinel.containsLegacyVersionSentinel(bytes, nativesPkg.version)
+	);
 }
 
 async function stageNativeAddon(target: SidecarTarget): Promise<void> {
