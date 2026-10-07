@@ -1933,6 +1933,7 @@ export const zh: Record<string, string> = {
 	"btw.branched": "已从 /btw 回答创建分支",
 	"btw.branchCancelled": "扩展取消了分支操作。",
 	"btw.branchFailed": "无法从 /btw 创建分支",
+	"btw.cancel": "停止回答",
 	"btw.statusCancelled": "回答已取消。",
 	"btw.statusError": "旁问失败。",
 

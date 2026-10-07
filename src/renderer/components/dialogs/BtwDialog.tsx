@@ -1,5 +1,5 @@
 import { GitBranch, MessageCircleQuestion } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type BtwHistoryRecord, getBtwLatestTurn } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
 import { copyText } from "../../lib/format";
@@ -24,6 +24,14 @@ export function BtwDialog() {
 	const [loading, setLoading] = useState(false);
 	const [branching, setBranching] = useState(false);
 	const recordIdRef = useRef<string | null>(null);
+	/** Topic whose latest turn is still streaming; cancelled when the dialog closes. */
+	const runningIdRef = useRef<string | null>(null);
+
+	const trackRecord = useCallback((next: BtwHistoryRecord): void => {
+		setRecord(next);
+		setLiveAnswer(getBtwLatestTurn(next).answer);
+		runningIdRef.current = getBtwLatestTurn(next).status === "running" ? next.id : null;
+	}, []);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: changing the bound task invalidates the pending answer even if its question is identical.
 	useEffect(() => {
@@ -35,8 +43,14 @@ export function BtwDialog() {
 		setBranching(false);
 		setDraft(question ?? "");
 		recordIdRef.current = null;
+		runningIdRef.current = null;
 		return () => {
 			generation.current++;
+			// The sidecar runs one side question at a time: an answer left
+			// streaming after close would reject the next /btw as "still running".
+			const runningId = runningIdRef.current;
+			runningIdRef.current = null;
+			if (runningId) void command({ type: "btw_cancel", recordId: runningId }).catch(() => {});
 		};
 	}, [question, command]);
 
@@ -51,14 +65,16 @@ export function BtwDialog() {
 				return;
 			}
 			if (frame.record.id !== currentId) return;
-			setRecord(frame.record);
-			setLiveAnswer(getBtwLatestTurn(frame.record).answer);
+			trackRecord(frame.record);
 			setLoading(false);
 		});
-	}, []);
+	}, [trackRecord]);
+
+	const latest = record ? getBtwLatestTurn(record) : null;
+	const running = latest?.status === "running";
 
 	const ask = async () => {
-		if (!draft.trim() || loading) return;
+		if (!draft.trim() || loading || running) return;
 		const version = generation.current;
 		setError(null);
 		setLoading(true);
@@ -71,9 +87,8 @@ export function BtwDialog() {
 			if (generation.current !== version) return;
 			if (!response.success) throw new Error(response.error);
 			const data = response.data as { record: BtwHistoryRecord };
-			setRecord(data.record);
 			recordIdRef.current = data.record.id;
-			setLiveAnswer(getBtwLatestTurn(data.record).answer);
+			trackRecord(data.record);
 		} catch (cause) {
 			if (generation.current === version) setError(String(cause));
 		} finally {
@@ -83,10 +98,14 @@ export function BtwDialog() {
 		}
 	};
 
-	const latest = record ? getBtwLatestTurn(record) : null;
-	const running = latest?.status === "running";
 	const answerText = running || !record ? liveAnswer : latest!.answer;
 	const canBranch = latest?.status === "complete";
+
+	const cancel = (): void => {
+		const runningId = runningIdRef.current;
+		if (!runningId) return;
+		void command({ type: "btw_cancel", recordId: runningId }).catch(() => {});
+	};
 
 	const copyAnswer = async (): Promise<void> => {
 		if (!answerText.trim()) return;
@@ -145,6 +164,9 @@ export function BtwDialog() {
 				</div>
 			) : record ? (
 				<div className="max-h-[55vh] overflow-y-auto pr-1">
+					{(record.followUps?.length ?? 0) > 0 && latest ? (
+						<div className="mb-2 text-xs text-(--omp-dim)">{latest.question}</div>
+					) : null}
 					{latest && latest.status !== "running" && latest.status !== "complete" ? (
 						<div className="mb-2 text-xs text-(--omp-dim)">
 							{latest.status === "cancelled" || latest.status === "interrupted"
@@ -154,25 +176,28 @@ export function BtwDialog() {
 					) : null}
 					{answerText ? (
 						<MarkdownRenderer content={answerText} />
-					) : (
+					) : running ? (
 						<div className="flex items-center gap-2 py-8 text-sm text-(--omp-dim)">
 							<Spinner size="sm" /> {t("btw.thinking")}
 						</div>
-					)}
-					{(record.followUps?.length ?? 0) > 0 && latest && latest.question !== record.question && (
-						<div className="mt-2 text-xs text-(--omp-dim)">{latest.question}</div>
-					)}
+					) : null}
 				</div>
 			) : null}
 			<div className="mt-5 flex justify-end gap-2 border-t border-(--omp-border-muted) pt-3">
-				<Button
-					disabled={!draft.trim() || loading || branching}
-					loading={loading}
-					onClick={() => void ask()}
-					size="sm"
-				>
-					{t("btw.ask")}
-				</Button>
+				{running ? (
+					<Button onClick={cancel} size="sm" variant="secondary">
+						{t("btw.cancel")}
+					</Button>
+				) : (
+					<Button
+						disabled={!draft.trim() || loading || branching}
+						loading={loading}
+						onClick={() => void ask()}
+						size="sm"
+					>
+						{t("btw.ask")}
+					</Button>
+				)}
 				<Button disabled={!answerText.trim()} onClick={() => void copyAnswer()} size="sm" variant="secondary">
 					{t("btw.copy")}
 				</Button>
