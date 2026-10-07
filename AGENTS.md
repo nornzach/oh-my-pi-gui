@@ -86,6 +86,8 @@ SKIP_MERGE=1 bash packages/gui/scripts/sync-upstream.sh
 
 Commit remaining monorepo changes at the monorepo root and push to the fork's `origin`. Never push to `upstream`.
 
+Format and lint monorepo files with the monorepo's tooling (`bunx oxfmt` / `bunx oxlint` from `packages/coding-agent`), never the GUI's Biome — a Biome `--write` on merge-resolved files once added ~4k lines of formatting churn against upstream.
+
 ### Phase 2 — Release prep (inside `packages/gui/`)
 
 1. Bump `version` in `package.json`.
@@ -115,6 +117,8 @@ bun scripts/smoke-sidecar.mjs resources/omp     # + .x64 on an Intel host, .exe 
 
 Cross-compilation is not runtime verification — smoke-test each binary on a compatible host.
 
+An npm natives leaf may ship only one x64 variant (`pi-natives-darwin-x64@18.8.0` carries `baseline` only); `build:omp` sets aside a stale local sibling for the build so the embedder doesn't reject it, then restores it.
+
 ### Phase 5 — Installers
 
 ```bash
@@ -127,7 +131,7 @@ Inspect every artifact before publishing:
 
 - Mount each DMG; verify the seal: `codesign --verify --deep --strict --verbose=2 "<path>/omp.app"`.
 - `file "<path>/omp.app/Contents/Resources/omp"` — the bundled sidecar arch must match the DMG (`omp-X.Y.Z-arm64.dmg` = arm64; `omp-X.Y.Z.dmg` = Intel).
-- Launch each package on a compatible host: sidecar reaches `ready`, `get_settings` RPC succeeds, one settings toggle persists.
+- Launch each package on a compatible host: sidecar reaches `ready`, `get_settings` RPC succeeds, one settings toggle persists. From an agent shell, launch with `env -u ELECTRON_RUN_AS_NODE …/Contents/MacOS/omp --user-data-dir=/tmp/<dir>`: a leaked `ELECTRON_RUN_AS_NODE=1` makes Electron exit 0 silently, and a separate user-data dir avoids the single-instance lock of an installed copy.
 - Windows: `file win-unpacked/resources/omp.exe` (arch must be x86-64). Preferred path is CI: `.github/workflows/release-windows.yml` (windows-latest) runs on release publish — or dispatch it for an existing tag — and reproduces the sidecar from `sidecar-source.json`'s monorepo pin, smoke-tests it (sidecar RPC handshake + packaged-GUI launch with no renderer crash, plus the locale-pak regression guard), then attaches the setup/portable installers + `latest.yml` itself. Local `bun run package:win -- --publish never` remains available on a Windows host.
 - Linux is built by CI, not locally: `.github/workflows/release-linux.yml` (ubuntu-latest) runs on release publish — or dispatch it for an existing tag — and reproduces the sidecar from `sidecar-source.json`'s monorepo pin, smoke-tests it, then attaches AppImage + deb + `latest-linux.yml` itself.
 
