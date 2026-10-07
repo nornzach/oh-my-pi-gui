@@ -2,14 +2,17 @@
 
 ## [Unreleased]
 
-## [0.9.17] - 2026-10-07
+## [0.9.17] - 2026-10-08
 
 ### Added
 
+- **Streaming `/btw` side questions**: the Side Question dialog streams the answer as it is written, keeps follow-ups in the same side conversation, and offers **Stop answer** while it runs. Answers are saved to the session's shared `/btw` history, so the terminal UI and the GUI see the same topics. Closing the dialog mid-answer stops it, so the next question is no longer rejected as "still running"; a turn that fails or is stopped before any text shows why instead of an endless spinner.
 - **Context strategy row under the composer**: one line shows the running model, its window, the compaction strategy and the method that will really run for that model (for example "Kimi K3 256K 262.1k · Balanced · Image archive at 222.8k"). Click it to switch between Balanced, Preserve detail and the experimental Notes-backed mode, tune the compaction threshold and how much recent history is kept verbatim, and toggle automatic compaction and larger-model promotion. A quiet dot recommends Preserve detail for models without server-side compaction, whose defaults would otherwise archive history as images and truncate old tool output.
 
 ### Changed
 
+- Bundled agent rebuilt from upstream through **v18.8.0** (monorepo `97990a6c`, merge `185562f4`): upstream's `/btw` history and streaming protocol (`btw_delta`/`btw_record`, `get_btw_history`, `btw_cancel`), per-credential logout (`get_logout_accounts`), and the native addon now embedded in memory at compile time. Upstream published the 18.8.0 natives for every platform, so no target compiles natives from source this release.
+- **Sign out** in Providers follows upstream's per-credential logout: it lists the provider's stored accounts and removes each, so the row's meaning ("log out of this provider") is unchanged.
 - Calmer motion throughout: transcript turns, tool cards, panels and empty states appear in place instead of sliding or cascading in; dialogs, menus and toasts use short fades without bounce or backdrop blur; hover and press change color only.
 - Streaming replies render formatted as they arrive — bold, inline code, lists, tables and code blocks take their final shape immediately instead of flashing raw Markdown and reflowing when each paragraph completes. The caret is a thin, softly blinking bar at the end of the live line.
 - The sidebar keeps Commands, Agent Hub, PR Center and Workspace in view and folds the app-wide tools under **More**; Settings moved to the sidebar footer and opens on the GUI preferences page.
@@ -30,6 +33,7 @@
 - Providers no longer shows a red "model lists could not be refreshed" warning on a fresh install; refresh problems are reported, in amber, only for providers you signed in to or configured.
 - The selected session in the sidebar is a filled row instead of an outlined box that looked like a focus ring.
 - **Session tree dialog crashed on long sessions** (`Maximum call stack size exceeded`): the tidy-tree layout recursed once per message depth and computed each node's depth with an O(n²) walk-up, so opening the tree on a tens-of-thousands-entry session overflowed the call stack and froze the renderer. Both the depth pass and the layout walk are now linear iterative passes. Same fix applied to the subagent DAG layout the code was ported from.
+- **Branch into conversation** from `/btw` inserted the provider's raw reply (duplicate text parts, redacted reasoning) instead of the answer shown in the dialog, and an answer that arrived after being stopped could still be branched. It now branches exactly the visible answer, and only from a completed turn.
 
 ## [0.9.16] - 2026-10-06
 
