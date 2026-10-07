@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.9.17] - 2026-10-07
+
+### Added
+
+- **Context strategy row under the composer**: one line shows the running model, its window, the compaction strategy and the method that will really run for that model (for example "Kimi K3 256K 262.1k · Balanced · Image archive at 222.8k"). Click it to switch between Balanced, Preserve detail and the experimental Notes-backed mode, tune the compaction threshold and how much recent history is kept verbatim, and toggle automatic compaction and larger-model promotion. A quiet dot recommends Preserve detail for models without server-side compaction, whose defaults would otherwise archive history as images and truncate old tool output.
+
+### Changed
+
+- Calmer motion throughout: transcript turns, tool cards, panels and empty states appear in place instead of sliding or cascading in; dialogs, menus and toasts use short fades without bounce or backdrop blur; hover and press change color only.
+- Streaming replies render formatted as they arrive — bold, inline code, lists, tables and code blocks take their final shape immediately instead of flashing raw Markdown and reflowing when each paragraph completes. The caret is a thin, softly blinking bar at the end of the live line.
+- The sidebar keeps Commands, Agent Hub, PR Center and Workspace in view and folds the app-wide tools under **More**; Settings moved to the sidebar footer and opens on the GUI preferences page.
+- The composer keeps model, thinking, approval and modes inline at narrower widths (labels collapse to icons first), so opening the workspace panel no longer hides them behind "…".
+- Command Center rows show an icon for their category instead of the same slash on every row.
+- New tabs show their start screen while the agent starts, instead of a spinner on a blank page; tabs resuming a session still wait for its history.
+- The conversation column is narrower (about 110 characters of prose per line) and the composer aligns with it; a prompt's copy/branch actions float on its edge on hover instead of reserving empty space under every message.
+- The title bar hides usage figures until a session has spent something, and gives the session title priority in narrow windows.
+- The Modes menu describes each mode in one line; Agent Hub's model override and prewalk read as clickable fields.
+- Settings: switches are legible in both themes, the per-row "Reading the existing Agent setting" note is gone (the section intro explains it), the paste threshold is a compact field, and the capabilities page no longer leaves a gap beside Quick actions.
+
+### Fixed
+
+- Text fields drew a second focus ring inside their focused border: global focus and transition styles now sit below Tailwind utilities in the cascade.
+- The title bar showed "New session" after the first prompt while the tab and sidebar already showed the conversation title.
+- Long tab titles no longer scroll on hover; the full title is in the tab tooltip.
+- PR Center no longer repeats its title inside its own header, and the Diff panel's empty states use the panel's text size.
+- Providers no longer shows a red "model lists could not be refreshed" warning on a fresh install; refresh problems are reported, in amber, only for providers you signed in to or configured.
+- The selected session in the sidebar is a filled row instead of an outlined box that looked like a focus ring.
+- **Session tree dialog crashed on long sessions** (`Maximum call stack size exceeded`): the tidy-tree layout recursed once per message depth and computed each node's depth with an O(n²) walk-up, so opening the tree on a tens-of-thousands-entry session overflowed the call stack and froze the renderer. Both the depth pass and the layout walk are now linear iterative passes. Same fix applied to the subagent DAG layout the code was ported from.
+
 ## [0.9.16] - 2026-10-06
 
 ### Added
