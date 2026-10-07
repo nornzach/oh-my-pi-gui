@@ -247,6 +247,17 @@ async function stageNativeAddon(target: SidecarTarget): Promise<void> {
 			`${leafPackage}@${nativesPkg.version} installed but contains none of: ${target.addonFilenames.join(", ")}`,
 		);
 	}
+	// A leaf can ship a subset of the variants (darwin-x64@18.8.0 carries only
+	// baseline). A stale sibling the leaf did not replace would still be picked
+	// up by the embedder, which rejects any unstamped addon — set it aside
+	// (its bytes are already snapshotted in replacedByUs and restored after).
+	for (const filename of target.addonFilenames) {
+		const local = path.join(nativesNativeDir, filename);
+		if (!(filename in replacedByUs) || !(await Bun.file(local).exists())) continue;
+		if (await addonMatchesVersion(local)) continue;
+		console.log(`[build:omp] setting aside ${filename}: ${leafPackage}@${nativesPkg.version} does not ship it`);
+		await fs.rm(local, { force: true });
+	}
 }
 
 /** Undo the staging writes: remove files we added, restore files we overwrote. */
