@@ -91,7 +91,7 @@ const HEADER_META_CLASS = "font-medium normal-case tracking-normal text-[var(--o
 /** Card frame matching ContextBubble: rounded custom-message background on the chat gutter. */
 function CardFrame({ children }: { children: ReactNode }) {
 	return (
-		<div className="omp-custom-turn omp-fade-up ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-3">
+		<div className="omp-custom-turn ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-3">
 			<div className="omp-transcript-content rounded-[10px] border border-[var(--omp-border-muted)] bg-[var(--omp-custom-msg-bg)] px-3.5 py-3 shadow-[var(--omp-shadow-sm)]">
 				{children}
 			</div>
@@ -134,11 +134,7 @@ function CollapsibleText({ text, lines, className }: { text: string; lines: numb
 function CompletionRows({ children, inProcess }: { children: ReactNode; inProcess: boolean }) {
 	return (
 		<div
-			className={
-				inProcess
-					? "py-0.5"
-					: "omp-custom-turn omp-fade-up ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-2"
-			}
+			className={inProcess ? "py-0.5" : "omp-custom-turn ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-2"}
 		>
 			<div className={cx("space-y-0.5", !inProcess && "omp-transcript-content")}>{children}</div>
 		</div>
@@ -650,7 +646,7 @@ function SkillCard({ message }: { message: AgentMessage }) {
 				</div>
 			)}
 			{open && text && (
-				<div className="omp-fade-in mt-2 border-t border-[var(--omp-border-muted)]/70 pt-2">
+				<div className="mt-2 border-t border-[var(--omp-border-muted)]/70 pt-2">
 					<div className="mb-1 text-omp-xs font-bold uppercase tracking-[0.12em] text-[var(--omp-muted)]">
 						{t("chat.custom.prompt")}
 					</div>
@@ -669,7 +665,7 @@ function CollabCard({ message }: { message: AgentMessage }) {
 	const from = str(resultDetails(message)?.from) ?? "guest";
 	const text = resultText(message.content).trim();
 	return (
-		<div className="omp-fade-up ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-3">
+		<div className="ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-3">
 			<div className="omp-transcript-content rounded-xl border border-[var(--omp-user-msg-border)] bg-[var(--omp-user-msg-bg)] px-3.5 py-3 shadow-[var(--omp-shadow-sm)]">
 				<div className="mb-1.5 text-omp-md font-bold text-[var(--omp-accent)]">«{from}» ›</div>
 				{text && <MarkdownRenderer content={text} singleDollarTextMath={false} />}

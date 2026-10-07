@@ -594,7 +594,9 @@ if (process.argv.includes("stats")) {
 							assistantMessageEvent: {
 								type: "text_delta",
 								contentIndex: 0,
-								delta: `Stream chunk ${streamChunks}.\n`,
+								// One paragraph per chunk: the live tail renders as Markdown, where
+								// single newlines are soft breaks that join lines into one paragraph.
+								delta: `Stream chunk ${streamChunks}.\n\n`,
 								partial: answer,
 							},
 						});

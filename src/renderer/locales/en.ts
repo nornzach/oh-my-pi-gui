@@ -287,6 +287,11 @@ export const en: Record<string, string> = {
 	"input.loop.activeTitle": "Loop mode — {args}",
 	"input.roles.label": "Roles",
 	"input.roles.title": "Model roles — assign models per role",
+	"input.modes.planDesc": "Draft a plan before changing files",
+	"input.modes.goalDesc": "Keep working toward one objective",
+	"input.modes.loopDesc": "Re-send a prompt after every turn",
+	"input.modes.vibeDesc": "Hand work to fast persistent workers",
+	"input.modes.rolesDesc": "Pick models for planning, review and more",
 	"input.more.label": "More",
 	"input.more.title": "More coding toggles",
 	"input.modes.title": "Session modes and coding toggles",
@@ -329,8 +334,74 @@ export const en: Record<string, string> = {
 	"sidebar.newCode": "New task",
 	"sidebar.newWork": "New work task",
 	"sidebar.quickChat": "Quick chat",
-	"sidebar.navigation.collapse": "Collapse navigation",
-	"sidebar.navigation.expand": "Expand navigation",
+	"sidebar.navigation.collapse": "Hide more navigation",
+	"sidebar.navigation.expand": "Show more navigation",
+	"contextStrategy.title": "Context strategy — what happens when this model's context fills",
+	"contextStrategy.strategyLabel": "Strategy",
+	"contextStrategy.window": "{size} window",
+	"contextStrategy.windowUnknown": "Window size unknown",
+	"contextStrategy.capability.vision": "Reads images",
+	"contextStrategy.capability.native": "Server compaction",
+	"contextStrategy.capability.noVision": "Text only",
+	"contextStrategy.capability.noNative": "No server compaction",
+	"contextStrategy.strategy.balanced": "Balanced",
+	"contextStrategy.strategy.balanced.desc":
+		"The agent's defaults: server compaction when the provider offers it, then image archive, then summaries.",
+	"contextStrategy.strategy.preserve": "Preserve detail",
+	"contextStrategy.strategy.preserve.desc":
+		"Moves heavy tool output to recoverable references, then writes a handoff. Keeps more recent history verbatim.",
+	"contextStrategy.strategy.notes": "Notes-backed",
+	"contextStrategy.strategy.notes.desc":
+		"The model keeps its own notes and starts fresh windows; full history stays searchable.",
+	"contextStrategy.strategy.custom": "Custom",
+	"contextStrategy.strategy.custom.desc":
+		"Your own method order or retention — edit it under All compaction settings.",
+	"contextStrategy.recommended": "Recommended for this model",
+	"contextStrategy.experimental": "Experimental",
+	"contextStrategy.suggested": "{strategy} is recommended for this model",
+	"contextStrategy.reason.native": "This model's provider compacts on the server, so the defaults suit it.",
+	"contextStrategy.reason.vision":
+		"No server compaction for this model: the defaults would archive history as images, which truncates old tool output. Preserve detail avoids that.",
+	"contextStrategy.reason.text":
+		"No server compaction for this model: the defaults fall back to text summaries that rewrite old history. Preserve detail keeps tool output recoverable.",
+	"contextStrategy.method.remote": "Server compaction",
+	"contextStrategy.method.snapcompact": "Image archive",
+	"contextStrategy.method.handoff": "Handoff",
+	"contextStrategy.method.shake": "Shake",
+	"contextStrategy.method.soft": "Summary",
+	"contextStrategy.method.notes": "Notes",
+	"contextStrategy.method.none": "No runnable method",
+	"contextStrategy.method.remote.desc":
+		"The provider compacts history on its server and the agent replays the result.",
+	"contextStrategy.method.snapcompact.desc":
+		"Old history is printed onto images the model reads back; long tool output is cut to its start and end.",
+	"contextStrategy.method.handoff.desc":
+		"The model writes a handoff document from its full context and continues from it.",
+	"contextStrategy.method.shake.desc":
+		"Large old tool results are replaced with references the model can re-read on demand.",
+	"contextStrategy.method.soft.desc":
+		"A summary replaces old history; details not in the summary are gone from context.",
+	"contextStrategy.method.notes.desc":
+		"The model saves its working state to notes and starts a fresh window; originals stay searchable.",
+	"contextStrategy.method.none.desc":
+		"Every listed method needs a capability this model lacks, so nothing will compact automatically. Add Handoff or Summary under All compaction settings.",
+	"contextStrategy.at": "at {tokens}",
+	"contextStrategy.off": "Auto-compact off",
+	"contextStrategy.outcome": "At about {tokens} tokens: {method}.",
+	"contextStrategy.outcomeNoWindow": "When the window fills: {method}.",
+	"contextStrategy.lossless": "Original wording stays recoverable.",
+	"contextStrategy.lossy": "Old history is rewritten or truncated.",
+	"contextStrategy.compactAt": "Compact at",
+	"contextStrategy.auto": "Auto",
+	"contextStrategy.keepRecent": "Keep recent",
+	"contextStrategy.autoCompact": "Compact automatically",
+	"contextStrategy.promotion": "Switch to a larger model on overflow",
+	"contextStrategy.promotionHint": "Needs a larger sibling set as contextPromotionTarget in models.yml.",
+	"contextStrategy.scope": "Saved to your global settings.",
+	"contextStrategy.allSettings": "All compaction settings",
+	"contextStrategy.saveFailed": "Could not save context settings",
+	"sidebar.navigation.more": "More",
+	"sidebar.navigation.capabilities": "OMP capabilities",
 	"sidebar.emptyCode": "No code sessions yet",
 	"sidebar.emptyWork": "No work tasks yet",
 	"sidebar.local": "Local",
@@ -1440,7 +1511,7 @@ export const en: Record<string, string> = {
 	"providerCfg.toast.refreshFailed": "Change saved, but the live model catalog could not refresh",
 
 	// Settings page
-	"settings.searchPlaceholder": "Search settings and managed resources…",
+	"settings.searchPlaceholder": "Search settings…",
 	"settings.close": "Close",
 	"settings.noMatches": "No settings match your search.",
 	"settings.tabs.runtime": "Runtime",
@@ -1516,7 +1587,7 @@ export const en: Record<string, string> = {
 	"settings.capabilities.eyebrow": "Start with OMP",
 	"settings.capabilities.title": "Start with what makes OMP different",
 	"settings.capabilities.description":
-		"These controls change how work is executed, not how the settings page looks: intervene mid-stream, fan work out, route model roles, and keep project memory.",
+		"These change how the agent works: correct it mid-stream, fan work out to subagents, route models by role, and keep project memory.",
 	"settings.capabilities.commandCenter": "Command Center",
 	"settings.capabilities.commandCenterDesc":
 		"Browse every GUI command, mode, provider action, extension action, and shortcut from one searchable palette.",
@@ -1574,7 +1645,6 @@ export const en: Record<string, string> = {
 	"settings.display.scope":
 		"Saved only for the GUI. If you have not chosen a GUI value, the existing Agent setting is read for compatibility; GUI changes never modify terminal configuration.",
 	"settings.display.local": "GUI preference",
-	"settings.display.legacy": "Reading the existing Agent setting",
 	"settings.display.inherit": "Use existing setting",
 	"settings.display.hideThinkingBlock": "Hide reasoning content",
 	"settings.display.proseOnlyThinking": "Hide code fences in reasoning",

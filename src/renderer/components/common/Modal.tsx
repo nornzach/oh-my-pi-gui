@@ -144,7 +144,7 @@ export function Modal({
 
 	return createPortal(
 		<div
-			className={`omp-dialog-overlay ${closing ? "omp-fade-out" : "omp-fade-in"} fixed inset-0 z-50 flex justify-center bg-(--omp-overlay-bg) p-4 backdrop-blur-[6px] ${placement === "top" ? "items-start pt-[12dvh]" : "items-center"}`}
+			className={`omp-dialog-overlay ${closing ? "omp-fade-out" : "omp-fade-in"} fixed inset-0 z-50 flex justify-center bg-(--omp-overlay-bg) p-4 ${placement === "top" ? "items-start pt-[12dvh]" : "items-center"}`}
 			inert={closing}
 			onMouseDown={event => {
 				if (closing) return;

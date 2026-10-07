@@ -291,11 +291,12 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	closeModelPicker: () => set({ modelPickerOpen: false }),
 	// Without an explicit target, a window that is already open stays on its
 	// page: ⌘, pressed again must not bounce the user back to the first tab (and
-	// wipe the search they typed).
+	// wipe the search they typed). A cold open lands on the GUI preferences page
+	// (`GUI_TAB_ID`); the capabilities overview has its own navigation entry.
 	openSettings: tab =>
 		set(state => ({
 			settingsOpen: true,
-			settingsTab: tab ?? (state.settingsOpen ? state.settingsTab : "capabilities"),
+			settingsTab: tab ?? (state.settingsOpen ? state.settingsTab : "gui"),
 		})),
 	closeSettings: () => set({ settingsOpen: false }),
 	usageOpen: false,

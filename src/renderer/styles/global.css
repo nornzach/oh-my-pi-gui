@@ -37,6 +37,10 @@
    literal colors here would leak the default palette into custom transcripts. */
 :root {
 	--omp-transcript-rail: var(--omp-border);
+	/* Switch "on" track: dark themes use pale accents, which a white knob
+	   disappears against, so the track is the accent deepened toward black. */
+	--omp-switch-on: color-mix(in srgb, var(--omp-accent) 62%, #06080a);
+	--omp-switch-off: var(--omp-border-strong);
 	--omp-transcript-rule: var(--omp-border-muted);
 	--omp-transcript-event: var(--omp-dim);
 	--omp-transcript-event-live: var(--omp-accent);
@@ -162,10 +166,15 @@ kbd,
 	color: var(--omp-selection-text);
 }
 
-:focus-visible {
-	outline: 2px solid var(--omp-accent);
-	outline-offset: 1px;
-	border-radius: 4px;
+/* Base layer: Tailwind v4 puts utilities in `@layer utilities`, and unlayered
+   rules beat every layered rule regardless of specificity. Unlayered, this ring
+   overrode each field's own `outline-none` and drew a second ring inside the
+   container's focus border. */
+@layer base {
+	:focus-visible {
+		outline: 2px solid color-mix(in srgb, var(--omp-accent) 75%, transparent);
+		outline-offset: 1px;
+	}
 }
 
 /* ============================================================================
@@ -181,28 +190,38 @@ kbd,
 }
 
 /* ============================================================================
-   Motion system — spring-flavored entrances, instant-feeling state changes,
-   no layout animation on rows
+   Motion system
+
+   Motion is reserved for things that come and go on top of the page —
+   dialogs, menus, popovers, toasts, overlay drawers — and it only confirms
+   where they came from: a short fade with a few pixels of travel, decelerating,
+   never overshooting. Content does not travel: transcript turns, tool cards,
+   panels and streamed text appear in place, because the reader is already
+   looking at them and any movement reads as lag — a row that newly arrives at
+   the transcript tail gets a brief opacity fade and nothing more. Hover, press
+   and selection change color only.
    ============================================================================ */
 
 :root {
-	--omp-motion-instant: 90ms; /* motion-ok: token definition */
-	--omp-motion-fast: 150ms;
-	--omp-motion-med: 240ms;
-	--omp-motion-slow: 380ms; /* motion-ok: token definition */
-	--omp-ease: cubic-bezier(0.25, 1, 0.35, 1);
-	--omp-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
-	--omp-ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+	--omp-motion-instant: 70ms; /* motion-ok: token definition */
+	--omp-motion-fast: 110ms;
+	--omp-motion-med: 160ms;
+	--omp-motion-slow: 220ms; /* motion-ok: token definition */
+	--omp-ease: cubic-bezier(0.2, 0, 0, 1);
+	--omp-ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+	--omp-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+	/* Historical name; deliberately no overshoot. */
+	--omp-ease-spring: var(--omp-ease-enter);
 }
 
 @keyframes omp-fade-up {
 	from {
 		opacity: 0;
-		transform: translateY(10px) scale(0.995);
+		transform: translateY(4px);
 	}
 	to {
 		opacity: 1;
-		transform: translateY(0) scale(1);
+		transform: none;
 	}
 }
 
@@ -218,44 +237,44 @@ kbd,
 @keyframes omp-scale-in {
 	from {
 		opacity: 0;
-		transform: scale(0.93) translateY(10px);
+		transform: translateY(6px) scale(0.985);
 	}
 	to {
 		opacity: 1;
-		transform: scale(1) translateY(0);
+		transform: none;
 	}
 }
 
 @keyframes omp-toast-in {
 	from {
 		opacity: 0;
-		transform: translateY(14px) scale(0.95);
+		transform: translateY(6px);
 	}
 	to {
 		opacity: 1;
-		transform: translateY(0) scale(1);
+		transform: none;
 	}
 }
 
 @keyframes omp-pop-in {
 	from {
 		opacity: 0;
-		transform: scale(0.95) translateY(-6px);
+		transform: translateY(3px) scale(0.99);
 	}
 	to {
 		opacity: 1;
-		transform: scale(1) translateY(0);
+		transform: none;
 	}
 }
 
 @keyframes omp-slide-in-right {
 	from {
 		opacity: 0;
-		transform: translateX(28px);
+		transform: translateX(12px);
 	}
 	to {
 		opacity: 1;
-		transform: translateX(0);
+		transform: none;
 	}
 }
 
@@ -268,38 +287,24 @@ kbd,
 	}
 }
 
+/* Live-work signals: opacity only, slow, low amplitude — no scaling or glow. */
 @keyframes omp-pulse-dot {
 	0%,
 	100% {
 		opacity: 1;
-		transform: scale(1);
 	}
 	50% {
-		opacity: 0.4;
-		transform: scale(0.82);
+		opacity: 0.45;
 	}
 }
 
 @keyframes omp-signal-light {
 	0%,
 	100% {
-		opacity: 0.58;
-		box-shadow: 0 0 0 transparent;
+		opacity: 0.5;
 	}
 	50% {
 		opacity: 1;
-		box-shadow: 0 0 7px currentColor;
-	}
-}
-
-@keyframes omp-tab-title-scroll {
-	0%,
-	15% {
-		transform: translateX(0);
-	}
-	85%,
-	100% {
-		transform: translateX(calc(-1 * var(--omp-tab-title-overflow, 0px)));
 	}
 }
 
@@ -321,29 +326,27 @@ kbd,
 }
 
 .omp-scale-in {
-	animation: omp-scale-in var(--omp-motion-med) var(--omp-ease-spring) both;
+	animation: omp-scale-in var(--omp-motion-med) var(--omp-ease-enter) both;
 }
 
 .omp-toast-in {
-	animation: omp-toast-in var(--omp-motion-med) var(--omp-ease-spring) both;
+	animation: omp-toast-in var(--omp-motion-med) var(--omp-ease-enter) both;
 }
 @keyframes omp-toast-out {
 	from {
 		opacity: 1;
-		transform: translateY(0) scale(1);
 	}
 	to {
 		opacity: 0;
-		transform: translateY(8px) scale(0.96);
 	}
 }
 
 .omp-toast-out {
-	animation: omp-toast-out var(--omp-motion-fast) var(--omp-ease) both;
+	animation: omp-toast-out var(--omp-motion-fast) var(--omp-ease-exit) both;
 }
 
 .omp-pop-in {
-	animation: omp-pop-in var(--omp-motion-fast) var(--omp-ease-spring) both;
+	animation: omp-pop-in var(--omp-motion-fast) var(--omp-ease-enter) both;
 }
 
 .omp-slide-in-right {
@@ -352,13 +355,13 @@ kbd,
 
 /* The exit half of the enter utilities above. Keyframes alone are not a class:
  * an overlay that swaps to `omp-scale-out` gets `animation: none` unless the
- * utility exists, which is why every exit silently snapped instead of fading. */
+ * utility exists. Exits are shorter than entrances and do not travel. */
 .omp-fade-out {
-	animation: omp-fade-out var(--omp-motion-fast) var(--omp-ease) both;
+	animation: omp-fade-out var(--omp-motion-instant) var(--omp-ease-exit) both;
 }
 
 .omp-scale-out {
-	animation: omp-scale-out var(--omp-motion-fast) var(--omp-ease) both;
+	animation: omp-fade-out var(--omp-motion-instant) var(--omp-ease-exit) both;
 }
 
 @keyframes omp-fade-out {
@@ -367,17 +370,6 @@ kbd,
 	}
 	to {
 		opacity: 0;
-	}
-}
-
-@keyframes omp-scale-out {
-	from {
-		opacity: 1;
-		transform: scale(1);
-	}
-	to {
-		opacity: 0;
-		transform: scale(0.96) translateY(6px);
 	}
 }
 
@@ -394,7 +386,7 @@ kbd,
 }
 
 .omp-pulse-dot {
-	animation: omp-pulse-dot 1.6s ease-in-out infinite; /* motion-ok: waiting signal */
+	animation: omp-pulse-dot 2s ease-in-out infinite; /* motion-ok: waiting signal */
 }
 
 .omp-signal-light {
@@ -408,7 +400,7 @@ kbd,
 }
 
 .omp-signal-light--active {
-	animation: omp-signal-light 2.8s ease-in-out infinite; /* motion-ok: slow semantic status signal */
+	animation: omp-signal-light 2.4s ease-in-out infinite; /* motion-ok: slow semantic status signal */
 }
 
 .omp-signal-light.omp-tab-signal {
@@ -416,17 +408,6 @@ kbd,
 	inset: 0 auto 0 0;
 	height: 100%;
 	border-radius: 0;
-}
-
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-	[data-tab-title-wrap][data-overflowing="true"]:hover [data-tab-title] {
-		visibility: hidden;
-	}
-
-	[data-tab-title-wrap][data-overflowing="true"]:hover .omp-tab-title-scroll {
-		visibility: visible;
-		animation: omp-tab-title-scroll 5s ease-in-out infinite alternate; /* motion-ok: user-triggered title reveal */
-	}
 }
 
 .omp-indeterminate-progress {
@@ -439,7 +420,7 @@ kbd,
 }
 
 .omp-disclosure-chevron {
-	transition: transform var(--omp-motion-fast) var(--omp-ease-spring);
+	transition: transform var(--omp-motion-fast) var(--omp-ease);
 }
 
 /* ============================================================================
@@ -448,36 +429,31 @@ kbd,
 
 .omp-pressable {
 	transition:
-		background-color var(--omp-motion-fast) var(--omp-ease),
-		border-color var(--omp-motion-fast) var(--omp-ease),
-		color var(--omp-motion-fast) var(--omp-ease),
-		box-shadow var(--omp-motion-fast) var(--omp-ease),
-		opacity var(--omp-motion-fast) var(--omp-ease),
-		transform var(--omp-motion-fast) var(--omp-ease);
-}
-
-.omp-pressable:active {
-	opacity: 0.72;
+		background-color var(--omp-motion-instant) var(--omp-ease),
+		border-color var(--omp-motion-instant) var(--omp-ease),
+		color var(--omp-motion-instant) var(--omp-ease),
+		box-shadow var(--omp-motion-instant) var(--omp-ease);
 }
 
 /* Hover, focus and selection color changes were instant on every control that
    forgot a transition utility — a tab, a menu item, a settings row — which reads
    as a flicker rather than a response. Covering the interactive elements once
    beats a `transition-colors` class at thirty callsites, and stays subordinate:
-   a callsite's own `transition-*` utility is a class selector, so it outranks this
-   rule and keeps its own properties and timing. */
-button,
-a[href],
-summary,
-[role="button"],
-[role="menuitem"],
-[role="menuitemcheckbox"],
-[role="option"],
-[role="tab"] {
-	transition:
-		background-color var(--omp-motion-fast) var(--omp-ease),
-		border-color var(--omp-motion-fast) var(--omp-ease),
-		color var(--omp-motion-fast) var(--omp-ease);
+   it lives in the base layer, so a callsite's own `transition-*` utility wins. */
+@layer base {
+	button,
+	a[href],
+	summary,
+	[role="button"],
+	[role="menuitem"],
+	[role="menuitemcheckbox"],
+	[role="option"],
+	[role="tab"] {
+		transition:
+			background-color var(--omp-motion-instant) var(--omp-ease),
+			border-color var(--omp-motion-instant) var(--omp-ease),
+			color var(--omp-motion-instant) var(--omp-ease);
+	}
 }
 
 .omp-color-fade {
@@ -563,53 +539,18 @@ summary,
 
 .omp-lift {
 	transition:
-		border-color var(--omp-motion-fast) var(--omp-ease),
-		background-color var(--omp-motion-fast) var(--omp-ease),
-		box-shadow var(--omp-motion-fast) var(--omp-ease),
-		transform var(--omp-motion-fast) var(--omp-ease);
+		border-color var(--omp-motion-instant) var(--omp-ease),
+		background-color var(--omp-motion-instant) var(--omp-ease);
 }
 
 .omp-lift:hover {
 	border-color: var(--omp-border-strong);
-	box-shadow: var(--omp-shadow-md);
-	transform: translateY(-2px);
+	background-color: var(--omp-bg-tertiary);
 }
 
-.omp-lift:active {
-	transform: translateY(0) scale(0.99);
-}
-
-/* Empty-state entrance — logo, title, subtitle and starter cards cascade in. */
-.omp-empty-canvas > * {
-	animation: omp-fade-up var(--omp-motion-med) var(--omp-ease-enter) both;
-}
-
-.omp-empty-canvas > *:nth-child(2) {
-	animation-delay: calc(var(--omp-motion-fast) * 0.35);
-}
-
-.omp-empty-canvas > *:nth-child(3) {
-	animation-delay: calc(var(--omp-motion-fast) * 0.7);
-}
-
-.omp-empty-canvas > *:nth-child(4) {
-	animation-delay: calc(var(--omp-motion-fast) * 1.05);
-}
-
-.omp-starter-grid > * {
-	animation: omp-fade-up var(--omp-motion-med) var(--omp-ease-enter) both;
-}
-
-.omp-starter-grid > *:nth-child(2) {
-	animation-delay: calc(var(--omp-motion-fast) * 0.9);
-}
-
-.omp-starter-grid > *:nth-child(3) {
-	animation-delay: calc(var(--omp-motion-fast) * 1.15);
-}
-
-.omp-starter-grid > *:nth-child(4) {
-	animation-delay: calc(var(--omp-motion-fast) * 1.4);
+/* Empty state: the canvas fades in once as a whole — no per-element cascade. */
+.omp-empty-canvas {
+	animation: omp-fade-in var(--omp-motion-med) var(--omp-ease) both;
 }
 
 @media (min-width: 1120px) {
@@ -649,7 +590,6 @@ summary,
 .omp-inspector {
 	container: omp-inspector / inline-size;
 	box-shadow: none;
-	animation: omp-slide-in-right var(--omp-motion-med) var(--omp-ease-enter) both;
 }
 
 .omp-inspector-tab-label {
@@ -664,6 +604,7 @@ summary,
 		z-index: 30;
 		width: min(460px, calc(100vw - 56px)) !important;
 		box-shadow: -8px 0 24px rgba(24, 28, 33, 0.08);
+		animation: omp-slide-in-right var(--omp-motion-med) var(--omp-ease-enter) both;
 	}
 }
 
@@ -899,6 +840,11 @@ summary,
 		transform: none;
 		opacity: 0.55;
 	}
+}
+
+:root[data-theme="light"] {
+	--omp-switch-on: var(--omp-accent);
+	--omp-switch-off: color-mix(in srgb, var(--omp-border-strong) 70%, var(--omp-bg-primary));
 }
 
 /* GUI density changes conversation spacing without scaling text or scroll coordinates. */

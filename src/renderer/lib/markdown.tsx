@@ -40,6 +40,12 @@ interface MarkdownRendererProps {
 	 * SSR/tests pass this — the pref store's server snapshot is always off.
 	 */
 	codeLineNumbers?: boolean;
+	/**
+	 * Content is the still-growing tail of a streaming reply: code renders in
+	 * its final chrome but skips syntax highlighting, which would otherwise
+	 * re-tokenize the whole fence on every frame.
+	 */
+	streaming?: boolean;
 }
 
 // Hoisted to module scope: stable plugin arrays and component maps keep
@@ -251,6 +257,7 @@ export async function setCodeLineNumbersPref(next: boolean): Promise<boolean> {
 
 /** MarkdownRenderer prop → Pre, threading around the static components map. */
 const CodeLineNumbersOverride = createContext<boolean | undefined>(undefined);
+const StreamingContent = createContext(false);
 
 function useCodeLineNumbers(): boolean {
 	const override = useContext(CodeLineNumbersOverride);
@@ -357,6 +364,7 @@ const FENCE_LANGUAGE_RE = /(?:^|\s)language-(\S+)/;
 
 function Pre({ children }: ComponentPropsWithoutRef<"pre">) {
 	const showLineNumbers = useCodeLineNumbers();
+	const streaming = useContext(StreamingContent);
 	// A mermaid fence swaps the whole block for a diagram with its own chrome —
 	// skip the <pre> wrapper so the diagram is not boxed like code.
 	if (isMermaidCodeElement(children)) return <>{children}</>;
@@ -373,6 +381,7 @@ function Pre({ children }: ComponentPropsWithoutRef<"pre">) {
 			code={textOf(children).replace(/\n$/, "")}
 			language={language}
 			showLineNumbers={showLineNumbers}
+			highlight={!streaming}
 			maxHeightClass={PREVIEW_SCROLL_CODE}
 			className="my-2"
 		/>
@@ -531,19 +540,22 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
 	content,
 	codeLineNumbers,
 	singleDollarTextMath = true,
+	streaming = false,
 }: MarkdownRendererProps) {
 	return (
 		<div className="markdown-body text-[1em] leading-[1.5]">
-			<CodeLineNumbersOverride.Provider value={codeLineNumbers}>
-				<ReactMarkdown
-					remarkPlugins={singleDollarTextMath ? REMARK_PLUGINS : REMARK_PLUGINS_LITERAL_SINGLE_DOLLAR}
-					rehypePlugins={REHYPE_PLUGINS}
-					components={COMPONENTS}
-					urlTransform={URL_TRANSFORM}
-				>
-					{content}
-				</ReactMarkdown>
-			</CodeLineNumbersOverride.Provider>
+			<StreamingContent.Provider value={streaming}>
+				<CodeLineNumbersOverride.Provider value={codeLineNumbers}>
+					<ReactMarkdown
+						remarkPlugins={singleDollarTextMath ? REMARK_PLUGINS : REMARK_PLUGINS_LITERAL_SINGLE_DOLLAR}
+						rehypePlugins={REHYPE_PLUGINS}
+						components={COMPONENTS}
+						urlTransform={URL_TRANSFORM}
+					>
+						{content}
+					</ReactMarkdown>
+				</CodeLineNumbersOverride.Provider>
+			</StreamingContent.Provider>
 		</div>
 	);
 });

@@ -18,6 +18,8 @@ export interface CodeBlockProps {
 	showCopy?: boolean;
 	/** Show the line-number gutter. */
 	showLineNumbers?: boolean;
+	/** Tokenize with highlight.js. Off for code that is still streaming in. */
+	highlight?: boolean;
 	/** Highlight these literal strings inside the code (e.g. grep pattern). */
 	highlightPattern?: string;
 	/** Number shown on the first gutter line (ranged reads start past 1). */
@@ -58,6 +60,7 @@ export function CodeBlock({
 	showLanguage = true,
 	showCopy = true,
 	showLineNumbers = true,
+	highlight = true,
 	startLine,
 	lineNumbers,
 	highlightPattern,
@@ -67,8 +70,9 @@ export function CodeBlock({
 	const t = useT();
 	const lang = normalizeLanguage(language);
 	const [copied, setCopied] = useState(false);
+	const tokenize = highlight && !highlightedHtml && Boolean(code) && (code?.length ?? 0) <= HIGHLIGHT_CHAR_CAP;
 	const [hlHtml, setHlHtml] = useState<string | null>(() => {
-		if (highlightedHtml || !code || code.length > HIGHLIGHT_CHAR_CAP) return null;
+		if (!tokenize || !code) return null;
 		const hljs = getLoadedHljs();
 		if (!hljs) return null;
 		return lang !== "plaintext" && hljs.getLanguage(lang)
@@ -77,7 +81,7 @@ export function CodeBlock({
 	});
 
 	useEffect(() => {
-		if (highlightedHtml || !code || code.length > HIGHLIGHT_CHAR_CAP) return;
+		if (!tokenize || !code) return;
 
 		let cancelled = false;
 		void loadHljs().then(hljs => {
@@ -91,7 +95,7 @@ export function CodeBlock({
 		return () => {
 			cancelled = true;
 		};
-	}, [code, lang, highlightedHtml]);
+	}, [code, lang, tokenize]);
 
 	// Final rendered HTML: pre-highlighted input, lazy hljs output, or escaped
 	// plain code — with optional pattern matches wrapped in <mark>. Pattern
@@ -103,12 +107,17 @@ export function CodeBlock({
 		// shorter value — otherwise the old source displays while Copy takes
 		// the new one.
 		const overCap = code != null && code.length > HIGHLIGHT_CHAR_CAP;
-		const base = overCap ? escapeHtml(code) : (highlightedHtml ?? hlHtml ?? (code != null ? escapeHtml(code) : null));
+		const plain = overCap || (!highlight && !highlightedHtml);
+		const base = plain
+			? code != null
+				? escapeHtml(code)
+				: null
+			: (highlightedHtml ?? hlHtml ?? (code != null ? escapeHtml(code) : null));
 		if (base == null) return null;
 		if (!highlightPattern) return base;
 		const re = new RegExp(escapeRegExp(highlightPattern), "gi");
 		return base.replace(re, m => `<mark class="omp-hl">${escapeHtml(m)}</mark>`);
-	}, [highlightedHtml, hlHtml, code, highlightPattern]);
+	}, [highlightedHtml, hlHtml, code, highlightPattern, highlight]);
 
 	const codeElement =
 		html != null ? (

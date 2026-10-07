@@ -2,6 +2,7 @@ import {
 	ChevronRight,
 	Clock3,
 	Coins,
+	Command,
 	Database,
 	FolderOpen,
 	Gauge,
@@ -9,7 +10,6 @@ import {
 	Info,
 	MoreHorizontal,
 	PanelLeft,
-	Search,
 	Share2,
 	Wrench,
 } from "lucide-react";
@@ -20,6 +20,7 @@ import { basename, cx, formatCost, formatDuration, formatPercent, formatTokens }
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { onEscape } from "../../lib/keymap";
+import { sessionDisplayTitle } from "../../lib/session-title";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
@@ -129,11 +130,13 @@ export function TitleBar() {
 	}, [hasRunningTool, isStreaming]);
 
 	const current = sessions.find(s => s.id === sessionId);
-	// `||` everywhere: empty-string titles (never-generated auto-title slot)
-	// fall through like null, ending at the "New Session" placeholder.
-	const displayName = sessionName || current?.title || t("sidebar.newSession");
+	// Same display-title contract as the tab strip and sidebar: an explicit name,
+	// then the generated title, then the first prompt — so the header never says
+	// "New session" while the tab beside it already shows the conversation.
+	const displayName = sessionName || (current ? sessionDisplayTitle(current, "") : "") || t("sidebar.newSession");
 	const visibleStats = stats?.sessionId === sessionId ? stats : null;
 	const cacheHit = sessionCacheHitPercent(visibleStats);
+	const usedTokens = visibleStats ? (visibleStats.history?.totalTokens ?? visibleStats.tokens.total) : 0;
 	const executionDuration = sessionExecutionDurationMs({
 		messages,
 		streamingMessage,
@@ -142,6 +145,8 @@ export function TitleBar() {
 		isStreaming,
 		now,
 	});
+
+	const hasUsage = usedTokens > 0 || executionDuration > 0;
 
 	const commitName = () => {
 		const name = draft.trim();
@@ -287,26 +292,36 @@ export function TitleBar() {
 			>
 				<PanelLeft size={18} className={cx(sidebarVisible && "text-[var(--omp-text)]")} />
 			</button>
-			<button
-				type="button"
-				aria-label={t("titlebar.commands")}
-				title={t("titlebar.commands")}
-				onClick={openCommandPalette}
-				className={iconButton}
-			>
-				<Search aria-hidden="true" size={16} />
-			</button>
+			{/* The sidebar carries the labelled Command Center entry; this shortcut
+			    only stands in for it while the sidebar is hidden. */}
+			{!sidebarVisible && (
+				<button
+					type="button"
+					aria-label={t("titlebar.commands")}
+					title={t("titlebar.commands")}
+					onClick={openCommandPalette}
+					className={iconButton}
+				>
+					<Command aria-hidden="true" size={16} />
+				</button>
+			)}
 
 			<div className="omp-titlebar-identity no-drag flex min-w-0 items-center gap-1.5">
 				<button
-					className="omp-pressable flex min-w-0 max-w-48 items-center gap-2 truncate rounded-lg px-2 py-1.5 text-omp-lg font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-not-allowed disabled:text-[var(--omp-dim)]"
+					className="omp-pressable flex min-w-0 max-w-48 shrink-0 items-center gap-2 truncate rounded-lg px-2 py-1.5 text-omp-lg font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:cursor-not-allowed disabled:text-[var(--omp-dim)]"
 					disabled={isStreaming}
 					onClick={() => setWorkspaceOpen(true)}
-					title={isStreaming ? t("titlebar.abortHint") : t("titlebar.openProject")}
+					title={
+						isStreaming
+							? t("titlebar.abortHint")
+							: !isChat && cwd
+								? `${t("titlebar.openProject")} — ${projectName}`
+								: t("titlebar.openProject")
+					}
 					type="button"
 				>
 					<FolderOpen className="shrink-0" size={15} />
-					<span className="truncate">{projectName}</span>
+					<span className="omp-titlebar-project-name truncate">{projectName}</span>
 				</button>
 				<ChevronRight size={14} className="text-[var(--omp-dim)]" />
 				{editingName ? (
@@ -359,30 +374,33 @@ export function TitleBar() {
 
 			<div className="flex-1" />
 
-			<div className="omp-session-metrics no-drag flex shrink-0 items-center gap-3 font-mono text-omp-sm tabular-nums text-[var(--omp-muted)]">
-				<span
-					className="flex items-center gap-1"
-					title={t(visibleStats?.history ? "titlebar.metric.historyTokens" : "titlebar.metric.tokens")}
-				>
-					<Database aria-hidden="true" size={14} />
-					{visibleStats ? formatTokens(visibleStats.history?.totalTokens ?? visibleStats.tokens.total) : "—"}
-				</span>
-				<span
-					className="flex items-center gap-1"
-					title={t(visibleStats?.history ? "titlebar.metric.historyCost" : "titlebar.metric.cost")}
-				>
-					<Coins aria-hidden="true" size={14} />
-					{visibleStats ? formatCost(visibleStats.history?.cost ?? visibleStats.cost, 4) : "—"}
-				</span>
-				<span className="flex items-center gap-1" title={t("titlebar.metric.cacheHit")}>
-					<Gauge aria-hidden="true" size={14} />
-					{formatPercent(cacheHit, 0)}
-				</span>
-				<span className="flex items-center gap-1" title={t("titlebar.metric.duration")}>
-					<Clock3 aria-hidden="true" size={14} />
-					{executionDuration > 0 ? formatDuration(executionDuration) : t("time.secondsShort", { count: 0 })}
-				</span>
-			</div>
+			{/* A session with nothing spent yet shows no figures — a row of zeros is noise. */}
+			{hasUsage && (
+				<div className="omp-session-metrics no-drag flex shrink-0 items-center gap-3 font-mono text-omp-sm tabular-nums text-[var(--omp-muted)]">
+					<span
+						className="flex items-center gap-1"
+						title={t(visibleStats?.history ? "titlebar.metric.historyTokens" : "titlebar.metric.tokens")}
+					>
+						<Database aria-hidden="true" size={14} />
+						{visibleStats ? formatTokens(visibleStats.history?.totalTokens ?? visibleStats.tokens.total) : "—"}
+					</span>
+					<span
+						className="flex items-center gap-1"
+						title={t(visibleStats?.history ? "titlebar.metric.historyCost" : "titlebar.metric.cost")}
+					>
+						<Coins aria-hidden="true" size={14} />
+						{visibleStats ? formatCost(visibleStats.history?.cost ?? visibleStats.cost, 4) : "—"}
+					</span>
+					<span className="flex items-center gap-1" title={t("titlebar.metric.cacheHit")}>
+						<Gauge aria-hidden="true" size={14} />
+						{formatPercent(cacheHit, 0)}
+					</span>
+					<span className="flex items-center gap-1" title={t("titlebar.metric.duration")}>
+						<Clock3 aria-hidden="true" size={14} />
+						{executionDuration > 0 ? formatDuration(executionDuration) : t("time.secondsShort", { count: 0 })}
+					</span>
+				</div>
+			)}
 			<button
 				type="button"
 				aria-label={t("titlebar.actions")}

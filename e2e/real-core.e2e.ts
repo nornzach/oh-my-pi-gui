@@ -149,6 +149,9 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		await page.reload();
 		await expect(page.locator("[data-transcript-kind]")).toContainText(["arm audit ok"]);
 		await closeWelcomeIfPresent("Welcome to omp", "Close");
+		// App-wide tools fold under the sidebar's "More" group.
+		const moreNavigation = page.getByRole("button", { name: "Show more navigation", exact: true });
+		if (await moreNavigation.isVisible()) await moreNavigation.click();
 		await page.getByRole("button", { name: "Session stats", exact: true }).click();
 		const stats = page.getByRole("dialog");
 		await expect(stats).toBeVisible();

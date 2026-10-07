@@ -1048,6 +1048,12 @@ export interface ModelInfo {
 	/** Below the catalog these are reported only for models with a rate card. */
 	maxTokens?: number | null;
 	cost?: ModelCost;
+	/** Wire API the model speaks (`openai-responses`, `anthropic-messages`, …); present on `get_state`. */
+	api?: string;
+	/** Input modalities; `image` means snapcompact can archive history for this model. */
+	input?: string[];
+	/** Catalog-resolved quirks (an opaque bag here); the context strategy reads only `supportsServerCompaction`. */
+	compat?: object;
 }
 
 export interface RpcSessionState {

@@ -26,7 +26,7 @@ import { useMessagesStore } from "../../stores/messages";
 import { type QueueLane, useQueuedMessages, useQueueStore } from "../../stores/queue";
 import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
-import { useActiveTabKind } from "../../stores/tabs";
+import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { type TodoSnapshot, useTodoStore } from "../../stores/todo";
 import { type ToolEntry, toolEntryKey, useToolsStore } from "../../stores/tools";
@@ -51,6 +51,7 @@ import {
 	messageTimestampMs,
 	type Row,
 	shouldRePinTranscript,
+	tabAwaitsTranscript,
 } from "./chat-stream-utils";
 import { ExecutionGroup } from "./ExecutionGroup";
 import { MessageBubble } from "./MessageBubble";
@@ -230,6 +231,13 @@ function SessionTranscript() {
 	/** Chat tabs get a conversation-oriented empty state (agent starters imply tools). */
 	const isChat = useActiveTabKind() === "chat";
 	const starters = isChat ? CHAT_STARTERS : STARTERS;
+	// A fresh tab has no transcript to wait for: its start screen can show while
+	// the sidecar boots instead of a spinner on a blank page. A tab resuming a
+	// session keeps the spinner, so the start screen never flashes before history.
+	const tabHasHistory = useTabsStore(state =>
+		tabAwaitsTranscript(state.tabs.find(candidate => candidate.id === tabId)),
+	);
+	const awaitingTranscript = status === "starting" && tabHasHistory;
 
 	const virtualizer = useVirtualizer({
 		count: rows.length,
@@ -531,14 +539,14 @@ function SessionTranscript() {
 							<div className="omp-indeterminate-progress h-full bg-[var(--omp-accent)]" />
 						</div>
 					)}
-					{status === "starting" && rows.length === 0 && !switchPending && (
+					{awaitingTranscript && rows.length === 0 && !switchPending && (
 						<div className="flex justify-center py-3">
 							<Loader2 size={16} className="animate-spin text-[var(--omp-muted)]" />
 						</div>
 					)}
-					{status !== "starting" && rows.length === 0 && !isStreaming && !switchPending && (
+					{!awaitingTranscript && rows.length === 0 && !isStreaming && !switchPending && (
 						<div className="omp-empty-canvas flex min-h-full flex-col justify-center pb-20">
-							<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--omp-btn-primary-bg)] text-[var(--omp-btn-primary-text)]">
+							<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--omp-border-muted)] bg-[var(--omp-selected-bg)] text-[var(--omp-accent)]">
 								<PiLogo size={22} />
 							</div>
 							<h1 className="font-display text-[30px] font-semibold leading-tight tracking-[-0.025em] text-[var(--omp-text)]">
@@ -941,7 +949,7 @@ export function TurnStatusRow() {
 	}
 
 	return (
-		<div className="omp-status-turn omp-fade-in flex flex-col gap-1 ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-4 text-omp-lg text-[var(--omp-muted)]">
+		<div className="omp-status-turn flex flex-col gap-1 ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-4 text-omp-lg text-[var(--omp-muted)]">
 			<span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
 				{announcement}
 			</span>
@@ -1125,4 +1133,5 @@ export {
 	mergeTodoSnapshots,
 	ROW_ENTRANCE_TAIL_ROWS,
 	shouldRePinTranscript,
+	tabAwaitsTranscript,
 } from "./chat-stream-utils";

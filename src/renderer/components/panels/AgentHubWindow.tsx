@@ -17,7 +17,18 @@ import { useTabRpc } from "../../lib/tab-rpc";
  * everything.
  */
 
-import { ArrowLeft, Check, MessageSquare, Pause, Play, RefreshCw, Square, X } from "lucide-react";
+import {
+	ArrowLeft,
+	Check,
+	ChevronsUpDown,
+	MessageSquare,
+	Pause,
+	Pencil,
+	Play,
+	RefreshCw,
+	Square,
+	X,
+} from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcAgentDefinitionInfo, SubagentSnapshot } from "../../../shared/rpc-types";
 import { cx } from "../../lib/format";
@@ -68,7 +79,7 @@ function Toggle({
 				aria-checked={checked}
 				aria-label={label}
 				className={`relative h-4.5 w-8 shrink-0 rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${
-					checked ? "bg-(--omp-accent)" : "border border-(--omp-border-muted)"
+					checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)"
 				}`}
 				disabled={disabled}
 				onClick={() => onChange(!checked)}
@@ -76,7 +87,7 @@ function Toggle({
 				type="button"
 			>
 				<span
-					className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-all duration-150 ${
+					className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-[left] duration-150 ${
 						checked ? "left-4" : "left-0.5"
 					}`}
 				/>
@@ -97,6 +108,10 @@ const PrewalkState = {
 } as const;
 type PrewalkState = (typeof PrewalkState)[keyof typeof PrewalkState];
 
+/** A compact field-like control: bordered, with a trailing glyph that says how it changes. */
+const AGENT_FIELD_BUTTON =
+	"omp-pressable inline-flex h-6 max-w-64 items-center gap-1.5 rounded-md border border-(--omp-input-border) bg-(--omp-input-bg) px-2 text-omp-sm hover:border-(--omp-border-strong) disabled:cursor-not-allowed disabled:opacity-50";
+
 /** Current prewalk override state for an agent (TUI dashboard cycle: agent default → on → off). */
 function prewalkStateOf(overrides: Record<string, string>, name: string): PrewalkState {
 	const value = overrides[name]?.trim().toLowerCase();
@@ -105,10 +120,10 @@ function prewalkStateOf(overrides: Record<string, string>, name: string): Prewal
 	return PrewalkState.default;
 }
 
-const PREWALK_VARIANT: Record<PrewalkState, "default" | "info" | "muted"> = {
-	default: "default",
-	on: "info",
-	off: "muted",
+const PREWALK_TONE: Record<PrewalkState, string> = {
+	default: "text-(--omp-text-secondary)",
+	on: "text-(--omp-accent)",
+	off: "text-(--omp-dim)",
 };
 
 /** Known definition sources; anything else renders raw (e.g. future extension sources). */
@@ -274,25 +289,35 @@ const DefinitionRow = memo(function DefinitionRow({
 						</span>
 					) : (
 						<>
-							<span className={override ? "font-mono text-(--omp-text)" : "text-(--omp-dim)"}>
-								{override ?? t("agentHub.defs.modelSession")}
-							</span>
-							<Button disabled={busy} onClick={() => onBeginModelEdit(entry.name)} size="sm" variant="ghost">
-								{t("agentHub.defs.modelEdit")}
-							</Button>
+							{/* One field-like control: the value is what you click to change it. */}
+							<button
+								aria-label={`${t("agentHub.defs.modelLabel")}: ${override ?? t("agentHub.defs.modelSession")} — ${t("agentHub.defs.modelEdit")}`}
+								className={cx(
+									AGENT_FIELD_BUTTON,
+									override ? "font-mono text-(--omp-text)" : "text-(--omp-muted)",
+								)}
+								disabled={busy}
+								onClick={() => onBeginModelEdit(entry.name)}
+								title={t("agentHub.defs.modelEdit")}
+								type="button"
+							>
+								<span className="truncate">{override ?? t("agentHub.defs.modelSession")}</span>
+								<Pencil aria-hidden className="shrink-0 text-(--omp-dim)" size={11} />
+							</button>
 						</>
 					)}
 				</span>
 				<span className="flex items-center gap-1.5 text-omp-sm">
 					<span className="text-(--omp-dim)">{t("agentHub.defs.prewalkLabel")}</span>
 					<button
-						className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+						className={cx(AGENT_FIELD_BUTTON, PREWALK_TONE[prewalk])}
 						disabled={busy}
 						onClick={() => onCyclePrewalk(entry.name)}
 						title={t("agentHub.defs.prewalkHint")}
 						type="button"
 					>
-						<Badge variant={PREWALK_VARIANT[prewalk]}>{t(`agentHub.defs.prewalk.${prewalk}`)}</Badge>
+						<span className="truncate">{t(`agentHub.defs.prewalk.${prewalk}`)}</span>
+						<ChevronsUpDown aria-hidden className="shrink-0 text-(--omp-dim)" size={11} />
 					</button>
 				</span>
 			</div>

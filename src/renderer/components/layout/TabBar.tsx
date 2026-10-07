@@ -146,26 +146,9 @@ function TabChip({
 				</span>
 			) : (
 				<span className="min-w-0 flex-1 leading-tight">
-					<span
-						className="relative block min-w-0 overflow-hidden whitespace-nowrap"
-						data-tab-title-wrap
-						onMouseEnter={event => {
-							const scroller = event.currentTarget.querySelector<HTMLElement>("[data-tab-title-scroll]");
-							const overflow = Math.max(0, (scroller?.scrollWidth ?? 0) - event.currentTarget.clientWidth);
-							event.currentTarget.dataset.overflowing = overflow > 0 ? "true" : "false";
-							event.currentTarget.style.setProperty("--omp-tab-title-overflow", `${overflow}px`);
-						}}
-					>
-						<span className="block truncate" data-tab-title>
-							{label}
-						</span>
-						<span
-							aria-hidden
-							className="omp-tab-title-scroll invisible absolute inset-0 w-max whitespace-nowrap"
-							data-tab-title-scroll
-						>
-							{label}
-						</span>
+					{/* Long titles truncate; the chip's tooltip carries the full title. */}
+					<span className="block truncate" data-tab-title>
+						{label}
 					</span>
 					<span className="block truncate text-omp-xxs font-normal text-[var(--omp-dim)]" data-tab-workspace>
 						{workspaceLabel}

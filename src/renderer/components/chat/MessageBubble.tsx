@@ -83,7 +83,7 @@ function ExecutionBubble({ message }: { message: AgentMessage }) {
 	const failed = !running && (message.cancelled || (message.exitCode != null && message.exitCode !== 0));
 
 	return (
-		<div className="omp-execution-turn omp-fade-up px-6 py-4">
+		<div className="omp-execution-turn px-6 py-4">
 			<div className="omp-transcript-content overflow-hidden rounded-[10px] border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] shadow-[var(--omp-shadow-sm)]">
 				<div className="flex items-center gap-2 border-b border-[var(--omp-border-muted)] px-3.5 py-2">
 					<Terminal className="text-[var(--omp-status-path)]" size={13} />
@@ -171,7 +171,7 @@ function ContextBubble({ message }: { message: AgentMessage }) {
 				: t("chat.context.referencedFiles");
 
 	return (
-		<div className="omp-context-turn omp-fade-up px-6 py-3">
+		<div className="omp-context-turn px-6 py-3">
 			<div className="omp-transcript-content rounded-[10px] border border-[var(--omp-border-muted)] px-3.5 py-3">
 				<div className="mb-2 flex items-center gap-1.5 text-omp-xs font-bold tracking-[0.12em] text-[var(--omp-status-context)] uppercase">
 					{isFiles ? <FileText size={12} /> : <Archive size={12} />}
@@ -315,7 +315,7 @@ export const MessageBubble = memo(function MessageBubble({
 		return (
 			<div className="omp-user-turn group flex justify-end px-6 py-2.5">
 				<div
-					className="omp-transcript-content omp-user-bubble omp-fade-up relative rounded-xl border border-[var(--omp-user-msg-border)] bg-[var(--omp-user-msg-bg)] px-3.5 py-3"
+					className="omp-transcript-content omp-user-bubble relative rounded-xl border border-[var(--omp-user-msg-border)] bg-[var(--omp-user-msg-bg)] px-3.5 py-3"
 					style={{ boxShadow: "var(--omp-shadow-sm)" }}
 				>
 					{reaction ? (
@@ -437,7 +437,6 @@ export const MessageBubble = memo(function MessageBubble({
 		<div
 			className={cx(
 				"group flex px-6",
-				!compact && "omp-fade-up",
 				!compactChrome && "omp-assistant-turn",
 				compactChrome && "omp-assistant-turn--compact",
 				compactChrome ? "py-1.5" : "py-3",

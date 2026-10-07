@@ -214,17 +214,6 @@ async function rightClick(element: TestElement): Promise<void> {
 	await flush();
 }
 
-/** Drive an element's React onMouseEnter (linkedom has no layout/event system). */
-async function mouseEnter(element: TestElement): Promise<void> {
-	const record = element as unknown as Record<string, unknown>;
-	const propsKey = Object.getOwnPropertyNames(record).find(key => key.startsWith("__reactProps$"));
-	const props = propsKey
-		? (record[propsKey] as { onMouseEnter?: (event: { currentTarget: TestElement }) => void } | undefined)
-		: undefined;
-	if (!props?.onMouseEnter) throw new Error("element onMouseEnter not found");
-	await act(async () => props.onMouseEnter?.({ currentTarget: element }));
-}
-
 function menuItem(label: string): TestElement | null {
 	return (
 		(document.body as unknown as TestElement)
@@ -396,7 +385,7 @@ describe("TabBar", () => {
 		expect(tabWorkspaces()).toEqual(["alpha", "beta"]);
 	});
 
-	it("keeps chips fixed-width and only arms hover scrolling for an overflowing title", async () => {
+	it("keeps chips fixed-width and exposes a truncated title through the tooltip", async () => {
 		useTabsStore.setState({
 			tabs: [
 				{
@@ -418,23 +407,8 @@ describe("TabBar", () => {
 		expect([longChip, shortChip].every(chip => chip?.getAttribute("class")?.split(/\s+/).includes("w-44"))).toBe(
 			true,
 		);
-		const longTitle = longChip?.querySelector("[data-tab-title-wrap]");
-		const longScroller = longTitle?.querySelector("[data-tab-title-scroll]");
-		const shortTitle = shortChip?.querySelector("[data-tab-title-wrap]");
-		const shortScroller = shortTitle?.querySelector("[data-tab-title-scroll]");
-		if (!longTitle || !longScroller || !shortTitle || !shortScroller)
-			throw new Error("tab title scrollers not rendered");
-		Object.defineProperty(longTitle, "clientWidth", { configurable: true, value: 100 });
-		Object.defineProperty(longScroller, "scrollWidth", { configurable: true, value: 240 });
-		Object.defineProperty(shortTitle, "clientWidth", { configurable: true, value: 100 });
-		Object.defineProperty(shortScroller, "scrollWidth", { configurable: true, value: 80 });
-
-		await mouseEnter(longTitle);
-		await mouseEnter(shortTitle);
-
-		expect(longTitle.getAttribute("data-overflowing")).toBe("true");
-		expect((longTitle as unknown as HTMLElement).style.getPropertyValue("--omp-tab-title-overflow")).toBe("140px");
-		expect(shortTitle.getAttribute("data-overflowing")).toBe("false");
+		expect(longChip?.getAttribute("title")).toContain("A deliberately long session title");
+		expect(longChip?.querySelector("[data-tab-title]")?.getAttribute("class")).toContain("truncate");
 	});
 
 	it("hides the close button at the single-tab floor and shows it with two tabs", async () => {

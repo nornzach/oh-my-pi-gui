@@ -158,3 +158,180 @@ export function segmentStreamingMarkdown(text: string): StreamingMarkdownSegment
 		tailStart: blockStart,
 	};
 }
+
+export interface StreamingTailPresentation {
+	/** Markdown that renders cleanly now: unfinished constructs are closed or held back. */
+	markdown: string;
+	/** An unfinished display-math block, shown as plain text until it closes. */
+	plain: string;
+}
+
+const TABLE_ROW_RE = /^[ \t]{0,3}\|/;
+const TABLE_DELIMITER_RE = /^[ \t]{0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+/**
+ * A partial last line that would render as a different block than it becomes:
+ * a bare heading marker, a list marker still waiting for text, or a run of
+ * `-`/`=` that would briefly turn the paragraph above into a setext heading.
+ */
+const UNSETTLED_LINE_RE = /^[ \t]{0,3}(?:#{1,6}|[-*+]|\d{1,9}[.)]?|-+|=+|>)[ \t]*$/;
+
+/** Collapse inline code spans to same-length filler so their content is never read as markup. */
+function maskInlineCode(line: string): { masked: string; openTick: boolean } {
+	let masked = "";
+	let index = 0;
+	while (index < line.length) {
+		if (line[index] !== "`") {
+			masked += line[index];
+			index++;
+			continue;
+		}
+		let run = 0;
+		while (line[index + run] === "`") run++;
+		const fence = "`".repeat(run);
+		const close = line.indexOf(fence, index + run);
+		if (close === -1) return { masked: masked + line.slice(index), openTick: true };
+		masked += " ".repeat(close + run - index);
+		index = close + run;
+	}
+	return { masked, openTick: false };
+}
+
+/** Offset where the inline context still being written begins: its paragraph or list item. */
+function openInlineContextStart(body: string): number {
+	const lines = body.split("\n");
+	let line = lines.length - 1;
+	while (line > 0 && !LIST_ITEM_RE.test(lines[line] ?? "") && (lines[line - 1] ?? "").trim() !== "") line--;
+	let offset = 0;
+	for (let index = 0; index < line; index++) offset += (lines[index]?.length ?? 0) + 1;
+	return offset;
+}
+
+/**
+ * Close emphasis and inline code that the model has opened but not yet closed,
+ * so the live tail renders formatted instead of flashing raw `**`/`` ` ``
+ * markers until the paragraph completes.
+ */
+function closeInlineMarkup(text: string): string {
+	// A link or image whose target is still arriving shows only its text, and a
+	// half-written HTML tag shows nothing.
+	let out = text
+		.replace(/!\[[^\]\n]*\](?:\([^)\n]*)?$/, "")
+		.replace(/\[([^\]\n]*)\](?:\([^)\n]*)?$/, "$1")
+		.replace(/\[([^\]\n]*)$/, "$1")
+		.replace(/<\/?[A-Za-z][^>\n]*$/, "");
+	// A marker with nothing after it yet would render literally.
+	out = out.replace(/(?:^|(?<=\s))(?:\*{1,3}|~{1,2})$/, "");
+
+	const trailing = /\s*$/.exec(out)?.[0] ?? "";
+	let body = out.slice(0, out.length - trailing.length);
+	const contextStart = openInlineContextStart(body);
+	let scan = maskInlineCode(body.slice(contextStart));
+	if (scan.openTick) {
+		body += "`";
+		scan = maskInlineCode(body.slice(contextStart));
+	}
+	const masked = scan.masked;
+
+	let strong = -1;
+	let strike = -1;
+	let emphasis = -1;
+	for (let index = 0; index < masked.length; index++) {
+		const char = masked[index];
+		const next = masked[index + 1] ?? "";
+		if (char === "~" && next === "~") {
+			strike = strike === -1 ? index : -1;
+			index++;
+		} else if (char === "*" && next === "*") {
+			strong = strong === -1 ? index : -1;
+			index++;
+		} else if (char === "*") {
+			const lineHead = masked.slice(masked.lastIndexOf("\n", index - 1) + 1, index);
+			if (next === " " && lineHead.trim() === "") continue; // list bullet
+			const previous = masked[index - 1] ?? "";
+			if (emphasis === -1) {
+				if (next && !/\s/.test(next)) emphasis = index;
+			} else if (previous && !/\s/.test(previous)) {
+				emphasis = -1;
+			}
+		}
+	}
+	const opens = [
+		{ at: strong, marker: "**" },
+		{ at: strike, marker: "~~" },
+		{ at: emphasis, marker: "*" },
+	]
+		.filter(open => open.at !== -1)
+		.sort((left, right) => right.at - left.at);
+	return `${body}${opens.map(open => open.marker).join("")}${trailing}`;
+}
+
+/**
+ * Prepare the unfinished tail of a streaming reply for formatted display.
+ *
+ * The tail is rendered as Markdown every frame, so it must never contain a
+ * construct that renders differently once more text arrives: open code fences
+ * are closed (the block grows in place instead of appearing at the end), a table
+ * waits for its delimiter row, half-written markers are closed or held back, and
+ * unfinished display math stays plain text so KaTeX never typesets half a formula.
+ */
+export function presentStreamingTail(tail: string): StreamingTailPresentation {
+	if (!tail) return { markdown: "", plain: "" };
+	const lines = tail.split("\n");
+	let fence: FenceState | null = null;
+	let sawFence = false;
+	let mathStart = -1;
+	let displayMath: "$$" | "\\]" | null = null;
+	for (let index = 0; index < lines.length; index++) {
+		const line = lines[index] ?? "";
+		const trimmed = line.trim();
+		if (fence) {
+			if (closesFence(line, fence)) fence = null;
+			continue;
+		}
+		if (!displayMath) {
+			const opened = openingFence(line);
+			if (opened) {
+				fence = opened;
+				sawFence = true;
+				continue;
+			}
+			if (trimmed === "$$") {
+				displayMath = "$$";
+				mathStart = index;
+			} else if (trimmed.startsWith("\\[")) {
+				displayMath = "\\]";
+				mathStart = index;
+			}
+			if (displayMath === "\\]" && /(?:^|[^\\])(?:\\\\)*\\\]$/.test(trimmed)) displayMath = null;
+		} else if (
+			(displayMath === "$$" && trimmed === "$$") ||
+			(displayMath === "\\]" && /(?:^|[^\\])(?:\\\\)*\\\]$/.test(trimmed))
+		) {
+			displayMath = null;
+		}
+	}
+
+	if (fence) {
+		const separator = tail.endsWith("\n") ? "" : "\n";
+		return { markdown: `${tail}${separator}${fence.marker.repeat(fence.length)}`, plain: "" };
+	}
+	if (displayMath) {
+		return { markdown: lines.slice(0, mathStart).join("\n"), plain: lines.slice(mathStart).join("\n") };
+	}
+
+	let end = lines.length;
+	const lastLine = lines[end - 1] ?? "";
+	if (UNSETTLED_LINE_RE.test(lastLine)) end--;
+	// A table renders only once its delimiter row is complete; until then its
+	// rows would show as a paragraph of pipes.
+	let tableStart = end;
+	while (tableStart > 0 && TABLE_ROW_RE.test(lines[tableStart - 1] ?? "")) tableStart--;
+	if (tableStart < end) {
+		const delimiter = tableStart + 1;
+		const delimiterComplete = delimiter < lines.length - 1 && TABLE_DELIMITER_RE.test(lines[delimiter] ?? "");
+		if (!delimiterComplete) end = tableStart;
+	}
+	const kept = lines.slice(0, end).join("\n");
+	if (sawFence) return { markdown: kept, plain: "" };
+	return { markdown: closeInlineMarkup(kept), plain: "" };
+}

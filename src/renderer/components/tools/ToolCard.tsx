@@ -87,7 +87,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 	return (
 		<div
 			className={cx(
-				"omp-tool-card omp-fade-up relative my-2 overflow-hidden rounded-[10px] border border-[var(--omp-border-muted)] transition-[border-color,box-shadow,background-color] duration-200",
+				"omp-tool-card relative my-2 overflow-hidden rounded-[10px] border border-[var(--omp-border-muted)] transition-[border-color,box-shadow,background-color] duration-200",
 				status === "running" && "border-[var(--omp-border-accent)]/60",
 			)}
 			data-tool-status={status}
@@ -155,7 +155,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 				/>
 			</button>
 			{expanded && (
-				<div className="omp-tool-body omp-fade-in border-t border-[var(--omp-border-muted)]/70 px-3.5 py-2.5">
+				<div className="omp-tool-body border-t border-[var(--omp-border-muted)]/70 px-3.5 py-2.5">
 					{isAborted && (
 						<div className="mb-1.5 flex items-center gap-1.5 font-mono text-omp-sm text-[var(--omp-warning)]">
 							<Ban size={11} className="shrink-0" />

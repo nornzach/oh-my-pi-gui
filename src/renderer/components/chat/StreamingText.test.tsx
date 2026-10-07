@@ -90,52 +90,43 @@ describe("StreamingText presentation", () => {
 
 		await flushFrame();
 		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe("ABC");
-		expect(container.querySelector(".omp-streaming-reveal")?.textContent).toBe("BC");
 	});
 
 	/**
-	 * The reveal is a CSS transition on a chunk that stays mounted. When a commit
-	 * destroyed the previous span instead, text already on screen restarted its
-	 * fade ~25 times a second, which is the strobe readers see while streaming.
+	 * The unfinished block used to render as raw text and reflow into formatting
+	 * once its paragraph closed: `**`, backticks and table pipes flashed on screen
+	 * and every block jumped. It now renders formatted while it grows.
 	 */
-	it("keeps an already-revealed chunk mounted as newer text arrives", async () => {
-		await mount("Hel");
+	it("renders the unfinished block formatted instead of as raw Markdown", async () => {
+		await mount("- **Structure**: a demo with `README.md` and **unfinished `co");
 
-		await act(async () => {
-			useMessagesStore.setState({ streamingText: "Hello " });
-		});
-		await flushFrame();
-		const revealed = container.querySelector(".omp-streaming-reveal");
-		expect(revealed?.textContent).toBe("lo ");
-		// Identity probe: survives a re-render of the same node, vanishes if React
-		// tears the node down and mounts a replacement.
-		revealed?.setAttribute("data-probe", "1");
-
-		await act(async () => {
-			useMessagesStore.setState({ streamingText: "Hello wor" });
-		});
-		await flushFrame();
-
-		// Same node, now settled: its fade keeps running from where it was.
-		const held = container.querySelector("[data-probe='1']");
-		expect(held?.textContent).toBe("lo ");
-		expect(held?.getAttribute("class")).not.toContain("omp-streaming-reveal");
-		expect(container.querySelector(".omp-streaming-reveal")?.textContent).toBe("wor");
-		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe("Hello wor");
+		const tail = container.querySelector(".omp-streaming-tail");
+		expect(tail?.querySelector("li")).not.toBeNull();
+		expect(tail?.querySelectorAll("strong").map(node => node.textContent)).toEqual(["Structure", "unfinished co"]);
+		expect(tail?.querySelectorAll("code").map(node => node.textContent)).toEqual(["README.md", "co"]);
+		expect(tail?.textContent).not.toContain("**");
+		expect(tail?.textContent).not.toContain("`");
 	});
 
-	it("bounds the live tail to the last few reveal chunks", async () => {
-		let text = "a";
-		await mount(text);
-		for (let commit = 0; commit < 12; commit++) {
-			text += "bc";
-			await act(async () => {
-				useMessagesStore.setState({ streamingText: text });
-			});
-			await flushFrame();
-		}
-		expect(container.querySelectorAll(".omp-streaming-chunk").length).toBeLessThanOrEqual(7);
-		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe(text);
+	it("holds a table back until its delimiter row is complete", async () => {
+		await mount("| File | Status |\n| --- | --");
+		expect(container.querySelector(".omp-streaming-tail")?.textContent).not.toContain("|");
+
+		await act(async () => {
+			useMessagesStore.setState({ streamingText: "| File | Status |\n| --- | --- |\n| README.md | modi" });
+		});
+		await flushFrame();
+		const tail = container.querySelector(".omp-streaming-tail");
+		expect(tail?.querySelectorAll("th").map(node => node.textContent)).toEqual(["File", "Status"]);
+		expect(tail?.querySelectorAll("td").map(node => node.textContent)).toEqual(["README.md", "modi"]);
+	});
+
+	it("keeps the caret on the last rendered line", async () => {
+		await mount("Intro paragraph.\n\n- first\n- second ite");
+
+		const marked = container.querySelectorAll("[data-omp-caret]");
+		expect(marked).toHaveLength(1);
+		expect(marked[0]?.textContent).toBe("second ite");
 	});
 
 	it("parses a completed paragraph once and keeps the unfinished suffix lightweight", async () => {
@@ -152,19 +143,24 @@ describe("StreamingText presentation", () => {
 		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe("Tail still growing");
 	});
 
-	it("defers code highlighting until the streamed fence closes", async () => {
+	it("grows an unfinished fence inside the final code chrome and highlights it once closed", async () => {
 		const unfinished = "```ts\nconst answer = 42;\n";
 		const completed = `${unfinished}\`\`\`\n`;
 		await mount(unfinished);
-		expect(container.querySelector("code.language-typescript")).toBeNull();
-		expect(container.querySelector(".omp-streaming-tail")?.textContent).toContain("const answer = 42;");
+		const live = container.querySelector(".omp-streaming-tail code.language-typescript");
+		expect(live?.textContent).toContain("const answer = 42;");
+		// Tokenizing every frame is what the plain live render avoids.
+		expect(live?.querySelector("[class^='hljs-']")).toBeNull();
+		expect(container.querySelector(".omp-streaming-tail")?.textContent).not.toContain("```");
 
 		await act(async () => {
 			useMessagesStore.setState({ streamingText: completed });
 		});
 		await flushFrame();
 
-		expect(container.querySelector("code.language-typescript")?.textContent).toContain("const answer = 42;");
+		expect(container.querySelector(".omp-streaming-block code.language-typescript")?.textContent).toContain(
+			"const answer = 42;",
+		);
 		expect(container.querySelector(".omp-streaming-tail")?.textContent).toBe("");
 	});
 

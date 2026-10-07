@@ -6,7 +6,25 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
  * submenus, prompts) instead of injecting "/command" text into the composer.
  */
 
-import { Check, ChevronRight, CornerDownLeft, History, Search, Slash, X } from "lucide-react";
+import {
+	Blocks,
+	Check,
+	ChevronRight,
+	CornerDownLeft,
+	Cpu,
+	FolderTree,
+	Gauge,
+	History,
+	Layers,
+	LayoutPanelLeft,
+	type LucideIcon,
+	MessageSquare,
+	Plug,
+	Search,
+	Slash,
+	Wrench,
+	X,
+} from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvailableCommand } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
@@ -14,6 +32,7 @@ import { newSessionNow } from "../../hooks/use-session-switch";
 import {
 	buildCommandMenu,
 	type CommandAffordance,
+	type CommandCategory,
 	type CommandMenuItem,
 	commandArgPrefill,
 	forkSessionFromGui,
@@ -131,6 +150,20 @@ async function runAffordance(
 			return;
 	}
 }
+
+/** One glyph per category, so a long list reads by kind instead of repeating one marker. */
+const CATEGORY_ICONS: Record<CommandCategory, LucideIcon> = {
+	session: MessageSquare,
+	model: Cpu,
+	context: Gauge,
+	tools: Wrench,
+	providers: Plug,
+	extensions: Blocks,
+	modes: Layers,
+	view: LayoutPanelLeft,
+	workspace: FolderTree,
+	other: Slash,
+};
 
 export function CommandPalette() {
 	const tabRpc = useTabRpc();
@@ -578,6 +611,7 @@ export function CommandPalette() {
 		const disabled = item.affordance.kind === "unavailable" || blocked;
 		const isSubmenu = item.affordance.kind === "submenu";
 		const toggleOn = item.affordance.kind === "toggle" ? item.affordance.get() : null;
+		const CategoryIcon = CATEGORY_ICONS[item.category] ?? Slash;
 
 		return (
 			<button
@@ -596,9 +630,9 @@ export function CommandPalette() {
 				type="button"
 			>
 				{options?.recent ? (
-					<History className="shrink-0 text-(--omp-accent)" size={12} />
+					<History className="shrink-0 text-(--omp-muted)" size={13} />
 				) : (
-					<Slash className="shrink-0 text-(--omp-accent)" size={12} />
+					<CategoryIcon className="shrink-0 text-(--omp-muted)" size={13} />
 				)}
 				<span className="min-w-0 flex-1">
 					<span className="flex items-center gap-1.5">
@@ -647,7 +681,7 @@ export function CommandPalette() {
 
 	return (
 		<div
-			className="omp-dialog-overlay omp-fade-in fixed inset-0 z-50 flex items-start justify-center bg-[var(--omp-overlay-bg)] p-4 pt-[12dvh] backdrop-blur-[2px]"
+			className="omp-dialog-overlay omp-fade-in fixed inset-0 z-50 flex items-start justify-center bg-[var(--omp-overlay-bg)] p-4 pt-[12dvh]"
 			onMouseDown={event => {
 				if (event.target === event.currentTarget) close();
 			}}

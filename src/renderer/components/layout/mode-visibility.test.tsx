@@ -133,7 +133,7 @@ describe("ComposerModes menu", () => {
 			"Plan mode — agent drafts a plan before acting",
 			"Goal mode — Ship the activity dock",
 			"Loop mode — 7 of 10 iterations left",
-			"Vibe",
+			"Route this session through persistent fast workers.",
 		]) {
 			const row = buttonByTitle(title);
 			expect(row).not.toBeNull();

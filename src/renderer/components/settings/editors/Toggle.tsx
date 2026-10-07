@@ -40,11 +40,11 @@ export function Toggle({
 			<span
 				aria-hidden
 				className={`relative mt-0.5 h-4.5 w-8 shrink-0 rounded-full transition-colors duration-150 ${
-					checked ? "bg-(--omp-accent)" : "bg-(--omp-bg-tertiary) border border-(--omp-border-muted)" // surface-ok: toggle switch track fill
+					checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)" // surface-ok: toggle switch track fill
 				}`}
 			>
 				<span
-					className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-all duration-150 ${
+					className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-[left] duration-150 ${
 						checked ? "left-4" : "left-0.5"
 					}`}
 				/>

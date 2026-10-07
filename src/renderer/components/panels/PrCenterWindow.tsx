@@ -96,9 +96,13 @@ export function PrCenterWindow() {
 			<div className="flex h-[80vh] min-h-0 flex-col">
 				{/* Header */}
 				<div className="flex shrink-0 items-center gap-3 border-b border-(--omp-border-muted) px-4 py-2.5">
-					<GitPullRequest size={14} className="shrink-0 text-(--omp-accent)" />
-					<span className="text-omp-lg font-medium text-(--omp-text)">{t("prCenter.title")}</span>
-					{repo?.available && <span className="truncate text-omp-md text-(--omp-dim)">{repo.repo}</span>}
+					{/* The modal title already names the window; this row names the repository. */}
+					{repo?.available && (
+						<>
+							<GitPullRequest size={14} className="shrink-0 text-(--omp-muted)" />
+							<span className="truncate text-omp-md font-medium text-(--omp-text)">{repo.repo}</span>
+						</>
+					)}
 					<div className="ml-auto flex items-center gap-2">
 						<Tabs
 							tabs={stateTabs}

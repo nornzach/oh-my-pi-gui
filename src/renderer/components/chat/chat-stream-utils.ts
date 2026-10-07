@@ -544,3 +544,13 @@ export function buildTimelineMarkers(rows: readonly HistoryRow[]): Array<Timelin
 
 	return markers;
 }
+
+/**
+ * Whether a tab that is still starting has a transcript on its way. A tab
+ * spawned onto (or about to switch to) a session file must wait for that
+ * history; a fresh tab has nothing to load, so its start screen can show while
+ * the sidecar boots instead of a spinner on a blank page.
+ */
+export function tabAwaitsTranscript(tab: { sessionPath?: string; pendingSessionPath?: string } | undefined): boolean {
+	return !tab || Boolean(tab.sessionPath || tab.pendingSessionPath);
+}

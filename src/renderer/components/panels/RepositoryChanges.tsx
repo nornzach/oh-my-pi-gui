@@ -87,11 +87,11 @@ export function RepositoryChanges() {
 				</p>
 			)}
 			{loading && !changes ? (
-				<p>{t("common.loading")}</p>
+				<p className="text-omp-sm text-(--omp-muted)">{t("common.loading")}</p>
 			) : changes && !changes.isRepo ? (
-				<p>{t("diffPanel.notRepo")}</p>
+				<p className="text-omp-sm text-(--omp-muted)">{t("diffPanel.notRepo")}</p>
 			) : changes?.files.length === 0 ? (
-				<p>{t("diffPanel.clean")}</p>
+				<p className="text-omp-sm text-(--omp-muted)">{t("diffPanel.clean")}</p>
 			) : (
 				changes && (
 					<>
@@ -120,7 +120,9 @@ export function RepositoryChanges() {
 							))}
 							{files.length === 0 && <p>{t("diffPanel.noMatch")}</p>}
 						</div>
-						{selected && !preview && !error && <p>{t("common.loading")}</p>}
+						{selected && !preview && !error && (
+							<p className="text-omp-sm text-(--omp-muted)">{t("common.loading")}</p>
+						)}
 						{preview && (
 							<div className="min-w-0">
 								<p className="mb-2 break-all font-mono text-omp-sm">{preview.path}</p>

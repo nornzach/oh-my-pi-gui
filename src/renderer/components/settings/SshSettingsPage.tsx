@@ -476,10 +476,10 @@ export function SshSettingsPage() {
 								</span>
 							</span>
 							<span
-								className={`relative mt-0.5 h-4.5 w-8 shrink-0 rounded-full ${draft.compat ? "bg-(--omp-accent)" : "bg-(--omp-bg-tertiary) border border-(--omp-border-muted)" /* surface-ok: toggle switch track fill */}`}
+								className={`relative mt-0.5 h-4.5 w-8 shrink-0 rounded-full ${draft.compat ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)" /* surface-ok: toggle switch track fill */}`}
 							>
 								<span
-									className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-all ${draft.compat ? "left-4" : "left-0.5"}`}
+									className={`absolute top-0.5 size-3.5 rounded-full bg-white shadow transition-[left] ${draft.compat ? "left-4" : "left-0.5"}`}
 								/>
 							</span>
 						</button>

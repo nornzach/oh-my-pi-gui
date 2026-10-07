@@ -48,9 +48,18 @@ export function resolveProviderEditAction(
 }
 
 /** Only user-required discovery failures should become settings errors. */
-export function providerDiscoveryErrors(states: readonly ProviderDiscoveryState[], fallbackMessage: string): string[] {
+/**
+ * Discovery failures worth surfacing: only providers the user has signed in to
+ * or configured. A fresh install probes every bundled catalog, and a refresh
+ * failure for a provider nobody uses is noise, not a problem to fix.
+ */
+export function providerDiscoveryErrors(
+	states: readonly ProviderDiscoveryState[],
+	fallbackMessage: string,
+	inUse: ReadonlySet<string>,
+): string[] {
 	return states
-		.filter(state => state.status === "unavailable" && !state.optional)
+		.filter(state => state.status === "unavailable" && !state.optional && inUse.has(state.provider))
 		.map(state => `${state.provider}: ${state.error ?? fallbackMessage}`);
 }
 export function ProviderRow({
@@ -301,7 +310,15 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 
 	const authenticated = providers.filter(p => p.authenticated);
 	const unauthenticated = providers.filter(p => !p.authenticated);
-	const discoveryErrors = providerDiscoveryErrors(discoveryStates, t("providers.discoveryUnavailable"));
+	const providersInUse = new Set([
+		...authenticated.map(provider => provider.id),
+		...customConfigs.filter(config => !config.builtin).map(config => config.id),
+	]);
+	const discoveryErrors = providerDiscoveryErrors(
+		discoveryStates,
+		t("providers.discoveryUnavailable"),
+		providersInUse,
+	);
 	const unlistedConfigs = customConfigs.filter(
 		config => !config.builtin && !providers.some(provider => provider.id === config.id),
 	);
@@ -365,7 +382,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 						</div>
 					)}
 					{discoveryErrors.length > 0 && (
-						<div className="rounded-md bg-[var(--omp-tool-error-bg)] px-3 py-2 text-omp-md text-[var(--omp-error)]">
+						<div className="rounded-md border border-[var(--omp-warning)]/35 bg-[var(--omp-warning)]/10 px-3 py-2 text-omp-md text-[var(--omp-text-secondary)]">
 							{t("providers.discoveryFailed", { details: discoveryErrors.join("; ") })}
 						</div>
 					)}

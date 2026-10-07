@@ -119,7 +119,9 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 			<div className="flex-1">
 				<Toggle
 					label={t(`settings.display.${field}`)}
-					description={t(overridden ? "settings.display.local" : "settings.display.legacy")}
+					// The section intro already explains that unset rows read the Agent
+					// setting; only a row that diverges from it needs a marker.
+					description={overridden ? t("settings.display.local") : undefined}
 					checked={value}
 					disabled={saving}
 					onChange={next => void save(next)}
@@ -986,7 +988,7 @@ export function SettingsWindow() {
 							)}
 						</div>
 						{showGlobalSearch && (
-							<div className="relative w-[clamp(13rem,32vw,18rem)] max-w-full min-w-0 shrink">
+							<div className="relative w-[clamp(13rem,32vw,20rem)] max-w-full min-w-0 shrink">
 								<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-(--omp-dim)" size={13} />
 								<input
 									aria-label={t("settings.searchPlaceholder")}
@@ -1106,31 +1108,41 @@ export function SettingsWindow() {
 													<DisplayPreferenceRow key={field} field={field} />
 												))}
 											</div>
-											<label id="setting-gui-pasteMenuThreshold" className="mt-4 block text-omp-sm">
-												{t("settings.display.pasteMenuThreshold")}
-												<Input
-													type="number"
-													min={0}
-													step={1}
-													value={pasteThresholdDraft ?? String(pasteMenuThreshold)}
-													onChange={event => setPasteThresholdDraft(event.target.value)}
-													onBlur={() => {
-														if (pasteThresholdDraft === null) return;
-														const value = Number(pasteThresholdDraft);
-														if (
-															pasteThresholdDraft.trim() === "" ||
-															!Number.isInteger(value) ||
-															value < 0
-														) {
-															toast({ variant: "error", message: t("settings.editors.errNumber") });
-															return;
-														}
-														void setDisplayPreference("pasteMenuThreshold", value).then(ok => {
-															if (ok) setPasteThresholdDraft(null);
-														});
-													}}
-												/>
-											</label>
+											{/* Same row geometry as the switches above: label left, a
+											    number-sized field right — not a full-width text box. */}
+											<div
+												id="setting-gui-pasteMenuThreshold"
+												className="flex items-center justify-between gap-4 px-2 py-2"
+											>
+												<span className="text-xs font-medium text-(--omp-text)">
+													{t("settings.display.pasteMenuThreshold")}
+												</span>
+												<div className="w-24 shrink-0">
+													<Input
+														aria-label={t("settings.display.pasteMenuThreshold")}
+														type="number"
+														min={0}
+														step={1}
+														value={pasteThresholdDraft ?? String(pasteMenuThreshold)}
+														onChange={event => setPasteThresholdDraft(event.target.value)}
+														onBlur={() => {
+															if (pasteThresholdDraft === null) return;
+															const value = Number(pasteThresholdDraft);
+															if (
+																pasteThresholdDraft.trim() === "" ||
+																!Number.isInteger(value) ||
+																value < 0
+															) {
+																toast({ variant: "error", message: t("settings.editors.errNumber") });
+																return;
+															}
+															void setDisplayPreference("pasteMenuThreshold", value).then(ok => {
+																if (ok) setPasteThresholdDraft(null);
+															});
+														}}
+													/>
+												</div>
+											</div>
 										</Section>
 										<Section id="setting-gui-readability" title={t("settings.gui.readability")}>
 											<Toggle

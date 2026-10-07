@@ -365,7 +365,7 @@ function PluginToggle({
 			aria-label={label}
 			className={cx(
 				"relative h-4.5 w-8 shrink-0 rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
-				enabled ? "bg-(--omp-accent)" : "border border-(--omp-border-muted)",
+				enabled ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)",
 			)}
 			disabled={disabled}
 			onClick={onToggle}
@@ -375,7 +375,7 @@ function PluginToggle({
 		>
 			<span
 				className={cx(
-					"absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full bg-white shadow transition-all duration-150",
+					"absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full bg-white shadow transition-[left] duration-150",
 					enabled ? "left-4" : "left-0.5",
 				)}
 			/>

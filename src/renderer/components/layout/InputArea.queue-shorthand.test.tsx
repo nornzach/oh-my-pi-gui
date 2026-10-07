@@ -152,10 +152,11 @@ async function mount(withRuntime = false): Promise<void> {
 	setPlanMode = vi.fn(async (enabled: boolean) => ok({ enabled }));
 	(window as unknown as Record<string, unknown>).omp = {
 		fs: { list: vi.fn(async () => ({ entries: [] })) },
-		events: { onCommandsUpdate: vi.fn(() => () => {}) },
+		events: { onCommandsUpdate: vi.fn(() => () => {}), onConfigUpdate: vi.fn(() => () => {}) },
 		prefs: { set: vi.fn(async () => ({})), get: vi.fn(async () => []) },
 		rpc: {
 			getAvailableCommands: vi.fn(async () => ok({ commands: [] })),
+			getSettings: vi.fn(async () => ok({ values: {} })),
 			getQueue: vi.fn(async () => ok({ steering: [], followUp: [] })),
 			followUp,
 			steer,
@@ -605,7 +606,7 @@ describe("InputArea run settings", () => {
 	}
 
 	async function mountCompact(): Promise<void> {
-		setWindowWidth(600);
+		setWindowWidth(500);
 		await mount();
 	}
 

@@ -4,14 +4,15 @@ import {
 	BriefcaseBusiness,
 	ChevronDown,
 	ChevronRight,
-	ChevronUp,
 	Code2,
 	Coins,
+	Command,
 	ExternalLink,
 	Folder,
 	GitBranchPlus,
 	GitPullRequest,
 	Keyboard,
+	type LucideIcon,
 	MessageCircle,
 	MessageSquarePlus,
 	MessageSquareWarning,
@@ -83,6 +84,28 @@ type PendingDelete = { kind: "session"; session: SessionInfo } | { kind: "group"
 
 type SidebarMode = "code" | "work";
 
+const NAVIGATION_MORE_KEY = "omp.sidebar.navigationMore";
+
+/** Whether the "More" navigation group is open — a per-window convenience, folded by default. */
+function useNavigationMoreOpen(): [boolean, (open: boolean) => void] {
+	const [open, setOpen] = useState(() => {
+		try {
+			return window.localStorage.getItem(NAVIGATION_MORE_KEY) === "1";
+		} catch {
+			return false;
+		}
+	});
+	const update = useCallback((next: boolean) => {
+		setOpen(next);
+		try {
+			window.localStorage.setItem(NAVIGATION_MORE_KEY, next ? "1" : "0");
+		} catch {
+			// Storage unavailable — the choice lasts for this window only.
+		}
+	}, []);
+	return [open, update];
+}
+
 function modifiedAt(session: SessionInfo): number {
 	const timestamp = Date.parse(session.modified);
 	return Number.isFinite(timestamp) ? timestamp : 0;
@@ -115,7 +138,7 @@ export function Sidebar() {
 		[keymapOverrides],
 	);
 	const [mode, setMode] = useState<SidebarMode>("code");
-	const [navigationExpanded, setNavigationExpanded] = useState(true);
+	const [navigationExpanded, setNavigationExpanded] = useNavigationMoreOpen();
 	const [defaultWorkspace, setDefaultWorkspace] = useState<string | null>(null);
 	const switchPendingTo = useSessionStore(s => s.switchPending?.toId ?? null);
 	// Resizable left rail (mirrors PanelContainer's right-rail drag, but the
@@ -424,8 +447,8 @@ export function Sidebar() {
 				className={cx(
 					"omp-sidebar-session-row omp-color-fade group cursor-pointer rounded-md border px-2 py-1",
 					active
-						? "border-[var(--omp-border-accent)] bg-[var(--omp-selected-bg)]"
-						: "border-transparent hover:border-[var(--omp-border-muted)] hover:bg-[var(--omp-sidebar-item-hover)]",
+						? "border-transparent bg-[var(--omp-selected-bg)]"
+						: "border-transparent hover:bg-[var(--omp-sidebar-item-hover)]",
 				)}
 			>
 				<div className="flex min-w-0 items-center">
@@ -522,6 +545,96 @@ export function Sidebar() {
 		);
 	};
 
+	interface NavigationItem {
+		id: string;
+		icon: LucideIcon;
+		label: string;
+		title?: string;
+		shortcut?: string;
+		onClick: () => void;
+	}
+	// Session work stays one click away; app-wide tools fold under "More" and
+	// remain reachable from the Command Center.
+	const primaryNavigation: NavigationItem[] = [
+		{
+			id: "commands",
+			icon: Command,
+			label: t("titlebar.commands"),
+			shortcut: paletteShortcut,
+			title: t("titlebar.commandsHint", { shortcut: paletteShortcut }),
+			onClick: () => useUiStore.getState().openCommandPalette(),
+		},
+		{ id: "agents", icon: Bot, label: t("titlebar.agentHub"), onClick: () => useUiStore.getState().openAgentHub() },
+		{
+			id: "pull-requests",
+			icon: GitPullRequest,
+			label: t("titlebar.prCenter"),
+			onClick: () => useUiStore.getState().openPrCenter(),
+		},
+		{
+			id: "workspace",
+			icon: PanelRight,
+			label: t("titlebar.workspace"),
+			onClick: () => useUiStore.getState().togglePanel(),
+		},
+	];
+	const secondaryNavigation: NavigationItem[] = [
+		{
+			id: "capabilities",
+			icon: Sparkles,
+			label: t("sidebar.navigation.capabilities"),
+			title: t("settings.capabilities.description"),
+			onClick: () => useUiStore.getState().openSettings("capabilities"),
+		},
+		{
+			id: "providers",
+			icon: Plug,
+			label: t("titlebar.providers"),
+			onClick: () => useUiStore.getState().openProviders(),
+		},
+		{ id: "usage", icon: Coins, label: t("titlebar.usage"), onClick: () => useUiStore.getState().openUsage() },
+		{
+			id: "stats",
+			icon: BarChart3,
+			label: t("titlebar.stats"),
+			onClick: () => useUiStore.getState().openStatsDashboard(),
+		},
+		{
+			id: "hotkeys",
+			icon: Keyboard,
+			label: t("titlebar.hotkeys"),
+			onClick: () => useUiStore.getState().openHotkeys(),
+		},
+		{
+			id: "feedback",
+			icon: MessageSquareWarning,
+			label: t("titlebar.feedback"),
+			title: t("titlebar.feedbackHint"),
+			onClick: () => useUiStore.getState().openFeedback(),
+		},
+	];
+	const renderNavigationItem = (item: NavigationItem) => {
+		const Icon = item.icon;
+		return (
+			<button
+				key={item.id}
+				type="button"
+				onClick={item.onClick}
+				data-command-center-entry={item.id === "commands" ? true : undefined}
+				title={item.title}
+				className="omp-pressable flex h-8 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-omp-md text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+			>
+				<Icon aria-hidden="true" className="shrink-0" size={15} />
+				<span className="min-w-0 flex-1 truncate">{item.label}</span>
+				{item.shortcut && (
+					<kbd className="shrink-0 rounded border border-[var(--omp-border-muted)] px-1 text-omp-xxs text-[var(--omp-dim)]">
+						{item.shortcut}
+					</kbd>
+				)}
+			</button>
+		);
+	};
+
 	const utilityButton =
 		"omp-pressable flex h-6 w-7 shrink-0 items-center justify-center rounded-md text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]";
 
@@ -589,6 +702,22 @@ export function Sidebar() {
 				</div>
 
 				<div className="px-2 pb-2" data-sidebar-navigation>
+					<div className="space-y-0.5">{primaryNavigation.map(renderNavigationItem)}</div>
+					<button
+						type="button"
+						aria-expanded={navigationExpanded}
+						aria-label={t(navigationExpanded ? "sidebar.navigation.collapse" : "sidebar.navigation.expand")}
+						title={t(navigationExpanded ? "sidebar.navigation.collapse" : "sidebar.navigation.expand")}
+						onClick={() => setNavigationExpanded(!navigationExpanded)}
+						className="omp-pressable mt-0.5 flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left text-omp-sm text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-muted)]"
+					>
+						<ChevronRight
+							aria-hidden="true"
+							size={13}
+							className={cx("omp-disclosure-chevron shrink-0", navigationExpanded && "rotate-90")}
+						/>
+						<span>{t("sidebar.navigation.more")}</span>
+					</button>
 					<div
 						aria-hidden={!navigationExpanded}
 						className="omp-sidebar-group"
@@ -596,110 +725,9 @@ export function Sidebar() {
 						inert={!navigationExpanded}
 					>
 						<div className="omp-sidebar-group-content space-y-0.5">
-							{[
-								{
-									id: "commands",
-									icon: Search,
-									label: t("titlebar.commands"),
-									shortcut: paletteShortcut,
-									title: t("titlebar.commandsHint", { shortcut: paletteShortcut }),
-									onClick: () => useUiStore.getState().openCommandPalette(),
-								},
-								{
-									id: "capabilities",
-									icon: Sparkles,
-									label: t("settings.capabilities.title"),
-									title: t("settings.capabilities.description"),
-									onClick: () => useUiStore.getState().openSettings("capabilities"),
-								},
-								{
-									id: "agents",
-									icon: Bot,
-									label: t("titlebar.agentHub"),
-									onClick: () => useUiStore.getState().openAgentHub(),
-								},
-								{
-									id: "providers",
-									icon: Plug,
-									label: t("titlebar.providers"),
-									onClick: () => useUiStore.getState().openProviders(),
-								},
-								{
-									id: "usage",
-									icon: Coins,
-									label: t("titlebar.usage"),
-									onClick: () => useUiStore.getState().openUsage(),
-								},
-								{
-									id: "stats",
-									icon: BarChart3,
-									label: t("titlebar.stats"),
-									onClick: () => useUiStore.getState().openStatsDashboard(),
-								},
-								{
-									id: "pull-requests",
-									icon: GitPullRequest,
-									label: t("titlebar.prCenter"),
-									onClick: () => useUiStore.getState().openPrCenter(),
-								},
-								{
-									id: "workspace",
-									icon: PanelRight,
-									label: t("titlebar.workspace"),
-									onClick: () => useUiStore.getState().togglePanel(),
-								},
-								{
-									id: "hotkeys",
-									icon: Keyboard,
-									label: t("titlebar.hotkeys"),
-									onClick: () => useUiStore.getState().openHotkeys(),
-								},
-								{
-									id: "feedback",
-									icon: MessageSquareWarning,
-									label: t("titlebar.feedback"),
-									title: t("titlebar.feedbackHint"),
-									onClick: () => useUiStore.getState().openFeedback(),
-								},
-								{
-									id: "settings",
-									icon: Settings,
-									label: t("titlebar.settings"),
-									onClick: () => useUiStore.getState().openSettings(),
-								},
-							].map(item => {
-								const Icon = item.icon;
-								return (
-									<button
-										key={item.id}
-										type="button"
-										onClick={item.onClick}
-										data-command-center-entry={item.id === "commands" ? true : undefined}
-										title={item.title}
-										className="omp-pressable flex h-8 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-omp-md text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
-									>
-										<Icon aria-hidden="true" className="shrink-0" size={15} />
-										<span className="min-w-0 flex-1 truncate">{item.label}</span>
-										{item.shortcut && (
-											<kbd className="shrink-0 rounded border border-[var(--omp-border-muted)] px-1 text-omp-xxs text-[var(--omp-dim)]">
-												{item.shortcut}
-											</kbd>
-										)}
-									</button>
-								);
-							})}
+							{secondaryNavigation.map(renderNavigationItem)}
 						</div>
 					</div>
-					<button
-						type="button"
-						aria-expanded={navigationExpanded}
-						aria-label={t(navigationExpanded ? "sidebar.navigation.collapse" : "sidebar.navigation.expand")}
-						title={t(navigationExpanded ? "sidebar.navigation.collapse" : "sidebar.navigation.expand")}
-						onClick={() => setNavigationExpanded(expanded => !expanded)}
-						className="omp-pressable mt-1 flex h-6 w-full items-center justify-center rounded-lg border border-[var(--omp-border-muted)] text-[var(--omp-dim)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-muted)]"
-					>
-						{navigationExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-					</button>
 				</div>
 
 				<div className="flex items-center justify-between px-4 pb-1.5">
@@ -922,9 +950,21 @@ export function Sidebar() {
 					})}
 				</div>
 
-				{/* Bottom utility row: theme + language only — stats/settings live in the
-				    TitleBar, and the files button was a subset of the drawer toggle. */}
-				<div className="flex h-7 shrink-0 items-center gap-0.5 border-t border-[var(--omp-border-muted)] px-2">
+				{/* Bottom utility row: settings, theme and language — the app-level
+				    controls that are not tied to a session. */}
+				<div className="flex h-8 shrink-0 items-center gap-0.5 border-t border-[var(--omp-border-muted)] px-2">
+					<button
+						type="button"
+						data-sidebar-settings
+						onClick={() => useUiStore.getState().openSettings()}
+						title={t("titlebar.settings")}
+						aria-label={t("titlebar.settings")}
+						className="omp-pressable flex h-6 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-omp-sm text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+					>
+						<Settings aria-hidden="true" size={13} />
+						<span>{t("titlebar.settings")}</span>
+					</button>
+					<div className="flex-1" />
 					<button
 						type="button"
 						onClick={openThemePicker}
@@ -935,7 +975,6 @@ export function Sidebar() {
 						<Palette size={13} />
 					</button>
 					<LangSwitcher className="h-6 max-h-6 rounded-md px-1.5 text-omp-sm [&_svg]:size-[14px]" />
-					<div className="flex-1" />
 				</div>
 				<div
 					role="separator"

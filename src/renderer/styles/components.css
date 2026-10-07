@@ -5,56 +5,47 @@
 
 /* ---------------------------------------------------------------------------
  * Streaming caret
+ *
+ * A thin bar that rides the end of the text still being written. It blinks
+ * softly (opacity only) so it marks the live edge without pulling the eye.
  * ------------------------------------------------------------------------- */
-.omp-caret {
+.omp-caret,
+.omp-streaming [data-omp-caret]::after {
 	display: inline-block;
-	width: 7px;
+	width: 2px;
 	height: 1.05em;
 	margin-left: 2px;
 	vertical-align: text-bottom;
-	border-radius: 2px;
+	border-radius: 1px;
 	background: var(--omp-streaming-cursor);
-	transform-origin: center bottom;
-	animation: omp-caret-breathe 0.92s ease-in-out infinite; /* motion-ok: caret loop */
+	animation: omp-caret-blink 1.1s ease-in-out infinite; /* motion-ok: caret loop */
 }
 
-@keyframes omp-caret-breathe {
-	0%, 100% {
-		opacity: 0.95;
-		transform: scaleY(1);
+.omp-streaming [data-omp-caret]::after {
+	content: "";
+}
+
+@keyframes omp-caret-blink {
+	0%,
+	45% {
+		opacity: 0.9;
 	}
-	50% {
-		opacity: 0.42;
-		transform: scaleY(0.88);
+	70%,
+	100% {
+		opacity: 0.25;
 	}
 }
 
-/* Typography MUST match .markdown-body (14.5px/1.7): the tail is promoted
- * into a markdown block at every paragraph boundary, and a size mismatch
- * reads as a visible jump mid-stream. Promotion must carry no entrance motion
- * either — those characters were already on screen, so fading them in from
- * transparent blinks the paragraph out and back. */
+/* The live tail renders as Markdown with the same typography as promoted
+ * blocks, so a paragraph moving from the tail into a stable block never shifts.
+ * Only an unfinished display-math block stays plain until it closes. */
 .omp-streaming-tail {
 	min-height: 1.5em;
+}
+
+.omp-streaming-plain {
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
-	font-size: calc(var(--gui-font-size, 15px) * 14.5 / 15);
-	line-height: 1.7;
-}
-
-/* A commit appends one chunk and only flips the class on the previous one, so
- * revealed text never loses its node mid-motion. Transitions (not animations)
- * because the stream's commit cadence must be able to interrupt a fade without
- * restarting it, which is what made the old per-frame re-keyed reveal strobe. */
-.omp-streaming-chunk {
-	transition:
-		opacity var(--omp-motion-fast) var(--omp-ease),
-		filter var(--omp-motion-fast) var(--omp-ease);
-}
-
-.omp-streaming-reveal {
-	opacity: 0.8;
-	filter: blur(0.3px);
 }
 
 
@@ -127,6 +118,8 @@
    tail's 14.5px would visibly outweigh promoted paragraphs inside the
    12px thinking block. */
 .omp-thinking-body .omp-streaming-tail {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
 	font-size: inherit;
 	line-height: inherit;
 }
@@ -333,14 +326,9 @@
 	.omp-thinking-shimmer {
 		animation: none;
 	}
-	.omp-caret {
+	.omp-caret,
+	.omp-streaming [data-omp-caret]::after {
 		animation: none;
-	}
-	/* With transitions flattened, the reveal dim would itself strobe at the
-	 * commit cadence: dim for one frame, full for the next. */
-	.omp-streaming-reveal {
-		opacity: 1;
-		filter: none;
 	}
 }
 
@@ -428,7 +416,7 @@
 .omp-workspace-main,
 .settings-main-canvas {
 	--omp-column-pad: clamp(16px, 3vw, 40px);
-	--omp-column-reading: 60rem;
+	--omp-column-reading: 50rem; /* ~110 characters of 13px transcript prose */
 	--omp-column-workspace: 104rem;
 }
 
@@ -676,9 +664,19 @@
 	margin-block: 0;
 }
 
+/* Hover actions float on the bubble's top edge instead of reserving an
+   invisible row under every prompt (which read as empty bottom padding). */
 .omp-transcript-editorial .omp-user-bubble-actions {
+	position: absolute;
+	top: -15px;
+	right: 8px;
+	z-index: 1;
 	justify-content: flex-end;
-	margin-top: 8px;
+	padding: 0 2px 0 8px;
+	border: 1px solid var(--omp-border-muted);
+	border-radius: 8px;
+	background: var(--omp-bg-elevated);
+	box-shadow: var(--omp-shadow-sm);
 	opacity: 0;
 	pointer-events: none;
 	transition: opacity var(--omp-motion-fast) var(--omp-ease);
@@ -1027,11 +1025,11 @@
 /* Marked once per row key, so this never interrupts itself. The motion is on the
  * row rather than its virtual slot because the slot is positioned with an inline
  * transform the animation would overwrite. */
+/* A row that genuinely arrives at the tail (sent prompt, new reply) fades in
+   briefly so arrival is perceptible — opacity only, nothing travels. */
 .omp-transcript-editorial .omp-row-arrive > .omp-transcript-row {
-	animation: omp-fade-up var(--omp-motion-med) var(--omp-ease-enter) both;
+	animation: omp-fade-in var(--omp-motion-fast) var(--omp-ease) both;
 }
-
-
 
 .omp-empty-canvas,
 .omp-composer-shell {
@@ -1071,6 +1069,21 @@
 	}
 }
 
+/* When the title bar runs short, the session title keeps its room: usage
+   figures step back to the context meter in the composer, and the project
+   shows as its folder icon (full name in the tooltip) instead of "p…". */
+@container omp-workspace (max-width: 760px) {
+	.omp-session-metrics {
+		display: none !important;
+	}
+}
+
+@container omp-workspace (max-width: 700px) {
+	.omp-titlebar-project-name {
+		display: none;
+	}
+}
+
 @container omp-workspace (max-width: 520px) {
 	.omp-titlebar-status {
 		margin-inline: 0;
@@ -1095,6 +1108,33 @@
 
 	.omp-conversation-nav {
 		left: 4px;
+	}
+}
+
+/* The composer toolbar degrades in steps instead of folding everything into
+   "…" at once: first the control labels go (each keeps its icon and tooltip),
+   and only a toolbar too narrow for the icons folds the run settings. */
+.omp-composer-toolbar {
+	container: omp-composer-toolbar / inline-size;
+}
+
+@container omp-composer-toolbar (max-width: 780px) {
+	.omp-composer-control-label {
+		display: none !important;
+	}
+}
+
+/* Context strategy row: the model reading goes first when space runs short,
+   then the method and threshold; the strategy name always stays. */
+@container omp-workspace (max-width: 620px) {
+	.omp-context-bar-model {
+		display: none;
+	}
+}
+
+@container omp-workspace (max-width: 420px) {
+	.omp-context-bar-detail {
+		display: none;
 	}
 }
 

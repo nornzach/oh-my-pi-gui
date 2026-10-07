@@ -16,6 +16,7 @@ import {
 	mergeTodoSnapshots,
 	ROW_ENTRANCE_TAIL_ROWS,
 	shouldRePinTranscript,
+	tabAwaitsTranscript,
 } from "./ChatStream";
 
 const at = "2026-08-05T04:00:00.000Z";
@@ -522,5 +523,18 @@ describe("transcript row entrances", () => {
 		const other = history(30);
 		expect(claim(latch, "session-b", true, other)).toEqual([]);
 		expect(claim(latch, "session-b", true, [...other, "a30"])).toEqual(["a30"]);
+	});
+});
+
+describe("tabAwaitsTranscript", () => {
+	it("lets a fresh tab show its start screen while the sidecar boots", () => {
+		expect(tabAwaitsTranscript({})).toBe(false);
+	});
+
+	it("keeps a resuming tab on the loading state so the start screen never flashes before history", () => {
+		expect(tabAwaitsTranscript({ sessionPath: "/sessions/a.jsonl" })).toBe(true);
+		expect(tabAwaitsTranscript({ pendingSessionPath: "/sessions/b.jsonl" })).toBe(true);
+		// An unknown tab is treated conservatively, as one with history.
+		expect(tabAwaitsTranscript(undefined)).toBe(true);
 	});
 });

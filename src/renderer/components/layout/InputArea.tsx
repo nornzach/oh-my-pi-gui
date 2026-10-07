@@ -41,6 +41,7 @@ import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { ApprovalControl } from "./ApprovalControl";
 import { ComposerModes } from "./ComposerModes";
+import { ContextStrategyBar } from "./ContextStrategyBar";
 import { ContextUsagePopover } from "./ContextUsagePopover";
 import { HistorySearchOverlay } from "./HistorySearchOverlay";
 import { fileToImage, listMentionFiles, mentionFileCache } from "./input-area-utils";
@@ -118,7 +119,10 @@ export function InputArea() {
 	useLayoutEffect(() => {
 		const toolbar = composerToolbarRef.current;
 		if (!toolbar) return;
-		const inlineMinWidth = isChat ? 560 : 820;
+		// Below 780px the control labels collapse to icons (components.css), so
+		// the full row fits in ~540px. Folding earlier hid the run state (model,
+		// thinking, approval) whenever the workspace panel was open.
+		const inlineMinWidth = isChat ? 420 : 560;
 		const measure = () => {
 			const measured = toolbar.getBoundingClientRect().width;
 			const width = Number.isFinite(measured) && measured > 0 ? measured : window.innerWidth;
@@ -997,11 +1001,7 @@ export function InputArea() {
 											: "text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]",
 									)}
 								>
-									{recording ? (
-										<Square size={12} fill="currentColor" className="omp-pulse-dot" />
-									) : (
-										<Mic size={16} />
-									)}
+									{recording ? <Square size={12} fill="currentColor" /> : <Mic size={16} />}
 								</button>
 							)}
 
@@ -1149,6 +1149,7 @@ export function InputArea() {
 						</div>
 					</div>
 				</div>
+				<ContextStrategyBar />
 			</div>
 		</div>
 	);
@@ -1173,7 +1174,7 @@ function FastModeControl({ menuItem = false }: { menuItem?: boolean }) {
 			)}
 		>
 			<Zap size={14} fill={active ? "currentColor" : "none"} />
-			<span>{t("input.fast.label")}</span>
+			<span className="omp-composer-control-label">{t("input.fast.label")}</span>
 		</button>
 	);
 }

@@ -62,7 +62,7 @@ function Toggle({
 			aria-checked={checked}
 			aria-label={label}
 			className={`relative h-[18px] w-8 shrink-0 rounded-full transition-colors duration-150 ${
-				checked ? "bg-(--omp-accent)" : "border border-(--omp-border-muted) bg-(--omp-bg-tertiary)" // surface-ok: toggle switch track fill
+				checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)" // surface-ok: toggle switch track fill
 			}`}
 			disabled={disabled}
 			onClick={event => {

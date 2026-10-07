@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { segmentStreamingMarkdown } from "./streaming-markdown";
+import { presentStreamingTail, segmentStreamingMarkdown } from "./streaming-markdown";
 
 describe("streaming Markdown segmentation", () => {
 	it("promotes complete paragraphs while leaving the unfinished tail mutable", () => {
@@ -75,5 +75,37 @@ describe("streaming Markdown segmentation", () => {
 		const result = segmentStreamingMarkdown(source);
 		expect(result.blocks).toEqual([]);
 		expect(result.tail).toBe(source);
+	});
+});
+
+describe("streaming tail presentation", () => {
+	it("closes an open fence so the code block grows in place", () => {
+		expect(presentStreamingTail("~~~~py\nprint(1")).toEqual({ markdown: "~~~~py\nprint(1\n~~~~", plain: "" });
+	});
+
+	it("keeps unfinished display math as plain text so KaTeX never sees half a formula", () => {
+		expect(presentStreamingTail("Before\n$$\nx = \\frac{1}{")).toEqual({
+			markdown: "Before",
+			plain: "$$\nx = \\frac{1}{",
+		});
+	});
+
+	it("holds back a partial line that would render as a different block", () => {
+		// A bare `##`, a list marker without text, and a `--` that would turn the
+		// paragraph above into a setext heading.
+		expect(presentStreamingTail("Intro\n##").markdown).toBe("Intro");
+		expect(presentStreamingTail("Intro\n12.").markdown).toBe("Intro");
+		expect(presentStreamingTail("Some paragraph\n--").markdown).toBe("Some paragraph");
+	});
+
+	it("shows only the text of a link whose target is still arriving", () => {
+		expect(presentStreamingTail("See [the docs](https://exa").markdown).toBe("See the docs");
+		expect(presentStreamingTail("Logo ![alt](./lo").markdown).toBe("Logo ");
+	});
+
+	it("closes nested emphasis innermost-first and leaves literal asterisks alone", () => {
+		expect(presentStreamingTail("**bold and *both").markdown).toBe("**bold and *both***");
+		expect(presentStreamingTail("2 * 3 = 6 and a * b").markdown).toBe("2 * 3 = 6 and a * b");
+		expect(presentStreamingTail("- **Done**: item\n* next").markdown).toBe("- **Done**: item\n* next");
 	});
 });

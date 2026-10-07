@@ -69,7 +69,7 @@ describe("resolveProviderEditAction", () => {
 });
 
 describe("providerDiscoveryErrors", () => {
-	it("reports configured upstream failures without alarming on optional local probes", () => {
+	it("reports failures only for providers in use, never for optional local probes", () => {
 		expect(
 			providerDiscoveryErrors(
 				[
@@ -89,8 +89,17 @@ describe("providerDiscoveryErrors", () => {
 						models: [],
 						error: "connection refused",
 					},
+					{
+						provider: "ollama-cloud",
+						status: "unavailable",
+						optional: false,
+						stale: false,
+						models: [],
+						error: "upstream model list unavailable",
+					},
 				],
 				"Discovery unavailable",
+				new Set(["custom-openai", "ollama"]),
 			),
 		).toEqual(["custom-openai: HTTP 401"]);
 	});

@@ -225,15 +225,16 @@ function SidebarWithRecency() {
 }
 
 describe("Sidebar menus and pinned ordering", () => {
-	it("lists the former titlebar actions below New session and collapses them as one menu", async () => {
+	it("keeps session tools visible and folds app-wide tools under More", async () => {
 		installMockOmp(LIST);
 		seedStores();
 		await mount(<Sidebar />);
 
 		const navigation = container.querySelector("[data-sidebar-navigation]");
+		const group = () => navigation!.querySelector(".omp-sidebar-group") as unknown as Element;
 		for (const label of [
 			"Commands",
-			"Start with what makes OMP different",
+			"OMP capabilities",
 			"Agent Hub",
 			"Providers & login",
 			"Usage & quotas",
@@ -241,12 +242,20 @@ describe("Sidebar menus and pinned ordering", () => {
 			"PR Center",
 			"Open workspace",
 			"Keyboard shortcuts",
-			"Settings",
 		]) {
 			expect(navigation?.textContent).toContain(label);
 		}
+		// Primary items sit outside the fold; app-wide tools start folded away.
+		expect(group().textContent).not.toContain("Agent Hub");
+		expect(group().textContent).toContain("Providers & login");
+		expect(group().getAttribute("aria-hidden")).toBe("true");
+		const more = navigation!.querySelector('[aria-label="Show more navigation"]');
+		await fire(more, "onClick");
+		expect(group().getAttribute("aria-hidden")).toBe("false");
+		expect(more?.getAttribute("aria-expanded")).toBe("true");
+
 		const capabilities = [...navigation!.querySelectorAll("button")].find(button =>
-			(button.textContent ?? "").includes("Start with what makes OMP different"),
+			(button.textContent ?? "").includes("OMP capabilities"),
 		);
 		if (!capabilities) throw new Error("Capabilities navigation item missing");
 		await fire(capabilities, "onClick");
@@ -266,12 +275,10 @@ describe("Sidebar menus and pinned ordering", () => {
 		await fire(hotkeys, "onClick");
 		expect(useUiStore.getState().hotkeysOpen).toBe(true);
 
-		const collapse = navigation!.querySelector('[aria-label="Collapse navigation"]');
-		expect(collapse?.getAttribute("title")).toBe("Collapse navigation");
-		await fire(collapse, "onClick");
-		expect((navigation!.querySelector(".omp-sidebar-group") as unknown as Element).getAttribute("aria-hidden")).toBe(
-			"true",
-		);
+		await act(async () => useUiStore.setState({ settingsOpen: false }));
+		const settings = container.querySelector("[data-sidebar-settings]");
+		await fire(settings, "onClick");
+		expect(useUiStore.getState().settingsOpen).toBe(true);
 	});
 
 	it("moves the most recently used session and its workspace to the front immediately", async () => {

@@ -112,7 +112,7 @@ test("settings expose eight groups, translated search and independent display pr
 	await settings.getByRole("button", { name: "Appearance & use", exact: true }).click();
 	await expect(settings).toContainText("Choose GUI theme");
 	await page.screenshot({ path: "test-results/01-settings.png", scale: "css", animations: "disabled" });
-	const search = settings.getByPlaceholder("Search settings and managed resources…");
+	const search = settings.getByPlaceholder("Search settings…");
 	await search.fill("压缩");
 	await expect(settings).toContainText("Auto compaction");
 	await search.fill("paste.largeMenuThreshold");
@@ -140,7 +140,7 @@ test("voice and side question require an explicit start", async () => {
 test("Escape cancels a settings edit without saving its abandoned value", async () => {
 	await page.getByRole("button", { name: "Settings", exact: true }).click();
 	const settings = page.getByRole("dialog");
-	await settings.getByPlaceholder("Search settings and managed resources…").fill("compaction.reserveTokens");
+	await settings.getByPlaceholder("Search settings…").fill("compaction.reserveTokens");
 	await settings.getByRole("button", { name: "Reserve tokens compaction.reserveTokens", exact: true }).click();
 	const input = settings.locator('input[type="number"]').first();
 	await expect(input).toHaveValue("8192");
@@ -420,7 +420,7 @@ test("model benchmark, collaboration, tools and debug open without external muta
 test("settings search opens advanced controls and old refreshes cannot undo a saved edit", async () => {
 	await page.getByRole("button", { name: "Settings", exact: true }).click();
 	const settings = page.getByRole("dialog");
-	const search = settings.getByPlaceholder("Search settings and managed resources…");
+	const search = settings.getByPlaceholder("Search settings…");
 	await search.fill("proxyUrl");
 	await settings.getByRole("button", { name: /^HTTP proxy/ }).click();
 	await expect(page.locator("#setting-gui-proxy input")).toBeEditable();
@@ -597,7 +597,7 @@ test("failed preference writes retain edits and never allow a premature restart"
 	await expect(prompt).toBeEditable();
 	await expect(restart).toBeDisabled();
 	expect(await app.evaluate(() => Reflect.get(globalThis, "auditRestarts"))).toEqual([]);
-	await settings.getByPlaceholder("Search settings and managed resources…").fill("codeLineNumbers");
+	await settings.getByPlaceholder("Search settings…").fill("codeLineNumbers");
 	await settings.getByRole("button", { name: /^Line numbers/ }).click();
 	const lineNumbers = page.locator('#setting-gui-lineNumbers [role="switch"]');
 	const checked = await lineNumbers.getAttribute("aria-checked");

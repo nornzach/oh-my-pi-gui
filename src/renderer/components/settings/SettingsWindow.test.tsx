@@ -380,10 +380,10 @@ describe("SettingsWindow", () => {
 		// No explicit target: reopening must not bounce the user to the first tab.
 		useUiStore.getState().openSettings();
 		expect(useUiStore.getState()).toMatchObject({ settingsOpen: true, settingsTab: "mcp" });
-		// A cold open still starts at the default page.
+		// A cold open starts at the GUI preferences page.
 		useUiStore.getState().closeSettings();
 		useUiStore.getState().openSettings();
-		expect(useUiStore.getState()).toMatchObject({ settingsOpen: true, settingsTab: "capabilities" });
+		expect(useUiStore.getState()).toMatchObject({ settingsOpen: true, settingsTab: "gui" });
 	});
 
 	it("renders nothing when closed", () => {
