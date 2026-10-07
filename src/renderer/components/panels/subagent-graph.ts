@@ -199,27 +199,38 @@ export function buildSubagentDag(
 		if (inferred) unresolved.push(agent.id);
 	}
 
-	// Depth via walk-up with cycle protection; a cycle re-attaches the node to main.
+	// Depth via walk-up with cycle protection; a cycle re-attaches the walked
+	// node to main. Depths are memoized and backfilled along each walk, so a
+	// long lineage resolves in one pass instead of an O(n²) walk-per-node.
 	const depthOf = new Map<string, number>([[MAIN_NODE_ID, 0]]);
 	for (const agent of sorted) {
-		const seen = new Set<string>([agent.id]);
+		if (depthOf.has(agent.id)) continue;
+		const path: string[] = [];
+		const onPath = new Set<string>();
 		let cursor = agent.id;
-		let hops = 0;
-		let cycled = false;
+		let base: number | null = null;
 		while (cursor !== MAIN_NODE_ID) {
-			const parent = parentOf.get(cursor) ?? MAIN_NODE_ID;
-			if (parent !== MAIN_NODE_ID) {
-				if (seen.has(parent)) {
-					cycled = true;
-					break;
-				}
-				seen.add(parent);
+			const known = depthOf.get(cursor);
+			if (known !== undefined) {
+				base = known;
+				break;
 			}
-			cursor = parent;
-			hops++;
+			if (onPath.has(cursor)) break; // re-entered this walk's path → cycle
+			onPath.add(cursor);
+			path.push(cursor);
+			cursor = parentOf.get(cursor) ?? MAIN_NODE_ID;
 		}
-		if (cycled) parentOf.set(agent.id, MAIN_NODE_ID);
-		depthOf.set(agent.id, cycled ? 1 : hops);
+		if (base === null && cursor !== MAIN_NODE_ID) {
+			// Walked into a cycle: re-root the node and leave the rest of the
+			// path unresolved — they walk again and terminate at the re-root.
+			parentOf.set(agent.id, MAIN_NODE_ID);
+			depthOf.set(agent.id, 1);
+			continue;
+		}
+		const baseDepth = base ?? 0;
+		for (let i = path.length - 1; i >= 0; i--) {
+			depthOf.set(path[i]!, baseDepth + (path.length - i));
+		}
 	}
 
 	const childrenOf = new Map<string, string[]>();
@@ -231,27 +242,40 @@ export function buildSubagentDag(
 	}
 
 	// Tidy rows: leaves take successive slots; internal nodes center on children.
+	// Iterative post-order — recursion over a deep lineage overflows the stack.
 	let leafCount = 0;
 	const slotOf = new Map<string, number>();
-	const place = (id: string): number => {
+	const postOrder: string[] = [];
+	const expanded = new Set<string>();
+	const pending: Array<{ id: string; expanded: boolean }> = [{ id: MAIN_NODE_ID, expanded: false }];
+	while (pending.length > 0) {
+		const top = pending.pop()!;
+		if (top.expanded) {
+			postOrder.push(top.id);
+			continue;
+		}
+		if (expanded.has(top.id)) continue; // residual cycle: skip instead of looping
+		expanded.add(top.id);
+		pending.push({ id: top.id, expanded: true });
+		// Pushed in reverse so the left-to-right sibling order survives the LIFO pop.
+		const kids = childrenOf.get(top.id) ?? [];
+		for (let i = kids.length - 1; i >= 0; i--) pending.push({ id: kids[i]!, expanded: false });
+	}
+	for (const id of postOrder) {
 		const kids = childrenOf.get(id) ?? [];
 		if (kids.length === 0) {
-			const slot = leafCount++;
-			slotOf.set(id, slot);
-			return slot;
+			slotOf.set(id, leafCount++);
+			continue;
 		}
 		let first = Number.POSITIVE_INFINITY;
 		let last = Number.NEGATIVE_INFINITY;
 		for (const kid of kids) {
-			const slot = place(kid);
+			const slot = slotOf.get(kid) ?? 0;
 			first = Math.min(first, slot);
 			last = Math.max(last, slot);
 		}
-		const slot = (first + last) / 2;
-		slotOf.set(id, slot);
-		return slot;
-	};
-	place(MAIN_NODE_ID);
+		slotOf.set(id, (first + last) / 2);
+	}
 
 	const rowPitch = DAG_NODE_HEIGHT + DAG_GAP_Y;
 	const colPitch = DAG_NODE_WIDTH + DAG_GAP_X;
