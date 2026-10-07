@@ -291,20 +291,11 @@ async function signMacBinary(filePath: string): Promise<void> {
 	if (exitCode !== 0) throw new Error(`codesign failed with exit code ${exitCode}`);
 }
 
-async function embedNativeForTarget(target: SidecarTarget): Promise<void> {
-	const env =
-		target.platformTag === `${process.platform}-${process.arch}`
-			? process.env
-			: {
-					...process.env,
-					TARGET_PLATFORM: target.platformTag.split("-")[0]!,
-					TARGET_ARCH: target.platformTag.split("-")[1]!,
-				};
-	await runPackageScript(nativesDir, "gen:native", env);
-}
-
 async function restoreGeneratedAssets(): Promise<void> {
-	await Promise.all([runPackageScript(nativesDir, "gen:native:reset"), runPackageScript(statsDir, "gen:stats:reset")]);
+	// gen:stats:reset stays: upstream removed gen:native when embedding moved
+	// into Bun.build({ files }) inside compileCodingAgent (in-memory manifest,
+	// no generated source to reset).
+	await runPackageScript(statsDir, "gen:stats:reset");
 }
 
 // ---------------------------------------------------------------------------
@@ -322,12 +313,13 @@ try {
 	try {
 		await runPackageScript(statsDir, "gen:stats");
 		await runPackageScript(collabWebDir, "gen:tool-views");
-		await embedNativeForTarget(target);
+		const [platform, arch] = target.platformTag.split("-");
 		await compileCodingAgent({
 			repoRoot,
 			entrypoint: path.join(codingAgentDir, "src", "cli.ts"),
 			outfile: out,
 			transformersVersion,
+			native: { platform: platform!, arch: arch! },
 			...(target.target ? { target: target.target } : {}),
 			skipBuiltinCodesign: shouldAdhocSign,
 		});

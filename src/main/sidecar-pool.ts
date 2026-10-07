@@ -49,6 +49,7 @@ import {
 	type HostUriRequest,
 	type ModelCatalogUpdateFrame,
 	type PromptResultFrame,
+	type RpcBtwFrame,
 	type RpcCommand,
 	type RpcLiveFrame,
 	type RpcResponse,
@@ -379,6 +380,9 @@ export class SidecarPool {
 		});
 		wire("liveFrame", (frame: RpcLiveFrame) => {
 			forwardActive(IPC_EVENTS.LIVE_FRAME, frame);
+		});
+		wire("btwFrame", (frame: RpcBtwFrame) => {
+			forwardActive(IPC_EVENTS.BTW_FRAME, frame);
 		});
 		wire("modelCatalogUpdate", (frame: ModelCatalogUpdateFrame) => {
 			forwardActive(IPC_EVENTS.MODEL_CATALOG_UPDATE, frame);

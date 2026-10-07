@@ -21,6 +21,7 @@ import type {
 	ModelCatalogUpdateFrame,
 	OutboundFrame,
 	PromptResultFrame,
+	RpcBtwFrame,
 	RpcLiveFrame,
 	RpcReadyFrame,
 	RpcResponse,
@@ -31,7 +32,7 @@ import type {
 	SidecarStatusPayload,
 	SubagentFrame,
 } from "../shared/rpc-types";
-import { LIVE_FRAME_TYPES } from "../shared/rpc-types";
+import { BTW_FRAME_TYPES, LIVE_FRAME_TYPES } from "../shared/rpc-types";
 import { EventBatcher } from "./event-batcher";
 import { attachNdjsonParser, supportsRpcProtocolV2 } from "./rpc-bridge";
 import { RpcClient } from "./rpc-client";
@@ -198,6 +199,7 @@ export interface SidecarEvents {
 	hostUriRequest: (request: HostUriRequest) => void;
 	subagentFrame: (frame: SubagentFrame) => void;
 	liveFrame: (frame: RpcLiveFrame) => void;
+	btwFrame: (frame: RpcBtwFrame) => void;
 	modelCatalogUpdate: (frame: ModelCatalogUpdateFrame) => void;
 	commandsUpdate: (commands: unknown[]) => void;
 	sessionSettled: (frame: SessionSettledFrame) => void;
@@ -496,6 +498,11 @@ export class SidecarManager extends EventEmitter {
 		}
 		if (LIVE_FRAME_TYPES.has(obj.type as string)) {
 			this.emit("liveFrame", obj as unknown as RpcLiveFrame);
+			this.emit("frame", obj);
+			return;
+		}
+		if (BTW_FRAME_TYPES.has(obj.type as string)) {
+			this.emit("btwFrame", obj as unknown as RpcBtwFrame);
 			this.emit("frame", obj);
 			return;
 		}

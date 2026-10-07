@@ -70,7 +70,8 @@ export type RpcCommand =
 	| { id?: string; type: "get_messages_page"; cursor?: string; limit?: number }
 	| { id?: string; type: "get_login_providers" }
 	| { id?: string; type: "login"; providerId: string }
-	| { id?: string; type: "logout"; providerId: string }
+	| { id?: string; type: "get_logout_accounts"; providerId: string }
+	| { id?: string; type: "logout"; providerId: string; credentialId: number }
 	| { id?: string; type: "get_usage" }
 	| { id?: string; type: "get_settings_schema" }
 	| { id?: string; type: "get_settings"; paths?: string[] }
@@ -138,8 +139,10 @@ export type RpcCommand =
 	| { id?: string; type: "get_goal" }
 	| { id?: string; type: "guided_goal"; initial?: string }
 	| { id?: string; type: "set_agents_paused"; enabled: boolean }
-	| { id?: string; type: "btw"; question: string }
+	| { id?: string; type: "btw"; question: string; recordId?: string }
 	| { id?: string; type: "btw_branch" }
+	| { id?: string; type: "btw_cancel"; recordId: string }
+	| { id?: string; type: "get_btw_history" }
 	| { id?: string; type: "tan"; work: string }
 	| { id?: string; type: "omfg"; complaint: string }
 	| {
@@ -493,6 +496,55 @@ export const LIVE_FRAME_TYPES: ReadonlySet<string> = new Set<RpcLiveFrame["type"
 	"live_transcript",
 	"live_end",
 ]);
+
+/** One /btw turn (upstream wire shape: `session/btw-history`). */
+export interface BtwHistoryTurn {
+	question: string;
+	answer: string;
+	status: "running" | "complete" | "cancelled" | "error" | "interrupted";
+	createdAt: number;
+	updatedAt: number;
+	error?: string;
+}
+
+/** A side-question conversation: the root turn plus follow-up turns. */
+export interface BtwHistoryRecord extends BtwHistoryTurn {
+	id: string;
+	leafId: string | null;
+	followUps?: readonly BtwHistoryTurn[];
+}
+
+/** The latest (or root) turn of a btw record. */
+export function getBtwLatestTurn(record: BtwHistoryRecord): BtwHistoryTurn {
+	return record.followUps?.at(-1) ?? record;
+}
+
+/** One stored credential selectable for /logout (upstream `logout-account-selector`). */
+export interface LogoutAccount {
+	credentialId: number;
+	provider: string;
+	label: string;
+	detail: string;
+	type: "api_key" | "oauth";
+	active: boolean;
+}
+
+/** Text appended to the running side question's latest answer. */
+export interface RpcBtwDeltaFrame {
+	type: "btw_delta";
+	recordId: string;
+	delta: string;
+}
+
+/** Full record snapshot on every lifecycle change: started, complete, cancelled, error. */
+export interface RpcBtwRecordFrame {
+	type: "btw_record";
+	record: BtwHistoryRecord;
+}
+
+export type RpcBtwFrame = RpcBtwDeltaFrame | RpcBtwRecordFrame;
+
+export const BTW_FRAME_TYPES: ReadonlySet<string> = new Set<RpcBtwFrame["type"]>(["btw_delta", "btw_record"]);
 
 export interface RpcLiveStartResult {
 	voice: string;

@@ -235,12 +235,20 @@ function providersResponse(data: ProvidersResult): RpcResponse {
 }
 
 const getProviders = vi.fn(async () => providersResponse(snapshot([row("anthropic")])));
+const getLogoutAccounts = vi.fn(
+	async (): Promise<RpcResponse> => ({
+		type: "response",
+		command: "get_logout_accounts",
+		success: true,
+		data: { accounts: [{ credentialId: 1, provider: "anthropic", label: "a", detail: "", type: "oauth", active: true }] },
+	}),
+);
 const logout = vi.fn(async (): Promise<RpcResponse> => ({ type: "response", command: "logout", success: true }));
 const listProviders = vi.fn(async (): Promise<CustomProviderView[]> => []);
 
 Object.assign(window as unknown as Record<string, unknown>, {
 	omp: {
-		rpc: { getProviders, logout },
+		rpc: { getProviders, getLogoutAccounts, logout },
 		models: { listProviders },
 	},
 });
@@ -363,7 +371,8 @@ describe("ProvidersWindow", () => {
 			buttonWithLabel(translate("providers.logoutConfirm"))?.click();
 		});
 
-		expect(logout).toHaveBeenCalledWith("my-proxy");
+		expect(getLogoutAccounts).toHaveBeenCalledWith("my-proxy");
+		expect(logout).toHaveBeenCalledWith("my-proxy", 1);
 		expect(logout).toHaveBeenCalledOnce();
 		// A non-forced read is answered from a cache row that is still fresh, which
 		// is why the row kept showing the logged-in provider after logout.

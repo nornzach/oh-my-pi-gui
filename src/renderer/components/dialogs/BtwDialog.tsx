@@ -1,5 +1,6 @@
 import { GitBranch, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { type BtwHistoryRecord, getBtwLatestTurn } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -9,12 +10,6 @@ import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner, TextArea } from "../common";
 
-interface BtwResult {
-	question: string;
-	replyText: string;
-	canBranch: boolean;
-}
-
 export function BtwDialog() {
 	const t = useT();
 	const command = useTabCommand();
@@ -23,23 +18,44 @@ export function BtwDialog() {
 	const [draft, setDraft] = useState("");
 	const question = useUiStore(state => state.btwRequest);
 	const close = useUiStore(state => state.closeBtw);
-	const [result, setResult] = useState<BtwResult | null>(null);
+	const [record, setRecord] = useState<BtwHistoryRecord | null>(null);
+	const [liveAnswer, setLiveAnswer] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [branching, setBranching] = useState(false);
+	const recordIdRef = useRef<string | null>(null);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: changing the bound task invalidates the pending answer even if its question is identical.
 	useEffect(() => {
 		generation.current++;
-		setResult(null);
+		setRecord(null);
+		setLiveAnswer("");
 		setError(null);
 		setLoading(false);
 		setBranching(false);
 		setDraft(question ?? "");
+		recordIdRef.current = null;
 		return () => {
 			generation.current++;
 		};
 	}, [question, command]);
+
+	// Streaming frames: deltas append to the running answer; record snapshots are
+	// authoritative on every lifecycle change (started/complete/cancelled/error).
+	useEffect(() => {
+		return window.omp.events.onBtwFrame(frame => {
+			const currentId = recordIdRef.current;
+			if (!currentId) return;
+			if (frame.type === "btw_delta") {
+				if (frame.recordId === currentId) setLiveAnswer(prev => prev + frame.delta);
+				return;
+			}
+			if (frame.record.id !== currentId) return;
+			setRecord(frame.record);
+			setLiveAnswer(getBtwLatestTurn(frame.record).answer);
+			setLoading(false);
+		});
+	}, []);
 
 	const ask = async () => {
 		if (!draft.trim() || loading) return;
@@ -47,20 +63,34 @@ export function BtwDialog() {
 		setError(null);
 		setLoading(true);
 		try {
-			const response = await command({ type: "btw", question: draft.trim() }, 120_000);
+			const priorId = record?.id;
+			const response = await command(
+				{ type: "btw", question: draft.trim(), ...(priorId ? { recordId: priorId } : {}) },
+				120_000,
+			);
 			if (generation.current !== version) return;
 			if (!response.success) throw new Error(response.error);
-			setResult(response.data as BtwResult);
+			const data = response.data as { record: BtwHistoryRecord };
+			setRecord(data.record);
+			recordIdRef.current = data.record.id;
+			setLiveAnswer(getBtwLatestTurn(data.record).answer);
 		} catch (cause) {
 			if (generation.current === version) setError(String(cause));
 		} finally {
+			// The response carries the started record; the running state below
+			// shows its own streaming/thinking indicator.
 			if (generation.current === version) setLoading(false);
 		}
 	};
 
+	const latest = record ? getBtwLatestTurn(record) : null;
+	const running = latest?.status === "running";
+	const answerText = running || !record ? liveAnswer : latest!.answer;
+	const canBranch = latest?.status === "complete";
+
 	const copyAnswer = async (): Promise<void> => {
-		if (!result) return;
-		if (!(await copyText(result.replyText))) {
+		if (!answerText.trim()) return;
+		if (!(await copyText(answerText))) {
 			toast({ variant: "error", message: t("btw.copyFailed") });
 			return;
 		}
@@ -68,7 +98,7 @@ export function BtwDialog() {
 	};
 
 	const branch = async (): Promise<void> => {
-		if (!result?.canBranch || branching) return;
+		if (!canBranch || branching) return;
 		const version = generation.current;
 		setBranching(true);
 		try {
@@ -100,13 +130,12 @@ export function BtwDialog() {
 					value={draft}
 					onChange={event => {
 						setDraft(event.target.value);
-						setResult(null);
 					}}
 					disabled={loading || branching}
 					rows={3}
 				/>
 			</div>
-			{loading ? (
+			{loading && !record ? (
 				<div className="flex items-center justify-center gap-2 py-16 text-sm text-(--omp-dim)">
 					<Spinner size="sm" /> {t("btw.thinking")}
 				</div>
@@ -114,9 +143,25 @@ export function BtwDialog() {
 				<div className="rounded-lg border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent p-3 text-sm text-[var(--omp-error)]">
 					{error}
 				</div>
-			) : result ? (
+			) : record ? (
 				<div className="max-h-[55vh] overflow-y-auto pr-1">
-					<MarkdownRenderer content={result.replyText} />
+					{latest && latest.status !== "running" && latest.status !== "complete" ? (
+						<div className="mb-2 text-xs text-(--omp-dim)">
+							{latest.status === "cancelled" || latest.status === "interrupted"
+								? t("btw.statusCancelled")
+								: latest.error || t("btw.statusError")}
+						</div>
+					) : null}
+					{answerText ? (
+						<MarkdownRenderer content={answerText} />
+					) : (
+						<div className="flex items-center gap-2 py-8 text-sm text-(--omp-dim)">
+							<Spinner size="sm" /> {t("btw.thinking")}
+						</div>
+					)}
+					{(record.followUps?.length ?? 0) > 0 && latest && latest.question !== record.question && (
+						<div className="mt-2 text-xs text-(--omp-dim)">{latest.question}</div>
+					)}
 				</div>
 			) : null}
 			<div className="mt-5 flex justify-end gap-2 border-t border-(--omp-border-muted) pt-3">
@@ -128,10 +173,10 @@ export function BtwDialog() {
 				>
 					{t("btw.ask")}
 				</Button>
-				<Button disabled={!result} onClick={() => void copyAnswer()} size="sm" variant="secondary">
+				<Button disabled={!answerText.trim()} onClick={() => void copyAnswer()} size="sm" variant="secondary">
 					{t("btw.copy")}
 				</Button>
-				<Button disabled={!result?.canBranch || branching} onClick={() => void branch()} size="sm">
+				<Button disabled={!canBranch || branching} onClick={() => void branch()} size="sm">
 					{branching ? <Spinner size="sm" /> : <GitBranch size={13} />}
 					{t("btw.branch")}
 				</Button>

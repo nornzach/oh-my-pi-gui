@@ -8,7 +8,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { Edit, ExternalLink, Globe, LogIn, LogOut, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CustomProviderView } from "../../../shared/ipc-types";
-import type { ProviderDiscoveryState, ProviderInfo, ProvidersResult } from "../../../shared/rpc-types";
+import type { LogoutAccount, ProviderDiscoveryState, ProviderInfo, ProvidersResult } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
@@ -262,10 +262,21 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 		const name = providers.find(p => p.id === providerId)?.name ?? providerId;
 		setBusyProvider(providerId);
 		try {
-			const res = await tabRpc.logout(providerId);
-			if (!res.success) {
-				toast({ variant: "error", title: t("providers.logoutFailed"), message: res.error });
+			// Upstream logout is credential-scoped: sign out every stored
+			// credential for the provider to preserve the row's "log out"
+			// semantics.
+			const accountsRes = await tabRpc.getLogoutAccounts(providerId);
+			if (!accountsRes.success) {
+				toast({ variant: "error", title: t("providers.logoutFailed"), message: accountsRes.error });
 				return;
+			}
+			const accounts = (accountsRes.data as { accounts?: LogoutAccount[] } | undefined)?.accounts ?? [];
+			for (const account of accounts) {
+				const res = await tabRpc.logout(providerId, account.credentialId);
+				if (!res.success) {
+					toast({ variant: "error", title: t("providers.logoutFailed"), message: res.error });
+					return;
+				}
 			}
 			// Non-forced is answered from a cache row that is still fresh, which is
 			// how a signed-out provider used to keep showing as authenticated.

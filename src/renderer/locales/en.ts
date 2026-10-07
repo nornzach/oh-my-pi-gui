@@ -1987,6 +1987,8 @@ export const en: Record<string, string> = {
 	"btw.branched": "Branched from the /btw answer",
 	"btw.branchCancelled": "Branching was cancelled by an extension.",
 	"btw.branchFailed": "Could not branch from /btw",
+	"btw.statusCancelled": "Answer cancelled.",
+	"btw.statusError": "Side question failed.",
 
 	// Tangential background agent
 	"tan.usage": "Usage: /tan <work>",

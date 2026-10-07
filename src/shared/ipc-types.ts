@@ -23,6 +23,7 @@ import type {
 	PromptResultFrame,
 	RpcCommand,
 	RpcDebugParams,
+	RpcBtwFrame,
 	RpcLiveFrame,
 	RpcMcpServerInput,
 	RpcResponse,
@@ -70,6 +71,8 @@ export const IPC_EVENTS = {
 	EXTENSION_ERROR: "extension:error",
 	/** Realtime voice session state/levels/transcript update. */
 	LIVE_FRAME: "live:frame",
+	/** /btw side-question streaming delta or lifecycle record update. */
+	BTW_FRAME: "btw:frame",
 	/** Model/provider discovery completed after a bounded listing response. */
 	MODEL_CATALOG_UPDATE: "model-catalog:update",
 	/** Session list changed */
@@ -1004,7 +1007,8 @@ export interface OmpApi {
 		getMessagesPage(cursor?: string, limit?: number): Promise<RpcResponse>;
 		getLoginProviders(): Promise<RpcResponse>;
 		login(providerId: string): Promise<RpcResponse>;
-		logout(providerId: string): Promise<RpcResponse>;
+		getLogoutAccounts(providerId: string): Promise<RpcResponse>;
+		logout(providerId: string, credentialId: number): Promise<RpcResponse>;
 		getUsage(): Promise<RpcResponse>;
 		getSettingsSchema(): Promise<RpcResponse>;
 		getSettings(paths?: string[]): Promise<RpcResponse>;
@@ -1110,6 +1114,7 @@ export interface OmpApi {
 		onHostToolCall(callback: (request: HostToolCallRequest) => void): () => void;
 		onHostUriRequest(callback: (request: HostUriRequest) => void): () => void;
 		onLiveFrame(callback: (frame: RpcLiveFrame) => void): () => void;
+		onBtwFrame(callback: (frame: RpcBtwFrame) => void): () => void;
 		onModelCatalogUpdate(callback: (frame: ModelCatalogUpdateFrame) => void): () => void;
 		onSubagentFrame(callback: (frame: SubagentFrame) => void): () => void;
 		onCommandsUpdate(callback: (commands: AvailableCommand[]) => void): () => void;
