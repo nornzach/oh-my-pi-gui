@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-10-09
+
+### Changed
+
+- Bundled agent rebuilt from upstream through **v18.8.6** (monorepo `ba05fea6`, ~500 commits since v18.8.0): Claude Haiku 5.5 joins the smol tier, per-model compaction limits can be set from the model hub, sessions recorded inside a removed worktree reopen in the checkout that owns them, and resumed Claude sessions keep their thinking configuration and prompt cache.
+- No GUI-side changes; this release carries the upstream agent update.
+
 ## [0.9.17] - 2026-10-08
 
 ### Added
