@@ -1,10 +1,11 @@
 import { useTabRpc } from "../../lib/tab-rpc";
 /**
- * Model picker: grouped-by-provider dropdown with search, auth status from
- * login providers, current model highlighted. Selection calls set_model.
+ * Model picker: provider groups as collapsible dropdowns with search, auth
+ * status from login providers, current model highlighted. Selection calls
+ * set_model.
  */
 
-import { Check, Cpu, Plus, Search, TriangleAlert } from "lucide-react";
+import { Check, ChevronRight, Cpu, Plus, Search, TriangleAlert } from "lucide-react";
 import {
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
@@ -16,7 +17,7 @@ import {
 } from "react";
 import type { LoginProvider, ModelInfo } from "../../../shared/rpc-types";
 import { applyModelInfo, hydrateSession } from "../../hooks/use-rpc-events";
-import { formatTokens } from "../../lib/format";
+import { cx, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { useModelStore } from "../../stores/model";
@@ -50,6 +51,10 @@ export function ModelPicker() {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
 	const listboxId = useId();
+	/** Providers the user opened; persists across picker opens. */
+	const [expandedProviders, setExpandedProviders] = useState<ReadonlySet<string>>(() => new Set());
+	/** While searching every matching provider is open; these were closed for the current query. */
+	const [searchCollapsed, setSearchCollapsed] = useState<ReadonlySet<string>>(() => new Set());
 
 	const requestVersion = useRef(0);
 
@@ -95,7 +100,14 @@ export function ModelPicker() {
 	useEffect(() => {
 		if (!open) return undefined;
 		setQuery("");
+		setSearchCollapsed(new Set());
 		setActiveIndex(0);
+		// The current model's provider always opens with the picker. Read via
+		// getState so a model switch while open does not re-run this effect.
+		const currentProvider = useModelStore.getState().model?.provider;
+		if (currentProvider) {
+			setExpandedProviders(prev => (prev.has(currentProvider) ? prev : new Set(prev).add(currentProvider)));
+		}
 		requestAnimationFrame(() => inputRef.current?.focus());
 		void load(false);
 		return () => {
@@ -128,13 +140,36 @@ export function ModelPicker() {
 		return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 	}, [availableModels, query]);
 
-	// Flat row order (group order → in-group order) for keyboard navigation.
+	const searching = query.trim().length > 0;
+	const openProviderSet = useMemo(
+		() =>
+			new Set(
+				groups
+					.map(([provider]) => provider)
+					.filter(provider => (searching ? !searchCollapsed.has(provider) : expandedProviders.has(provider))),
+			),
+		[expandedProviders, groups, searchCollapsed, searching],
+	);
+
+	const toggleProvider = (provider: string) => {
+		const toggle = (prev: ReadonlySet<string>): ReadonlySet<string> => {
+			const next = new Set(prev);
+			if (!next.delete(provider)) next.add(provider);
+			return next;
+		};
+		if (searching) setSearchCollapsed(toggle);
+		else setExpandedProviders(toggle);
+	};
+
+	// Flat row order over open groups (group order → in-group order) for keyboard navigation.
 	const flatOptions = useMemo(
 		() =>
-			groups.flatMap(([provider, models]) =>
-				models.map(model => ({ provider, modelId: model.id, key: `${provider}/${model.id}` })),
-			),
-		[groups],
+			groups
+				.filter(([provider]) => openProviderSet.has(provider))
+				.flatMap(([provider, models]) =>
+					models.map(model => ({ provider, modelId: model.id, key: `${provider}/${model.id}` })),
+				),
+		[groups, openProviderSet],
 	);
 	const indexByKey = useMemo(() => new Map(flatOptions.map((option, index) => [option.key, index])), [flatOptions]);
 
@@ -242,7 +277,10 @@ export function ModelPicker() {
 						aria-controls={listboxId}
 						aria-label={t("modelPicker.searchLabel")}
 						className="min-w-0 flex-1 bg-transparent text-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
-						onChange={event => setQuery(event.target.value)}
+						onChange={event => {
+							setQuery(event.target.value);
+							setSearchCollapsed(new Set());
+						}}
 						onKeyDown={onKeyDown}
 						placeholder={t("modelPicker.placeholder")}
 						ref={inputRef}
@@ -286,20 +324,48 @@ export function ModelPicker() {
 					) : (
 						groups.map(([provider, models]) => {
 							const auth = authByProvider.get(provider);
+							const expanded = openProviderSet.has(provider);
+							const groupId = `${listboxId}-group-${provider}`;
 							return (
 								<section aria-label={provider} className="mb-1" key={provider} role="group">
-									<div className="flex items-center gap-2 px-2.5 pt-2 pb-1">
-										<Cpu className="shrink-0 text-(--omp-dim)" size={10} />
-										<span className="text-omp-xxs font-semibold text-(--omp-dim)">{provider}</span>
-										{auth && (
-											<Badge variant={auth.authenticated ? "success" : auth.available ? "warning" : "muted"}>
-												{auth.authenticated
-													? t("modelPicker.auth.authenticated")
-													: auth.available
-														? t("modelPicker.auth.notSignedIn")
-														: t("modelPicker.auth.unavailable")}
-											</Badge>
-										)}
+									<div className="flex items-center gap-1 px-1 pt-1">
+										<button
+											aria-controls={expanded ? groupId : undefined}
+											aria-expanded={expanded}
+											className="omp-pressable flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-(--omp-bg-tertiary)"
+											onClick={() => toggleProvider(provider)}
+											type="button"
+										>
+											<ChevronRight
+												aria-hidden="true"
+												className={cx(
+													"omp-disclosure-chevron shrink-0 text-(--omp-dim)",
+													expanded && "rotate-90",
+												)}
+												size={12}
+											/>
+											<Cpu className="shrink-0 text-(--omp-dim)" size={10} />
+											<span className="truncate text-omp-xxs font-semibold text-(--omp-dim)">
+												{provider}
+											</span>
+											{auth && (
+												<Badge
+													variant={auth.authenticated ? "success" : auth.available ? "warning" : "muted"}
+												>
+													{auth.authenticated
+														? t("modelPicker.auth.authenticated")
+														: auth.available
+															? t("modelPicker.auth.notSignedIn")
+															: t("modelPicker.auth.unavailable")}
+												</Badge>
+											)}
+											{!expanded && current?.provider === provider && (
+												<Check aria-hidden="true" className="shrink-0 text-(--omp-accent)" size={11} />
+											)}
+											<span className="ml-auto text-omp-xxs tabular-nums text-(--omp-dim)">
+												{models.length}
+											</span>
+										</button>
 										{auth?.available && !auth.authenticated && (
 											<button
 												type="button"
@@ -312,100 +378,102 @@ export function ModelPicker() {
 												{t("providers.login")}
 											</button>
 										)}
-										<span className="ml-auto text-omp-xxs tabular-nums text-(--omp-dim)">
-											{models.length}
-										</span>
 									</div>
-									{models.map(model => {
-										const isCurrent = current?.provider === provider && current.id === model.id;
-										const key = `${provider}/${model.id}`;
-										const optionIndex = indexByKey.get(key) ?? 0;
-										const isActive = optionIndex === activeIndex;
-										const over = !isCurrent && isOverContext(model);
-										return (
-											<button
-												aria-selected={isCurrent}
-												className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors ${
-													isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"
-												}`}
-												data-option-index={optionIndex}
-												disabled={switching !== null || !sidecarReady}
-												title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
-												id={`${listboxId}-option-${optionIndex}`}
-												key={key}
-												onClick={() => void select(provider, model.id)}
-												onMouseEnter={() => setActiveIndex(optionIndex)}
-												role="option"
-												type="button"
-											>
-												<div className="flex min-w-0 flex-1 flex-col gap-0.5">
-													<div className="flex min-w-0 items-center gap-1.5">
-														<span
-															className={`truncate text-xs ${isCurrent ? "font-semibold text-(--omp-accent)" : over ? "text-(--omp-dim)" : "text-(--omp-text)"}`}
-														>
-															{model.name || model.id}
-														</span>
-														{model.isRecommended && (
-															<Badge className="px-1.5 text-omp-xxs leading-3" variant="success">
-																{t("modelPicker.badge.recommended")}
-															</Badge>
-														)}
-														{model.isNew && (
-															<Badge className="px-1.5 text-omp-xxs leading-3" variant="info">
-																{t("modelPicker.badge.new")}
-															</Badge>
-														)}
-														{model.isBeta && (
-															<Badge className="px-1.5 text-omp-xxs leading-3" variant="warning">
-																{t("modelPicker.badge.beta")}
-															</Badge>
-														)}
-													</div>
-													{((model.name && model.name !== model.id) || model.description) && (
-														<span
-															className="truncate font-mono text-omp-xxs text-(--omp-dim)"
-															title={model.description}
-														>
-															{[
-																model.name && model.name !== model.id ? model.id : null,
-																model.description,
-															]
-																.filter(Boolean)
-																.join(" · ")}
-														</span>
-													)}
-												</div>
-												{model.int != null && Number.isFinite(model.int) && (
-													<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
-														{t("modelPicker.intelligence", { value: Math.round(model.int) })}
-													</span>
-												)}
-												{model.tps != null && Number.isFinite(model.tps) && model.tps > 0 && (
-													<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
-														{t("modelPicker.speed", {
-															value: model.tps >= 10 ? Math.round(model.tps) : model.tps.toFixed(1),
-														})}
-													</span>
-												)}
-												{over && (
-													<span
-														className="flex shrink-0 items-center gap-1 text-(--omp-warning)"
-														title={t("modelPicker.overContextHint", {
-															current: formatTokens(contextUsage?.tokens),
-															limit: formatTokens(model.contextWindow),
-														})}
+									{expanded && (
+										<div className="mt-0.5" id={groupId}>
+											{models.map(model => {
+												const isCurrent = current?.provider === provider && current.id === model.id;
+												const key = `${provider}/${model.id}`;
+												const optionIndex = indexByKey.get(key) ?? 0;
+												const isActive = optionIndex === activeIndex;
+												const over = !isCurrent && isOverContext(model);
+												return (
+													<button
+														aria-selected={isCurrent}
+														className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors ${
+															isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"
+														}`}
+														data-option-index={optionIndex}
+														disabled={switching !== null || !sidecarReady}
+														title={!sidecarReady ? t("modelPicker.notConnected") : undefined}
+														id={`${listboxId}-option-${optionIndex}`}
+														key={key}
+														onClick={() => void select(provider, model.id)}
+														onMouseEnter={() => setActiveIndex(optionIndex)}
+														role="option"
+														type="button"
 													>
-														<TriangleAlert size={12} />
-														<span className="text-omp-xxs font-medium">
-															{t("modelPicker.overContext")}
-														</span>
-													</span>
-												)}
-												{switching === key && <Spinner size="sm" />}
-												{isCurrent && <Check className="shrink-0 text-(--omp-accent)" size={13} />}
-											</button>
-										);
-									})}
+														<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+															<div className="flex min-w-0 items-center gap-1.5">
+																<span
+																	className={`truncate text-xs ${isCurrent ? "font-semibold text-(--omp-accent)" : over ? "text-(--omp-dim)" : "text-(--omp-text)"}`}
+																>
+																	{model.name || model.id}
+																</span>
+																{model.isRecommended && (
+																	<Badge className="px-1.5 text-omp-xxs leading-3" variant="success">
+																		{t("modelPicker.badge.recommended")}
+																	</Badge>
+																)}
+																{model.isNew && (
+																	<Badge className="px-1.5 text-omp-xxs leading-3" variant="info">
+																		{t("modelPicker.badge.new")}
+																	</Badge>
+																)}
+																{model.isBeta && (
+																	<Badge className="px-1.5 text-omp-xxs leading-3" variant="warning">
+																		{t("modelPicker.badge.beta")}
+																	</Badge>
+																)}
+															</div>
+															{((model.name && model.name !== model.id) || model.description) && (
+																<span
+																	className="truncate font-mono text-omp-xxs text-(--omp-dim)"
+																	title={model.description}
+																>
+																	{[
+																		model.name && model.name !== model.id ? model.id : null,
+																		model.description,
+																	]
+																		.filter(Boolean)
+																		.join(" · ")}
+																</span>
+															)}
+														</div>
+														{model.int != null && Number.isFinite(model.int) && (
+															<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
+																{t("modelPicker.intelligence", { value: Math.round(model.int) })}
+															</span>
+														)}
+														{model.tps != null && Number.isFinite(model.tps) && model.tps > 0 && (
+															<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
+																{t("modelPicker.speed", {
+																	value:
+																		model.tps >= 10 ? Math.round(model.tps) : model.tps.toFixed(1),
+																})}
+															</span>
+														)}
+														{over && (
+															<span
+																className="flex shrink-0 items-center gap-1 text-(--omp-warning)"
+																title={t("modelPicker.overContextHint", {
+																	current: formatTokens(contextUsage?.tokens),
+																	limit: formatTokens(model.contextWindow),
+																})}
+															>
+																<TriangleAlert size={12} />
+																<span className="text-omp-xxs font-medium">
+																	{t("modelPicker.overContext")}
+																</span>
+															</span>
+														)}
+														{switching === key && <Spinner size="sm" />}
+														{isCurrent && <Check className="shrink-0 text-(--omp-accent)" size={13} />}
+													</button>
+												);
+											})}
+										</div>
+									)}
 								</section>
 							);
 						})
