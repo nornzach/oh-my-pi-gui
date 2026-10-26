@@ -59,5 +59,6 @@
   "search.role.assistant",
   "memory.tab.skills",
   "cmd.git",
-  "tools.learn.skill"
+  "tools.learn.skill",
+  "themePicker.theme.rosePine.label"
 ]

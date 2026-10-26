@@ -3467,6 +3467,8 @@ export const en: Record<string, string> = {
 	"themePicker.theme.latte.description": "Roasted coffee surfaces and a soft caramel accent.",
 	"themePicker.theme.gruvbox.label": "Ember",
 	"themePicker.theme.gruvbox.description": "Warm charcoal with a low, copper ember.",
+	"themePicker.theme.rosePine.label": "Rosé Pine",
+	"themePicker.theme.rosePine.description": "Muted violet night with rose, foam, and iris accents.",
 	"themePicker.theme.frost.label": "Glacier",
 	"themePicker.theme.frost.description": "Airy ice-white with a clear steel-blue accent.",
 	"themePicker.theme.matcha.label": "Sage",

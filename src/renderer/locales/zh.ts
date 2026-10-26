@@ -3403,6 +3403,8 @@ export const zh: Record<string, string> = {
 	"themePicker.theme.latte.description": "烘焙咖啡色表面，搭配柔和焦糖色。",
 	"themePicker.theme.gruvbox.label": "余烬",
 	"themePicker.theme.gruvbox.description": "暖炭灰背景，搭配低亮度赤铜余烬。",
+	"themePicker.theme.rosePine.label": "Rosé Pine",
+	"themePicker.theme.rosePine.description": "柔和紫夜色调，点缀玫瑰粉、泡沫青与鸢尾紫。",
 	"themePicker.theme.frost.label": "冰川",
 	"themePicker.theme.frost.description": "通透冰白、清晰钢蓝，保留轻盈冷调。",
 	"themePicker.theme.matcha.label": "鼠尾草",

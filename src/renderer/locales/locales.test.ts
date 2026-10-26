@@ -86,6 +86,7 @@ const ALLOW_IDENTICAL: Record<string, true> = {
 	"themePicker.theme.nord.label": true, // Nord — theme name
 	"themePicker.theme.solarized.label": true, // Solarized — theme name
 	"themePicker.theme.latte.label": true, // Latte — theme name
+	"themePicker.theme.rosePine.label": true, // Rosé Pine: theme name
 };
 
 const LATIN_LETTER = /[a-zA-Z]/;

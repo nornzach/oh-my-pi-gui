@@ -3292,6 +3292,9 @@ export const ru: Record<string, string> = {
 	"themePicker.theme.latte.description": "Поверхности цвета жареного кофе и мягкий карамельный акцент.",
 	"themePicker.theme.gruvbox.label": "Угольки",
 	"themePicker.theme.gruvbox.description": "Тёплый угольный фон с приглушённым медным оттенком.",
+	"themePicker.theme.rosePine.label": "Rosé Pine",
+	"themePicker.theme.rosePine.description":
+		"Приглушённая фиолетовая ночь с розовыми, пенно-бирюзовыми и ирисовыми акцентами.",
 	"themePicker.theme.frost.label": "Ледник",
 	"themePicker.theme.frost.description": "Воздушный ледяной белый цвет с чётким стальным синим акцентом.",
 	"themePicker.theme.matcha.label": "Шалфей",
