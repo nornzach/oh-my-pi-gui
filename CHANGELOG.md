@@ -6,10 +6,21 @@
 
 - **Rosé Pine** theme: the dark Rosé Pine palette for the whole window, in Settings → Theme.
 
+## [0.9.29] - 2026-10-26
+
+### Added
+
+- Each row in the Agents tab says the agent's type and number, its model with the reasoning level, and its tokens and cost, as the agents card above the message box does ([#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)).
+
 ### Fixed
 
 - **All** in the Agents tab lists agents in the order they were spawned, so new agents land at the end instead of mixing in with the agents of earlier task calls ([#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)).
 - **This turn** keeps every agent spawned since your last message after it finishes, including agents spawned by an agent from an earlier turn ([#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)).
+- The bundled agent runs on Bun 1.4.4, so it no longer trusts certificates from the compromised eMudhra intermediate CAs (CVE-2026-91403) and no longer carries the Brotli decoder out-of-bounds write (CVE-2026-111497).
+
+### Changed
+
+- Bundled agent rebuilt from monorepo `08a26683`, on upstream omp v18.13.0 plus the fork's RPC queue fix and the saved subagents of reopened sessions. Among upstream's changes: a subagent's result up to 11,500 characters reaches its parent whole, waiting on a subagent shows its run time, cost and stage, `grep` can leave paths out with `!`, and compaction no longer repeats on small context windows.
 
 ## [0.9.28] - 2026-10-26
 

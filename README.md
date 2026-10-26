@@ -24,8 +24,8 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [What's new in 0.9.28](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.28 release.** The improvements below are included in v0.9.28, with the bundled agent built from monorepo `79e6760b` (upstream main past v18.12.6 plus the fork's RPC queue fix and saved subagents). The gallery screenshots are captured from v0.9.27; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+[Features](#en-features) · [What's new in 0.9.29](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+> **v0.9.29 release.** The improvements below are included in v0.9.29, with the bundled agent built from monorepo `08a26683` (upstream omp v18.13.0 plus the fork's RPC queue fix and saved subagents). The gallery screenshots are captured from v0.9.27; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -63,18 +63,16 @@ The distinctive part is not just a chat window: it is being able to **separate p
 Model requests still go to the providers you configure. The bundled agent removes the separate runtime install, not the need to configure credentials, project dependencies, external Git/OpenSSH/MCP tools, or optional services. Only connect tools and services you trust.
 
 <a id="en-recent"></a>
-### What's new in 0.9.28
+### What's new in 0.9.29
 
-v0.9.28 gives every subagent its own page, keeps a session's agents in the sidebar and the drawer, and brings back a session's full state when you reopen it:
+v0.9.29 makes the Agents tab easier to read and moves the bundled agent to omp v18.13.0 on a patched Bun:
 
 | In daily use | What has improved |
 |---|---|
-| **Subagent pages** | Click a subagent anywhere to open its page in a tab beside its session: its conversation, live while it works, with Stop, Revive, Open beside and Keep open. A page only reads; it never acts on the session. |
-| **Agents in the sidebar** | Each open session lists this turn's agents under its row, background tabs included. Once a later turn starts none, the earlier agents wait behind a closed arrow with a count. Resting on a row shows the agent's status and last steps. |
-| **Agents tab in the drawer** | This turn's agents or all of them, as a list or a graph, with pause, stop and expand. |
-| **Reopened sessions keep their state** | Closing a session and reopening it keeps its agents, with their names, outcome, model, tokens and conversations, and its "Todos updated" rows. |
-| **Fixes** | Launching the installed app with a folder opens that folder; new sessions appear on a fresh profile without a restart; deleting a session leaves no "Untitled" row; Escape at "Close tab?" no longer stops the run; a split pane's ✕ removes that pane. |
-| **Bundled agent** | Rebuilt from monorepo `79e6760b`: upstream main has no new commits since 0.9.27 (still past v18.12.6), plus the fork's RPC queue fix and the saved subagents of reopened sessions. |
+| **Agent details in the Agents tab** | Each row says the agent's type and number, its model with the reasoning level, and its tokens and cost, as the agents card above the message box does ([#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)). |
+| **All and This turn** | **All** lists agents in the order they were spawned. **This turn** keeps every agent spawned since your last message after it finishes, including agents spawned by an agent from an earlier turn ([#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)). |
+| **Security** | The bundled agent runs on Bun 1.4.4: it no longer trusts the compromised eMudhra intermediate CAs (CVE-2026-91403) or carries the Brotli decoder out-of-bounds write (CVE-2026-111497). |
+| **Bundled agent** | Rebuilt from monorepo `08a26683` on upstream omp v18.13.0, plus the fork's RPC queue fix and the saved subagents of reopened sessions. A subagent's result up to 11,500 characters now reaches its parent whole, waiting on a subagent shows its run time, cost and stage, and compaction no longer repeats on small context windows. |
 <a id="en-gallery"></a>
 ### Explore the interface
 
@@ -167,22 +165,22 @@ Search with `⌘K`. Supported commands lead to native controls; pass-through and
 <a id="en-install"></a>
 ### Install & start
 
-**Documented install baseline: [v0.9.28](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.28).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
+**Documented install baseline: [v0.9.29](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.29).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
 
-| Mac | v0.9.28 download |
+| Mac | v0.9.29 download |
 |---|---|
-| Apple Silicon | [omp-0.9.28-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28-arm64.dmg) |
-| Intel | [omp-0.9.28.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28.dmg) |
+| Apple Silicon | [omp-0.9.29-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29-arm64.dmg) |
+| Intel | [omp-0.9.29.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29.dmg) |
 
-| Windows x64 | v0.9.28 download |
+| Windows x64 | v0.9.29 download |
 |---|---|
-| Installer | [omp-0.9.28-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28-setup.exe) |
-| Portable | [omp-0.9.28-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28-portable.exe) |
+| Installer | [omp-0.9.29-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29-setup.exe) |
+| Portable | [omp-0.9.29-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29-portable.exe) |
 
-| Linux x64 | v0.9.28 download |
+| Linux x64 | v0.9.29 download |
 |---|---|
-| AppImage | [omp-0.9.28.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28.AppImage) |
-| Debian/Ubuntu | [omp_0.9.28_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp_0.9.28_amd64.deb) |
+| AppImage | [omp-0.9.29.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29.AppImage) |
+| Debian/Ubuntu | [omp_0.9.29_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp_0.9.29_amd64.deb) |
 
 Open the DMG and drag **omp** into **Applications**. The app and bundled macOS sidecar are ad-hoc signed but not notarized. If macOS blocks the first launch, use **right-click → Open**, or **System Settings → Privacy & Security → Open Anyway**, after confirming the download's source.
 
@@ -336,9 +334,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG、NSIS 或便携版安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [0.9.28 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.29 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.28 功能展示。** 下文改进均纳入 v0.9.28，内置 Agent 基于 monorepo `79e6760b` 构建（上游 main v18.12.6 之后，外加 fork 的 RPC 队列修复与子 agent 恢复）。界面导览截图取自 v0.9.27；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.29 功能展示。** 下文改进均纳入 v0.9.29，内置 Agent 基于 monorepo `08a26683` 构建（上游 omp v18.13.0，外加 fork 的 RPC 队列修复与子 agent 恢复）。界面导览截图取自 v0.9.27；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -376,18 +374,16 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 模型请求仍会发送到你配置的 Provider。内置 Agent 省去了单独安装运行时的步骤，但不替你配置凭据、项目依赖、外部 Git/OpenSSH/MCP 工具或可选服务。请只连接你信任的工具与服务。
 
 <a id="zh-recent"></a>
-### 0.9.28 更新内容
+### 0.9.29 更新内容
 
-v0.9.28 为每个子 agent 提供独立页面，侧边栏和抽屉中都能找到会话的 agent，重新打开会话时也能恢复完整状态：
+v0.9.29 让 Agents 标签页的信息更清楚，并把内置代理升级到 omp v18.13.0，运行在已修补的 Bun 上：
 
 | 日常场景 | 改进内容 |
 |---|---|
-| **子 agent 页面** | 在任意位置点击子 agent，即在其会话旁的标签页中打开它的页面：显示它的对话，运行时实时更新，并提供「停止代理」「唤醒」「在旁边打开」和「保持打开」。页面只读，不会对会话执行任何操作。 |
-| **侧边栏中的 agent** | 每个打开的会话在其行下列出本轮的 agent，后台标签页也一样。之后的轮次没有启动 agent 时，之前的 agent 收在带数量的折叠箭头后面。鼠标停在某行上会显示该 agent 的状态和最近步骤。 |
-| **抽屉中的 Agents 标签页** | 查看本轮或全部 agent，可切换列表或关系图，并可暂停、停止和展开。 |
-| **重新打开的会话保留状态** | 关闭会话后再打开，它的 agent（名称、结果、模型、token 和对话）以及「待办已更新」记录都会保留。 |
-| **修复** | 带文件夹启动已安装的应用会打开该文件夹；新配置下新会话无需重启即可出现在侧边栏；删除会话不再留下「Untitled」行；在「关闭标签页？」提示中按 Escape 不再停止运行；分屏窗格的 ✕ 移除的是该窗格。 |
-| **内置代理** | 基于 monorepo `79e6760b` 重新构建：自 0.9.27 起上游 main 无新提交（仍在 v18.12.6 之后），外加 fork 的 RPC 队列修复，以及重新打开的会话可恢复已保存的子 agent。 |
+| **Agents 标签页中的 agent 详情** | 每行显示 agent 的类型和编号、带推理级别的模型，以及 token 和费用，与输入框上方的 agents 卡片一致（[#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)）。 |
+| **「全部」与「本轮」** | 「全部」按生成顺序列出 agent。「本轮」会保留自你上一条消息以来生成的所有 agent，即使它们已经结束，也包括由更早轮次的 agent 生成的 agent（[#23](https://github.com/nornzach/oh-my-pi-gui/issues/23)）。 |
+| **安全** | 内置代理运行在 Bun 1.4.4 上：不再信任已被攻破的 eMudhra 中间 CA（CVE-2026-91403），也不再带有 Brotli 解码器越界写入问题（CVE-2026-111497）。 |
+| **内置代理** | 基于 monorepo `08a26683` 重新构建，对应上游 omp v18.13.0，外加 fork 的 RPC 队列修复，以及重新打开的会话可恢复已保存的子 agent。不超过 11,500 个字符的子 agent 结果现在会完整交给父 agent；等待子 agent 时会显示其运行时长、费用和阶段；小上下文窗口下不再反复压缩。 |
 <a id="zh-gallery"></a>
 ### 界面导览
 
@@ -480,22 +476,22 @@ v0.9.28 为每个子 agent 提供独立页面，侧边栏和抽屉中都能找�
 <a id="zh-install"></a>
 ### 安装与开始使用
 
-**本文安装基线：[v0.9.28](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.28)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+**本文安装基线：[v0.9.29](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.29)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
-| Mac | v0.9.28 下载 |
+| Mac | v0.9.29 下载 |
 |---|---|
-| Apple Silicon | [omp-0.9.28-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28-arm64.dmg) |
-| Intel | [omp-0.9.28.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28.dmg) |
+| Apple Silicon | [omp-0.9.29-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29-arm64.dmg) |
+| Intel | [omp-0.9.29.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29.dmg) |
 
-| Windows x64 | v0.9.28 下载 |
+| Windows x64 | v0.9.29 下载 |
 |---|---|
-| 安装程序 | [omp-0.9.28-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28-setup.exe) |
-| 便携版 | [omp-0.9.28-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28-portable.exe) |
+| 安装程序 | [omp-0.9.29-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29-setup.exe) |
+| 便携版 | [omp-0.9.29-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29-portable.exe) |
 
-| Linux x64 | v0.9.28 下载 |
+| Linux x64 | v0.9.29 下载 |
 |---|---|
-| AppImage | [omp-0.9.28.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp-0.9.28.AppImage) |
-| Debian/Ubuntu | [omp_0.9.28_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.28/omp_0.9.28_amd64.deb) |
+| AppImage | [omp-0.9.29.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp-0.9.29.AppImage) |
+| Debian/Ubuntu | [omp_0.9.29_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.29/omp_0.9.29_amd64.deb) |
 
 打开 DMG，把 **omp** 拖入**应用程序**。应用与内置 macOS sidecar 均采用 ad-hoc 签名，未经公证。如果 macOS 拦截首次启动，请先确认下载来源，再使用**右键 → 打开**，或**系统设置 → 隐私与安全性 → 仍要打开**。
 

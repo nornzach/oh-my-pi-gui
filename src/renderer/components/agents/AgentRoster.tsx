@@ -19,7 +19,7 @@ import { useSubagentsStore } from "../../stores/subagents";
 import { toast } from "../../stores/toast";
 import { ContextMenu, type ContextMenuItem } from "../common/ContextMenu";
 import { SubagentDag } from "../panels/SubagentDag";
-import { formatElapsed, subagentElapsedMs, subagentPrimaryLabel } from "../panels/subagent-graph";
+import { formatElapsed, subagentElapsedMs, subagentFacts, subagentPrimaryLabel } from "../panels/subagent-graph";
 import { useAgentHoverCard } from "./AgentHoverCard";
 import { AgentSignal, useActivityLabel } from "./AgentPage";
 import { type AgentTreeRow, agentNowLine, visibleTreeRows } from "./agent-activity";
@@ -500,6 +500,8 @@ const RosterRow = memo(function RosterRow({
 	const hover = useAgentHoverCard(tabId, row.agent.id, "left");
 	const { agent, activity } = row;
 	const title = subagentPrimaryLabel(agent);
+	const facts = subagentFacts(agent, t("sessionInfo.tokens"));
+	const factsText = [facts.kind, facts.model, facts.usage].filter(Boolean).join(" · ");
 	const elapsed = subagentElapsedMs(agent, now);
 	const time =
 		activity === "working" || activity === "done"
@@ -532,14 +534,13 @@ const RosterRow = memo(function RosterRow({
 		<div
 			{...hover}
 			aria-expanded={expandable ? !collapsed : undefined}
-			aria-label={[title, activityLabel(agent), activity === "working" ? time : null, nowText || null]
+			aria-label={[title, activityLabel(agent), activity === "working" ? time : null, factsText, nowText || null]
 				.filter(Boolean)
 				.join(", ")}
 			aria-level={row.depth + 1}
 			aria-selected={selected}
 			className={cx(
-				"omp-roster-row omp-color-fade relative flex cursor-pointer rounded-lg pr-2 outline-none focus-visible:ring-1 focus-visible:ring-[var(--omp-border-strong)]",
-				line ? "py-1.5" : "h-[30px] items-center",
+				"omp-roster-row omp-color-fade relative flex cursor-pointer rounded-lg py-1.5 pr-2 outline-none focus-visible:ring-1 focus-visible:ring-[var(--omp-border-strong)]",
 				selected ? "bg-[var(--omp-selected-bg)]" : "hover:bg-[var(--omp-sidebar-item-hover)]",
 			)}
 			onClick={event => onOpen(event.altKey)}
@@ -616,6 +617,9 @@ const RosterRow = memo(function RosterRow({
 					>
 						{row.context ? "" : time}
 					</span>
+				</span>
+				<span className="mt-0.5 block truncate text-omp-xs text-[var(--omp-dim)]" title={factsText}>
+					{factsText}
 				</span>
 				{line && (
 					<span

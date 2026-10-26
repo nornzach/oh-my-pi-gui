@@ -16,7 +16,7 @@ import { Bot, ChevronRight, List, Network } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { SubagentSnapshot } from "../../../../shared/rpc-types";
 import { useTabGuard } from "../../../hooks/use-tab-guard";
-import { cx, formatCost, formatTokens } from "../../../lib/format";
+import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
 import { useNowTick } from "../../../lib/now-tick";
 import { useAgentPagesStore } from "../../../stores/agent-pages";
@@ -36,6 +36,7 @@ import {
 	isLiveSubagentStatus,
 	statusMeta,
 	subagentElapsedMs,
+	subagentFacts,
 	subagentPrimaryLabel,
 	useSubagentGraphStore,
 } from "../../panels/subagent-graph";
@@ -72,11 +73,7 @@ const SubagentRow = memo(function SubagentRow({
 	const progressLine = live ? agent.progress?.description?.trim() : undefined;
 	const description = agent.description?.trim();
 	const detail = [progressLine, description].find(line => line && line !== title);
-	const model = agent.progress?.resolvedModel;
-	const usage =
-		agent.progress && (agent.progress.requests > 0 || agent.progress.tokens > 0 || agent.progress.cost > 0)
-			? `${formatTokens(agent.progress.tokens)} ${t("sessionInfo.tokens")} · ${formatCost(agent.progress.cost)}`
-			: undefined;
+	const facts = subagentFacts(agent, t("sessionInfo.tokens"));
 
 	return (
 		<div aria-level={depth + 1} className="relative" role="treeitem" style={{ marginLeft: Math.min(depth, 6) * 14 }}>
@@ -131,10 +128,9 @@ const SubagentRow = memo(function SubagentRow({
 							</span>
 							<span className="mt-1 flex min-w-0 items-center gap-1 text-omp-xxs text-(--omp-dim)">
 								<Bot className="shrink-0 text-(--omp-status-subagents)" size={10} />
-								<span className="shrink-0">{agent.agent}</span>
-								<span className="shrink-0 tabular-nums">#{agent.index + 1}</span>
-								{model && <span className="min-w-0 truncate">· {model}</span>}
-								{usage && <span className="shrink-0 tabular-nums">· {usage}</span>}
+								<span className="shrink-0 tabular-nums">{facts.kind}</span>
+								{facts.model && <span className="min-w-0 truncate">· {facts.model}</span>}
+								{facts.usage && <span className="shrink-0 tabular-nums">· {facts.usage}</span>}
 								{elapsed !== null && (
 									<span className="ml-auto shrink-0 tabular-nums">{formatElapsed(elapsed)}</span>
 								)}

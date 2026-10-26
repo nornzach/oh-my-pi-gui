@@ -73,7 +73,9 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          # The sidecar build requires the monorepo's exact Bun (packageManager),
+          # so follow the pinned checkout instead of a hard-coded version.
+          bun-version-file: oh-my-pi/package.json
 
       - name: Install dependencies
         working-directory: oh-my-pi

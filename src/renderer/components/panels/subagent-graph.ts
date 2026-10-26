@@ -15,6 +15,7 @@ import { useSubagentGraphStore } from "../../stores/subagent-graph";
 export * from "../../stores/subagent-graph";
 
 import type { AgentMessage, SubagentSnapshot } from "../../../shared/rpc-types";
+import { formatCost, formatTokens } from "../../lib/format";
 import type { BadgeVariant } from "../common";
 
 /**
@@ -155,6 +156,29 @@ export function subagentPrimaryLabel(agent: SubagentSnapshot, maxLength = 60): s
 	const raw = agent.description ?? agent.assignment ?? agent.task ?? agent.agent;
 	const text = raw.trim() || agent.agent;
 	return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
+/** What an agent runs as, under its title. The agents card and the Agents tab show the same facts. */
+export interface SubagentFacts {
+	/** Agent type and its place in its task call, as `task #2`. */
+	kind: string;
+	/** The serving model: `provider/model`, with `:level` when a reasoning level was set. */
+	model?: string;
+	/** Tokens and cost, once the agent has made a request. */
+	usage?: string;
+}
+
+/** `tokensWord` is the localized unit after the token count. */
+export function subagentFacts(agent: SubagentSnapshot, tokensWord: string): SubagentFacts {
+	const progress = agent.progress;
+	return {
+		kind: `${agent.agent} #${agent.index + 1}`,
+		model: progress?.resolvedModel,
+		usage:
+			progress && (progress.requests > 0 || progress.tokens > 0 || progress.cost > 0)
+				? `${formatTokens(progress.tokens)} ${tokensWord} · ${formatCost(progress.cost)}`
+				: undefined,
+	};
 }
 
 /**
