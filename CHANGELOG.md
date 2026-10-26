@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Rosé Pine** theme: the dark Rosé Pine palette for the whole window, in Settings → Theme.
+- **Rosé Pine** theme: the dark Rosé Pine palette for the whole window, in Settings → Theme. — thanks [@ItsLemmy](https://github.com/ItsLemmy) ([#24](https://github.com/nornzach/oh-my-pi-gui/pull/24))
 
 ## [0.9.29] - 2026-10-26
 
