@@ -24,8 +24,8 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [What's new in 0.9.32](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.32 release.** The improvements below are included in v0.9.32, with the bundled agent built from monorepo `e1df76a4` (upstream omp v18.13.3). The gallery screenshots are captured from v0.9.27; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+[Features](#en-features) · [What's new in 0.9.33](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+> **v0.9.33 release.** The improvements below are included in v0.9.33, with the bundled agent built from monorepo `4d2b93cd` (upstream omp main after v18.13.3). The gallery screenshots are captured from v0.9.27; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -63,17 +63,19 @@ The distinctive part is not just a chat window: it is being able to **separate p
 Model requests still go to the providers you configure. The bundled agent removes the separate runtime install, not the need to configure credentials, project dependencies, external Git/OpenSSH/MCP tools, or optional services. Only connect tools and services you trust.
 
 <a id="en-recent"></a>
-### What's new in 0.9.32
+### What's new in 0.9.33
 
-v0.9.32 keeps split tabs together as pairs, lets you drag and wrap tabs, opens sessions without waiting for omp to start, and moves the bundled agent to omp v18.13.3:
+v0.9.33 lets the agent work in terminal sessions you watch, gives scheduled tasks a depth so their runs finish the work, opens images full-window, and moves the bundled agent to upstream omp main:
 
 | In daily use | What has improved |
 |---|---|
-| **Split pairs** | Two split tabs merge into one chip in the tab bar and one frame in the sidebar, and selecting either shows both. Selecting another tab shows it alone without undoing the pair, a window can hold several pairs, and they all come back after a restart. Right-click a tab for **Split with…** or **Separate pair** ([#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)). |
-| **Tab bar** | Drag a tab to reorder it; a pair moves as one and the order survives a restart. **Tab bar** in Settings → GUI sets compact, default or wide tabs and can wrap them onto up to three rows, and the all-tabs button at the end lists every tab with search ([#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)). |
-| **Tab shortcuts** | `⌘1`–`⌘9` select a tab (`⌘9` the last), `⌃Tab` / `⌃⇧Tab` go to the next or previous tab, and `⌥⇧⌘←` / `⌥⇧⌘→` move the current tab ([#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)). |
-| **Opening sessions** | Opening a session from the sidebar, or a new tab with `⌘T`, in a workspace you already have open no longer waits for omp to start: the tab takes over an idle agent kept running there. A session whose saved model is gone still opens, on the default model ([#29](https://github.com/nornzach/oh-my-pi-gui/issues/29)). |
-| **Bundled agent** | Rebuilt from monorepo `e1df76a4` on upstream omp v18.13.3. One Esc no longer stops a session from waking on its own background jobs, `!` commands on zsh or fish no longer hang at interactive prompts, and resuming after a prewalk handoff keeps the model it switched to. |
+| **Terminal sessions** | The agent can open shell sessions in the Terminal panel, on this machine or over SSH, and run commands in them one at a time as you would type them, so the directory and environment carry over. A password, passphrase or new-host question waits for you to answer in the terminal, and the agent never sees what you type. A session's tab shows when it runs a command or waits for you, and marks a root shell. |
+| **Scheduled tasks** | Ask the agent to create, list, change, pause, resume or delete the workspace's scheduled tasks, and it does so in the conversation. Each task has a depth: **Check** takes one pass, **Goal** keeps working until the task is done instead of stopping at suggested next steps, and **Research** digs deeper over several rounds (3 by default). |
+| **Images** | Click an image in the conversation to see it full-window. Click it, press `+` / `−`, or pinch to zoom, drag to look around, and press Escape or click beside it to close. |
+| **Opening sessions** | Sessions you click in the sidebar open right away, and a blank tab, or one you opened from the sidebar and have not sent a message in, shows the next session you click instead of starting another tab ([#29](https://github.com/nornzach/oh-my-pi-gui/issues/29)). |
+| **Model Roles** | Changing a role's model keeps its thinking level, and you can pick the level, including Off ([#34](https://github.com/nornzach/oh-my-pi-gui/issues/34)). |
+| **Links, keys, alerts** | Bare links in Chinese replies end at full-width punctuation ([#35](https://github.com/nornzach/oh-my-pi-gui/issues/35)). On Windows and Linux, shortcuts shown with ⌘ use Ctrl ([#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)). **Notify while focused** in Settings → GUI announces a finished turn while you are looking at the window. |
+| **Bundled agent** | Rebuilt from monorepo `4d2b93cd` on upstream omp main after v18.13.3. A model named in settings or roles must match an exact id or alias, session startup does more work in parallel, and language-server diagnostics no longer time out or report "no issues" before the server answers. |
 <a id="en-gallery"></a>
 ### Explore the interface
 
@@ -166,22 +168,22 @@ Search with `⌘K`. Supported commands lead to native controls; pass-through and
 <a id="en-install"></a>
 ### Install & start
 
-**Documented install baseline: [v0.9.32](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.32).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
+**Documented install baseline: [v0.9.33](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.33).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
 
-| Mac | v0.9.32 download |
+| Mac | v0.9.33 download |
 |---|---|
-| Apple Silicon | [omp-0.9.32-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32-arm64.dmg) |
-| Intel | [omp-0.9.32.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32.dmg) |
+| Apple Silicon | [omp-0.9.33-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33-arm64.dmg) |
+| Intel | [omp-0.9.33.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33.dmg) |
 
-| Windows x64 | v0.9.32 download |
+| Windows x64 | v0.9.33 download |
 |---|---|
-| Installer | [omp-0.9.32-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32-setup.exe) |
-| Portable | [omp-0.9.32-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32-portable.exe) |
+| Installer | [omp-0.9.33-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33-setup.exe) |
+| Portable | [omp-0.9.33-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33-portable.exe) |
 
-| Linux x64 | v0.9.32 download |
+| Linux x64 | v0.9.33 download |
 |---|---|
-| AppImage | [omp-0.9.32.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32.AppImage) |
-| Debian/Ubuntu | [omp_0.9.32_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp_0.9.32_amd64.deb) |
+| AppImage | [omp-0.9.33.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33.AppImage) |
+| Debian/Ubuntu | [omp_0.9.33_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp_0.9.33_amd64.deb) |
 
 Open the DMG and drag **omp** into **Applications**. The app and bundled macOS sidecar are ad-hoc signed but not notarized. If macOS blocks the first launch, use **right-click → Open**, or **System Settings → Privacy & Security → Open Anyway**, after confirming the download's source.
 
@@ -338,9 +340,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG、NSIS 或便携版安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [0.9.32 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.33 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.32 功能展示。** 下文改进均纳入 v0.9.32，内置 Agent 基于 monorepo `e1df76a4` 构建（上游 omp v18.13.3）。界面导览截图取自 v0.9.27；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.33 功能展示。** 下文改进均纳入 v0.9.33，内置 Agent 基于 monorepo `4d2b93cd` 构建（上游 omp v18.13.3 之后的 main）。界面导览截图取自 v0.9.27；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -378,17 +380,19 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 模型请求仍会发送到你配置的 Provider。内置 Agent 省去了单独安装运行时的步骤，但不替你配置凭据、项目依赖、外部 Git/OpenSSH/MCP 工具或可选服务。请只连接你信任的工具与服务。
 
 <a id="zh-recent"></a>
-### 0.9.32 更新内容
+### 0.9.33 更新内容
 
-v0.9.32 让分屏标签页保持成对，标签页可拖动、可多行显示，打开会话不再等待 omp 启动，并把内置代理升级到 omp v18.13.3：
+v0.9.33 让代理可以在你看得见的终端会话里工作，为定时任务加入「深度」让每次运行把事情做完，图片可以全窗口查看，并把内置代理升级到上游 omp main：
 
 | 日常场景 | 改进内容 |
 |---|---|
-| **分屏组合** | 两个分屏标签页在标签栏中合并为一个标签、在侧边栏中合并为一个框，选中任意一个即同时显示两者。选中其他标签页时单独显示它，不会拆散组合；一个窗口可以有多组分屏，重启后全部恢复。右键标签页可选择**与…分屏**或**解除分屏**（[#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)）。 |
-| **标签栏** | 拖动标签页即可调整顺序，分屏组合整体移动，顺序重启后保留。在设置 → 界面的**标签栏**中可选紧凑、标准或宽标签页，并可最多分三行显示；标签栏末尾的「全部标签页」按钮列出所有标签页并支持搜索（[#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)）。 |
-| **标签页快捷键** | `⌘1`–`⌘9` 选中标签页（`⌘9` 为最后一个），`⌃Tab` / `⌃⇧Tab` 切换到下一个或上一个，`⌥⇧⌘←` / `⌥⇧⌘→` 移动当前标签页（[#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)）。 |
-| **打开会话** | 在已打开的工作区中，从侧边栏打开会话或用 `⌘T` 新建标签页时不再等待 omp 启动：标签页会直接接管在该工作区待命的空闲代理。已保存的模型不存在时，会话仍会以默认模型打开（[#29](https://github.com/nornzach/oh-my-pi-gui/issues/29)）。 |
-| **内置代理** | 基于 monorepo `e1df76a4` 重新构建，对应上游 omp v18.13.3。按一次 Esc 不会再让会话收不到自己后台任务的结果；zsh 或 fish 中的 `!` 命令遇到交互提示时不再卡住；prewalk 交接后恢复会话会继续使用交接时切换的模型。 |
+| **终端会话** | 代理可以在终端面板中打开 shell 会话（本机或经 SSH），像你手动输入一样逐条运行命令，目录和环境变量会延续下去。遇到密码、口令或首次连接主机的确认时，会话会等你在终端里作答，代理看不到你输入的内容。会话的标签页会显示正在运行命令或正在等你，root 会话会有标记。 |
+| **定时任务** | 让代理创建、列出、修改、暂停、恢复或删除当前工作区的定时任务，它会直接在对话中完成。每个任务都有深度：**检查**过一遍就汇报，**目标**一直做到任务完成为止、不会停在「下一步建议」，**调研**分多轮逐步深入（默认 3 轮）。 |
+| **图片** | 点击对话中的图片即可全窗口查看。点击图片、按 `+` / `−` 或双指缩放来放大缩小，拖动查看各处，按 Esc 或点击图片外侧关闭。 |
+| **打开会话** | 在侧边栏点击的会话会立即打开；空白标签页，或从侧边栏打开后还没发过消息的标签页，会直接显示你接着点击的会话，不再另开标签页（[#29](https://github.com/nornzach/oh-my-pi-gui/issues/29)）。 |
+| **模型角色** | 更换角色的模型时会保留它的思考强度，并且可以直接选择思考强度，包括关闭（[#34](https://github.com/nornzach/oh-my-pi-gui/issues/34)）。 |
+| **链接、快捷键、通知** | 中文回复中的裸链接会在全角标点处结束（[#35](https://github.com/nornzach/oh-my-pi-gui/issues/35)）。在 Windows 和 Linux 上，以 ⌘ 显示的快捷键改用 Ctrl（[#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)）。设置 → 界面中的**窗口聚焦时也通知**会在你正看着窗口时也提示回合结束。 |
+| **内置代理** | 基于 monorepo `4d2b93cd` 重新构建，对应上游 omp v18.13.3 之后的 main。设置和角色中填写的模型必须与 id 或别名完全一致；会话启动时更多工作并行进行；语言服务器诊断不再超时，也不会在服务器回应前就报告「没有问题」。 |
 <a id="zh-gallery"></a>
 ### 界面导览
 
@@ -481,22 +485,22 @@ v0.9.32 让分屏标签页保持成对，标签页可拖动、可多行显示，
 <a id="zh-install"></a>
 ### 安装与开始使用
 
-**本文安装基线：[v0.9.32](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.32)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+**本文安装基线：[v0.9.33](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.33)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
-| Mac | v0.9.32 下载 |
+| Mac | v0.9.33 下载 |
 |---|---|
-| Apple Silicon | [omp-0.9.32-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32-arm64.dmg) |
-| Intel | [omp-0.9.32.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32.dmg) |
+| Apple Silicon | [omp-0.9.33-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33-arm64.dmg) |
+| Intel | [omp-0.9.33.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33.dmg) |
 
-| Windows x64 | v0.9.32 下载 |
+| Windows x64 | v0.9.33 下载 |
 |---|---|
-| 安装程序 | [omp-0.9.32-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32-setup.exe) |
-| 便携版 | [omp-0.9.32-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32-portable.exe) |
+| 安装程序 | [omp-0.9.33-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33-setup.exe) |
+| 便携版 | [omp-0.9.33-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33-portable.exe) |
 
-| Linux x64 | v0.9.32 下载 |
+| Linux x64 | v0.9.33 下载 |
 |---|---|
-| AppImage | [omp-0.9.32.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp-0.9.32.AppImage) |
-| Debian/Ubuntu | [omp_0.9.32_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.32/omp_0.9.32_amd64.deb) |
+| AppImage | [omp-0.9.33.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp-0.9.33.AppImage) |
+| Debian/Ubuntu | [omp_0.9.33_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.33/omp_0.9.33_amd64.deb) |
 
 打开 DMG，把 **omp** 拖入**应用程序**。应用与内置 macOS sidecar 均采用 ad-hoc 签名，未经公证。如果 macOS 拦截首次启动，请先确认下载来源，再使用**右键 → 打开**，或**系统设置 → 隐私与安全性 → 仍要打开**。
 

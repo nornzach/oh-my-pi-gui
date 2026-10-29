@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.33] - 2026-10-29
+
 ### Added
 
 - **Notify while focused** in Settings → GUI: desktop notifications now have a companion switch for the case they always skipped, so a turn that finishes while you are looking at the window still announces itself. It stays off by default, and the master switch still silences everything.
@@ -12,6 +14,7 @@
 
 ### Changed
 
+- Bundled agent rebuilt from monorepo `4d2b93cd`, on upstream omp main after v18.13.3 (`91f7e627`), with its native addon from npm 18.13.3. Among upstream's changes: a model named in settings or roles must match an exact id or alias (a near miss fails and suggests close ids), session startup does more work in parallel, language-server diagnostics no longer time out or report "no issues" before the server answers, and HTML exports have a new design.
 - Sessions you click in the sidebar open right away instead of after up to a few seconds. A blank tab, or a tab you opened from the sidebar and have not sent a message in, shows the next session you click instead of starting another tab ([#29](https://github.com/nornzach/oh-my-pi-gui/issues/29)).
 - A scheduled task you ask the agent for is created right away and reported in the conversation, with its first run, instead of waiting for you to confirm a card. Runs stay read-only, and a model you name is used for them.
 
