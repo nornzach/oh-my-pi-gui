@@ -1,9 +1,9 @@
 import { CalendarClock } from "lucide-react";
-import type { TaskSchedule } from "../../../shared/scheduler-types";
+import type { TaskDepth, TaskSchedule } from "../../../shared/scheduler-types";
 import { formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
-import { scheduleLabel } from "../tasks/task-format";
+import { depthLabel, scheduleLabel } from "../tasks/task-format";
 import { resultBodyText, resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
 
@@ -39,6 +39,7 @@ export function ScheduleTaskRenderer({ args, result, isError, isPartial }: ToolR
 	const taskId = created && typeof details?.taskId === "string" ? details.taskId : undefined;
 	const firstRun = created && typeof details?.nextFireAt === "number" ? details.nextFireAt : null;
 	const model = created && typeof details?.model === "string" ? details.model : "";
+	const depth = created && typeof details?.depth === "object" ? (details.depth as TaskDepth | null) : null;
 	const status = isPartial
 		? t("tools.scheduleTask.scheduling")
 		: isError
@@ -69,6 +70,7 @@ export function ScheduleTaskRenderer({ args, result, isError, isPartial }: ToolR
 				{status}
 				{firstRun !== null && ` ${t("tools.scheduleTask.firstRun", { time: formatClock(firstRun) })}`}
 				{model && ` · ${model}`}
+				{depth?.kind && ` · ${depthLabel(t, depth)}`}
 			</p>
 			{isError && (
 				<p className="text-omp-sm break-words whitespace-pre-wrap text-(--omp-muted)">

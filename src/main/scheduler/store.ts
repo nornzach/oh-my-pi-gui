@@ -7,6 +7,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import type { RunState, ScheduledTask, TaskConfig, TaskRun } from "../../shared/scheduler-types";
+import { storedDepth } from "../../shared/task-depth";
 
 const SCHEMA_VERSION = "1";
 
@@ -71,12 +72,12 @@ CREATE INDEX IF NOT EXISTS runs_by_time ON runs (created_at DESC);`);
 
 	listTasks(): StoredTask[] {
 		const rows = this.#db.prepare("SELECT data FROM tasks ORDER BY created_at ASC").all() as { data: string }[];
-		return rows.map(row => JSON.parse(row.data) as StoredTask);
+		return rows.map(row => withDefaults(JSON.parse(row.data) as StoredTask));
 	}
 
 	getTask(id: string): StoredTask | null {
 		const row = this.#db.prepare("SELECT data FROM tasks WHERE id = ?").get(id) as { data: string } | undefined;
-		return row ? (JSON.parse(row.data) as StoredTask) : null;
+		return row ? withDefaults(JSON.parse(row.data) as StoredTask) : null;
 	}
 
 	/** Insert or replace; a new revision number also freezes that revision's config. */
@@ -98,14 +99,18 @@ CREATE INDEX IF NOT EXISTS runs_by_time ON runs (created_at DESC);`);
 		const row = this.#db
 			.prepare("SELECT data FROM task_revisions WHERE task_id = ? AND revision = ?")
 			.get(taskId, revision) as { data: string } | undefined;
-		return row ? (JSON.parse(row.data) as TaskConfig) : null;
+		return row ? withDefaults(JSON.parse(row.data) as TaskConfig) : null;
 	}
 
 	listRevisions(taskId: string): { revision: number; createdAt: number; config: TaskConfig }[] {
 		const rows = this.#db
 			.prepare("SELECT revision, created_at, data FROM task_revisions WHERE task_id = ? ORDER BY revision DESC")
 			.all(taskId) as { revision: number; created_at: number; data: string }[];
-		return rows.map(row => ({ revision: row.revision, createdAt: row.created_at, config: JSON.parse(row.data) }));
+		return rows.map(row => ({
+			revision: row.revision,
+			createdAt: row.created_at,
+			config: withDefaults(JSON.parse(row.data) as TaskConfig),
+		}));
 	}
 
 	/** Remove a task with its revisions and runs. */
@@ -204,6 +209,11 @@ CREATE INDEX IF NOT EXISTS runs_by_time ON runs (created_at DESC);`);
 	}
 }
 
+/** Fill in settings added after a record was saved. */
+function withDefaults<T extends TaskConfig>(record: T): T {
+	return { ...record, depth: storedDepth(record.depth) };
+}
+
 export function configOf(task: TaskConfig): TaskConfig {
 	return {
 		title: task.title,
@@ -212,6 +222,7 @@ export function configOf(task: TaskConfig): TaskConfig {
 		schedule: task.schedule,
 		model: task.model,
 		tools: task.tools,
+		depth: task.depth,
 		timeoutMs: task.timeoutMs,
 		verify: task.verify,
 		notify: task.notify,

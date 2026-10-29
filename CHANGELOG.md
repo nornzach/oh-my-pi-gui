@@ -6,6 +6,8 @@
 
 - **Notify while focused** in Settings → GUI: desktop notifications now have a companion switch for the case they always skipped, so a turn that finishes while you are looking at the window still announces itself. It stays off by default, and the master switch still silences everything.
 - Ask the agent to list, change, pause, resume or delete the scheduled tasks of the workspace you are in, and it does so in the conversation. Only you can let a task's runs edit files, in Scheduled Tasks.
+- Click an image in the conversation to see it full-window. Click it, press + or −, or pinch to zoom, and drag or scroll to look around. Escape or a click beside it closes the view.
+- Scheduled tasks have a depth that sets how far each run goes. **Check** takes one pass. **Goal** keeps working until the task is done, instead of stopping at suggested next steps. **Research** digs deeper over several rounds (3 by default). Each run decides from its own report whether to start another round, within its time limit. Set the depth in the task editor, or ask the agent. A run's page shows how many rounds it took.
 
 ### Changed
 

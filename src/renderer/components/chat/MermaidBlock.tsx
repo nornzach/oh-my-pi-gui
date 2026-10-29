@@ -10,6 +10,7 @@ import { memo, useEffect, useState } from "react";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import type { ResolvedTheme } from "../../lib/theme";
+import { ZoomableImage } from "../common/ImageViewer";
 import { Spinner } from "../common/Spinner";
 import { CodeBlock } from "./CodeBlock";
 
@@ -137,7 +138,7 @@ interface MermaidImageProps {
 function MermaidImage({ svg, alt }: MermaidImageProps) {
 	const [url] = useState(() => URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })));
 	useEffect(() => () => URL.revokeObjectURL(url), [url]);
-	return <img src={url} alt={alt} className="mx-auto block h-auto max-w-full" />;
+	return <ZoomableImage src={url} alt={alt} className="mx-auto block h-auto max-w-full" />;
 }
 
 export interface MermaidBlockProps {

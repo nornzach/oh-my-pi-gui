@@ -11,6 +11,7 @@ import type {
 	ScheduledTask,
 	SchedulerLimits,
 	TaskConfig,
+	TaskDepth,
 	TaskSaveResult,
 	TaskSchedule,
 	TaskState,
@@ -21,8 +22,11 @@ import manageTasksList from "./prompts/manage-tasks-list.md?raw";
 import manageTasksDescription from "./prompts/manage-tasks-tool.md?raw";
 import {
 	checkModel,
+	depthValues,
+	parseDepthArgs,
 	parseScheduleArgs,
 	problemValues,
+	ROUNDS_DESCRIPTION,
 	rejected,
 	type ScheduleToolContext,
 	type ToolReply,
@@ -57,8 +61,26 @@ export const MANAGE_TASKS_TOOL_DEFINITION: HostToolDefinition = {
 			everyMinutes: { type: "number", description: "Interval in minutes (at least 5), or 0." },
 			at: { type: "string", description: "ISO 8601 date-time for a one-off run, or empty." },
 			model: { type: "string", description: "provider/id, default for the workspace default, or empty to keep it." },
+			depth: {
+				type: "string",
+				enum: ["", "check", "goal", "research"],
+				description: "How far each run goes, as in schedule_task, or empty to keep it.",
+			},
+			rounds: { type: "number", description: ROUNDS_DESCRIPTION },
 		},
-		required: ["action", "taskId", "title", "prompt", "scheduleKind", "cron", "everyMinutes", "at", "model"],
+		required: [
+			"action",
+			"taskId",
+			"title",
+			"prompt",
+			"scheduleKind",
+			"cron",
+			"everyMinutes",
+			"at",
+			"model",
+			"depth",
+			"rounds",
+		],
 		additionalProperties: false,
 	},
 };
@@ -141,6 +163,7 @@ export async function runManageTasksTool(
 			nextRun: showsRuns && changed.nextFireAt !== null ? wallClock(changed.nextFireAt, deps.context.timeZone) : "",
 			model: showsRuns ? changed.model : "",
 			defaultModel: showsRuns && changed.model === null,
+			...(action === "update" ? depthValues(changed.depth) : {}),
 		}),
 		isError: false,
 		details: { action, taskId: changed.id, title: changed.title, nextFireAt: changed.nextFireAt },
@@ -160,6 +183,7 @@ async function updatedConfig(
 		schedule: task.schedule,
 		model: task.model,
 		tools: task.tools,
+		depth: task.depth,
 		timeoutMs: task.timeoutMs,
 		verify: task.verify,
 		notify: task.notify,
@@ -179,6 +203,12 @@ async function updatedConfig(
 		const parsed = parseScheduleArgs(args, deps.context);
 		if (!parsed.ok) return notChanged({ error: parsed.error, retry: true });
 		config.schedule = parsed.schedule;
+		changes++;
+	}
+	const depth = parseDepthArgs(args);
+	if (!depth.ok) return notChanged({ error: depth.error, retry: true });
+	if (depth.depth) {
+		config.depth = depth.depth;
 		changes++;
 	}
 	const model = text(args.model);
@@ -213,6 +243,12 @@ const STATE_TEXT: Record<TaskState, string> = {
 	archived: "deleted",
 };
 
+const DEPTH_TEXT: Record<TaskDepth["kind"], string> = {
+	check: "check: one pass per run",
+	goal: "goal: each run works until done",
+	research: "research: each run digs deeper in rounds",
+};
+
 const ACCESS_TEXT: Record<TaskToolPolicy, string> = {
 	read_only: "read-only",
 	workspace: "edits files in a worktree",
@@ -224,7 +260,7 @@ function taskLine(task: ScheduledTask, timeZone: string): string {
 	const state = STATE_TEXT[task.state];
 	const next = task.nextFireAt === null ? "" : `, next run ${wallClock(task.nextFireAt, timeZone)}`;
 	const model = task.model ?? "workspace default model";
-	return `- ${task.id}: "${task.title}", ${scheduleText(task.schedule, timeZone)}, ${state}${next}, ${model}, ${ACCESS_TEXT[task.tools]}`;
+	return `- ${task.id}: "${task.title}", ${scheduleText(task.schedule, timeZone)}, ${state}${next}, ${model}, ${DEPTH_TEXT[task.depth.kind]}${task.depth.kind === "research" ? ` (${task.depth.rounds} rounds)` : ""}, ${ACCESS_TEXT[task.tools]}`;
 }
 
 function scheduleText(schedule: TaskSchedule, timeZone: string): string {

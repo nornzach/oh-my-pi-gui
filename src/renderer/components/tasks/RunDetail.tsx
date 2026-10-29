@@ -72,7 +72,8 @@ export function RunRow({
 				{duration !== null && run.state !== "running" && <span>· {formatDuration(duration)}</span>}
 				{run.state === "running" && progress && (
 					<span className="truncate">
-						· {t("tasks.run.progress", { turns: progress.turns })}
+						· {progress.round > 1 && `${t("tasks.run.round", { round: progress.round })} · `}
+						{t("tasks.run.progress", { turns: progress.turns })}
 						{progress.lastTool && ` · ${progress.lastTool}`}
 					</span>
 				)}
@@ -230,6 +231,7 @@ export function RunDetail({ run, taskTitle, actions }: { run: TaskRun; taskTitle
 						: "—"}
 				</Fact>
 				<Fact label={t("tasks.run.fact.model")}>{run.model ?? "—"}</Fact>
+				{run.rounds !== undefined && <Fact label={t("tasks.run.fact.rounds")}>{run.rounds}</Fact>}
 			</dl>
 
 			{live && (
@@ -241,6 +243,7 @@ export function RunDetail({ run, taskTitle, actions }: { run: TaskRun; taskTitle
 						</p>
 						{progress && (
 							<p className="truncate text-omp-sm text-(--omp-dim)">
+								{progress.round > 1 && `${t("tasks.run.round", { round: progress.round })} · `}
 								{t("tasks.run.progress", { turns: progress.turns })}
 								{progress.lastTool && ` · ${progress.lastTool}`}
 							</p>

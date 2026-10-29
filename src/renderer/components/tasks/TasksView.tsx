@@ -11,7 +11,7 @@ import { useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
 import { Badge, Button, ConfirmDialog } from "../common";
 import { RunDetail, RunRow } from "./RunDetail";
-import { runDotClass, scheduleLabel, TASK_STATE_VARIANT, timeLimitLabel, untilLabel } from "./task-format";
+import { depthLabel, runDotClass, scheduleLabel, TASK_STATE_VARIANT, timeLimitLabel, untilLabel } from "./task-format";
 
 function RecentStrip({ runs }: { runs: TaskRun[] }) {
 	const recent = runs.slice(0, 12).reverse();
@@ -221,6 +221,7 @@ function TaskDetail({ task, runs }: { task: ScheduledTask; runs: TaskRun[] }) {
 					<Setting label={t("tasks.form.folder")}>
 						<span className="font-mono text-omp-sm">{shortenPath(task.cwd)}</span>
 					</Setting>
+					<Setting label={t("tasks.form.depth")}>{depthLabel(t, task.depth)}</Setting>
 					<Setting label={t("tasks.form.access")}>{t(`tasks.access.${task.tools}`)}</Setting>
 					<Setting label={t("tasks.form.model")}>{task.model ?? t("tasks.form.modelDefault")}</Setting>
 					<Setting label={t("tasks.detail.timeLimit")}>{timeLimitLabel(t, task.timeoutMs)}</Setting>

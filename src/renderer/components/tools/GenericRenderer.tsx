@@ -2,6 +2,7 @@ import { OutputText } from "../../lib/ansi";
 import { cx, extractImageDataUrl, resultDetails, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_SM } from "../../lib/preview";
+import { ZoomableImage } from "../common/ImageViewer";
 import type { ToolRendererProps } from "./ToolCard";
 
 function toJson(value: unknown): string {
@@ -111,7 +112,7 @@ export function GenericRenderer({ args, result, isError, isPartial, partialResul
 					{isPartial ? t("tools.generic.partialResult") : t("tools.generic.result")}
 				</div>
 				{image ? (
-					<img
+					<ZoomableImage
 						src={image}
 						alt=""
 						className="max-h-72 rounded-md border border-[var(--omp-border-muted)] object-contain"

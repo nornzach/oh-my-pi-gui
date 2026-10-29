@@ -5,15 +5,17 @@
  * main would refuse.
  */
 
-import { ChevronRight, Eye, FolderOpen, GitBranch, ShieldAlert } from "lucide-react";
+import { ChevronRight, CircleCheck, Eye, FolderOpen, GitBranch, Microscope, ShieldAlert, Target } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type {
 	DraftProblem,
+	TaskDepth,
 	TaskDraft,
 	TaskNotify,
 	TaskSchedule,
 	TaskToolPolicy,
 } from "../../../shared/scheduler-types";
+import { RESEARCH_ROUNDS } from "../../../shared/task-depth";
 import { cx, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { Button, Input, TextArea } from "../common";
@@ -387,6 +389,74 @@ function ScheduleField({
 	);
 }
 
+const DEPTHS: { id: TaskDepth["kind"]; icon: typeof Eye }[] = [
+	{ id: "check", icon: CircleCheck },
+	{ id: "goal", icon: Target },
+	{ id: "research", icon: Microscope },
+];
+
+/** How far each run goes; research also takes its rounds. */
+function DepthField({
+	value,
+	onChange,
+	error,
+}: {
+	value: TaskDepth;
+	onChange: (value: TaskDepth) => void;
+	error?: string;
+}) {
+	const t = useT();
+	const [rounds, setRounds] = useState(value.kind === "research" ? value.rounds : RESEARCH_ROUNDS.default);
+	return (
+		<div>
+			<FieldLabel error={error}>{t("tasks.form.depth")}</FieldLabel>
+			<div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t("tasks.form.depth")}>
+				{DEPTHS.map(({ id, icon: Icon }) => {
+					const active = id === value.kind;
+					return (
+						<button
+							aria-checked={active}
+							className={cx(
+								"omp-pressable flex flex-col gap-1 rounded-xl border px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow] duration-150",
+								active
+									? "border-(--omp-accent) bg-(--omp-selected-bg) shadow-[0_0_0_3px_var(--omp-input-glow)]"
+									: "border-(--omp-border-muted) hover:border-(--omp-border-strong)",
+							)}
+							key={id}
+							onClick={() => onChange(id === "research" ? { kind: id, rounds } : { kind: id })}
+							role="radio"
+							type="button"
+						>
+							<span className="flex items-center gap-1.5 text-omp-md font-medium text-(--omp-text)">
+								<Icon size={14} className="text-(--omp-muted)" />
+								{t(`tasks.depth.${id}`)}
+							</span>
+							<span className="text-omp-sm leading-snug text-(--omp-dim)">{t(`tasks.depth.${id}.detail`)}</span>
+						</button>
+					);
+				})}
+			</div>
+			{value.kind === "research" && (
+				<label className="mt-2 flex items-center gap-2 text-omp-md text-(--omp-muted)">
+					{t("tasks.form.rounds")}
+					<input
+						className={cx(SELECT_CLASS, "w-20 tabular-nums")}
+						max={RESEARCH_ROUNDS.max}
+						min={RESEARCH_ROUNDS.min}
+						onChange={event => {
+							const next = Math.round(Number(event.target.value) || 0);
+							setRounds(next);
+							onChange({ kind: "research", rounds: next });
+						}}
+						type="number"
+						value={value.rounds}
+					/>
+				</label>
+			)}
+		</div>
+	);
+}
+
 const ACCESS: { id: TaskToolPolicy; icon: typeof Eye }[] = [
 	{ id: "read_only", icon: Eye },
 	{ id: "workspace", icon: GitBranch },
@@ -496,6 +566,7 @@ export function TaskForm({
 				onChange={schedule => patch({ schedule })}
 				schedule={draft.schedule}
 			/>
+			<DepthField error={problemText("depth_invalid")} onChange={depth => patch({ depth })} value={draft.depth} />
 			<AccessField onChange={tools => patch({ tools })} value={draft.tools} />
 			<div>
 				<FieldLabel>{t("tasks.form.model")}</FieldLabel>

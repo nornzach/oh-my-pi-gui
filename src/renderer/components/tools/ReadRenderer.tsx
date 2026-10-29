@@ -11,6 +11,7 @@ import {
 import { useT } from "../../lib/i18n";
 import { PREVIEW_HEIGHT_LG, PREVIEW_SCROLL_LG, READ_PREVIEW_LINES } from "../../lib/preview";
 import { CodeBlock } from "../chat/CodeBlock";
+import { ZoomableImage } from "../common/ImageViewer";
 import { ProcReadRenderer } from "./CoordinationRenderer";
 import { PathLink } from "./PathLink";
 import type { ToolRendererProps } from "./ToolCard";
@@ -72,7 +73,7 @@ export function ReadRenderer({ args, result, isError, isPartial, partialResult }
 				</PathLink>
 			</div>
 			{image ? (
-				<img
+				<ZoomableImage
 					src={image}
 					alt={path || t("tools.image.alt")}
 					className={`${PREVIEW_HEIGHT_LG} rounded-md border border-[var(--omp-border-muted)] object-contain`}

@@ -18,6 +18,13 @@ export type TaskNotify = "always" | "on_change" | "on_failure";
 export type TaskState = "active" | "paused" | "disabled" | "archived";
 export type TaskDisabledReason = "failure_streak" | "blocked_config";
 
+/**
+ * How far one run goes (see shared/task-depth.ts): `check` one pass, `goal`
+ * until the work is done and checked, `research` at least `rounds` rounds,
+ * each digging deeper than the last.
+ */
+export type TaskDepth = { kind: "check" } | { kind: "goal" } | { kind: "research"; rounds: number };
+
 export interface TaskVerify {
 	command: string;
 	timeoutMs: number;
@@ -37,6 +44,7 @@ export interface TaskConfig {
 	/** Model selector the user pinned; null runs on the workspace default. */
 	model: string | null;
 	tools: TaskToolPolicy;
+	depth: TaskDepth;
 	timeoutMs: number;
 	verify: TaskVerify | null;
 	notify: TaskNotify;
@@ -116,6 +124,8 @@ export interface RunWorktree {
 export interface RunProgress {
 	turns: number;
 	lastTool: string | null;
+	/** The round the run is in, from 1; see TaskDepth. */
+	round: number;
 }
 
 export interface TaskRun {
@@ -140,6 +150,8 @@ export interface TaskRun {
 	review: RunReview;
 	usage?: RunUsage;
 	model?: string;
+	/** Rounds the run took; absent on runs from before rounds existed. */
+	rounds?: number;
 	error?: { message: string; kind: RunErrorKind };
 	retryOf?: string;
 	progress?: RunProgress;
@@ -176,6 +188,7 @@ export type DraftProblem =
 	| "too_frequent"
 	| "too_many_enabled"
 	| "timeout_invalid"
+	| "depth_invalid"
 	| "verify_invalid";
 
 export interface InsightsDay {

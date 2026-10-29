@@ -12,7 +12,7 @@ import { nextFireAfter } from "../../shared/schedule";
 import type { RunWorktree, TaskDraft, TaskRun } from "../../shared/scheduler-types";
 import type { RunInput, RunResult } from "./runner";
 import { computeInsights, MISSED_GRACE_MS, Scheduler, type SchedulerNotice } from "./scheduler";
-import { SchedulerStore } from "./store";
+import { SchedulerStore, type StoredTask } from "./store";
 
 const T0 = Date.parse("2026-10-26T08:00:00Z");
 const MINUTE = 60_000;
@@ -75,6 +75,7 @@ const draft = (overrides: Partial<TaskDraft> = {}): TaskDraft => ({
 	schedule: { kind: "cron", expr: "0 9 * * *", tz: "UTC" },
 	model: null,
 	tools: "read_only",
+	depth: { kind: "goal" },
 	timeoutMs: 30 * MINUTE,
 	verify: null,
 	notify: "on_change",
@@ -248,6 +249,19 @@ describe("task state", () => {
 		expect(restored.ok && restored.task).toMatchObject({ state: "paused", nextFireAt: null });
 		await vi.advanceTimersByTimeAsync(2 * HOUR);
 		expect(pending).toHaveLength(0);
+	});
+
+	it("runs a task saved before runs had a depth as a goal", async () => {
+		const scheduler = makeScheduler();
+		scheduler.start();
+		const task = created(scheduler);
+		const { depth: _dropped, ...older } = store.getTask(task.id) as StoredTask;
+		store.saveTask({ ...(older as StoredTask), revision: task.revision + 1 });
+
+		expect(scheduler.getTask(task.id)?.depth).toEqual({ kind: "goal" });
+		scheduler.runNow(task.id);
+		await settle();
+		expect(pending[0].input.config.depth).toEqual({ kind: "goal" });
 	});
 });
 

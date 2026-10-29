@@ -5,7 +5,14 @@
  * too frequent, is the folder set) is the scheduler's `validate`, not this.
  */
 
-import type { TaskConfig, TaskDraft, TaskNotify, TaskSchedule, TaskToolPolicy } from "../../shared/scheduler-types";
+import type {
+	TaskConfig,
+	TaskDepth,
+	TaskDraft,
+	TaskNotify,
+	TaskSchedule,
+	TaskToolPolicy,
+} from "../../shared/scheduler-types";
 
 const TOOL_POLICIES: Record<TaskToolPolicy, true> = { read_only: true, workspace: true, full: true };
 const NOTIFY_MODES: Record<TaskNotify, true> = { always: true, on_change: true, on_failure: true };
@@ -42,6 +49,8 @@ export function asTaskConfig(value: unknown): TaskConfig | null {
 	if (typeof value.tools !== "string" || !(value.tools in TOOL_POLICIES)) return null;
 	if (typeof value.notify !== "string" || !(value.notify in NOTIFY_MODES)) return null;
 	if (!isFiniteNumber(value.timeoutMs)) return null;
+	const depth = asTaskDepth(value.depth);
+	if (!depth) return null;
 	let verify: TaskConfig["verify"] = null;
 	if (value.verify !== null) {
 		if (
@@ -60,10 +69,19 @@ export function asTaskConfig(value: unknown): TaskConfig | null {
 		schedule,
 		model: value.model === "" ? null : (value.model as string | null),
 		tools: value.tools as TaskToolPolicy,
+		depth,
 		timeoutMs: value.timeoutMs,
 		verify,
 		notify: value.notify as TaskNotify,
 	};
+}
+
+/** The depth's shape only; its range is a draft problem the editor shows. */
+function asTaskDepth(value: unknown): TaskDepth | null {
+	if (!isRecord(value)) return null;
+	if (value.kind === "check" || value.kind === "goal") return { kind: value.kind };
+	if (value.kind === "research" && isFiniteNumber(value.rounds)) return { kind: "research", rounds: value.rounds };
+	return null;
 }
 
 export function asTaskDraft(value: unknown): TaskDraft | null {

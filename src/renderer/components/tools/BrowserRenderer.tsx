@@ -1,6 +1,7 @@
 import { Globe } from "lucide-react";
 import { extractImageDataUrl, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { ZoomableImage } from "../common/ImageViewer";
 import type { ToolRendererProps } from "./ToolCard";
 
 /** Browser automation: action description + screenshot thumbnail when present. */
@@ -20,7 +21,7 @@ export function BrowserRenderer({ args, result, isError, isPartial, partialResul
 				{url && <span className="min-w-0 flex-1 truncate text-[var(--omp-md-link)]">{url}</span>}
 			</div>
 			{screenshot && (
-				<img
+				<ZoomableImage
 					src={screenshot}
 					alt={t("tools.browser.screenshotAlt")}
 					className="max-h-56 rounded-md border border-[var(--omp-border-muted)] object-contain"

@@ -1,6 +1,7 @@
 import { Monitor } from "lucide-react";
 import { extractImageDataUrl, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { ZoomableImage } from "../common/ImageViewer";
 import type { ToolRendererProps } from "./ToolCard";
 
 /** Computer use: action description + screenshot. */
@@ -22,7 +23,7 @@ export function ComputerRenderer({ args, result, isError, isPartial, partialResu
 				{text && <span className="min-w-0 flex-1 truncate text-[var(--omp-muted)]">“{text}”</span>}
 			</div>
 			{screenshot && (
-				<img
+				<ZoomableImage
 					src={screenshot}
 					alt={t("tools.computer.captureAlt")}
 					className="max-h-64 rounded-md border border-[var(--omp-border-muted)] object-contain"

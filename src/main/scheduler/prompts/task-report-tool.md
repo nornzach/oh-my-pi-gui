@@ -1,1 +1,1 @@
-Finish this scheduled run with a structured report for the person reviewing it. Call it exactly once, as your last action. A run that ends without calling it is marked partial and sent to review.
+Finish a round of this scheduled run with a structured report for the person reviewing it. Call it as your last action in each round; each call replaces the report before it. A run that ends without calling it is marked partial and sent to review.

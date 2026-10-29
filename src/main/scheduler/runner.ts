@@ -32,6 +32,9 @@ import type {
 } from "../../shared/scheduler-types";
 import {
 	classifyRunError,
+	MIN_ROUND_MS,
+	type NextRound,
+	nextRound,
 	outputTail,
 	policyUsesWorktree,
 	RUN_DENIED_FLAGS,
@@ -42,6 +45,7 @@ import {
 	worktreeNameFor,
 } from "./policy";
 import runTemplate from "./prompts/run.md?raw";
+import runRoundTemplate from "./prompts/run-round.md?raw";
 import taskReportDescription from "./prompts/task-report-tool.md?raw";
 import { renderTemplate } from "./template";
 
@@ -110,6 +114,8 @@ export interface RunResult {
 	usage?: RunUsage;
 	worktree?: RunWorktree;
 	report?: RunReport;
+	/** Rounds the run took; see TaskDepth. */
+	rounds?: number;
 	blocked: { tool: string; target?: string }[];
 	changedFiles: string[];
 	verification: RunVerification;
@@ -204,6 +210,18 @@ export function renderRunPrompt(
 		previousSummary: previous?.summary,
 		previousNext: previous?.next,
 		rejectionNote: previous?.rejectionNote,
+		[config.depth.kind]: true,
+		rounds: config.depth.kind === "research" ? String(config.depth.rounds) : undefined,
+	});
+}
+
+/** The message that starts round `round` (from 2) of a run, and why it runs. */
+export function renderRoundPrompt(config: TaskConfig, round: number, why: NextRound): string {
+	const minRounds = config.depth.kind === "research" && round <= config.depth.rounds ? config.depth.rounds : null;
+	return renderTemplate(runRoundTemplate, {
+		round: String(round),
+		[why]: true,
+		minRounds: minRounds === null ? undefined : String(minRounds),
 	});
 }
 
@@ -295,7 +313,12 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 	const { config } = input;
 	const blocked: RunResult["blocked"] = [];
 	let report: RunReport | undefined;
+	/** The report filed in the round under way, if any. */
+	let roundReport: RunReport | null = null;
 	let turns = 0;
+	let round = 1;
+	/** `task_report` calls in the round under way, valid or not. */
+	let reportCalls = 0;
 	let lastTool: string | null = null;
 	let progressTimer: NodeJS.Timeout | null = null;
 	let sidecar: RunSidecar | null = null;
@@ -310,7 +333,7 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 		if (progressTimer) return;
 		progressTimer = setTimeout(() => {
 			progressTimer = null;
-			input.onProgress({ turns, lastTool });
+			input.onProgress({ turns, lastTool, round });
 		}, PROGRESS_THROTTLE_MS);
 	};
 
@@ -356,6 +379,7 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 			reply(`Unknown tool: ${request.toolName}`, true);
 			return;
 		}
+		reportCalls++;
 		const parsed = parseTaskReport(request.arguments);
 		if (!parsed) {
 			reply(
@@ -365,7 +389,8 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 			return;
 		}
 		report = parsed;
-		reply("Report recorded. The run is finished; stop here.");
+		roundReport = parsed;
+		reply("Report recorded. End your turn here.");
 	};
 
 	const finish = (state: RunEndState, error?: RunResult["error"]): RunResult => ({
@@ -377,6 +402,7 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 		usage,
 		worktree,
 		report,
+		rounds: round,
 		blocked,
 		changedFiles,
 		verification,
@@ -434,27 +460,59 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 			);
 		}
 
-		const end = await promptAndWait(
-			sidecar,
-			renderRunPrompt(config, input.previous, worktree ? { branch: worktree.branch } : null),
-			config.timeoutMs,
-			input.signal,
-		);
+		// Rounds go on in the same session while the agent's own report says the
+		// task's depth is not reached yet (policy.nextRound), within the time limit.
+		const deadline = deps.now() + config.timeoutMs;
+		let message = renderRunPrompt(config, input.previous, worktree ? { branch: worktree.branch } : null);
+		let end: PromptEnd | null = null;
+		// Read from the session, not the event stream: events arrive in batches,
+		// so a quick round can end before its tool events do.
+		const sessionToolCalls = async (target: RunSidecar) =>
+			(await command<SessionStats>(target, { type: "get_session_stats" }).catch(() => null))?.toolCalls ?? null;
+		let callsBefore = 0;
+		for (;;) {
+			roundReport = null;
+			reportCalls = 0;
+			try {
+				end = await promptAndWait(sidecar, message, deadline - deps.now(), input.signal);
+			} catch (error) {
+				// A later round that runs out of time leaves the earlier rounds' report standing.
+				if (!(error instanceof RunStop && error.state === "timed_out" && round > 1 && report)) throw error;
+				end = null;
+				break;
+			}
+			if (end.kind !== "result" || end.status !== "completed") break;
+			// A round whose only tool call was its report made no progress.
+			const callsAfter = await sessionToolCalls(sidecar);
+			const progressed = callsAfter !== null && callsAfter - callsBefore > reportCalls;
+			callsBefore = callsAfter ?? callsBefore;
+			const next = nextRound(config.depth, round, { report: roundReport, progressed });
+			if (!next || deadline - deps.now() < MIN_ROUND_MS) break;
+			round++;
+			input.onProgress({ turns, lastTool, round });
+			message = renderRoundPrompt(config, round, next);
+		}
 		if (progressTimer) {
 			clearTimeout(progressTimer);
 			progressTimer = null;
 		}
-		input.onProgress({ turns, lastTool });
+		input.onProgress({ turns, lastTool, round });
 
 		// Whatever happened, read what the session holds before the sidecar goes.
 		await collect();
 
-		if (end.kind === "rejected") throw new RunStop("failed", end.message, classifyRunError({ message: end.message }));
-		if (end.kind === "result" && end.status === "error") {
+		// A later round cut short by time or an error: the work so far stands, unfinished.
+		const cutShort =
+			round > 1 && report !== undefined && (end === null || end.kind !== "result" || end.status !== "completed");
+		if (cutShort && report) report = { ...report, status: "partial" };
+		else if (end?.kind === "rejected") {
+			throw new RunStop("failed", end.message, classifyRunError({ message: end.message }));
+		} else if (end?.kind === "result" && end.status === "error") {
 			const facts = end.error ?? { message: "The run ended with an error" };
 			throw new RunStop("failed", facts.message, classifyRunError(facts));
+		} else if (end?.kind === "result" && end.status === "aborted") {
+			throw new RunStop("failed", "The agent aborted the run");
 		}
-		if (end.kind === "result" && end.status === "aborted") throw new RunStop("failed", "The agent aborted the run");
 
 		if (!report) {
 			const text = await command<{ text?: string | null }>(sidecar, { type: "get_last_assistant_text" }).catch(

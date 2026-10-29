@@ -23,6 +23,7 @@ function task(id: string, overrides: Partial<ScheduledTask> = {}): ScheduledTask
 		schedule: { kind: "cron", expr: "0 9 * * 1-5", tz: "Europe/Berlin" },
 		model: null,
 		tools: "read_only",
+		depth: { kind: "goal" },
 		timeoutMs: 30 * 60_000,
 		verify: null,
 		notify: "on_change",
@@ -60,6 +61,8 @@ const args = (overrides: Record<string, unknown> = {}) => ({
 	everyMinutes: 0,
 	at: "",
 	model: "",
+	depth: "",
+	rounds: 0,
 	...overrides,
 });
 
@@ -103,7 +106,15 @@ describe("manage_scheduled_tasks", () => {
 	it("changes only the fields given and never what the task's runs may do", async () => {
 		const toolDeps = deps();
 		const result = await runManageTasksTool(
-			args({ action: "update", taskId: "deps", scheduleKind: "interval", everyMinutes: 60, model: "default" }),
+			args({
+				action: "update",
+				taskId: "deps",
+				scheduleKind: "interval",
+				everyMinutes: 60,
+				model: "default",
+				depth: "research",
+				rounds: 4,
+			}),
 			toolDeps,
 		);
 
@@ -114,6 +125,7 @@ describe("manage_scheduled_tasks", () => {
 			schedule: { kind: "interval", everyMs: 3_600_000, anchor: NOW + 3_600_000 },
 			model: null,
 			tools: "workspace",
+			depth: { kind: "research", rounds: 4 },
 			timeoutMs: 30 * 60_000,
 			verify: null,
 			notify: "on_change",

@@ -586,7 +586,7 @@ export class Scheduler {
 			...queued,
 			state: "running",
 			startedAt: this.#deps.now(),
-			progress: { turns: 0, lastTool: null },
+			progress: { turns: 0, lastTool: null, round: 1 },
 		};
 		this.#save(run);
 		const controller = new AbortController();
@@ -638,6 +638,7 @@ export class Scheduler {
 			usage: result.usage,
 			worktree: result.worktree,
 			report: result.report,
+			rounds: result.rounds,
 			blocked: result.blocked,
 			changedFiles: result.changedFiles,
 			verification: result.verification,

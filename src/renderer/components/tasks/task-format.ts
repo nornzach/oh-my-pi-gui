@@ -5,7 +5,8 @@
 
 import { languageDetails } from "../../../shared/languages";
 import { describeSchedule, nextFires } from "../../../shared/schedule";
-import type { RunState, TaskDraft, TaskRun, TaskSchedule, TaskState } from "../../../shared/scheduler-types";
+import type { RunState, TaskDepth, TaskDraft, TaskRun, TaskSchedule, TaskState } from "../../../shared/scheduler-types";
+import { DEFAULT_TASK_DEPTH } from "../../../shared/task-depth";
 import { formatClock } from "../../lib/format";
 import { getCurrentLanguage } from "../../lib/i18n";
 import type { BadgeVariant } from "../common";
@@ -18,6 +19,13 @@ export function weekdayName(weekday: number): string {
 	// 2026-10-04 is a Sunday; cron weekday 0 and 7 both mean Sunday.
 	const date = new Date(2026, 9, 4 + (weekday % 7));
 	return date.toLocaleDateString(languageDetails(getCurrentLanguage()).locale, { weekday: "long" });
+}
+
+/** How far each run goes: "Check", "Goal", or "Research, 3 rounds". */
+export function depthLabel(t: Translate, depth: TaskDepth): string {
+	return depth.kind === "research"
+		? t("tasks.depth.researchRounds", { rounds: depth.rounds })
+		: t(`tasks.depth.${depth.kind}`);
 }
 
 /** A time limit in the whole minutes the form takes: "45m", or "2h" on the hour. */
@@ -115,6 +123,7 @@ export function blankDraft(cwd: string): TaskDraft {
 		schedule: { kind: "cron", expr: "0 9 * * 1-5", tz: Intl.DateTimeFormat().resolvedOptions().timeZone },
 		model: null,
 		tools: "read_only",
+		depth: DEFAULT_TASK_DEPTH,
 		timeoutMs: DEFAULT_TASK_TIMEOUT_MS,
 		verify: null,
 		notify: "on_change",

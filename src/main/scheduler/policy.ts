@@ -9,13 +9,16 @@ import { scheduleProblem } from "../../shared/schedule";
 import type {
 	DraftProblem,
 	RunErrorKind,
+	RunReport,
 	RunState,
 	SchedulerLimits,
+	TaskDepth,
 	TaskDraft,
 	TaskNotify,
 	TaskRun,
 	TaskToolPolicy,
 } from "../../shared/scheduler-types";
+import { depthIsValid } from "../../shared/task-depth";
 
 export const DEFAULT_LIMITS: SchedulerLimits = {
 	minIntervalMs: 5 * 60_000,
@@ -140,6 +143,39 @@ export function isFailureState(state: RunState): boolean {
 	return state === "failed" || state === "timed_out";
 }
 
+/** The most rounds one run takes, whatever its depth. */
+export const MAX_RUN_ROUNDS = 8;
+/** Time a round needs left on the run's limit to be worth starting. */
+export const MIN_ROUND_MS = 2 * 60_000;
+
+/**
+ * Why a run starts another round: to dig deeper into research, to carry on
+ * with unfinished work, or to file the report the agent skipped.
+ */
+export type NextRound = "deeper" | "continue" | "report";
+
+/**
+ * Whether a run goes on after a round, judged from what the agent reported
+ * for it: `partial` means it has more it can do now. Research takes its
+ * rounds whatever the report says, a goal goes on while the work is
+ * partial, and a check only to get a report it skipped. A round that used
+ * no tool made no progress and ends the run, as do a blocked or empty
+ * report and the round cap.
+ */
+export function nextRound(
+	depth: TaskDepth,
+	round: number,
+	ended: { report: RunReport | null; progressed: boolean },
+): NextRound | null {
+	if (round >= MAX_RUN_ROUNDS || !ended.progressed) return null;
+	const status = ended.report?.status;
+	if (status === "blocked" || status === "nothing_to_report") return null;
+	if (depth.kind === "research" && round < depth.rounds) return "deeper";
+	if (!ended.report) return "report";
+	if (status !== "partial" || depth.kind === "check") return null;
+	return depth.kind === "research" ? "deeper" : "continue";
+}
+
 /** A run left work a person has to look at. */
 export function runNeedsReview(run: Pick<TaskRun, "changedFiles" | "report" | "verification" | "blocked">): boolean {
 	if (run.changedFiles.length > 0) return true;
@@ -210,6 +246,7 @@ export function draftProblems(draft: TaskDraft, context: DraftContext): DraftPro
 		problems.push("too_many_enabled");
 	}
 	if (!(draft.timeoutMs >= 60_000 && draft.timeoutMs <= MAX_TIMEOUT_MS)) problems.push("timeout_invalid");
+	if (!depthIsValid(draft.depth)) problems.push("depth_invalid");
 	if (draft.verify && (draft.verify.command.trim() === "" || !(draft.verify.timeoutMs >= 1_000))) {
 		problems.push("verify_invalid");
 	}

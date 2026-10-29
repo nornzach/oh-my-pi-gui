@@ -20,6 +20,8 @@ const args = (overrides: Record<string, unknown> = {}) => ({
 	everyMinutes: 0,
 	at: "",
 	model: "",
+	depth: "goal",
+	rounds: 0,
 	...overrides,
 });
 
@@ -67,13 +69,25 @@ describe("schedule_task arguments", () => {
 		expect(once.ok && once.draft.schedule).toEqual({ kind: "once", at: Date.parse("2026-10-27T07:30:00Z") });
 	});
 
-	it("refuses a call whose chosen schedule field is missing or unknown", () => {
+	it("gives research its rounds, three unless the agent asks for another count", () => {
+		const research = (rounds: number) => parseScheduleToolArgs(args({ depth: "research", rounds }), context);
+		expect(research(0)).toMatchObject({ ok: true, draft: { depth: { kind: "research", rounds: 3 } } });
+		expect(research(5)).toMatchObject({ ok: true, draft: { depth: { kind: "research", rounds: 5 } } });
+		expect(parseScheduleToolArgs(args({ depth: "check", rounds: 5 }), context)).toMatchObject({
+			ok: true,
+			draft: { depth: { kind: "check" } },
+		});
+	});
+
+	it("refuses a call whose chosen schedule field or depth is missing or unknown", () => {
 		for (const bad of [
 			args({ cron: "" }),
 			args({ scheduleKind: "interval", everyMinutes: 0 }),
 			args({ scheduleKind: "once", at: "tomorrow-ish" }),
 			args({ scheduleKind: "weekly" }),
 			args({ prompt: "  " }),
+			args({ depth: "deep" }),
+			args({ depth: "research", rounds: 9 }),
 		]) {
 			expect(parseScheduleToolArgs(bad, context).ok).toBe(false);
 		}

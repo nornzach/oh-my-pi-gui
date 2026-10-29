@@ -23,6 +23,8 @@ class FakeSidecar extends EventEmitter {
 	restartedTo: string | null = null;
 	disposed = false;
 	promptId = "";
+	/** Tool calls the agent made, as the session's stats report them. */
+	toolCalls = 0;
 	constructor(
 		readonly spec: RunSidecarSpec,
 		readonly handlers: Partial<Record<string, Handler>>,
@@ -36,7 +38,15 @@ class FakeSidecar extends EventEmitter {
 			const handler = this.handlers[cmd.type];
 			if (!handler) return { type: "response", command: cmd.type, success: true, data: {} };
 			try {
-				return { type: "response", command: cmd.type, success: true, data: handler(cmd) };
+				const data = handler(cmd);
+				if (cmd.type === "get_session_stats")
+					return {
+						type: "response",
+						command: cmd.type,
+						success: true,
+						data: { ...(data as object), toolCalls: this.toolCalls },
+					};
+				return { type: "response", command: cmd.type, success: true, data };
 			} catch (error) {
 				return { type: "response", command: cmd.type, success: false, error: (error as Error).message };
 			}
@@ -75,6 +85,7 @@ class FakeSidecar extends EventEmitter {
 		});
 	}
 	callTool(name: string, args: Record<string, unknown>, id = "tool-1") {
+		this.toolCalls++;
 		this.emit("hostToolCall", {
 			type: "host_tool_call",
 			id,
@@ -92,6 +103,7 @@ const config = (overrides: Partial<TaskConfig> = {}): TaskConfig => ({
 	schedule: { kind: "cron", expr: "0 9 * * *", tz: "UTC" },
 	model: null,
 	tools: "read_only",
+	depth: { kind: "goal" },
 	timeoutMs: 60_000,
 	verify: null,
 	notify: "on_change",
@@ -299,6 +311,87 @@ describe("run outcomes", () => {
 		const noModel = await run(config(), () => {}, { get_state: () => ({ sessionFile: null, model: null }) });
 		expect(noModel.result).toMatchObject({ state: "blocked_config", error: { kind: "config" } });
 		expect(noModel.sidecar.fired.some(cmd => cmd.type === "prompt")).toBe(false);
+	});
+});
+
+/** One round of agent work: a tool it ran, then the report it filed for the round (if any). */
+function round(fake: FakeSidecar, report: Record<string, unknown> | null, tool: string | null = "read") {
+	if (tool) fake.toolCalls++;
+	if (report) fake.callTool("task_report", { ...goodReport, ...report });
+	fake.finishPrompt();
+}
+
+/** Long enough for later rounds to start: each needs MIN_ROUND_MS left. */
+const TEN_MINUTES = 10 * 60_000;
+
+describe("rounds", () => {
+	it("goes on with a goal in the same session while the agent reports partial, and ends at done", async () => {
+		const messages: string[] = [];
+		const { result, sidecar } = await run(
+			config({ depth: { kind: "goal" }, timeoutMs: TEN_MINUTES }),
+			(fake, message) => {
+				messages.push(message);
+				round(fake, messages.length === 1 ? { status: "partial", summary: "Half the docs." } : goodReport);
+			},
+		);
+		expect(result).toMatchObject({ state: "succeeded", rounds: 2, report: { status: "done" } });
+		expect(sidecar.fired.filter(cmd => cmd.type === "prompt")).toHaveLength(2);
+		expect(messages[1]).toContain("Round 2");
+		expect(messages[1]).toContain("not finished");
+	});
+
+	it("takes every research round even when the agent reports done early, each asking for more depth", async () => {
+		const messages: string[] = [];
+		const { result } = await run(
+			config({ depth: { kind: "research", rounds: 3 }, timeoutMs: TEN_MINUTES }),
+			(fake, message) => {
+				messages.push(message);
+				round(fake, goodReport);
+			},
+		);
+		expect(result.rounds).toBe(3);
+		expect(messages[0]).toContain("at least 3 rounds");
+		expect(messages[2]).toContain("Go deeper");
+	});
+
+	it("stops a check after one round, and any run after a round that ran no tool", async () => {
+		const check = await run(config({ depth: { kind: "check" }, timeoutMs: TEN_MINUTES }), fake =>
+			round(fake, { status: "partial" }),
+		);
+		expect(check.result).toMatchObject({ rounds: 1, report: { status: "partial" } });
+		const idle = await run(config({ depth: { kind: "goal" }, timeoutMs: TEN_MINUTES }), fake =>
+			round(fake, { status: "partial" }, null),
+		);
+		expect(idle.result.rounds).toBe(1);
+	});
+
+	it("asks for the report a round skipped instead of ending without one", async () => {
+		const messages: string[] = [];
+		const { result } = await run(config({ depth: { kind: "check" }, timeoutMs: TEN_MINUTES }), (fake, message) => {
+			messages.push(message);
+			round(fake, messages.length === 1 ? null : goodReport);
+		});
+		expect(result).toMatchObject({ rounds: 2, report: { status: "done" } });
+		expect(messages[1]).toContain("without calling `task_report`");
+	});
+
+	it("keeps the earlier report, marked partial, when a later round runs out of time", async () => {
+		vi.useFakeTimers();
+		let prompts = 0;
+		const pending = run(config({ depth: { kind: "research", rounds: 3 }, timeoutMs: TEN_MINUTES }), fake => {
+			prompts++;
+			// The second round never finishes.
+			if (prompts === 1) round(fake, { status: "done", summary: "Compared two of three tools." });
+		});
+		await vi.advanceTimersByTimeAsync(TEN_MINUTES);
+		await vi.advanceTimersByTimeAsync(10_000);
+		const { result, sidecar } = await pending;
+		expect(sidecar.fired.map(cmd => cmd.type)).toContain("abort");
+		expect(result).toMatchObject({
+			state: "succeeded",
+			rounds: 2,
+			report: { status: "partial", summary: "Compared two of three tools." },
+		});
 	});
 });
 

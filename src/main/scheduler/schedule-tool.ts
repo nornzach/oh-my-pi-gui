@@ -10,17 +10,23 @@ import type { HostToolDefinition } from "../../shared/rpc-types";
 import type {
 	DraftProblem,
 	SchedulerLimits,
+	TaskDepth,
 	TaskDraft,
 	TaskSaveResult,
 	TaskSchedule,
 } from "../../shared/scheduler-types";
-import { DEFAULT_TIMEOUT_MS } from "./policy";
+import { DEFAULT_TASK_DEPTH, RESEARCH_ROUNDS } from "../../shared/task-depth";
+import { DEFAULT_TIMEOUT_MS, MAX_RUN_ROUNDS } from "./policy";
 import scheduleTaskCreated from "./prompts/schedule-task-created.md?raw";
 import scheduleTaskDescription from "./prompts/schedule-task-tool.md?raw";
 import taskToolRejected from "./prompts/task-tool-rejected.md?raw";
 import { renderTemplate, type TemplateValues } from "./template";
 
 export const SCHEDULE_TASK_TOOL = "schedule_task";
+
+export const DEPTH_DESCRIPTION =
+	"How far each run goes: check (one pass), goal (work until done), research (several rounds, each deeper).";
+export const ROUNDS_DESCRIPTION = "Research rounds per run, 2 to 6, or 0 for 3; ignored for other depths.";
 
 export const SCHEDULE_TASK_TOOL_DEFINITION: HostToolDefinition = {
 	name: SCHEDULE_TASK_TOOL,
@@ -37,8 +43,10 @@ export const SCHEDULE_TASK_TOOL_DEFINITION: HostToolDefinition = {
 			everyMinutes: { type: "number", description: "Interval in minutes (at least 5), or 0." },
 			at: { type: "string", description: "ISO 8601 date-time for a one-off run, or empty." },
 			model: { type: "string", description: "provider/id the user asked for, or empty for the default." },
+			depth: { type: "string", enum: ["check", "goal", "research"], description: DEPTH_DESCRIPTION },
+			rounds: { type: "number", description: ROUNDS_DESCRIPTION },
 		},
-		required: ["title", "prompt", "scheduleKind", "cron", "everyMinutes", "at", "model"],
+		required: ["title", "prompt", "scheduleKind", "cron", "everyMinutes", "at", "model", "depth", "rounds"],
 		additionalProperties: false,
 	},
 };
@@ -53,6 +61,31 @@ export interface ScheduleToolContext {
 export type ParsedScheduleTool = { ok: true; draft: TaskDraft; model: string | null } | { ok: false; error: string };
 
 export const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+
+/** The depth a tool call picked with `depth` (and `rounds` for research); null when it left depth empty. */
+export function parseDepthArgs(
+	args: Record<string, unknown>,
+): { ok: true; depth: TaskDepth | null } | { ok: false; error: string } {
+	const kind = text(args.depth);
+	if (!kind) return { ok: true, depth: null };
+	if (kind === "check" || kind === "goal") return { ok: true, depth: { kind } };
+	if (kind !== "research") return { ok: false, error: "depth must be check, goal or research" };
+	const asked = typeof args.rounds === "number" ? Math.round(args.rounds) : 0;
+	const rounds = asked > 0 ? asked : RESEARCH_ROUNDS.default;
+	if (rounds < RESEARCH_ROUNDS.min || rounds > RESEARCH_ROUNDS.max) {
+		return { ok: false, error: `rounds must be between ${RESEARCH_ROUNDS.min} and ${RESEARCH_ROUNDS.max}` };
+	}
+	return { ok: true, depth: { kind: "research", rounds } };
+}
+
+/** The template values that say how far each run goes. */
+export function depthValues(depth: TaskDepth): TemplateValues {
+	return {
+		[`${depth.kind}Depth`]: true,
+		rounds: depth.kind === "research" ? String(depth.rounds) : undefined,
+		maxRounds: String(MAX_RUN_ROUNDS),
+	};
+}
 
 /** The schedule a tool call picked with `scheduleKind` and that kind's field. */
 export function parseScheduleArgs(
@@ -92,6 +125,8 @@ export function parseScheduleToolArgs(args: Record<string, unknown>, context: Sc
 	const parsed = parseScheduleArgs(args, context);
 	if (!parsed.ok) return parsed;
 	const schedule = parsed.schedule;
+	const depth = parseDepthArgs(args);
+	if (!depth.ok) return depth;
 	return {
 		ok: true,
 		draft: {
@@ -101,6 +136,7 @@ export function parseScheduleToolArgs(args: Record<string, unknown>, context: Sc
 			schedule,
 			model: null,
 			tools: "read_only",
+			depth: depth.depth ?? DEFAULT_TASK_DEPTH,
 			timeoutMs: DEFAULT_TIMEOUT_MS,
 			verify: null,
 			notify: "on_change",
@@ -145,7 +181,7 @@ export interface ToolReply {
 
 export interface ScheduleToolResult extends ToolReply {
 	/** What the chat card shows; absent when nothing was created. */
-	details?: { outcome: "created"; taskId: string; nextFireAt: number | null; model: string | null };
+	details?: { outcome: "created"; taskId: string; nextFireAt: number | null; model: string | null; depth: TaskDepth };
 }
 
 const MAX_LISTED_MODELS = 40;
@@ -193,9 +229,16 @@ export async function runScheduleTool(
 			firstRun: task.nextFireAt === null ? "" : wallClock(task.nextFireAt, deps.context.timeZone),
 			model: task.model,
 			defaultModel: task.model === null,
+			...depthValues(task.depth),
 		}),
 		isError: false,
-		details: { outcome: "created", taskId: task.id, nextFireAt: task.nextFireAt, model: task.model },
+		details: {
+			outcome: "created",
+			taskId: task.id,
+			nextFireAt: task.nextFireAt,
+			model: task.model,
+			depth: task.depth,
+		},
 	};
 }
 

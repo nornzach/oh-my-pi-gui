@@ -1,6 +1,7 @@
 import { Image as ImageIcon } from "lucide-react";
 import { extractImageDataUrls, resultDetails, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { ZoomableImage } from "../common/ImageViewer";
 import type { ToolRendererProps } from "./ToolCard";
 
 function firstStringList(value: unknown): string {
@@ -39,7 +40,7 @@ export function ImageRenderer({ args, result, isError, isPartial, partialResult 
 			{images.length > 0 ? (
 				<div className="flex flex-wrap gap-1.5">
 					{images.map(src => (
-						<img
+						<ZoomableImage
 							alt={path || prompt || t("tools.image.alt")}
 							className="max-h-72 rounded-md border border-[var(--omp-border-muted)] object-contain"
 							key={src}

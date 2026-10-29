@@ -19,6 +19,7 @@ import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
 import { CodeBlock as SharedCodeBlock } from "../components/chat/CodeBlock";
 import { MermaidBlock } from "../components/chat/MermaidBlock";
+import { ZoomableImage } from "../components/common/ImageViewer";
 import { FileLink, PathCode, WebLink } from "../components/common/Links";
 import { useRuntimeTabId } from "../stores/session-runtime-context";
 import { saveGuiPreference } from "./display-preferences";
@@ -584,7 +585,7 @@ function LocalMarkdownImage({ path, alt, title }: { path: string; alt: string; t
 			</span>
 		);
 	}
-	return <img src={resolved.url} alt={alt} title={title ?? alt} className={MARKDOWN_IMAGE_CLASS} />;
+	return <ZoomableImage src={resolved.url} alt={alt} title={title ?? alt} className={MARKDOWN_IMAGE_CLASS} />;
 }
 
 function MarkdownImage({ src, alt, title, ...props }: ComponentPropsWithoutRef<"img">) {
@@ -601,7 +602,9 @@ function MarkdownImage({ src, alt, title, ...props }: ComponentPropsWithoutRef<"
 		);
 	}
 	if (classified.kind === "remote") return <RemoteMarkdownImage src={classified.src} alt={altText} />;
-	return <img {...props} src={classified.src} alt={altText} title={title} className={MARKDOWN_IMAGE_CLASS} />;
+	return (
+		<ZoomableImage {...props} src={classified.src} alt={altText} title={title} className={MARKDOWN_IMAGE_CLASS} />
+	);
 }
 
 const COMPONENTS: Components = {

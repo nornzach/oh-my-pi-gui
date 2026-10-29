@@ -66,6 +66,7 @@ function configOf(draft: TaskDraft): TaskConfig {
 		schedule: draft.schedule,
 		model: draft.model,
 		tools: draft.tools,
+		depth: draft.depth,
 		timeoutMs: draft.timeoutMs,
 		verify: draft.verify,
 		notify: draft.notify,
