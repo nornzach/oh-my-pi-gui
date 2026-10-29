@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { SessionInfo } from "../../../shared/ipc-types";
 import { useSidebarRecency } from "../../hooks/use-sidebar-recency";
 import { I18nProvider } from "../../lib/i18n";
+import { IS_MAC } from "../../lib/keymap";
 import { useAgentPagesStore } from "../../stores/agent-pages";
 import { useSessionStore } from "../../stores/session";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
@@ -279,8 +280,9 @@ describe("Sidebar menus and pinned ordering", () => {
 
 		const commandCenter = navigation?.querySelector('button[data-command-center-entry="true"]');
 		// The hover hint names the first configured chord; the tooltip lists them all.
-		expect(commandCenter?.textContent).toContain("⌘K");
-		expect(commandCenter?.getAttribute("title")).toContain("⌘K / ⌃K");
+		// Off macOS the default ⌘K is ⌃K, the other default, so it is listed once.
+		expect(commandCenter?.textContent).toContain(IS_MAC ? "⌘K" : "⌃K");
+		expect(commandCenter?.getAttribute("title")).toContain(IS_MAC ? "(⌘K / ⌃K)" : "(⌃K)");
 		await act(async () => useUiStore.setState({ keymapOverrides: { palette: ["⌘⇧K"] } }));
 		expect(commandCenter?.textContent).toContain("⇧⌘K");
 		expect(commandCenter?.textContent).not.toContain("⌃K");

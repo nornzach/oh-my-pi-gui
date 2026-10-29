@@ -175,7 +175,8 @@ describe("detectConflicts", () => {
 	});
 
 	it("drops the shadow warning once the shadowed action is itself remapped", () => {
-		const conflicts = detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃O"], "tools.expand": ["ctrl+shift+o"] });
+		// Not ⌃⇧O: off macOS that is the native window toggle.
+		const conflicts = detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃O"], "tools.expand": ["alt+shift+o"] });
 		expect(conflicts).toEqual([]);
 	});
 
