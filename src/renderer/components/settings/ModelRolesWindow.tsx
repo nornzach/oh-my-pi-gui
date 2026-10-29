@@ -10,7 +10,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { ModelRoleCandidate, ModelRoleEntry, ModelRolesResult } from "../../../shared/rpc-types";
+import type { ModelRoleCandidate, ModelRoleEntry, ModelRolesResult, ThinkingLevel } from "../../../shared/rpc-types";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -29,6 +29,38 @@ const COLOR_MAP: Record<string, string> = {
 	default: "var(--omp-muted)",
 };
 
+type ThinkingSelector = ThinkingLevel | "auto";
+type Translate = (k: string, p?: Record<string, string | number>) => string;
+
+interface RoleChange {
+	role: string;
+	modelId: string | null;
+	/** Saved by the backend as the selector's `:level` suffix. */
+	thinkingLevel?: ThinkingSelector;
+	/** Saved level the newly picked model does not offer, so the role falls back to inherit. */
+	droppedLevel?: ThinkingSelector;
+}
+
+function candidateKey(model: { provider: string; id: string }): string {
+	return `${model.provider}/${model.id}`;
+}
+
+function levelName(level: ThinkingSelector, t: Translate): string {
+	return level === "inherit" ? t("modelRoles.thinking.inherit") : t(`input.thinking.name.${level}`);
+}
+
+/**
+ * The change a model pick makes: the role's explicit level carries over when
+ * the new model offers it; otherwise it is dropped and reported, never kept.
+ */
+function modelPickChange(role: ModelRoleEntry, model: ModelRoleCandidate): RoleChange {
+	const saved = role.selected?.thinkingLevel;
+	const modelId = candidateKey(model);
+	if (saved === undefined || saved === "inherit") return { role: role.id, modelId };
+	if (model.thinkingLevels?.includes(saved)) return { role: role.id, modelId, thinkingLevel: saved };
+	return { role: role.id, modelId, droppedLevel: saved };
+}
+
 function RoleRow({
 	role,
 	onChange,
@@ -37,10 +69,10 @@ function RoleRow({
 	t,
 }: {
 	role: ModelRoleEntry;
-	onChange: (role: string, modelId: string | null) => void;
+	onChange: (change: RoleChange) => void;
 	busy: boolean;
 	sidecarReady: boolean;
-	t: (k: string, p?: Record<string, string | number>) => string;
+	t: Translate;
 }) {
 	const color = COLOR_MAP[role.color ?? "default"] ?? COLOR_MAP.default;
 	const candidates = role.candidates ?? [];
@@ -50,7 +82,13 @@ function RoleRow({
 		group.push(candidate);
 		groups.set(candidate.kind, group);
 	}
-	const savedOnly = role.model && !candidates.some(m => `${m.provider}/${m.id}` === role.model);
+	// The backend splits the `:level` suffix off; an older sidecar without
+	// `selected` still matches unsuffixed selectors verbatim.
+	const selectedKey = role.selected ? candidateKey(role.selected) : role.model;
+	const currentCandidate = candidates.find(model => candidateKey(model) === selectedKey);
+	const savedOnly = role.model && !currentCandidate;
+	const savedLevel = role.selected?.thinkingLevel ?? "inherit";
+	const levelOptions = currentCandidate?.thinkingLevels ?? [];
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -131,7 +169,6 @@ function RoleRow({
 			}),
 		])
 		.filter(([, models]) => models.length > 0) as [ModelRoleCandidate["kind"], ModelRoleCandidate[]][];
-	const currentCandidate = candidates.find(model => `${model.provider}/${model.id}` === role.model);
 	const currentLabel = currentCandidate
 		? `${currentCandidate.name} — ${currentCandidate.provider}/${currentCandidate.id}`
 		: savedOnly
@@ -217,7 +254,7 @@ function RoleRow({
 							disabled={!sidecarReady}
 							onClick={() => {
 								closePicker();
-								onChange(role.id, null);
+								onChange({ role: role.id, modelId: null });
 							}}
 							role="option"
 							onKeyDown={handleOptionKeyDown}
@@ -234,7 +271,7 @@ function RoleRow({
 								disabled={!sidecarReady}
 								onClick={() => {
 									closePicker();
-									onChange(role.id, role.model ?? null);
+									onChange({ role: role.id, modelId: role.model ?? null });
 								}}
 								role="option"
 								onKeyDown={handleOptionKeyDown}
@@ -251,16 +288,16 @@ function RoleRow({
 									{t(`modelRoles.kind.${kind}`)}
 								</div>
 								{models.map(model => {
-									const value = `${model.provider}/${model.id}`;
+									const value = candidateKey(model);
 									return (
 										<button
 											key={value}
-											aria-selected={value === role.model}
+											aria-selected={value === selectedKey}
 											className="flex w-full items-center rounded px-2 py-1.5 text-left text-omp-sm hover:bg-[var(--omp-selected-bg)]"
 											disabled={!sidecarReady}
 											onClick={() => {
 												closePicker();
-												onChange(role.id, value);
+												onChange(modelPickChange(role, model));
 											}}
 											onKeyDown={handleOptionKeyDown}
 											role="option"
@@ -280,6 +317,34 @@ function RoleRow({
 					</div>
 				)}
 			</div>
+			{currentCandidate && levelOptions.length > 0 && (
+				<select
+					aria-label={t("modelRoles.thinking", { role: role.name })}
+					className="h-7 shrink-0 rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-input-bg)] px-1.5 text-omp-sm text-[var(--omp-text)] focus:border-[var(--omp-border-accent)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+					disabled={busy || !sidecarReady}
+					onChange={event =>
+						onChange({
+							role: role.id,
+							modelId: candidateKey(currentCandidate),
+							thinkingLevel: event.target.value as ThinkingSelector,
+						})
+					}
+					title={!sidecarReady ? t("modelRoles.notConnected") : t("modelRoles.thinking", { role: role.name })}
+					value={savedLevel}
+				>
+					{/* A hand-written level the model does not list still shows as saved. */}
+					{!levelOptions.includes(savedLevel) && (
+						<option value={savedLevel}>
+							{t("modelRoles.thinking.saved", { level: levelName(savedLevel, t) })}
+						</option>
+					)}
+					{levelOptions.map(level => (
+						<option key={level} value={level}>
+							{levelName(level, t)}
+						</option>
+					))}
+				</select>
+			)}
 		</div>
 	);
 }
@@ -334,16 +399,24 @@ export function ModelRolesWindow() {
 		].filter(section => section.roles.length > 0);
 	}, [roles]);
 
-	const handleChange = async (role: string, modelId: string | null) => {
+	const handleChange = async ({ role, modelId, thinkingLevel, droppedLevel }: RoleChange) => {
 		if (!sidecarReady) return;
 		setBusyRole(role);
 		try {
-			const res = await tabRpc.setModelRole(role, modelId);
+			const res = await tabRpc.setModelRole(role, modelId, thinkingLevel);
 			if (res.success) {
-				toast({
-					variant: "success",
-					message: modelId ? t("modelRoles.set", { role, model: modelId }) : t("modelRoles.cleared", { role }),
-				});
+				// The receipt carries the stored selector, `:level` suffix included.
+				const saved = (res.data as { modelId?: string | null } | undefined)?.modelId ?? modelId;
+				const message = saved ? t("modelRoles.set", { role, model: saved }) : t("modelRoles.cleared", { role });
+				toast(
+					droppedLevel && modelId
+						? {
+								variant: "warning",
+								title: message,
+								message: t("modelRoles.levelDropped", { model: modelId, level: levelName(droppedLevel, t) }),
+							}
+						: { variant: "success", message },
+				);
 				await load();
 			} else {
 				toast({ variant: "error", title: t("modelRoles.failed"), message: res.error });

@@ -14,6 +14,7 @@ import type { Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
+import { useToastStore } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 
 const { document, window, Event, HTMLElement, Element, Node } = parseHTML("<html><body></body></html>");
@@ -237,6 +238,106 @@ describe("ModelRolesWindow", () => {
 		expect(option).toBeDefined();
 		await act(async () => option?.dispatchEvent(new Event("click", { bubbles: true })));
 
-		expect(setModelRole).toHaveBeenCalledWith("default", "openai/gpt");
+		// The saved selector carries no level, so none is sent.
+		expect(setModelRole).toHaveBeenCalledWith("default", "openai/gpt", undefined);
+	});
+});
+
+// Issue #34: saved selectors carry a `:level` suffix. The backend parses it into
+// `selected` and lists each candidate's role levels; the window must keep,
+// offer and save levels without dropping them on a model change.
+const ROLE_LEVELS = ["inherit", "off", "auto", "low", "high"];
+const LEVEL_ROLES = [
+	{
+		id: "smol",
+		name: "Fast",
+		section: "chat",
+		source: "settings",
+		model: "acme/thinker:high",
+		selected: { provider: "acme", id: "thinker", thinkingLevel: "high" },
+		candidates: [
+			{ provider: "acme", id: "thinker", name: "Thinker", kind: "chat", thinkingLevels: ROLE_LEVELS },
+			{ provider: "acme", id: "deep", name: "Deep", kind: "chat", thinkingLevels: [...ROLE_LEVELS, "max"] },
+			{
+				provider: "acme",
+				id: "lite",
+				name: "Lite",
+				kind: "chat",
+				thinkingLevels: ["inherit", "off", "auto", "low"],
+			},
+		],
+	},
+];
+
+async function mountLevelRoles() {
+	const rpc = installRpc(async () => ({ success: true, data: { roles: LEVEL_ROLES } }));
+	useSessionStore.getState().setStatus("ready", "/repo");
+	useUiStore.getState().openModelRoles();
+	await mount(<ModelRolesWindow />);
+	return rpc;
+}
+
+function byLabel(label: string): HTMLElement | undefined {
+	return [...document.body.querySelectorAll("[aria-label]")].find(
+		element => element.getAttribute("aria-label") === label,
+	) as HTMLElement | undefined;
+}
+
+async function pickModel(selector: string): Promise<void> {
+	await act(async () => byLabel("Model for Fast")?.click());
+	const option = [...document.body.querySelectorAll('[role="option"]')].find(button =>
+		(button.textContent ?? "").includes(selector),
+	);
+	expect(option).toBeDefined();
+	await act(async () => option?.dispatchEvent(new Event("click", { bubbles: true })));
+	await act(async () => {});
+}
+
+describe("ModelRolesWindow thinking levels", () => {
+	afterEach(() => {
+		useToastStore.setState({ toasts: [] });
+	});
+
+	it("shows a saved model as selected when its selector carries a level", async () => {
+		await mountLevelRoles();
+
+		expect(byLabel("Model for Fast")?.textContent).toContain("Thinker — acme/thinker");
+		expect((byLabel("Thinking level for Fast") as HTMLSelectElement | undefined)?.value).toBe("high");
+		await act(async () => byLabel("Model for Fast")?.click());
+		const selected = document.body.querySelector('[role="option"][aria-selected="true"]');
+		expect(selected?.textContent).toContain("acme/thinker");
+		expect(document.body.querySelector('[role="listbox"]')?.textContent).not.toContain("(saved)");
+	});
+
+	it("keeps the role's level when the newly picked model offers it", async () => {
+		const { setModelRole } = await mountLevelRoles();
+
+		await pickModel("acme/deep");
+
+		expect(setModelRole).toHaveBeenCalledWith("smol", "acme/deep", "high");
+	});
+
+	it("drops a level the newly picked model does not offer and says so", async () => {
+		const { setModelRole } = await mountLevelRoles();
+
+		await pickModel("acme/lite");
+
+		expect(setModelRole).toHaveBeenCalledWith("smol", "acme/lite", undefined);
+		const warning = useToastStore.getState().toasts.find(toast => toast.variant === "warning");
+		expect(warning?.message).toBe("acme/lite has no High thinking level, so the role's level was reset to Inherit.");
+	});
+
+	it("saves the level chosen for the role's model", async () => {
+		const { setModelRole } = await mountLevelRoles();
+		const select = byLabel("Thinking level for Fast") as HTMLSelectElement | undefined;
+		const off = [...(select?.querySelectorAll("option") ?? [])].find(option => option.value === "off");
+		expect(off).toBeDefined();
+
+		await act(async () => {
+			if (off) off.selected = true;
+			select?.dispatchEvent(new Event("change", { bubbles: true }));
+		});
+
+		expect(setModelRole).toHaveBeenCalledWith("smol", "acme/thinker", "off");
 	});
 });

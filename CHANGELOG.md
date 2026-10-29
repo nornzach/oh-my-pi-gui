@@ -10,6 +10,7 @@
 
 - On Windows and Linux, shortcuts shown with ⌘ use Ctrl. Ctrl+T and Ctrl+Shift+T open an agent or chat tab, Ctrl+W closes a tab, Ctrl+1–Ctrl+9 select one, Ctrl+Alt+Shift+← / → move it, and Ctrl+Shift+F searches conversations; before, these took the Windows key and did nothing. Show or hide thinking, which was Ctrl+T there, is now Alt+Shift+T. The shortcuts list and the new-tab buttons' tooltips show the Ctrl keys ([#30](https://github.com/nornzach/oh-my-pi-gui/issues/30)).
 - Links in Chinese replies no longer swallow the text after them: a bare address ends at full-width punctuation such as `，` or `。`, or where Chinese text runs straight into its host or port, and a bold address renders bold with the link inside ([#35](https://github.com/nornzach/oh-my-pi-gui/issues/35)).
+- Model Roles keeps a role's thinking level when you change its model, shows the saved model as selected, and lets you pick the level, including Off ([#34](https://github.com/nornzach/oh-my-pi-gui/issues/34)).
 
 ## [0.9.32] - 2026-10-28
 

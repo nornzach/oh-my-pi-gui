@@ -1308,7 +1308,7 @@ export interface OmpApi {
 		setPlanMode(enabled: boolean): Promise<RpcResponse>;
 		getPlanMode(): Promise<RpcResponse>;
 		getModelRoles(): Promise<RpcResponse>;
-		setModelRole(role: string, modelId: string | null): Promise<RpcResponse>;
+		setModelRole(role: string, modelId: string | null, thinkingLevel?: ThinkingLevel | "auto"): Promise<RpcResponse>;
 		getModelRoleMetadata(): Promise<RpcResponse>;
 		getAvailableCommands(): Promise<RpcResponse>;
 		getSkills(): Promise<RpcResponse>;

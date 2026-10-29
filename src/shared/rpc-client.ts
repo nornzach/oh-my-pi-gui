@@ -234,7 +234,8 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		setPlanMode: (enabled: boolean) => rpcCommand({ type: "set_plan_mode", enabled }),
 		getPlanMode: () => rpcCommand({ type: "get_plan_mode" }),
 		getModelRoles: () => rpcCommand({ type: "get_model_roles" }),
-		setModelRole: (role: string, modelId: string | null) => rpcCommand({ type: "set_model_role", role, modelId }),
+		setModelRole: (role: string, modelId: string | null, thinkingLevel?: ThinkingLevel | "auto") =>
+			rpcCommand({ type: "set_model_role", role, modelId, thinkingLevel }),
 		getModelRoleMetadata: () => rpcCommand({ type: "get_model_role_metadata" }),
 		getAvailableCommands: () => rpcCommand({ type: "get_available_commands" }),
 		getSkills: () => rpcCommand({ type: "get_skills" }),

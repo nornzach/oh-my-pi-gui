@@ -89,7 +89,14 @@ export type RpcCommand =
 	| { id?: string; type: "set_plan_mode"; enabled: boolean }
 	| { id?: string; type: "get_plan_mode" }
 	| { id?: string; type: "get_model_roles" }
-	| { id?: string; type: "set_model_role"; role: string; modelId: string | null }
+	| {
+			id?: string;
+			type: "set_model_role";
+			role: string;
+			modelId: string | null;
+			/** Saved as `modelId`'s `:level` suffix; one of the candidate's `thinkingLevels`. */
+			thinkingLevel?: ThinkingLevel | "auto";
+	  }
 	| { id?: string; type: "get_model_role_metadata" }
 
 	// Domain inspection (read-only)
@@ -2243,11 +2250,22 @@ export interface ModelRoleCandidate {
 	id: string;
 	name: string;
 	kind: "chat" | "tiny" | "image" | "tts" | "stt" | "search" | "judge";
+	/** Thinking levels a role can run this model at, in menu order; empty when it does not reason. */
+	thinkingLevels?: (ThinkingLevel | "auto")[];
+}
+
+/** The candidate a role's selector names, with its `:level` suffix parsed by the backend. */
+export interface ModelRoleSelection {
+	provider: string;
+	id: string;
+	thinkingLevel?: ThinkingLevel | "auto";
 }
 
 export interface ModelRoleEntry extends ModelRoleMetadata {
 	/** Configured selector, not necessarily a catalog model id. */
 	model?: string;
+	/** Set when `model` names one of `candidates`; absent for aliases and fallback chains. */
+	selected?: ModelRoleSelection;
 	source: string;
 	/** Backend-filtered eligible models; never shared with the chat picker. */
 	candidates: ModelRoleCandidate[];
