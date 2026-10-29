@@ -155,7 +155,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		labelKey: "settings.gui.sidebarQuotas",
 		aliases: "sidebarQuotas quota usage limit sidebar 配额 用量 侧边栏 квоты",
 	},
-	{ id: "notifications", labelKey: "settings.gui.notifications", aliases: "notifications 通知" },
+	{
+		id: "notifications",
+		labelKey: "settings.gui.notifications",
+		aliases: "notifications notify focused focus 通知 聚焦 前台 уведомления фокус",
+	},
 	{
 		id: "thinkingExpanded",
 		labelKey: "settings.gui.thinkingExpanded",

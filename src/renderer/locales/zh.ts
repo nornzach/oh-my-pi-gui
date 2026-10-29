@@ -1702,7 +1702,10 @@ export const zh: Record<string, string> = {
 	"settings.gui.tabRows": "标签页多行显示",
 	"settings.gui.tabRowsDesc": "最多三行，超出后滚动；标签栏随之变高。",
 	"settings.gui.notifications": "桌面通知",
-	"settings.gui.notificationsDesc": "窗口未聚焦时，在一轮完成、出错停止或等待输入时显示系统通知。",
+	"settings.gui.notificationsDesc": "在一轮完成、出错停止或等待输入时显示系统通知。",
+	"settings.gui.notificationsWhenFocused": "窗口聚焦时也通知",
+	"settings.gui.notificationsWhenFocusedDesc":
+		"正在查看 omp 窗口时也发出通知。关闭时，聚焦中的窗口保持安静，因为对话里已经显示结果。",
 	"settings.gui.thinkingExpanded": "默认展开推理内容",
 	"settings.gui.thinkingExpandedDesc": "无需逐条点击即可查看模型的推理过程，仍可单独折叠某一条。",
 	"settings.gui.sidebarQuotas": "侧边栏显示配额",
