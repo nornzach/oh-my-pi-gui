@@ -241,6 +241,7 @@ export function App() {
 				"followAgentTheme",
 				"fontSize",
 				"notifications",
+				"notificationsWhenFocused",
 				"thinkingExpanded",
 				"sidebarQuotas",
 				"transcriptDetail",
@@ -275,6 +276,12 @@ export function App() {
 				}
 				if (typeof prefs.notifications === "boolean" && !changedPreferences.has("notifications")) {
 					useUiStore.setState({ notifications: prefs.notifications });
+				}
+				if (
+					typeof prefs.notificationsWhenFocused === "boolean" &&
+					!changedPreferences.has("notificationsWhenFocused")
+				) {
+					useUiStore.setState({ notificationsWhenFocused: prefs.notificationsWhenFocused });
 				}
 				if (typeof prefs.thinkingExpanded === "boolean" && !changedPreferences.has("thinkingExpanded")) {
 					useUiStore.setState({ thinkingExpanded: prefs.thinkingExpanded });

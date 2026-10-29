@@ -1753,8 +1753,10 @@ export const en: Record<string, string> = {
 	"settings.gui.tabRows": "Wrap tabs onto more rows",
 	"settings.gui.tabRowsDesc": "Up to three rows before the bar scrolls; the bar grows to fit them.",
 	"settings.gui.notifications": "Desktop notifications",
-	"settings.gui.notificationsDesc":
-		"Show a system notification when a turn completes, fails, or waits for input while the window is unfocused.",
+	"settings.gui.notificationsDesc": "Show a system notification when a turn completes, fails, or waits for input.",
+	"settings.gui.notificationsWhenFocused": "Notify while the window has focus",
+	"settings.gui.notificationsWhenFocusedDesc":
+		"Also notify when you are looking at the omp window. Off, a focused window stays quiet and the transcript already shows the outcome.",
 	"settings.gui.thinkingExpanded": "Expand reasoning by default",
 	"settings.gui.thinkingExpandedDesc":
 		"Show the model's reasoning trace without clicking each block; blocks can still be collapsed individually.",

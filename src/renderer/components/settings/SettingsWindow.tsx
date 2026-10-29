@@ -197,6 +197,7 @@ export function SettingsWindow() {
 	const [pasteThresholdDraft, setPasteThresholdDraft] = useState<string | null>(null);
 	const setPanelTab = useUiStore(state => state.setPanelTab);
 	const setNotifications = useUiStore(state => state.setNotifications);
+	const setNotificationsWhenFocused = useUiStore(state => state.setNotificationsWhenFocused);
 	const setTranscriptDetail = useUiStore(state => state.setTranscriptDetail);
 	const fontSize = useUiStore(state => state.fontSize);
 	const compactDensity = useUiStore(state => state.compactDensity);
@@ -204,6 +205,7 @@ export function SettingsWindow() {
 	const followAgentTheme = useUiStore(state => state.followAgentTheme);
 	const panelTab = useUiStore(state => state.panelTab);
 	const notifications = useUiStore(state => state.notifications);
+	const notificationsWhenFocused = useUiStore(state => state.notificationsWhenFocused);
 	const thinkingExpanded = useUiStore(state => state.thinkingExpanded);
 	const sidebarQuotas = useUiStore(state => state.sidebarQuotas);
 	const transcriptDetail = useUiStore(state => state.transcriptDetail);
@@ -432,6 +434,9 @@ export function SettingsWindow() {
 	};
 	const applyNotifications = (next: boolean) => {
 		void saveGuiPreference("notifications", next, () => setNotifications(next));
+	};
+	const applyNotificationsWhenFocused = (next: boolean) => {
+		void saveGuiPreference("notificationsWhenFocused", next, () => setNotificationsWhenFocused(next));
 	};
 	const applyThinkingExpanded = (next: boolean) => {
 		void saveGuiPreference("thinkingExpanded", next, () => useUiStore.getState().setThinkingExpanded(next));
@@ -1253,6 +1258,13 @@ export function SettingsWindow() {
 												description={t("settings.gui.notificationsDesc")}
 												label={t("settings.gui.notifications")}
 												onChange={applyNotifications}
+											/>
+											<Toggle
+												checked={notificationsWhenFocused}
+												description={t("settings.gui.notificationsWhenFocusedDesc")}
+												disabled={!notifications}
+												label={t("settings.gui.notificationsWhenFocused")}
+												onChange={applyNotificationsWhenFocused}
 											/>
 										</Section>
 										<Section id="setting-gui-thinkingExpanded" title={t("settings.gui.thinkingExpanded")}>
