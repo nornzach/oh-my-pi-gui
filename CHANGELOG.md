@@ -5,10 +5,12 @@
 ### Added
 
 - **Notify while focused** in Settings → GUI: desktop notifications now have a companion switch for the case they always skipped, so a turn that finishes while you are looking at the window still announces itself. It stays off by default, and the master switch still silences everything.
+- Ask the agent to list, change, pause, resume or delete the scheduled tasks of the workspace you are in, and it does so in the conversation. Only you can let a task's runs edit files, in Scheduled Tasks.
 
 ### Changed
 
 - Sessions you click in the sidebar open right away instead of after up to a few seconds. A blank tab, or a tab you opened from the sidebar and have not sent a message in, shows the next session you click instead of starting another tab ([#29](https://github.com/nornzach/oh-my-pi-gui/issues/29)).
+- A scheduled task you ask the agent for is created right away and reported in the conversation, with its first run, instead of waiting for you to confirm a card. Runs stay read-only, and a model you name is used for them.
 
 ### Fixed
 

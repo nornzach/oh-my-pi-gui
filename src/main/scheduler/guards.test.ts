@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { asRequestOutcome, asTaskDraft } from "./guards";
+import { asTaskDraft } from "./guards";
 
 const valid = {
 	title: "Nightly",
@@ -35,13 +35,5 @@ describe("asTaskDraft", () => {
 		]) {
 			expect(asTaskDraft(broken)).toBeNull();
 		}
-	});
-});
-
-describe("asRequestOutcome", () => {
-	it("refuses an answer that is neither a decline nor a created task id", () => {
-		expect(asRequestOutcome({ kind: "created" })).toBeNull();
-		expect(asRequestOutcome({ kind: "accepted", taskId: "t" })).toBeNull();
-		expect(asRequestOutcome({ kind: "declined" })).toEqual({ kind: "declined", reason: "" });
 	});
 });

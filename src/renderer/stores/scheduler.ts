@@ -1,10 +1,8 @@
 import { create } from "zustand";
 import type {
 	RunProgress,
-	ScheduleRequestOutcome,
 	SchedulerOpenTarget,
 	SchedulerSnapshot,
-	ScheduleTaskRequest,
 	TaskConfig,
 	TaskDraft,
 	TaskSaveResult,
@@ -14,9 +12,9 @@ import { toast } from "./toast";
 
 /**
  * Scheduled tasks in this window (plan/23 §6): the main-process snapshot,
- * live progress of running runs, the Tasks window's navigation, and agent
- * drafts waiting on the confirm card. Main owns every record; this store
- * only mirrors pushes and forwards the user's actions.
+ * live progress of running runs, and the Tasks window's navigation. Main
+ * owns every record; this store only mirrors pushes and forwards the user's
+ * actions.
  */
 
 export type TasksView = "tasks" | "runs" | "review" | "insights";
@@ -28,7 +26,6 @@ export type TaskEditorState =
 interface SchedulerStore {
 	snapshot: SchedulerSnapshot | null;
 	progress: Record<string, RunProgress>;
-	requests: ScheduleTaskRequest[];
 	open: boolean;
 	view: TasksView;
 	selectedTaskId: string | null;
@@ -52,7 +49,6 @@ interface SchedulerStore {
 	cancelRun: (runId: string) => Promise<void>;
 	review: (runId: string, decision: "accepted" | "rejected", note?: string) => Promise<boolean>;
 	setPaused: (paused: boolean) => Promise<void>;
-	respond: (requestId: string, outcome: ScheduleRequestOutcome) => Promise<void>;
 }
 
 const failed = (error: unknown) =>
@@ -79,7 +75,6 @@ function configOf(draft: TaskDraft): TaskConfig {
 export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 	snapshot: null,
 	progress: {},
-	requests: [],
 	open: false,
 	view: "tasks",
 	selectedTaskId: null,
@@ -90,10 +85,6 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 		const api = window.omp.scheduler;
 		void api.snapshot().then(
 			snapshot => set({ snapshot }),
-			() => {},
-		);
-		void api.pendingRequests().then(
-			requests => set(state => ({ requests: mergeRequests(state.requests, requests) })),
 			() => {},
 		);
 		const unsubscribers = [
@@ -109,10 +100,6 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 			),
 			api.onProgress((runId, progress) => set(state => ({ progress: { ...state.progress, [runId]: progress } }))),
 			api.onOpen(target => get().openTasks(target)),
-			api.onRequest(request => set(state => ({ requests: mergeRequests(state.requests, [request]) }))),
-			api.onRequestClosed(requestId =>
-				set(state => ({ requests: state.requests.filter(request => request.requestId !== requestId) })),
-			),
 		];
 		return () => {
 			for (const unsubscribe of unsubscribers) unsubscribe();
@@ -201,17 +188,4 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 			failed(error);
 		}
 	},
-	respond: async (requestId, outcome) => {
-		set(state => ({ requests: state.requests.filter(request => request.requestId !== requestId) }));
-		try {
-			await window.omp.scheduler.respondRequest(requestId, outcome);
-		} catch (error) {
-			failed(error);
-		}
-	},
 }));
-
-function mergeRequests(current: ScheduleTaskRequest[], incoming: ScheduleTaskRequest[]): ScheduleTaskRequest[] {
-	const known = new Set(current.map(request => request.requestId));
-	return [...current, ...incoming.filter(request => !known.has(request.requestId))];
-}

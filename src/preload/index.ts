@@ -79,12 +79,10 @@ import type {
 import type {
 	DraftProblem,
 	RunProgress,
-	ScheduleRequestOutcome,
 	SchedulerInsights,
 	SchedulerLimits,
 	SchedulerOpenTarget,
 	SchedulerSnapshot,
-	ScheduleTaskRequest,
 	TaskConfig,
 	TaskDraft,
 	TaskRevision,
@@ -305,10 +303,6 @@ const api: OmpApi = {
 			ipcRenderer.invoke(IPC_COMMANDS.SCHEDULER_TASK_RUNS, { taskId }) as Promise<TaskRun[]>,
 		revisions: (taskId: string) =>
 			ipcRenderer.invoke(IPC_COMMANDS.SCHEDULER_REVISIONS, { taskId }) as Promise<TaskRevision[]>,
-		respondRequest: (requestId: string, outcome: ScheduleRequestOutcome) =>
-			ipcRenderer.invoke(IPC_COMMANDS.SCHEDULER_RESPOND_REQUEST, { requestId, outcome }) as Promise<void>,
-		pendingRequests: () =>
-			ipcRenderer.invoke(IPC_COMMANDS.SCHEDULER_PENDING_REQUESTS) as Promise<ScheduleTaskRequest[]>,
 		onSnapshot: (callback: (snapshot: SchedulerSnapshot) => void) =>
 			subscribe<SchedulerSnapshot>(IPC_EVENTS.SCHEDULER_SNAPSHOT, callback),
 		onProgress: (callback: (runId: string, progress: RunProgress) => void) =>
@@ -317,10 +311,6 @@ const api: OmpApi = {
 			),
 		onOpen: (callback: (target: SchedulerOpenTarget) => void) =>
 			subscribe<SchedulerOpenTarget>(IPC_EVENTS.SCHEDULER_OPEN, callback),
-		onRequest: (callback: (request: ScheduleTaskRequest) => void) =>
-			subscribe<ScheduleTaskRequest>(IPC_EVENTS.SCHEDULER_REQUEST, callback),
-		onRequestClosed: (callback: (requestId: string) => void) =>
-			subscribe<{ requestId: string }>(IPC_EVENTS.SCHEDULER_REQUEST_CLOSED, data => callback(data.requestId)),
 	},
 	sessions: {
 		list: (scope: "local" | "global") =>

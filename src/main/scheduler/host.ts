@@ -1,26 +1,27 @@
 /**
  * The scheduler inside Electron (plan/23 §2): owns scheduler.db, spawns run
  * sidecars, turns finished runs into notifications and the dock badge, pushes
- * snapshots to every window, and carries an agent's `schedule_task` draft to
- * the user's confirm card and the answer back to the agent.
+ * snapshots to every window, and carries out agents' `schedule_task` and
+ * `manage_scheduled_tasks` calls.
  */
 
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
-import { app, type BrowserWindow, ipcMain, Notification, powerMonitor } from "electron";
+import { app, ipcMain, Notification, powerMonitor } from "electron";
 import { APPROVAL_APPROVE, approvalToolName } from "../../shared/approval-prompt";
 import { IPC_COMMANDS, IPC_EVENTS } from "../../shared/ipc-types";
-import type { ExtensionUIRequest, HostToolCallRequest, RpcCommand, RpcResponse } from "../../shared/rpc-types";
 import type {
-	ScheduleRequestOutcome,
-	SchedulerLimits,
-	SchedulerOpenTarget,
-	ScheduleTaskRequest,
-	TaskRun,
-} from "../../shared/scheduler-types";
+	AvailableModelsResult,
+	ExtensionUIRequest,
+	HostToolCallRequest,
+	RpcCommand,
+	RpcResponse,
+} from "../../shared/rpc-types";
+import type { SchedulerLimits, SchedulerOpenTarget, TaskRun } from "../../shared/scheduler-types";
 import { type MainTextKey, mainT } from "../i18n";
 import type { SpawnWindow, WindowManager } from "../window";
-import { asRequestOutcome, asTaskConfig, asTaskDraft } from "./guards";
+import { asTaskConfig, asTaskDraft } from "./guards";
+import { MANAGE_TASKS_TOOL, MANAGE_TASKS_TOOL_DEFINITION, runManageTasksTool } from "./manage-tasks-tool";
 import {
 	executeRun,
 	type RunnerDeps,
@@ -29,16 +30,14 @@ import {
 	runMaintenanceScript,
 	worktreeRemovalScript,
 } from "./runner";
-import {
-	parseScheduleToolArgs,
-	SCHEDULE_TASK_TOOL,
-	SCHEDULE_TASK_TOOL_DEFINITION,
-	scheduleOutcomeText,
-} from "./schedule-tool";
+import { runScheduleTool, SCHEDULE_TASK_TOOL, SCHEDULE_TASK_TOOL_DEFINITION } from "./schedule-tool";
 import { Scheduler, type SchedulerNotice } from "./scheduler";
 import { SchedulerStore } from "./store";
 
 const SNAPSHOT_DEBOUNCE_MS = 100;
+
+/** The host tools agent tabs get. */
+const SCHEDULER_TOOLS = new Set([SCHEDULE_TASK_TOOL, MANAGE_TASKS_TOOL]);
 
 /** The slice of a pooled tab sidecar the host talks to. */
 export interface TabSidecar {
@@ -58,14 +57,6 @@ export interface SchedulerHostDeps {
 	log(message: string, details?: Record<string, unknown>): void;
 }
 
-interface PendingRequest {
-	request: ScheduleTaskRequest;
-	toolRequestId: string;
-	sidecar: TabSidecar;
-	win: BrowserWindow;
-	onFrame: (frame: Record<string, unknown>) => void;
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
 const idOf = (payload: unknown, key: string): string => {
@@ -79,7 +70,6 @@ export class SchedulerHost {
 	readonly #deps: SchedulerHostDeps;
 	readonly #store: SchedulerStore;
 	readonly #runSidecars = new Set<RunSidecar>();
-	readonly #pending = new Map<string, PendingRequest>();
 	#snapshotTimer: NodeJS.Timeout | null = null;
 	#badge = -1;
 	#disposed = false;
@@ -133,8 +123,6 @@ export class SchedulerHost {
 		if (this.#snapshotTimer) clearTimeout(this.#snapshotTimer);
 		void this.scheduler.stop();
 		for (const sidecar of [...this.#runSidecars]) sidecar.dispose();
-		for (const requestId of [...this.#pending.keys()])
-			this.#answer(requestId, { kind: "declined", reason: "omp quit before you answered." });
 	}
 
 	/** Run sessions stay out of the sidebar; they open from the Tasks window. */
@@ -142,114 +130,88 @@ export class SchedulerHost {
 		return this.scheduler.runSessionPaths();
 	}
 
-	// ------------------------------------------------- schedule_task (agent tabs)
+	// ------------------------------------------- scheduler tools (agent tabs)
 
-	/** A tab's sidecar came up: give agent tabs the tool. */
+	/** A tab's sidecar came up: give agent tabs the tools. */
 	tabReady(tab: { tabId: string; kind: "agent" | "chat"; sidecar: TabSidecar }): void {
 		if (tab.kind !== "agent") return;
 		tab.sidecar.rpcClient
-			?.command({ type: "set_host_tools", tools: [SCHEDULE_TASK_TOOL_DEFINITION] })
+			?.command({ type: "set_host_tools", tools: [SCHEDULE_TASK_TOOL_DEFINITION, MANAGE_TASKS_TOOL_DEFINITION] })
 			.catch(error => this.#deps.log("set_host_tools failed", { tabId: tab.tabId, error: String(error) }));
 	}
 
-	/** A tab's process stopped: its pending drafts can no longer be answered. */
 	/**
-	 * omp gates host tools as exec, so a tab below yolo asks before
-	 * `schedule_task` runs. The confirm card is that consent; the prompt in
-	 * front of it is answered here. True when the request was answered.
+	 * omp gates host tools as exec, so a tab below yolo asks before a
+	 * scheduler tool runs. The user asked for the change in the conversation
+	 * and runs stay read-only, so the prompt is answered here.
 	 */
 	answerToolPrompt(sidecar: TabSidecar, request: ExtensionUIRequest): boolean {
-		if (approvalToolName(request) !== SCHEDULE_TASK_TOOL) return false;
+		if (!SCHEDULER_TOOLS.has(approvalToolName(request) ?? "")) return false;
 		sidecar.sendSideChannel({ type: "extension_ui_response", id: request.id, value: APPROVAL_APPROVE });
 		return true;
 	}
 
-	tabDown(tabId: string): void {
-		for (const [requestId, pending] of this.#pending) {
-			if (pending.request.tabId === tabId) this.#close(requestId);
-		}
-	}
-
 	/**
 	 * Route one host tool call from a tab. Returns false for tools this host
-	 * does not own. The answer is deferred until the user confirms or declines.
+	 * does not own. The change is made at once and the agent told the result.
 	 */
 	handleToolCall(
 		sidecar: TabSidecar,
 		request: HostToolCallRequest,
-		win: BrowserWindow,
 		tab: { tabId: string; sessionFile: string | null } | null,
 	): boolean {
-		if (request.toolName !== SCHEDULE_TASK_TOOL) return false;
-		const fail = (text: string) =>
+		if (!SCHEDULER_TOOLS.has(request.toolName)) return false;
+		const reply = (text: string, isError: boolean, details?: object) =>
 			sidecar.sendSideChannel({
 				type: "host_tool_result",
 				id: request.id,
-				result: { content: [{ type: "text", text }] },
-				isError: true,
+				result: { content: [{ type: "text", text }], ...(details ? { details } : {}) },
+				...(isError ? { isError: true } : {}),
 			});
-		if (!tab || win.isDestroyed()) {
-			fail("This conversation cannot schedule tasks.");
+		if (!tab) {
+			reply("This conversation cannot schedule tasks.", true);
 			return true;
 		}
-		const parsed = parseScheduleToolArgs(request.arguments, {
-			cwd: sidecar.cwd,
-			now: Date.now(),
-			timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-			sessionPath: tab.sessionFile,
-		});
-		if (!parsed.ok) {
-			fail(
-				`The draft was not shown to the user: ${parsed.error}. Fix the arguments and call ${SCHEDULE_TASK_TOOL} again.`,
-			);
-			return true;
-		}
-		const scheduleRequest: ScheduleTaskRequest = {
-			requestId: request.id,
-			tabId: tab.tabId,
-			draft: parsed.draft,
-			suggestedModel: parsed.suggestedModel,
-			reason: parsed.reason,
-		};
+		let cancelled = false;
 		const onFrame = (frame: Record<string, unknown>) => {
-			if (frame.type === "host_tool_cancel" && frame.targetId === request.id) this.#close(request.id);
+			if (frame.type === "host_tool_cancel" && frame.targetId === request.id) cancelled = true;
 		};
 		sidecar.on("frame", onFrame);
-		this.#pending.set(request.id, { request: scheduleRequest, toolRequestId: request.id, sidecar, win, onFrame });
-		win.webContents.send(IPC_EVENTS.SCHEDULER_REQUEST, scheduleRequest);
-		return true;
-	}
-
-	#answer(requestId: string, outcome: ScheduleRequestOutcome): void {
-		const pending = this.#pending.get(requestId);
-		if (!pending) return;
-		let resolved = outcome;
-		if (outcome.kind === "created") {
-			const task = this.scheduler.getTask(outcome.taskId);
-			resolved = task
-				? { kind: "created", taskId: task.id, title: task.title, nextFireAt: task.nextFireAt, tools: task.tools }
-				: { kind: "declined", reason: "" };
-		}
-		pending.sidecar.sendSideChannel({
-			type: "host_tool_result",
-			id: pending.toolRequestId,
-			result: {
-				content: [{ type: "text", text: scheduleOutcomeText(resolved) }],
-				details:
-					resolved.kind === "created"
-						? { outcome: "created", taskId: resolved.taskId }
-						: { outcome: "declined", reason: resolved.reason },
+		const scheduler = this.scheduler;
+		const shared = {
+			context: {
+				cwd: sidecar.cwd,
+				now: Date.now(),
+				timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+				sessionPath: tab.sessionFile,
 			},
-		});
-		this.#close(requestId);
-	}
-
-	#close(requestId: string): void {
-		const pending = this.#pending.get(requestId);
-		if (!pending) return;
-		this.#pending.delete(requestId);
-		pending.sidecar.off("frame", pending.onFrame);
-		if (!pending.win.isDestroyed()) pending.win.webContents.send(IPC_EVENTS.SCHEDULER_REQUEST_CLOSED, { requestId });
+			limits: scheduler.limits,
+			models: async () => {
+				const response = await sidecar.rpcClient?.command({ type: "get_available_models" }).catch(() => null);
+				if (!response?.success) return null;
+				const { models } = response.data as AvailableModelsResult;
+				return models.map(model => `${model.provider}/${model.id}`);
+			},
+			cancelled: () => cancelled,
+		};
+		const run =
+			request.toolName === SCHEDULE_TASK_TOOL
+				? runScheduleTool(request.arguments, { ...shared, createTask: draft => scheduler.createTask(draft) })
+				: runManageTasksTool(request.arguments, {
+						...shared,
+						tasks: () => scheduler.snapshot().tasks,
+						updateTask: (id, config) => scheduler.updateTask(id, config),
+						setTaskEnabled: (id, enabled) => scheduler.setTaskEnabled(id, enabled),
+						// A run already going finishes; nothing starts after it.
+						archiveTask: id => scheduler.archiveTask(id, false),
+					});
+		void run
+			.then(result => {
+				if (result) reply(result.text, result.isError, result.details);
+			})
+			.catch(error => reply(`The scheduler could not do this: ${String(error)}`, true))
+			.finally(() => sidecar.off("frame", onFrame));
+		return true;
 	}
 
 	// ------------------------------------------------------------- plumbing
@@ -391,16 +353,6 @@ export class SchedulerHost {
 		);
 		ipcMain.handle(IPC_COMMANDS.SCHEDULER_REVISIONS, (_event, payload: unknown) =>
 			scheduler.listRevisions(idOf(payload, "taskId")),
-		);
-		ipcMain.handle(IPC_COMMANDS.SCHEDULER_RESPOND_REQUEST, (_event, payload: unknown) => {
-			const outcome = asRequestOutcome(isRecord(payload) ? payload.outcome : undefined);
-			if (!outcome) throw new Error("Invalid answer");
-			this.#answer(idOf(payload, "requestId"), outcome);
-		});
-		ipcMain.handle(IPC_COMMANDS.SCHEDULER_PENDING_REQUESTS, event =>
-			[...this.#pending.values()]
-				.filter(pending => pending.win.webContents === event.sender)
-				.map(pending => pending.request),
 		);
 	}
 }

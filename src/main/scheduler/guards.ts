@@ -5,14 +5,7 @@
  * too frequent, is the folder set) is the scheduler's `validate`, not this.
  */
 
-import type {
-	ScheduleRequestOutcome,
-	TaskConfig,
-	TaskDraft,
-	TaskNotify,
-	TaskSchedule,
-	TaskToolPolicy,
-} from "../../shared/scheduler-types";
+import type { TaskConfig, TaskDraft, TaskNotify, TaskSchedule, TaskToolPolicy } from "../../shared/scheduler-types";
 
 const TOOL_POLICIES: Record<TaskToolPolicy, true> = { read_only: true, workspace: true, full: true };
 const NOTIFY_MODES: Record<TaskNotify, true> = { always: true, on_change: true, on_failure: true };
@@ -84,15 +77,4 @@ export function asTaskDraft(value: unknown): TaskDraft | null {
 		origin: { sessionPath: origin.sessionPath as string | null, createdBy: origin.createdBy },
 		startPaused: value.startPaused === true,
 	};
-}
-
-export function asRequestOutcome(value: unknown): ScheduleRequestOutcome | null {
-	if (!isRecord(value)) return null;
-	if (value.kind === "declined")
-		return { kind: "declined", reason: typeof value.reason === "string" ? value.reason : "" };
-	if (value.kind === "created" && typeof value.taskId === "string") {
-		// Only the id is taken from the renderer; the host re-reads the task.
-		return { kind: "created", taskId: value.taskId, title: "", nextFireAt: null, tools: "read_only" };
-	}
-	return null;
 }

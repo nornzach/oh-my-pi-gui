@@ -128,9 +128,6 @@ const TasksWindow = lazy(() => import("./components/tasks/TasksWindow").then(m =
 const TaskEditorDialog = lazy(() =>
 	import("./components/tasks/TaskEditorDialog").then(m => ({ default: m.TaskEditorDialog })),
 );
-const ScheduleRequestDialog = lazy(() =>
-	import("./components/tasks/ScheduleRequestDialog").then(m => ({ default: m.ScheduleRequestDialog })),
-);
 const ProviderConfigDialog = lazy(() =>
 	import("./components/settings/ProviderConfigDialog").then(m => ({ default: m.ProviderConfigDialog })),
 );
@@ -896,7 +893,6 @@ export function App() {
 				<PrCenterWindow />
 				<TasksWindow />
 				<TaskEditorDialog />
-				<ScheduleRequestDialog />
 				<MemoryWindow />
 				<ConversationSearchDialog />
 				<ProviderConfigDialog

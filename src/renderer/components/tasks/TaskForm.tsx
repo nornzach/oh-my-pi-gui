@@ -432,13 +432,10 @@ export function TaskForm({
 	draft,
 	onChange,
 	problems,
-	suggestedModel,
 }: {
 	draft: TaskDraft;
 	onChange: (draft: TaskDraft) => void;
 	problems: DraftProblem[];
-	/** The agent's model suggestion, offered as a one-click pin (never applied silently). */
-	suggestedModel?: string | null;
 }) {
 	const t = useT();
 	const [advanced, setAdvanced] = useState(
@@ -518,15 +515,6 @@ export function TaskForm({
 						</Button>
 					)}
 				</div>
-				{suggestedModel && suggestedModel !== draft.model && (
-					<button
-						className="omp-fade-in mt-2 text-omp-sm text-(--omp-link) hover:underline"
-						onClick={() => patch({ model: suggestedModel })}
-						type="button"
-					>
-						{t("tasks.form.useSuggested", { model: suggestedModel })}
-					</button>
-				)}
 			</div>
 			<div>
 				<button

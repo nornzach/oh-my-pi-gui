@@ -1,5 +1,6 @@
 import { CalendarClock } from "lucide-react";
 import type { TaskSchedule } from "../../../shared/scheduler-types";
+import { formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
 import { scheduleLabel } from "../tasks/task-format";
@@ -7,9 +8,10 @@ import { resultBodyText, resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
 
 /**
- * `schedule_task` (plan/23 §5): the agent's draft as a one-line task, then
- * either "waiting for you" while the confirm card is open, or what the user
- * decided. The task itself lives in Scheduled Tasks, linked from here.
+ * `schedule_task` (plan/23 §5): the task as one line, then whether it was
+ * created and when it first runs, or why not. The task itself lives in
+ * Scheduled Tasks, linked from here. Sessions from before tasks were created
+ * at once can still hold a declined draft.
  */
 
 function draftSchedule(args: Record<string, unknown>): TaskSchedule | null {
@@ -34,10 +36,13 @@ export function ScheduleTaskRenderer({ args, result, isError, isPartial }: ToolR
 	const details = isPartial ? undefined : resultDetails(result);
 	const created = !isError && details?.outcome === "created";
 	const reason = typeof details?.reason === "string" ? details.reason.trim() : "";
+	const taskId = created && typeof details?.taskId === "string" ? details.taskId : undefined;
+	const firstRun = created && typeof details?.nextFireAt === "number" ? details.nextFireAt : null;
+	const model = created && typeof details?.model === "string" ? details.model : "";
 	const status = isPartial
-		? t("tools.scheduleTask.waiting")
+		? t("tools.scheduleTask.scheduling")
 		: isError
-			? t("tools.scheduleTask.notShown")
+			? t("tools.scheduleTask.notScheduled")
 			: created
 				? t("tools.scheduleTask.created")
 				: t("tools.scheduleTask.declined");
@@ -60,7 +65,11 @@ export function ScheduleTaskRenderer({ args, result, isError, isPartial }: ToolR
 				</span>
 				{schedule && <span className="shrink-0 text-(--omp-muted)">· {scheduleLabel(t, schedule)}</span>}
 			</div>
-			<p className={isPartial ? "omp-shimmer-text text-omp-sm" : "text-omp-sm text-(--omp-dim)"}>{status}</p>
+			<p className={isPartial ? "omp-shimmer-text text-omp-sm" : "text-omp-sm text-(--omp-dim)"}>
+				{status}
+				{firstRun !== null && ` ${t("tools.scheduleTask.firstRun", { time: formatClock(firstRun) })}`}
+				{model && ` · ${model}`}
+			</p>
 			{isError && (
 				<p className="text-omp-sm break-words whitespace-pre-wrap text-(--omp-muted)">
 					{resultBodyText(result).trim()}
@@ -72,7 +81,7 @@ export function ScheduleTaskRenderer({ args, result, isError, isPartial }: ToolR
 			{created && (
 				<button
 					className="self-start text-omp-sm text-(--omp-link) hover:underline"
-					onClick={() => useSchedulerStore.getState().openTasks({ view: "tasks" })}
+					onClick={() => useSchedulerStore.getState().openTasks({ view: "tasks", taskId })}
 					type="button"
 				>
 					{t("tools.scheduleTask.open")}

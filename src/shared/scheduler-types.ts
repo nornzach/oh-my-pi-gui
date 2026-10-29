@@ -201,16 +201,6 @@ export interface SchedulerInsights {
 	recentFailures: TaskRun[];
 }
 
-/** The agent's draft from the `schedule_task` tool, waiting on the user's confirm card. */
-export interface ScheduleTaskRequest {
-	requestId: string;
-	tabId: string;
-	draft: TaskDraft;
-	/** Model the agent suggested; never applied without the user accepting it. */
-	suggestedModel: string | null;
-	reason: string;
-}
-
 export type TaskSaveResult = { ok: true; task: ScheduledTask } | { ok: false; problems: DraftProblem[] };
 
 export interface TaskRevision {
@@ -218,11 +208,6 @@ export interface TaskRevision {
 	createdAt: number;
 	config: TaskConfig;
 }
-
-/** The user's answer to an agent's `schedule_task` draft. */
-export type ScheduleRequestOutcome =
-	| { kind: "created"; taskId: string; title: string; nextFireAt: number | null; tools: TaskToolPolicy }
-	| { kind: "declined"; reason: string };
 
 /** Where a notification click or a link should land in the Tasks window. */
 export interface SchedulerOpenTarget {

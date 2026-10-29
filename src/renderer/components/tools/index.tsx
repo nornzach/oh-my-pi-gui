@@ -21,6 +21,7 @@ import { GrepRenderer } from "./GrepRenderer";
 import { HubRenderer } from "./HubRenderer";
 import { ImageRenderer } from "./ImageRenderer";
 import { LspRenderer } from "./LspRenderer";
+import { ManageTasksRenderer } from "./ManageTasksRenderer";
 import { MemoryRenderer } from "./MemoryRenderer";
 import {
 	CheckpointRenderer,
@@ -160,6 +161,7 @@ const REGISTRY: Record<string, ComponentType<ToolRendererProps>> = {
 	security_scan: SecurityScanRenderer,
 	ida: IdaRenderer,
 	schedule_task: ScheduleTaskRenderer,
+	manage_scheduled_tasks: ManageTasksRenderer,
 };
 
 export function getToolRenderer(name: string): ComponentType<ToolRendererProps> {
@@ -243,6 +245,7 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>) => string> = {
 	resolve: args => argLine(args, ["reason", "label"]),
 	reject: args => argLine(args, ["reason"]),
 	schedule_task: args => argLine(args, ["title"]),
+	manage_scheduled_tasks: args => [argLine(args, ["action"]), argLine(args, ["title"])].filter(Boolean).join(" "),
 };
 
 const FALLBACK_ARG_KEYS = ["path", "file", "name", "pattern", "query", "command", "action", "i", "text"] as const;

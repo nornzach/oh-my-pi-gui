@@ -45,12 +45,10 @@ import type {
 import type {
 	DraftProblem,
 	RunProgress,
-	ScheduleRequestOutcome,
 	SchedulerInsights,
 	SchedulerLimits,
 	SchedulerOpenTarget,
 	SchedulerSnapshot,
-	ScheduleTaskRequest,
 	TaskConfig,
 	TaskDraft,
 	TaskRevision,
@@ -79,10 +77,6 @@ export const IPC_EVENTS = {
 	SCHEDULER_PROGRESS: "scheduler:progress",
 	/** Open the Tasks window at a task or run (notification click). */
 	SCHEDULER_OPEN: "scheduler:open",
-	/** An agent tab proposed a task through `schedule_task`; the user confirms it. */
-	SCHEDULER_REQUEST: "scheduler:request",
-	/** The proposal was answered elsewhere or its tab went away. */
-	SCHEDULER_REQUEST_CLOSED: "scheduler:request-closed",
 	/** Host tool call request */
 	HOST_TOOL_CALL: "host-tool:call",
 	/** Host URI request */
@@ -170,8 +164,6 @@ export const IPC_COMMANDS = {
 	SCHEDULER_GET_RUN: "scheduler:get-run",
 	SCHEDULER_TASK_RUNS: "scheduler:task-runs",
 	SCHEDULER_REVISIONS: "scheduler:revisions",
-	SCHEDULER_RESPOND_REQUEST: "scheduler:respond-request",
-	SCHEDULER_PENDING_REQUESTS: "scheduler:pending-requests",
 	/** Send host tool result */
 	HOST_TOOL_RESULT: "host-tool:result",
 	/** Send host tool update */
@@ -1481,15 +1473,9 @@ export interface OmpApi {
 		getRun(runId: string): Promise<TaskRun | null>;
 		taskRuns(taskId: string): Promise<TaskRun[]>;
 		revisions(taskId: string): Promise<TaskRevision[]>;
-		/** Answer an agent's `schedule_task` draft (the confirm card). */
-		respondRequest(requestId: string, outcome: ScheduleRequestOutcome): Promise<void>;
-		/** Drafts still waiting for this window's user (after a reload). */
-		pendingRequests(): Promise<ScheduleTaskRequest[]>;
 		onSnapshot(callback: (snapshot: SchedulerSnapshot) => void): () => void;
 		onProgress(callback: (runId: string, progress: RunProgress) => void): () => void;
 		onOpen(callback: (target: SchedulerOpenTarget) => void): () => void;
-		onRequest(callback: (request: ScheduleTaskRequest) => void): () => void;
-		onRequestClosed(callback: (requestId: string) => void): () => void;
 	};
 	sessions: {
 		list(scope: "local" | "global"): Promise<SessionInfo[]>;

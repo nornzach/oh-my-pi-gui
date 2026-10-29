@@ -192,6 +192,10 @@ export class Scheduler {
 		};
 	}
 
+	get limits(): SchedulerLimits {
+		return this.#limits;
+	}
+
 	getTask(taskId: string): ScheduledTask | null {
 		const task = this.#deps.store.getTask(taskId);
 		return task ? this.#present(task) : null;

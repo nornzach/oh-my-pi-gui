@@ -398,7 +398,6 @@ app.whenReady().then(() => {
 		},
 		down: tabId => {
 			host.unlink(tabId);
-			schedulerHost?.tabDown(tabId);
 		},
 		released: tabId => host.release(tabId),
 	};
