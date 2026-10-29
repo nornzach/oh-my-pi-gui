@@ -160,4 +160,20 @@ describe("ModelValueSelect", () => {
 		expect(rowFor("off-one").hasAttribute("disabled")).toBe(true);
 		expect(rowFor("off-one").textContent).toContain("(disabled)");
 	});
+
+	it("stays open while its own list scrolls, and closes when the page under the trigger scrolls", async () => {
+		await openDropdown();
+		const listbox = () => document.body.querySelector("[role='listbox']");
+		const scroll = async (target: Element) => {
+			await act(async () => {
+				target.dispatchEvent(new Event("scroll", { bubbles: true }));
+			});
+		};
+
+		await scroll(listbox() as Element);
+		expect(listbox()).not.toBeNull();
+
+		await scroll(document.body.firstElementChild as Element);
+		expect(listbox()).toBeNull();
+	});
 });

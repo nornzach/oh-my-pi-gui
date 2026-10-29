@@ -146,9 +146,9 @@ export function ModelValueSelect({
 		requestAnimationFrame(() => searchRef.current?.focus());
 	}, [open]);
 
-	// Close on outside click and on any scroll (the panel is viewport-fixed,
-	// so it would otherwise detach from the trigger inside the scrolling
-	// settings column).
+	// Close on outside click and on a scroll that moves the trigger (the panel
+	// is viewport-fixed, so it would otherwise detach from the trigger inside
+	// the scrolling settings column). Scrolling the option list keeps it open.
 	useEffect(() => {
 		if (!open) return;
 		const onMouseDown = (event: MouseEvent) => {
@@ -156,7 +156,11 @@ export function ModelValueSelect({
 				setOpen(false);
 			}
 		};
-		const onScroll = () => setOpen(false);
+		const onScroll = (event: Event) => {
+			const trigger = triggerRef.current;
+			if (trigger && event.target instanceof Node && !event.target.contains(trigger)) return;
+			setOpen(false);
+		};
 		document.addEventListener("mousedown", onMouseDown);
 		document.addEventListener("scroll", onScroll, true);
 		return () => {
@@ -256,8 +260,10 @@ export function ModelValueSelect({
 				<ChevronDown className="shrink-0 text-(--omp-dim)" size={12} />
 			</button>
 			{open && placement !== null && (
+				// Escape closes this panel, not a dialog it sits in.
 				<div
 					className="fixed z-50 flex flex-col overflow-hidden rounded-md border border-(--omp-border-muted) bg-(--omp-bg-elevated) shadow-xl shadow-black/40"
+					data-owns-escape
 					style={{ top: placement.top, left: placement.left, width: PANEL_WIDTH, maxHeight: PANEL_MAX_HEIGHT }}
 				>
 					<div className="flex items-center gap-2 border-b border-(--omp-border-muted) px-2.5 py-2">
@@ -271,6 +277,7 @@ export function ModelValueSelect({
 								if (event.key === "Escape") {
 									event.stopPropagation();
 									setOpen(false);
+									triggerRef.current?.focus();
 								}
 							}}
 							placeholder={t("modelValue.searchPlaceholder", { noun })}

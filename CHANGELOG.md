@@ -16,6 +16,7 @@
 - Links in Chinese replies no longer swallow the text after them: a bare address ends at full-width punctuation such as `，` or `。`, or where Chinese text runs straight into its host or port, and a bold address renders bold with the link inside ([#35](https://github.com/nornzach/oh-my-pi-gui/issues/35)).
 - Model Roles keeps a role's thinking level when you change its model, shows the saved model as selected, and lets you pick the level, including Off ([#34](https://github.com/nornzach/oh-my-pi-gui/issues/34)).
 - Settings search results for GUI and Advanced settings name their page ("GUI", "Advanced") instead of showing `settings.tab.gui` or `settings.tab.advanced`.
+- The model dropdown in the scheduled-task editor opens again. Model dropdowns also stay open while you scroll their list, and Escape inside a dialog closes only the dropdown.
 
 ## [0.9.32] - 2026-10-28
 

@@ -324,8 +324,11 @@ kbd,
 	animation: omp-fade-in var(--omp-motion-fast) var(--omp-ease) both;
 }
 
+/* No forward fill: a filled end state keeps an identity transform on the dialog
+   panel, which makes it the containing block of every `position: fixed`
+   popover inside, so those open in the wrong place, clipped by the panel. */
 .omp-scale-in {
-	animation: omp-scale-in var(--omp-motion-slow) var(--omp-ease-enter) both;
+	animation: omp-scale-in var(--omp-motion-slow) var(--omp-ease-enter) backwards;
 }
 
 .omp-toast-in {
