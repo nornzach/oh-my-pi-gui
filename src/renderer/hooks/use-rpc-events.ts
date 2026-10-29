@@ -107,7 +107,8 @@ export function resetRetryPending(tabId?: string): void {
  * pref (Settings → GUI, default on), then the agent's `<kind>.notify` setting
  * (read live via get_settings so edits from either the TUI or the GUI's
  * Interaction tab apply immediately), and finally window focus — never notify
- * while the user is watching.
+ * while the user is watching, unless the GUI's "notify while focused" pref
+ * (default off) asks for it.
  */
 async function maybeNotify(
 	kind: NotifyKind,
@@ -116,8 +117,10 @@ async function maybeNotify(
 	command: TabCommand = (rpcCommand, timeoutMs) => window.omp.rpc.command(rpcCommand, timeoutMs),
 ): Promise<void> {
 	try {
-		if (document.hasFocus()) return;
-		if (!useUiStore.getState().notifications) return;
+		const ui = useUiStore.getState();
+		if (!ui.notifications) return;
+		const focused = typeof document.hasFocus === "function" && document.hasFocus();
+		if (focused && !ui.notificationsWhenFocused) return;
 		const key = `${kind}.notify`;
 		const res = await command({ type: "get_settings", paths: [key] });
 		const values = res.success ? (res.data as { values?: Record<string, unknown> } | undefined)?.values : undefined;

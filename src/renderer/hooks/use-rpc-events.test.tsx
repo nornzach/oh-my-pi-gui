@@ -39,6 +39,7 @@ import { useTabsStore } from "../stores/tabs";
 import { useToastStore } from "../stores/toast";
 import { useTodoStore } from "../stores/todo";
 import { useToolsStore } from "../stores/tools";
+import { useUiStore } from "../stores/ui";
 import { hydrateSession, hydrateTabSession, useRpcEvents } from "./use-rpc-events";
 
 const { document, window, Event, CustomEvent, HTMLElement, Node } = parseHTML("<html><body></body></html>");
@@ -1174,6 +1175,82 @@ describe("failure toasts", () => {
 		Reflect.deleteProperty(document, "hasFocus");
 		useTabsStore.getState().reset();
 		useToastStore.setState({ toasts: [] });
+	});
+});
+
+describe("desktop notifications", () => {
+	// The test DOM has no focus model; the notification gate asks about focus,
+	// so each test stands one in and drops it again.
+	function standInFocus(focused: boolean): void {
+		Object.defineProperty(document, "hasFocus", { configurable: true, value: () => focused });
+	}
+
+	function seedLiveTab(): void {
+		useTabsStore.setState({
+			tabs: [{ kind: "agent", id: "t0", cwd: "/alpha", status: "ready", unreadDone: false }],
+			activeTabId: "t0",
+			bundles: new Map(),
+		});
+		ensureTabRuntime("t0");
+		setFocusedSessionRuntime("t0");
+	}
+
+	const settledTurn: AgentSessionEvent[] = [
+		{ type: "agent_start" },
+		{
+			type: "agent_end",
+			isTerminal: true,
+			messages: [{ role: "assistant", content: [], timestamp: 1, stopReason: "stop" }],
+		},
+	];
+
+	afterEach(() => {
+		Reflect.deleteProperty(document, "hasFocus");
+		useUiStore.setState({ notifications: true, notificationsWhenFocused: false });
+	});
+
+	it("stays quiet for a focused window by default and speaks once it loses focus", async () => {
+		const { emitTabBatch, notify } = installTabRoutedMockOmp();
+		seedLiveTab();
+		standInFocus(true);
+		await mount(<RpcEventsProbe />);
+
+		await act(async () => {
+			emitTabBatch(settledTurn, "t0");
+		});
+		expect(notify).not.toHaveBeenCalled();
+
+		standInFocus(false);
+		await act(async () => {
+			emitTabBatch(settledTurn, "t0");
+		});
+		expect(notify).toHaveBeenCalledWith("Oh My Pi", "Complete");
+	});
+
+	it("notifies a focused window when the preference is on", async () => {
+		const { emitTabBatch, notify } = installTabRoutedMockOmp();
+		seedLiveTab();
+		standInFocus(true);
+		useUiStore.setState({ notificationsWhenFocused: true });
+		await mount(<RpcEventsProbe />);
+
+		await act(async () => {
+			emitTabBatch(settledTurn, "t0");
+		});
+		expect(notify).toHaveBeenCalledWith("Oh My Pi", "Complete");
+	});
+
+	it("honours the master switch over the focused preference", async () => {
+		const { emitTabBatch, notify } = installTabRoutedMockOmp();
+		seedLiveTab();
+		standInFocus(false);
+		useUiStore.setState({ notifications: false, notificationsWhenFocused: true });
+		await mount(<RpcEventsProbe />);
+
+		await act(async () => {
+			emitTabBatch(settledTurn, "t0");
+		});
+		expect(notify).not.toHaveBeenCalled();
 	});
 });
 
