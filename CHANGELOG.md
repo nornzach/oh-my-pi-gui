@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- Chat tabs can use your own system prompt and limit what each message sends. Click the row under a chat's composer to pick **Continuous** or **Single turn**, cap how many earlier turns go with each message, and write a system prompt that replaces the default one. The chat still shows every turn. The settings are shared by every chat tab and are also in Settings → Context → Chat.
+
+### Changed
+
+- The composer's Steer/Follow-up switch is gone. While a turn runs, Enter steers it and ⌘Enter (Ctrl+Enter on Windows and Linux) queues a follow-up for when it ends. Hold ⌘ (or Ctrl) with a message typed to see **Follow-up** beside the send button. On macOS ⌃Enter still queues a follow-up, as in the terminal.
+
+### Fixed
+
+- Text boxes that grow with their text, in Settings, Memory, Modes and plugin details, no longer show a scrollbar while their text fits.
+
 ## [0.9.33] - 2026-10-29
 
 ### Added

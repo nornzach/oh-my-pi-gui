@@ -91,7 +91,9 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
 		const el = innerRef.current;
 		if (!el || !autoGrow) return;
 		el.style.height = "0px";
-		el.style.height = `${el.scrollHeight}px`;
+		// Border-box height counts the borders scrollHeight leaves out; without
+		// them the content overflows by 2px and draws a scrollbar.
+		el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
 	}, [autoGrow]);
 
 	useLayoutEffect(resize, [resize]);

@@ -355,9 +355,23 @@ export const KEYMAP_ACTIONS = [
 /** Chords the composer's own keydown handler owns (InputArea.handleKeyDown).
  *  They still work outside the composer, so a collision is a warning. */
 const COMPOSER_CHORDS: readonly ReservedChord[] = [
+	{ id: "composer.followUp", labelKey: "hotkeys.row.followUpSend", chord: "⌘↵", hotkeyGroup: "input" },
 	{ id: "composer.history", labelKey: "hotkeys.row.history", chord: "⌃R", hotkeyGroup: "input" },
 	{ id: "composer.editor", labelKey: "hotkeys.row.composerEditor", chord: "⌃G", hotkeyGroup: "input" },
 ];
+
+/** The composer's follow-up send chord as the platform's keyboard has it. */
+export const FOLLOW_UP_CHORD = platformChord("⌘↵");
+
+/**
+ * Whether Enter (or a send-button click) with these modifiers sends a follow-up,
+ * queued behind the running turn, instead of steering it: ⌘ on macOS, where the
+ * TUI's ⌃ still works too, and Ctrl elsewhere. AltGr reports Ctrl+Alt and never counts.
+ */
+export function isFollowUpSend(event: { metaKey: boolean; ctrlKey: boolean; altKey: boolean }, mac = IS_MAC): boolean {
+	if (event.altKey) return false;
+	return mac ? event.metaKey || event.ctrlKey : event.ctrlKey;
+}
 
 /** `chord` as the platform's keyboard has it: off macOS a default's ⌘ is ⌃. */
 export function platformChord(chord: string, mac = IS_MAC): string {
@@ -382,7 +396,7 @@ export function actionChords(action: KeymapAction, overrides: KeymapOverrides, m
  *  native accelerators are CmdOrCtrl, so their ⌘ follows the platform too. */
 export function reservedChords(mac = IS_MAC): readonly ReservedChord[] {
 	return [
-		...COMPOSER_CHORDS,
+		...COMPOSER_CHORDS.map(entry => ({ ...entry, chord: platformChord(entry.chord, mac) })),
 		...NATIVE_CHORDS.map(entry => ({
 			id: entry.id,
 			labelKey: entry.labelKey,

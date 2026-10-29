@@ -45,7 +45,7 @@ const EDGE = 12;
 const THRESHOLD_CHOICES = [70, 80, 90];
 const KEEP_RECENT_CHOICES = [20_000, 40_000, 80_000];
 
-function Segmented<T extends number>({
+export function Segmented<T extends number>({
 	label,
 	value,
 	options,

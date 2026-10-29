@@ -100,6 +100,9 @@ function draftFor(entry: SettingEntry, value: unknown): string {
 const SELECT_CLASS =
 	"w-full rounded-md border border-(--omp-border-muted) bg-(--omp-input-bg) px-2.5 py-1.5 text-xs text-(--omp-text) transition-colors duration-100 focus:border-(--omp-border-accent) focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 
+/** String settings holding a prompt: a one-line field is too narrow to read or write one. */
+const PROMPT_SETTINGS = new Set(["chat.systemPrompt"]);
+
 function SchemaSettingRow({
 	entry,
 	value,
@@ -418,6 +421,61 @@ function SchemaSettingRow({
 							</div>
 						</>
 					)}
+				</div>
+			);
+		}
+
+		// Prompts get a full-width multi-line editor below the label, applied explicitly.
+		if (entry.type === "string" && PROMPT_SETTINGS.has(entry.path)) {
+			return (
+				<div className="rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
+					<div className="flex items-center gap-2">
+						<span className="text-xs font-medium text-(--omp-text)" title={entry.path}>
+							{label}
+						</span>
+
+						{restartBadge}
+						{status}
+					</div>
+					{description && (
+						<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-muted)">{description}</span>
+					)}
+					<TextArea
+						autoGrow
+						className="mt-2"
+						disabled={saving}
+						onChange={event => {
+							setDraft(event.target.value);
+							setError(null);
+						}}
+						rows={4}
+						value={draft ?? baseDraft}
+					/>
+					<div className="mt-1.5 flex items-center justify-end gap-1.5">
+						{dirty && (
+							<Button
+								onClick={() => {
+									setDraft(null);
+									setError(null);
+								}}
+								size="sm"
+								type="button"
+								variant="ghost"
+							>
+								{t("common.reset")}
+							</Button>
+						)}
+						<Button
+							disabled={!dirty || saving}
+							loading={saving}
+							onClick={commitText}
+							size="sm"
+							type="button"
+							variant="secondary"
+						>
+							{t("common.apply")}
+						</Button>
+					</div>
 				</div>
 			);
 		}

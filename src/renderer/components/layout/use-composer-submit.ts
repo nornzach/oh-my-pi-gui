@@ -7,7 +7,12 @@
 import { useCallback } from "react";
 import type { AgentMessage, AvailableCommand } from "../../../shared/rpc-types";
 import { hydrateTabSession } from "../../hooks/use-rpc-events";
-import { isGuiOnlyBuiltinCommand, planComposerSubmit, settleComposerResponse } from "../../lib/composer-submit";
+import {
+	type ComposerSendMode,
+	isGuiOnlyBuiltinCommand,
+	planComposerSubmit,
+	settleComposerResponse,
+} from "../../lib/composer-submit";
 import { expandEmoticons } from "../../lib/emoji";
 import { useT } from "../../lib/i18n";
 import { parseComposerMode } from "../../lib/input-modes";
@@ -23,15 +28,12 @@ import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runti
 import { restoreTabComposer, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 
-type SendMode = "prompt" | "steer" | "followUp";
-
 export function useComposerSubmit({
 	text,
 	images,
 	sending,
 	status,
 	isStreaming,
-	mode,
 	queuedMessageCount,
 	commands,
 	emojiAutocomplete,
@@ -46,7 +48,6 @@ export function useComposerSubmit({
 	sending: boolean;
 	status: string;
 	isStreaming: boolean;
-	mode: SendMode;
 	queuedMessageCount: number;
 	commands: AvailableCommand[];
 	emojiAutocomplete: boolean;
@@ -64,8 +65,9 @@ export function useComposerSubmit({
 	const send = useCallback(
 		// `overrideText` sends a freshly computed value (voice dictation submit
 		// trigger) instead of the rendered `text` state, which lags a setText.
-		// `forceMode` overrides the steer/followUp toggle for one send (⌃Enter).
-		(overrideText?: string, forceMode?: SendMode) => {
+		// While a turn runs, `mode` steers it (Enter) or queues a follow-up behind
+		// it (⌘Enter); an idle session starts a turn either way.
+		(overrideText?: string, mode: ComposerSendMode = "steer") => {
 			const message = (overrideText ?? text).trim();
 			if ((!message && images.length === 0) || sending) return;
 			if (!routeReady || !runtimeTabId) return;
@@ -323,7 +325,7 @@ export function useComposerSubmit({
 				message: expandedMessage,
 				images: payload,
 				isStreaming,
-				mode: forceMode ?? mode,
+				mode,
 				commands,
 				rpc,
 			});
@@ -455,7 +457,6 @@ export function useComposerSubmit({
 			sending,
 			status,
 			isStreaming,
-			mode,
 			queuedMessageCount,
 			commands,
 			emojiAutocomplete,

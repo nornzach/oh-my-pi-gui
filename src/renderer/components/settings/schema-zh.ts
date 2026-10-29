@@ -34,6 +34,7 @@ export const ZH_GROUP_TITLES: Record<string, string> = {
 	Agent: "Agent",
 	Git: "Git",
 	General: "常规",
+	Chat: "聊天",
 	Compaction: "压缩",
 	"Rules (TTSR)": "规则（TTSR）",
 	Experimental: "实验性",
@@ -475,6 +476,13 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 		label: "扩展上下文",
 		description: "在支持的模型上启用更大的上下文窗口，可能增加费用；关闭后使用默认或标准计费窗口。",
 	},
+	"chat.systemPrompt": {
+		label: "聊天系统提示词",
+		description:
+			"在聊天会话（omp --chat、GUI 聊天标签页）中作为完整的系统提示词发送，替换默认提示词。留空则使用默认的聊天提示词",
+	},
+	"chat.history": { label: "聊天历史", description: "每条聊天消息让模型看到哪些内容。页面仍显示全部轮次" },
+	"chat.historyTurns": { label: "聊天历史深度", description: "连续对话的每条消息附带多少轮之前的对话" },
 	"compaction.enabled": { label: "自动压缩", description: "上下文过大时自动压缩" },
 	"compaction.midTurnEnabled": {
 		label: "轮中压缩",

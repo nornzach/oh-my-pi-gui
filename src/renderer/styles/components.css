@@ -1420,6 +1420,14 @@
 	background: var(--omp-selected-bg);
 }
 
+/* Send while the follow-up modifier is held: the message queues behind the
+   running turn instead of steering it. */
+.omp-send-button--follow-up {
+	background: color-mix(in srgb, var(--omp-accent) 18%, transparent);
+	color: var(--omp-accent);
+	box-shadow: inset 0 0 0 1px var(--omp-accent);
+}
+
 /* Code blocks: a slim header with the language and a copy control, on the
    same surface as the code. */
 .omp-code-block-header {

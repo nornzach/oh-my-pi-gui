@@ -17,6 +17,7 @@ import {
 	compileKeymap,
 	defaultChords,
 	detectConflicts,
+	isFollowUpSend,
 	KEYMAP_ACTIONS,
 	keymapActionsForGroup,
 	parseChord,
@@ -120,6 +121,22 @@ describe("chordFromEvent", () => {
 		expect(chordFromEvent({ key: "p", code: "KeyP", ...NO_MODS })).toBeNull();
 		expect(chordFromEvent({ key: "P", code: "KeyP", ...NO_MODS, shiftKey: true })).toBeNull();
 		expect(chordFromEvent({ key: "Control", code: "ControlLeft", ...NO_MODS, ctrlKey: true })).toBeNull();
+	});
+});
+
+describe("isFollowUpSend", () => {
+	it.each([
+		["⌘Enter on macOS", true, { metaKey: true, ctrlKey: false, altKey: false }, true],
+		// The terminal's follow-up chord keeps working in the app.
+		["⌃Enter on macOS", true, { metaKey: false, ctrlKey: true, altKey: false }, true],
+		["a bare Enter", true, { metaKey: false, ctrlKey: false, altKey: false }, false],
+		["Ctrl+Enter on Windows and Linux", false, { metaKey: false, ctrlKey: true, altKey: false }, true],
+		// Win/Super+Enter belongs to the system there.
+		["Win+Enter on Windows and Linux", false, { metaKey: true, ctrlKey: false, altKey: false }, false],
+		// AltGr arrives as Ctrl+Alt on Windows; typing with it must never queue.
+		["AltGr+Enter", false, { metaKey: false, ctrlKey: true, altKey: true }, false],
+	])("%s → follow-up: %s", (_name, mac, event, followUp) => {
+		expect(isFollowUpSend(event, mac)).toBe(followUp);
 	});
 });
 

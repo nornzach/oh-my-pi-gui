@@ -3,6 +3,7 @@ import {
 	Box,
 	ChevronDown,
 	History,
+	ListEnd,
 	Loader2,
 	Mic,
 	Paperclip,
@@ -17,6 +18,7 @@ import type { ClipboardEvent, DragEvent, KeyboardEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AvailableCommand, ImageContent } from "../../../shared/rpc-types";
+import { useFollowUpModifierHeld } from "../../hooks/use-follow-up-modifier";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useDisplayPreference } from "../../lib/display-preferences";
 import { tryEmojiInlineReplace } from "../../lib/emoji";
@@ -24,7 +26,7 @@ import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { parseComposerMode } from "../../lib/input-modes";
-import { onEscape } from "../../lib/keymap";
+import { FOLLOW_UP_CHORD, isFollowUpSend, onEscape } from "../../lib/keymap";
 import { abortActiveTurn } from "../../lib/messages";
 import {
 	dropReferencedPastes,
@@ -49,6 +51,7 @@ import { useUiStore } from "../../stores/ui";
 import { ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
 import { AdvisorBadge } from "./AdvisorBadge";
 import { ApprovalControl } from "./ApprovalControl";
+import { ChatContextBar } from "./ChatContextBar";
 import { ComposerModes } from "./ComposerModes";
 import { ContextStrategyBar } from "./ContextStrategyBar";
 import { DictationStrip } from "./DictationStrip";
@@ -65,14 +68,13 @@ import { type CompletionItem, type CompletionMenu, useCompletionMenu } from "./u
 import { useComposerSubmit } from "./use-composer-submit";
 import { useDictation } from "./use-dictation";
 
-type SendMode = "prompt" | "steer" | "followUp";
-
 const MENTION_FS_DEBOUNCE_MS = 150;
 
 /**
  * Composer: auto-growing textarea, Enter to send / Shift+Enter for newline,
- * image paste, @file mentions, /command completion, steering-mode selector,
- * and an abort button while the agent streams.
+ * image paste, @file mentions, /command completion, and an abort button while
+ * the agent streams. While it streams Enter steers the turn and ⌘Enter (⌃Enter
+ * off macOS) queues a follow-up, which holding the modifier previews.
  */
 export function InputArea() {
 	const collabReadOnly = useSessionStore(state => state.collab?.readOnly === true);
@@ -90,7 +92,6 @@ export function InputArea() {
 	const sessionId = useSessionStore(s => s.sessionId);
 	const queuedMessageCount = useSessionStore(s => s.queuedMessageCount);
 	const cwd = useSessionStore(s => s.cwd);
-	const steeringMode = useSettingsStore(s => s.steeringMode);
 	const model = useModelStore(s => s.model);
 	const fastModeActive = useModelStore(s => s.fastModeActive);
 	const openModelPicker = useUiStore(s => s.openModelPicker);
@@ -108,7 +109,6 @@ export function InputArea() {
 	const setText = useComposerStore(s => s.setDraft);
 	const images = useComposerStore(s => s.images);
 	const setImages = useComposerStore(s => s.setImages);
-	const [mode, setMode] = useState<SendMode>("prompt");
 	const [menu, setMenu] = useState<CompletionMenu | null>(null);
 	const [commands, setCommands] = useState<AvailableCommand[]>([]);
 	const sending = useComposerStore(state => state.sending);
@@ -517,7 +517,6 @@ export function InputArea() {
 		sending,
 		status,
 		isStreaming,
-		mode,
 		queuedMessageCount,
 		commands,
 		emojiAutocomplete,
@@ -631,9 +630,9 @@ export function InputArea() {
 				if (dictationPhase === "recording") dictation.stop();
 				return;
 			}
-			// ⌃Enter — send as follow-up, queueing behind the current yield (TUI
-			// app.message.followUp). Idle sessions start immediately either way.
-			send(undefined, e.ctrlKey && !e.metaKey && !e.altKey ? "followUp" : undefined);
+			// Enter steers a running turn; ⌘Enter (⌃Enter off macOS) queues a follow-up
+			// behind it (TUI app.message.followUp). Idle sessions start either way.
+			send(undefined, isFollowUpSend(e) ? "followUp" : "steer");
 		}
 	};
 
@@ -696,13 +695,9 @@ export function InputArea() {
 		insertPasteBlob(content);
 	};
 
-	const modeLabel = isStreaming
-		? mode === "followUp"
-			? t("input.followUp")
-			: t("input.steer")
-		: t("input.sendLabel");
-	const modeTitle = isStreaming ? t("input.streamingTitle", { mode: steeringMode }) : t("input.sendPrompt");
 	const hasDraft = text.trim().length > 0 || images.length > 0;
+	/** Holding the follow-up modifier over a running turn turns the next send into a follow-up. */
+	const followUpHeld = useFollowUpModifierHeld(isStreaming && hasDraft);
 
 	return (
 		<div className="omp-composer-region relative shrink-0 bg-transparent pb-1">
@@ -936,7 +931,7 @@ export function InputArea() {
 									status !== "ready"
 										? t("input.placeholder.connecting")
 										: isStreaming
-											? t("input.placeholder.streaming")
+											? t("input.placeholder.streaming", { chord: FOLLOW_UP_CHORD })
 											: isChat
 												? t("input.placeholder.chat")
 												: t("input.placeholder.idle")
@@ -1162,21 +1157,19 @@ export function InputArea() {
 									</span>
 								)}
 
-								{isStreaming && hasDraft && (
-									<button
-										type="button"
-										disabled={!routeReady || collabReadOnly}
-										onClick={() => setMode(current => (current === "followUp" ? "steer" : "followUp"))}
-										title={modeTitle}
-										className="omp-pressable omp-fade-in h-7 shrink-0 rounded-full border border-[var(--omp-border)] px-2.5 text-omp-sm font-medium text-[var(--omp-muted)] hover:border-[var(--omp-border-strong)] hover:text-[var(--omp-text)]"
+								{followUpHeld && (
+									<span
+										role="status"
+										className="omp-fade-in flex h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--omp-accent)] px-2.5 text-omp-sm font-medium text-[var(--omp-accent)]"
 									>
-										{modeLabel}
-									</button>
+										<ListEnd aria-hidden size={13} />
+										{t("input.followUpHint")}
+									</span>
 								)}
 								{(!isStreaming || hasDraft) && (
 									<button
 										type="button"
-										onClick={() => send()}
+										onClick={event => send(undefined, isFollowUpSend(event) ? "followUp" : "steer")}
 										disabled={
 											!routeReady ||
 											collabReadOnly ||
@@ -1186,11 +1179,17 @@ export function InputArea() {
 											dictating ||
 											!hasDraft
 										}
-										aria-label={t("input.send")}
-										title={t("input.send")}
-										className="omp-send-button"
+										aria-label={followUpHeld ? t("input.sendFollowUp") : t("input.send")}
+										title={
+											isStreaming ? t("input.sendStreaming", { chord: FOLLOW_UP_CHORD }) : t("input.send")
+										}
+										className={cx("omp-send-button", followUpHeld && "omp-send-button--follow-up")}
 									>
-										<ArrowUp size={16} strokeWidth={2.2} />
+										{followUpHeld ? (
+											<ListEnd size={16} strokeWidth={2.2} />
+										) : (
+											<ArrowUp size={16} strokeWidth={2.2} />
+										)}
 									</button>
 								)}
 								{isStreaming && (
@@ -1209,7 +1208,7 @@ export function InputArea() {
 						</div>
 					</div>
 				</div>
-				<ContextStrategyBar />
+				{isChat ? <ChatContextBar /> : <ContextStrategyBar />}
 			</div>
 		</div>
 	);

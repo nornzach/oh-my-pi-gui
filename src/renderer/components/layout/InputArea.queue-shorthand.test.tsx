@@ -9,6 +9,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { AgentMessage, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../lib/i18n";
+import { IS_MAC } from "../../lib/keymap";
 import { pasteMarkerText, storePaste } from "../../lib/paste-blobs";
 import { useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
@@ -94,8 +95,14 @@ async function typeInto(element: TestElement, value: string): Promise<void> {
 	await act(async () => props.onChange?.({ target: element, currentTarget: element }));
 }
 
+/** The modifier flags that make a send a follow-up on this platform. */
+const followUpModifier = { metaKey: IS_MAC, ctrlKey: !IS_MAC };
+
 /** Drive the textarea's React onKeyDown with an Enter press. */
-async function pressEnter(element: TestElement): Promise<void> {
+async function pressEnter(
+	element: TestElement,
+	modifiers: { metaKey?: boolean; ctrlKey?: boolean } = {},
+): Promise<void> {
 	const record = element as unknown as Record<string, unknown>;
 	const propsKey = Object.getOwnPropertyNames(record).find(key => key.startsWith("__reactProps$"));
 	const props = propsKey
@@ -109,6 +116,7 @@ async function pressEnter(element: TestElement): Promise<void> {
 			ctrlKey: false,
 			metaKey: false,
 			altKey: false,
+			...modifiers,
 			nativeEvent: { isComposing: false },
 			keyCode: 13,
 			preventDefault: () => {},
@@ -489,6 +497,77 @@ describe("InputArea queue shorthand submit", () => {
 		await flush();
 
 		expect(followUp).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("InputArea follow-up send", () => {
+	const sendButton = () =>
+		document.querySelector("button.omp-send-button:not(.omp-send-button--secondary)") as unknown as TestElement;
+	/** Press or release the platform's follow-up modifier anywhere in the window. */
+	const holdModifier = async (held: boolean) => {
+		await act(async () => {
+			window.dispatchEvent(
+				Object.assign(new Event(held ? "keydown" : "keyup"), {
+					key: IS_MAC ? "Meta" : "Control",
+					altKey: false,
+					metaKey: IS_MAC && held,
+					ctrlKey: !IS_MAC && held,
+				}),
+			);
+		});
+	};
+
+	it("queues a follow-up on the platform modifier with Enter or a send click while a turn runs", async () => {
+		await mount();
+		await typeInto(findTextarea(), "then rerun the suite");
+		await pressEnter(findTextarea(), followUpModifier);
+		await flush();
+		await flush();
+		expect(followUp).toHaveBeenCalledWith("then rerun the suite", []);
+
+		await typeInto(findTextarea(), "and update the docs");
+		await act(async () => {
+			sendButton().dispatchEvent(
+				Object.assign(new Event("click", { bubbles: true, cancelable: true }), {
+					altKey: false,
+					...followUpModifier,
+				}),
+			);
+		});
+		await flush();
+		await flush();
+		expect(followUp).toHaveBeenLastCalledWith("and update the docs", []);
+		expect(steer).not.toHaveBeenCalled();
+	});
+
+	it("previews a follow-up while the modifier is held, until it is released or the window loses focus", async () => {
+		await mount();
+		await typeInto(findTextarea(), "then rerun the suite");
+		expect(document.querySelector("[role='status']")).toBeNull();
+
+		await holdModifier(true);
+		expect(document.querySelector("[role='status']")?.textContent).toBe("Follow-up");
+		expect(sendButton().getAttribute("aria-label")).toBe("Send as follow-up");
+
+		await holdModifier(false);
+		expect(document.querySelector("[role='status']")).toBeNull();
+		expect(sendButton().getAttribute("aria-label")).toBe("Send (Enter)");
+
+		// The release of a modifier held while leaving the window never arrives.
+		await holdModifier(true);
+		await act(async () => {
+			window.dispatchEvent(new Event("blur"));
+		});
+		expect(document.querySelector("[role='status']")).toBeNull();
+	});
+
+	it("shows no follow-up preview while idle, where every send starts a turn", async () => {
+		await mount();
+		await act(async () => useSessionStore.setState({ isStreaming: false }));
+		await typeInto(findTextarea(), "start here");
+
+		await holdModifier(true);
+		expect(document.querySelector("[role='status']")).toBeNull();
 	});
 });
 
