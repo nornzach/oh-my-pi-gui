@@ -3103,6 +3103,14 @@ export const en: Record<string, string> = {
 	"terminal.agentWaiting": "The agent ran this command interactively and is waiting for it. Type here to answer it.",
 	"terminal.agentBackground":
 		"The agent started this command and can read its output. It keeps running until it exits or you close it.",
+	"terminal.session": "The agent runs commands in this shell one at a time. You can watch and type here too.",
+	"terminal.sessionRemote":
+		"The agent runs commands on {host} in this shell one at a time. You can watch and type here too.",
+	"terminal.sessionRoot": "It runs as root.",
+	"terminal.sessionInput":
+		"Waiting for you: type the answer in this terminal. The agent never sees what you type here.",
+	"terminal.state.busy": "Running a command",
+	"terminal.state.input": "Waiting for you",
 	"terminal.openFailed": "Couldn't start a terminal: {error}",
 	"terminal.emptyTitle": "No terminal open",
 	"terminal.emptyHint": "Start a shell in this workspace. Interactive commands the agent runs open here too.",

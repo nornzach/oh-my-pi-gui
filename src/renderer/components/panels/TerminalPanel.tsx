@@ -36,6 +36,10 @@ function TerminalChip({
 	const agent = terminal.kind !== "shell";
 	const Icon = agent ? Bot : SquareTerminal;
 	const ref = useActiveChipInView<HTMLDivElement>(active);
+	const where = [terminal.title, terminal.host && `ssh ${terminal.host}`, terminal.cwd].filter(Boolean).join(" — ");
+	// A session shows what it is doing: running the agent's command, or waiting for the user.
+	const busy = terminal.running && (terminal.state === "busy" || terminal.state === "starting");
+	const asking = terminal.running && terminal.state === "input";
 	return (
 		<div
 			ref={ref}
@@ -48,13 +52,30 @@ function TerminalChip({
 				type="button"
 				aria-pressed={active}
 				onClick={onSelect}
-				title={terminal.kind === "command" ? terminal.title : `${terminal.title} — ${terminal.cwd}`}
+				title={terminal.kind === "command" ? terminal.title : where}
 				className="flex min-w-0 items-center gap-1.5"
 			>
 				<Icon aria-hidden="true" size={13} className={cx("shrink-0", agent && "text-(--omp-accent)")} />
 				<span className={cx("truncate", !terminal.running && "text-(--omp-dim) line-through")}>
 					{terminal.title}
 				</span>
+				{terminal.root && terminal.running && (
+					<span className="shrink-0 rounded px-1 text-omp-xxs font-medium text-(--omp-error) ring-1 ring-(--omp-error)/40">
+						root
+					</span>
+				)}
+				{(busy || asking) && (
+					<span
+						data-session-state={terminal.state}
+						role="img"
+						aria-label={t(asking ? "terminal.state.input" : "terminal.state.busy")}
+						title={t(asking ? "terminal.state.input" : "terminal.state.busy")}
+						className={cx(
+							"size-1.5 shrink-0 rounded-full",
+							asking ? "bg-(--omp-warning)" : "animate-pulse bg-(--omp-accent)",
+						)}
+					/>
+				)}
 			</button>
 			<button
 				type="button"
@@ -66,6 +87,27 @@ function TerminalChip({
 				<X size={12} />
 			</button>
 		</div>
+	);
+}
+
+/** What an agent session is: the agent's shell, a question waiting on the user, a root shell. */
+function SessionNotice({ terminal }: { terminal: RpcTerminalInfo }) {
+	const t = useT();
+	if (terminal.state === "input") {
+		return (
+			<p
+				data-session-notice="input"
+				className="shrink-0 border-b border-(--omp-border-muted) bg-(--omp-warning-dim) px-3 py-1.5 text-omp-xs text-(--omp-text)"
+			>
+				{t("terminal.sessionInput")}
+			</p>
+		);
+	}
+	return (
+		<p className="shrink-0 border-b border-(--omp-border-muted) bg-(--omp-accent-dim) px-3 py-1.5 text-omp-xs text-(--omp-text)">
+			{terminal.host ? t("terminal.sessionRemote", { host: terminal.host }) : t("terminal.session")}
+			{terminal.root && <span className="text-(--omp-error)"> {t("terminal.sessionRoot")}</span>}
+		</p>
 	);
 }
 
@@ -175,10 +217,15 @@ export function TerminalPanel() {
 					<Plus size={15} />
 				</button>
 			</div>
-			{active?.kind !== "shell" && active?.running && (
-				<p className="shrink-0 border-b border-(--omp-border-muted) bg-(--omp-accent-dim) px-3 py-1.5 text-omp-xs text-(--omp-text)">
-					{t(active.kind === "command" ? "terminal.agentWaiting" : "terminal.agentBackground")}
-				</p>
+			{active?.kind === "session" && active.running ? (
+				<SessionNotice terminal={active} />
+			) : (
+				active?.kind !== "shell" &&
+				active?.running && (
+					<p className="shrink-0 border-b border-(--omp-border-muted) bg-(--omp-accent-dim) px-3 py-1.5 text-omp-xs text-(--omp-text)">
+						{t(active.kind === "command" ? "terminal.agentWaiting" : "terminal.agentBackground")}
+					</p>
+				)
 			)}
 			{error && (
 				<p className="shrink-0 border-b border-(--omp-border-muted) bg-(--omp-error-dim) px-3 py-1.5 text-omp-xs text-(--omp-error)">
