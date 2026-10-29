@@ -1560,7 +1560,7 @@ export function SettingsWindow() {
 									>
 										<span className="text-omp-md">{t(item.labelKey)}</span>
 										<span className="mt-1 block text-omp-xs text-(--omp-dim)">
-											{t("tabId" in item ? "settings.tab.advanced" : "settings.tab.gui")} · {item.id}
+											{t("tabId" in item ? "settings.tabs.advanced" : "settings.tabs.gui")} · {item.id}
 										</span>
 									</button>
 								))}
