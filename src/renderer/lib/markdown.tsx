@@ -27,6 +27,7 @@ import { type FileTarget, isWebUrl, looksLikeFilePath, parseFileTarget } from ".
 import { useResolvedPath } from "./path-resolver";
 import { PREVIEW_HEIGHT_LG, PREVIEW_SCROLL_CODE } from "./preview";
 import { rehypeDrivePaths } from "./rehype-drive-paths";
+import { remarkAutolinkBoundary } from "./remark-autolink-boundary";
 import { remarkDollarGuard } from "./remark-dollar-guard";
 import { remarkLatexMath } from "./remark-latex-math";
 
@@ -59,10 +60,18 @@ interface MarkdownRendererProps {
 // registers AFTER remark-math because micromark prepends each extension's
 // constructs — later registration means it is tried BEFORE mathText, letting
 // it keep prices like `$15 … $25` literal instead of letting them eat the
-// markup between them.
-const REMARK_PLUGINS: Options["remarkPlugins"] = [remarkGfm, remarkMath, remarkDollarGuard, remarkLatexMath];
+// markup between them. The autolink boundary follows remark-gfm: its mdast
+// transform trims the links GFM's own transform adds.
+const REMARK_PLUGINS: Options["remarkPlugins"] = [
+	remarkGfm,
+	remarkAutolinkBoundary,
+	remarkMath,
+	remarkDollarGuard,
+	remarkLatexMath,
+];
 const REMARK_PLUGINS_LITERAL_SINGLE_DOLLAR: Options["remarkPlugins"] = [
 	remarkGfm,
+	remarkAutolinkBoundary,
 	[remarkMath, { singleDollarTextMath: false }],
 	[remarkDollarGuard, { singleDollarTextMath: false }],
 	remarkLatexMath,

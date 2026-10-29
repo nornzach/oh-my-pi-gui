@@ -73,4 +73,10 @@ describe("isWebUrl", () => {
 		expect(isWebUrl("see https://example.com")).toBe(false);
 		expect(isWebUrl("ftp://example.com")).toBe(false);
 	});
+
+	it("rejects an address with Chinese prose glued on, but not a Chinese path", () => {
+		expect(isWebUrl("http://127.0.0.1:18091，仅")).toBe(false);
+		expect(isWebUrl("http://localhost:3000仅")).toBe(false);
+		expect(isWebUrl("https://zh.wikipedia.org/wiki/中文")).toBe(true);
+	});
 });

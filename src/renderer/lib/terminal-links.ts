@@ -2,15 +2,14 @@
  * Web addresses in terminal output are links: a dev server's
  * "Local: http://localhost:5173/" opens in the tab's browser panel like any
  * other link (⌘/Ctrl-click: the system browser). Addresses that soft-wrap
- * across rows stay one link.
+ * across rows stay one link, and end where CJK prose takes over, as they do
+ * in rendered replies (`bareAddressEnd`).
  */
 import type { IBufferCell, ILink, ILinkHandler, Terminal } from "@xterm/xterm";
+import { bareAddressEnd, trimAddress } from "./link-targets";
 import { openLink } from "./open-link";
 
 const URL_PATTERN = /\bhttps?:\/\/[^\s"'<>`]+/gi;
-/** Sentence punctuation that ends prose, not the address. */
-const TRAILING_PUNCTUATION = /[.,;:!?]+$/;
-const CLOSERS: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
 
 export interface TextLink {
 	/** Start index in the text. */
@@ -20,30 +19,11 @@ export interface TextLink {
 	url: string;
 }
 
-function count(text: string, char: string): number {
-	let total = 0;
-	for (const each of text) if (each === char) total++;
-	return total;
-}
-
-/** Trim prose around an address: trailing punctuation, and closing brackets the address never opened. */
-function trimAddress(url: string): string {
-	let trimmed = url;
-	for (;;) {
-		const next = trimmed.replace(TRAILING_PUNCTUATION, "");
-		const last = next.at(-1);
-		const opener = last ? CLOSERS[last] : undefined;
-		const result = opener && count(next, last as string) > count(next, opener) ? next.slice(0, -1) : next;
-		if (result === trimmed) return trimmed;
-		trimmed = result;
-	}
-}
-
 /** Web addresses in a line of terminal text. */
 export function findTextLinks(text: string): TextLink[] {
 	const links: TextLink[] = [];
 	for (const match of text.matchAll(URL_PATTERN)) {
-		const url = trimAddress(match[0]);
+		const url = trimAddress(match[0].slice(0, bareAddressEnd(match[0], text[match.index - 1])));
 		if (url.length <= "https://".length) continue;
 		links.push({ start: match.index, end: match.index + url.length, url });
 	}
