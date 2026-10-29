@@ -83,9 +83,26 @@ function isOptimisticUser(message: AgentMessage): boolean {
 	return message.role === "user" && message.optimistic === true;
 }
 
-function appendLiveMessages(messages: AgentMessage[], delivered: AgentMessage[]): AgentMessage[] {
+/**
+ * A transcript fetch answered after the run persisted this message but before
+ * its batched message_end arrived: the committed row already shows it.
+ */
+function alreadyCommitted(message: AgentMessage, committed: AgentMessage[]): boolean {
+	const identity = messageIdentity(message);
+	if (identity === undefined) return false;
+	return committed.some(
+		entry => entry.entryId !== undefined && messageIdentity(entry) === identity && sameMessageContent(message, entry),
+	);
+}
+
+function appendLiveMessages(
+	messages: AgentMessage[],
+	delivered: AgentMessage[],
+	committed: AgentMessage[],
+): AgentMessage[] {
 	let next = messages;
 	for (const message of delivered) {
+		const shown = alreadyCommitted(message, committed);
 		const optimisticIndex =
 			message.role === "user" && !message.steering
 				? next.findIndex(entry => isOptimisticUser(entry) && !entry.optimisticDelivered)
@@ -93,15 +110,18 @@ function appendLiveMessages(messages: AgentMessage[], delivered: AgentMessage[])
 		if (optimisticIndex >= 0) {
 			const optimistic = next[optimisticIndex];
 			next = [...next];
-			next[optimisticIndex] = {
-				...message,
-				optimistic: true,
-				optimisticDelivered: true,
-				optimisticAfterEntryId: optimistic?.optimisticAfterEntryId,
-			};
+			// The delivery still retires its echo, even when it adds no row of its own.
+			if (shown) next.splice(optimisticIndex, 1);
+			else
+				next[optimisticIndex] = {
+					...message,
+					optimistic: true,
+					optimisticDelivered: true,
+					optimisticAfterEntryId: optimistic?.optimisticAfterEntryId,
+				};
 			continue;
 		}
-		next = [...next, message];
+		if (!shown) next = [...next, message];
 	}
 	return next;
 }
@@ -215,7 +235,7 @@ export const createMessagesStore = () =>
 						break;
 					}
 					case "message_end":
-						liveMessages = appendLiveMessages(liveMessages, [event.message]);
+						liveMessages = appendLiveMessages(liveMessages, [event.message], messages);
 						if (event.message.role === "assistant") {
 							streamingMessage = null;
 							streamingText = "";

@@ -13,6 +13,7 @@
 ### Fixed
 
 - Text boxes that grow with their text, in Settings, Memory, Modes and plugin details, no longer show a scrollbar while their text fits.
+- A message sent right after opening a tab no longer shows twice while its reply streams.
 
 ## [0.9.33] - 2026-10-29
 

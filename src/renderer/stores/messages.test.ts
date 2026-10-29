@@ -248,6 +248,47 @@ describe("transcript hydration", () => {
 		expect(useMessagesStore.getState().liveMessages).toEqual([]);
 	});
 
+	it("shows a turn once when its transcript fetch overtakes the message_end events", () => {
+		const user: AgentMessage = { role: "user", content: "question", timestamp: 2 };
+		const reply: AgentMessage = { role: "assistant", content: "answer", timestamp: 3 };
+		const committed = [
+			{ ...user, entryId: "user-entry" },
+			{ ...reply, entryId: "reply-entry" },
+		];
+		useMessagesStore
+			.getState()
+			.appendLiveMessage({ ...user, timestamp: 1, optimistic: true, optimisticAfterEntryId: null });
+
+		useMessagesStore.getState().reconcileFetched(committed);
+		useMessagesStore.getState().applyEvents([
+			{ type: "message_end", message: user },
+			{ type: "message_start", message: reply },
+			{ type: "message_end", message: reply },
+		]);
+
+		const state = useMessagesStore.getState();
+		expect([...state.messages, ...state.liveMessages]).toEqual(committed);
+		expect(state.streamingMessage).toBeNull();
+	});
+
+	it("retires the local echo when the transcript already committed its expanded prompt", () => {
+		const delivered: AgentMessage = { role: "user", content: "expanded question", timestamp: 2 };
+		const committed = { ...delivered, entryId: "user-entry" };
+		useMessagesStore.getState().appendLiveMessage({
+			role: "user",
+			content: "question",
+			timestamp: 1,
+			optimistic: true,
+			optimisticAfterEntryId: null,
+		});
+
+		useMessagesStore.getState().reconcileFetched([committed]);
+		useMessagesStore.getState().applyEvents([{ type: "message_end", message: delivered }]);
+
+		const state = useMessagesStore.getState();
+		expect([...state.messages, ...state.liveMessages]).toEqual([committed]);
+	});
+
 	it("replaces a different persisted branch instead of guessing by content or timestamp", () => {
 		const a = userMessage("a");
 		useMessagesStore.setState({ messages: [a], totalMessages: 1 });
