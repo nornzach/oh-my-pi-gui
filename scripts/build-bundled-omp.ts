@@ -323,7 +323,8 @@ await stageNativeAddon(target);
 try {
 	try {
 		await runPackageScript(statsDir, "gen:stats");
-		await runPackageScript(collabWebDir, "gen:tool-views");
+		// The content-addressed export viewer, as upstream's build-binary.ts embeds it.
+		await runPackageScript(collabWebDir, "gen:export-viewer");
 		const [platform, arch] = target.platformTag.split("-");
 		await compileCodingAgent({
 			repoRoot,
