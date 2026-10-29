@@ -135,10 +135,7 @@ export async function forkSessionFromEntryInNewTab(
 }
 
 /** Locate a transcript message's entry in the active session tree (legacy rows carry no entryId). */
-async function resolveMessageEntryId(
-	message: AgentMessage,
-	rpc: Pick<TabRpc, "getSessionTree">,
-): Promise<string> {
+async function resolveMessageEntryId(message: AgentMessage, rpc: Pick<TabRpc, "getSessionTree">): Promise<string> {
 	let entryId = message.entryId;
 	if (!entryId) {
 		const response = await rpc.getSessionTree();

@@ -62,7 +62,9 @@ export function AdvisorBadge() {
 			style={{ color: advisorBadgeColor(statuses) }}
 		>
 			<Icon aria-hidden="true" size={14} />
-			{advisor.cost > 0 && <span className="tabular-nums text-[var(--omp-muted)]">{formatCost(advisor.cost, 2)}</span>}
+			{advisor.cost > 0 && (
+				<span className="tabular-nums text-[var(--omp-muted)]">{formatCost(advisor.cost, 2)}</span>
+			)}
 		</button>
 	);
 }

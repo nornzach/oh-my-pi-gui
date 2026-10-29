@@ -287,7 +287,10 @@ describe("editFromMessage", () => {
 			error: "Agent is busy",
 		}));
 		await expect(
-			editFromMessage({ role: "user", content: "x", timestamp: 1, entryId: "e" }, { branch, getSessionTree: vi.fn() }),
+			editFromMessage(
+				{ role: "user", content: "x", timestamp: 1, entryId: "e" },
+				{ branch, getSessionTree: vi.fn() },
+			),
 		).rejects.toThrow("Agent is busy");
 	});
 });
