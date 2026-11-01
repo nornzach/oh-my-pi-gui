@@ -1058,3 +1058,59 @@ describe("Sidebar session-list failures", () => {
 		expect(omp.sessions.list.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
 	});
 });
+
+describe("Sidebar session hierarchy", () => {
+	it("nests a subagent session under its parent instead of listing it as a peer", async () => {
+		const parent = session("/work/alpha/parent.jsonl", "/work/alpha", {
+			id: "parent-id",
+			title: "Main session",
+			modified: "2026-01-01T00:00:00Z",
+		});
+		const child = session("/work/alpha/parent/agent.jsonl", "/work/alpha", {
+			id: "agent",
+			title: "reply with OK only",
+			modified: "2026-01-03T00:00:00Z",
+			parentSessionPath: "/work/alpha/parent.jsonl",
+		});
+		const nested = session("/work/alpha/parent/agent/helper.jsonl", "/work/alpha", {
+			id: "helper",
+			title: "count from 1 to 30",
+			modified: "2026-01-04T00:00:00Z",
+			parentSessionPath: "/work/alpha/parent/agent.jsonl",
+		});
+		const peer = session("/work/alpha/other.jsonl", "/work/alpha", {
+			title: "Other session",
+			modified: "2026-01-02T00:00:00Z",
+		});
+		installMockOmp([child, peer, nested, parent]);
+		seedStores();
+		await mount(<Sidebar />);
+
+		const titles = [...document.querySelectorAll('[data-session-group="/work/alpha"] .omp-sidebar-title')].map(
+			element => element.textContent,
+		);
+		// The child is the newest file, but it stays under the parent, and that
+		// family sorts by the child's activity ahead of the older peer.
+		expect(titles).toEqual(["Main session", "reply with OK only", "count from 1 to 30", "Other session"]);
+		const childRow = [...document.querySelectorAll(".omp-sidebar-session-row")].find(element =>
+			(element.textContent ?? "").includes("reply with OK only"),
+		);
+		const nestedRow = [...document.querySelectorAll(".omp-sidebar-session-row")].find(element =>
+			(element.textContent ?? "").includes("count from 1 to 30"),
+		);
+		expect(childRow?.getAttribute("data-session-depth")).toBe("1");
+		expect(childRow?.getAttribute("data-session-parent")).toBe("/work/alpha/parent.jsonl");
+		expect(nestedRow?.getAttribute("data-session-depth")).toBe("2");
+		expect(nestedRow?.getAttribute("data-session-parent")).toBe("/work/alpha/parent/agent.jsonl");
+
+		const toggle = [...document.querySelectorAll("button")].find(
+			button => button.getAttribute("aria-label") === "Hide sessions started from this one",
+		);
+		await fire(toggle as unknown as Element, "onClick");
+		expect(
+			[...document.querySelectorAll('[data-session-group="/work/alpha"] .omp-sidebar-title')].map(
+				element => element.textContent,
+			),
+		).toEqual(["Main session", "Other session"]);
+	});
+});
