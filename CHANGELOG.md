@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.34] - 2026-11-02
+
 ### Added
 
 - Click an image pasted into the composer to see it full-size, as with images in the conversation ([#36](https://github.com/nornzach/oh-my-pi-gui/issues/36)).
