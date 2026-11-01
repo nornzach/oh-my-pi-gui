@@ -49,6 +49,7 @@ import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
+import { ZoomableImage } from "../common/ImageViewer";
 import { AdvisorBadge } from "./AdvisorBadge";
 import { ApprovalControl } from "./ApprovalControl";
 import { ChatContextBar } from "./ChatContextBar";
@@ -861,7 +862,7 @@ export function InputArea() {
 								<div className="mb-3 flex flex-wrap gap-2">
 									{images.map((image, index) => (
 										<div key={index} className="group relative">
-											<img
+											<ZoomableImage
 												src={image.preview}
 												alt={t("input.attachmentAlt", { index: index + 1 })}
 												className="h-16 w-16 rounded-lg border border-[var(--omp-border-muted)] object-cover"
