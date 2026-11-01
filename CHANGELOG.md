@@ -4,6 +4,7 @@
 
 ### Added
 
+- Click an image pasted into the composer to see it full-size, as with images in the conversation ([#36](https://github.com/nornzach/oh-my-pi-gui/issues/36)).
 - With **/btw Steering Inject** on (Settings → Interaction), a side answer that drafts a steering prompt shows it on its own rail with **Send to main session**, which steers the running turn or starts a new one. It turns green once sent and can be sent only once.
 - Background jobs (the Jobs dialog) lead with what the agent said each one is for, then a one-line caption of what a long command does and when it ends, ahead of the command line.
 - Chat tabs can use your own system prompt and limit what each message sends. Click the row under a chat's composer to pick **Continuous** or **Single turn**, cap how many earlier turns go with each message, and write a system prompt that replaces the default one. The chat still shows every turn. Each chat keeps its own settings; Settings → Context → Chat sets the defaults for chats that have not changed theirs.
@@ -20,6 +21,7 @@
 - A message sent right after opening a tab no longer shows twice while its reply streams.
 - Chat tabs no longer behave like the coding agent: they send only the chat system prompt, with no tools and no working directory.
 - ⌘A (Ctrl+A on Windows and Linux) in an open file's preview selects only the file's text, not the rest of the window.
+- Subagent sessions in the sidebar sit under the session that started them, with a chevron to fold each family, instead of as unrelated sessions at the top level. Forks and continuations nest under their parent too ([#36](https://github.com/nornzach/oh-my-pi-gui/issues/36)).
 
 ## [0.9.33] - 2026-10-29
 
