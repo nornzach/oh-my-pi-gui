@@ -10,6 +10,7 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner, TextArea } from "../common";
+import { BtwAnswer } from "../panels/BtwAnswer";
 
 export function BtwDialog() {
 	const t = useT();
@@ -139,7 +140,7 @@ export function BtwDialog() {
 							</div>
 							<div className="flex flex-col items-start gap-1.5">
 								{answerText ? (
-									<MarkdownRenderer content={answerText} />
+									<BtwAnswer answer={answerText} inject={record.inject} recordId={record.id} />
 								) : running ? (
 									<div className="flex items-center gap-2 py-3 text-sm text-(--omp-dim)">
 										<Spinner size="sm" /> {t("btw.thinking")}

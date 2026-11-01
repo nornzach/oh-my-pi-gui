@@ -100,4 +100,23 @@ describe("JobsDialog", () => {
 		expect([...order].sort((a, b) => a - b)).toEqual(order);
 		expect(text).toContain("3 running");
 	});
+
+	it("leads a job with the purpose the model gave, then its caption, ahead of the command", async () => {
+		const job = {
+			id: "j1",
+			type: "bash",
+			status: "running",
+			label: "bun test --coverage",
+			intent: "Run the test suite",
+			caption: "Runs all package tests; ends when coverage is written",
+			startTime: 1,
+		} as const;
+		await openWith({ jobs: [job] });
+		const text = document.body.textContent ?? "";
+		const order = ["Run the test suite", "Runs all package tests", "bun test --coverage"].map(part =>
+			text.indexOf(part),
+		);
+		expect(order.every(index => index >= 0)).toBe(true);
+		expect([...order].sort((a, b) => a - b)).toEqual(order);
+	});
 });

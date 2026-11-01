@@ -1023,4 +1023,12 @@ export const ZH_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
 	"20 seconds": "20 秒",
 	"Retry stops with no visible assistant message; tool calls are excluded (default)":
 		"重试没有可见助手消息的停止；不含工具调用（默认）。",
+	"Eval only": "仅 eval",
+	"Reject `model` on task items and eval agent()/workpool()": "拒绝任务项及 eval agent()/workpool() 中的 `model`",
+	"Accept `model` in eval agent() and workpool() only": "仅在 eval agent() 和 workpool() 中接受 `model`",
+	"Accept `model` on task items and in eval agent()/workpool()": "在任务项及 eval agent()/workpool() 中接受 `model`",
+	"Every prompt": "每次提示",
+	"Every 3 prompts": "每 3 次提示",
+	"Every 5 prompts": "每 5 次提示",
+	"Every 10 prompts": "每 10 次提示",
 };

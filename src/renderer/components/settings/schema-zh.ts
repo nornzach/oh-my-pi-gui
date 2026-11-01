@@ -481,7 +481,10 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 		description:
 			"未单独设置的聊天（omp --chat、GUI 聊天标签页）默认使用的系统提示词，替换内置的聊天提示词。留空则使用内置提示词",
 	},
-	"chat.history": { label: "聊天历史", description: "未单独设置的聊天，每条消息让模型看到哪些内容。页面仍显示全部轮次" },
+	"chat.history": {
+		label: "聊天历史",
+		description: "未单独设置的聊天，每条消息让模型看到哪些内容。页面仍显示全部轮次",
+	},
 	"chat.historyTurns": { label: "聊天历史深度", description: "未单独设置的连续对话，每条消息附带多少轮之前的对话" },
 	"compaction.enabled": { label: "自动压缩", description: "上下文过大时自动压缩" },
 	"compaction.midTurnEnabled": {
@@ -1867,5 +1870,49 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 	"gc.compressAfterDays": {
 		label: "压缩闲置天数",
 		description: "压缩闲置超过此天数的会话文件（默认 7）。",
+	},
+	// omp 18.14–18.15
+	"btw.inject": {
+		label: "/btw 引导注入",
+		description:
+			"让 /btw 起草引导提示时，把它放在 <inject> 标签中并在回答里高亮；按 Alt+I（app.btw.inject）将其发送到主会话。",
+	},
+	"hindsight.globalScope": {
+		label: "Hindsight 全局作用域",
+		description:
+			"允许 retain 和 learn 使用 scope: global，不带项目标签存储记忆，所有项目都能召回。需要 global 或 per-project-tagged 作用域。",
+	},
+	"judgment.attemptTimeoutMs": {
+		label: "判断模型尝试超时（毫秒）",
+		description: "配置了备用模型时，判断模型超过此时长（默认 3000 毫秒）未完成即改用备用模型，并短暂跳过超时的路由。",
+	},
+	"prewalk.from": {
+		label: "Prewalk 规划模型",
+		description: "/prewalk restart 返回用于规划的模型或角色（默认 '@default'）。",
+	},
+	"prewalk.into": {
+		label: "Prewalk 目标",
+		description:
+			"Prewalk 在首次编辑/写入时交接到的模型或角色（默认 '@smol'），用于 /prewalk、/prewalk restart、启用 Prewalk 和 --prewalk。自动 Prewalk 使用自己的目标。",
+	},
+	"providers.openai-codex.daybreak": {
+		label: "Codex Daybreak Blue",
+		description:
+			"在符合条件的 ChatGPT 账号上自动申请 Daybreak Blue 网络安全访问计划。OpenAI 可能使用 Daybreak Blue 会话内容改进模型。不影响专用 Daybreak Blue 模型（gpt-daybreak-blue-*），它们仍可能以 Daybreak 会话运行。",
+	},
+	"task.perCallModel": {
+		label: "按调用指定模型",
+		description:
+			"是否允许子代理调用用一个精确的 provider/model-id[@upstream][:level] 选择器指定模型。@upstream 固定属于模型身份，仅聚合服务支持。只接受配置中已可路由的模型。项目设置只能关闭、不能开启，也不能批准模型。",
+	},
+	"task.perCallModelAllow": {
+		label: "按调用模型允许列表",
+		description:
+			"精确选择器：`provider/model-id`，仅固定的 OpenRouter/Vercel 路由可带 `@upstream`（如 `openrouter/x@y`）。设置后，按调用指定的模型还必须在此列表中。留空表示配置允许的所有模型。项目列表只能进一步收窄。",
+	},
+	"title.refreshAfterPrompts": {
+		label: "定期刷新标题",
+		description:
+			"每隔这么多次用户提示，让判断模型检查自动生成的会话标题是否仍符合对话，不符合时重新生成。你自己设置的标题不会被替换。",
 	},
 };

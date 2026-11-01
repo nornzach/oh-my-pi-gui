@@ -4,11 +4,14 @@
 
 ### Added
 
+- With **/btw Steering Inject** on (Settings → Interaction), a side answer that drafts a steering prompt shows it on its own rail with **Send to main session**, which steers the running turn or starts a new one. It turns green once sent and can be sent only once.
+- Background jobs (the Jobs dialog) lead with what the agent said each one is for, then a one-line caption of what a long command does and when it ends, ahead of the command line.
 - Chat tabs can use your own system prompt and limit what each message sends. Click the row under a chat's composer to pick **Continuous** or **Single turn**, cap how many earlier turns go with each message, and write a system prompt that replaces the default one. The chat still shows every turn. Each chat keeps its own settings; Settings → Context → Chat sets the defaults for chats that have not changed theirs.
 - A bell at the top right of the window lists scheduled runs that finished, with a red count of the ones you have not opened. Click one to see its run, or mark them all read. Scheduled Tasks in the sidebar shows a red dot while any are unread.
 
 ### Changed
 
+- Bundled agent rebuilt from monorepo `27cd662e`, on upstream omp 18.15.0, with its native addon from npm 18.15.0. Among upstream's changes: a model whose provider has no usable credential switches to the first fallback that has one, `/compact` queued as a follow-up runs when the agent yields, Hindsight memories can be global, and session titles can refresh every few prompts. New settings are translated in Chinese and Russian.
 - The composer's Steer/Follow-up switch is gone. While a turn runs, Enter steers it and ⌘Enter (Ctrl+Enter on Windows and Linux) queues a follow-up for when it ends. Hold ⌘ (or Ctrl) with a message typed to see **Follow-up** beside the send button. On macOS ⌃Enter still queues a follow-up, as in the terminal.
 
 ### Fixed

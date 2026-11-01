@@ -2,7 +2,7 @@ import { CornerDownRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcAsyncJobItem, RpcJobsResult, RpcJobTreeRow } from "../../../shared/rpc-types";
 import { AnsiText } from "../../lib/ansi";
-import { formatClock, formatDuration } from "../../lib/format";
+import { cx, formatClock, formatDuration } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_LG } from "../../lib/preview";
 import { useTabRpc } from "../../lib/tab-rpc";
@@ -106,7 +106,22 @@ export function JobsDialog() {
 						: t("jobs.durationUnavailable")}
 				</span>
 			</div>
-			<div className="mt-0.5 break-words whitespace-pre-wrap text-xs text-(--omp-dim)">{job.label}</div>
+			{job.intent ? (
+				<div data-job-intent="" className="mt-0.5 break-words text-omp-sm text-(--omp-text)">
+					{job.intent}
+				</div>
+			) : null}
+			{job.caption ? (
+				<div data-job-caption="" className="mt-0.5 break-words text-xs text-(--omp-text-secondary) italic">
+					{job.caption}
+				</div>
+			) : null}
+			<div
+				className={cx("mt-0.5 break-words whitespace-pre-wrap text-xs text-(--omp-dim)", job.intent && "font-mono")}
+				title={job.command && job.command !== job.label ? job.command : undefined}
+			>
+				{job.label}
+			</div>
 			{job.widget ? <JobWidgetCard widget={job.widget} /> : null}
 			{(job.resultPreview || job.errorPreview) && (
 				<details className="mt-2 text-omp-sm">

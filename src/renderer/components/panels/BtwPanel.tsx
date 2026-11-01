@@ -16,6 +16,7 @@ import { useBtwStore } from "../../stores/btw";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { Badge, type BadgeVariant, Button, Spinner, TextArea } from "../common";
+import { BtwAnswer } from "./BtwAnswer";
 
 const STATUS_LABEL_KEYS: Record<BtwHistoryTurn["status"], string | null> = {
 	running: "btw.statusRunning",
@@ -209,7 +210,7 @@ export function BtwPanel() {
 					</div>
 				) : record ? (
 					<div className="space-y-5">
-						{getBtwTurns(record).map((turn, index) => {
+						{getBtwTurns(record).map((turn, index, turns) => {
 							const statusNote =
 								turn.status === "cancelled"
 									? t("btw.statusCancelled")
@@ -232,7 +233,11 @@ export function BtwPanel() {
 									</div>
 									<div className="flex flex-col items-start gap-1.5">
 										{turn.answer.trim() ? (
-											<MarkdownRenderer content={turn.answer} />
+											<BtwAnswer
+												answer={turn.answer}
+												inject={index === turns.length - 1 ? record.inject : undefined}
+												recordId={record.id}
+											/>
 										) : turn.status === "running" ? (
 											<div className="flex items-center gap-2 py-2 text-omp-sm text-(--omp-dim)">
 												<Spinner size="sm" /> {t("btw.thinking")}

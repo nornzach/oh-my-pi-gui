@@ -174,6 +174,7 @@ export type RpcCommand =
 	| { id?: string; type: "btw"; question: string; recordId?: string }
 	| { id?: string; type: "btw_branch" }
 	| { id?: string; type: "btw_cancel"; recordId: string }
+	| { id?: string; type: "btw_inject"; recordId: string }
 	| { id?: string; type: "get_btw_history" }
 	| { id?: string; type: "tan"; work: string }
 	| { id?: string; type: "omfg"; complaint: string }
@@ -472,6 +473,12 @@ export interface RpcAsyncJobItem {
 	type: "bash" | "task" | "eval";
 	status: "running" | "completed" | "failed" | "cancelled";
 	label: string;
+	/** What the model said the call is for (omp ≥18.15 sidecars); listings lead with it ahead of the command. */
+	intent?: string;
+	/** One line on what a long command does and when it ends, written by the widget model while widgets are on. */
+	caption?: string;
+	/** Full command line of a job that runs a process; `label` is cut to 120 characters. */
+	command?: string;
 	/** Epoch ms when the job started. */
 	startTime: number;
 	endedAt?: number;
@@ -823,11 +830,37 @@ export interface BtwHistoryTurn {
 	error?: string;
 }
 
+/** Where a side answer's steering prompt stands (`btw.inject`); only this sidecar's answers can be sent. */
+export type BtwInjectState = "ready" | "sending" | "sent";
+
 /** A side-question conversation: the root turn plus follow-up turns. */
 export interface BtwHistoryRecord extends BtwHistoryTurn {
 	id: string;
 	leafId: string | null;
 	followUps?: readonly BtwHistoryTurn[];
+	/** The latest turn's `<inject>` block: `ready` to send with `btw_inject`, `sending` or `sent`. */
+	inject?: BtwInjectState;
+}
+
+/** An answer around its closed `<inject>` block (the agent's `splitBtwInject`). */
+export interface BtwInjectParts {
+	before: string;
+	inject: string;
+	after: string;
+}
+
+/**
+ * Split an answer at its last closed `<inject>` block: the last opener with a close after it,
+ * paired with the first close after it, so a tag mentioned in prose cannot capture the block.
+ */
+export function splitBtwInject(answer: string): BtwInjectParts | undefined {
+	const lastClose = answer.lastIndexOf("</inject>");
+	const open = lastClose === -1 ? -1 : answer.lastIndexOf("<inject>", lastClose - "<inject>".length);
+	if (open === -1) return undefined;
+	const close = answer.indexOf("</inject>", open + "<inject>".length);
+	const inject = answer.slice(open + "<inject>".length, close).trim();
+	if (!inject) return undefined;
+	return { before: answer.slice(0, open), inject, after: answer.slice(close + "</inject>".length) };
 }
 
 /** The latest (or root) turn of a btw record. */

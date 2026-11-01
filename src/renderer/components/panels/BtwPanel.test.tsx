@@ -69,6 +69,7 @@ const command = vi.fn(async (cmd: RpcCommand): Promise<RpcResponse> => {
 	}
 	if (cmd.type === "btw_cancel") return ok("btw_cancel", { cancelled: true });
 	if (cmd.type === "btw_branch") return ok("btw_branch", { cancelled: false });
+	if (cmd.type === "btw_inject") return ok("btw_inject", { sent: true });
 	return { type: "response", command: cmd.type, success: false, error: "unsupported" };
 });
 
@@ -249,6 +250,41 @@ describe("BtwPanel", () => {
 		});
 
 		expect(document.body.textContent).toContain("streaming text");
+	});
+
+	it("sets a drafted steering prompt apart and sends it to the main session", async () => {
+		const answer = "Try this: <inject>Fix the failing build first.</inject> Then rerun.";
+		command.mockImplementationOnce(async () =>
+			ok("get_btw_history", { records: [record({ answer, status: "complete", inject: "ready" })] }),
+		);
+
+		await mount();
+		const block = document.querySelector("[data-btw-inject]") as unknown as TestElement | null;
+		expect(block?.textContent).toContain("Fix the failing build first.");
+		expect(document.body.textContent).not.toContain("<inject>");
+
+		await click(buttonWithText(translate("btw.injectSend")));
+		expect(command.mock.calls.map(([cmd]) => cmd)).toContainEqual({ type: "btw_inject", recordId: "topic-1" });
+
+		await act(async () => {
+			useBtwStore.getState().applyFrame({
+				type: "btw_record",
+				record: record({ answer, status: "complete", inject: "sent" }),
+			});
+		});
+		expect(document.body.textContent).toContain(translate("btw.injectSent"));
+		expect(buttonWithText(translate("btw.injectSend"))).toBeUndefined();
+	});
+
+	it("leaves an answer asked without the setting as plain text", async () => {
+		const answer = "Mentioning <inject>this</inject> in prose.";
+		command.mockImplementationOnce(async () =>
+			ok("get_btw_history", { records: [record({ answer, status: "complete" })] }),
+		);
+
+		await mount();
+		expect(document.querySelector("[data-btw-inject]")).toBeNull();
+		expect(buttonWithText(translate("btw.injectSend"))).toBeUndefined();
 	});
 
 	it("shows the empty state when the session has no topics", async () => {

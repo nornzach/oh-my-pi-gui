@@ -1194,4 +1194,14 @@ export const RU_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
 	Blocker: "Блокер",
 	Takeover: "Перехват",
 	Refuse: "Отказать",
+	"Eval only": "Только eval",
+	"Reject `model` on task items and eval agent()/workpool()":
+		"Отклонять `model` в задачах и в eval agent()/workpool()",
+	"Accept `model` in eval agent() and workpool() only": "Принимать `model` только в eval agent() и workpool()",
+	"Accept `model` on task items and in eval agent()/workpool()":
+		"Принимать `model` в задачах и в eval agent()/workpool()",
+	"Every prompt": "Каждый запрос",
+	"Every 3 prompts": "Каждые 3 запроса",
+	"Every 5 prompts": "Каждые 5 запросов",
+	"Every 10 prompts": "Каждые 10 запросов",
 };

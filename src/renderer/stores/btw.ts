@@ -26,6 +26,8 @@ export interface BtwStore {
 	ask: (question: string, recordId?: string) => Promise<BtwHistoryRecord>;
 	cancel: (recordId: string) => Promise<void>;
 	branch: () => Promise<{ cancelled?: boolean }>;
+	/** Send topic `recordId`'s steering prompt to the main session; false when the session refused it. */
+	inject: (recordId: string) => Promise<{ sent: boolean; reason?: string }>;
 	applyFrame: (frame: RpcBtwFrame) => void;
 	reset: () => void;
 }
@@ -157,6 +159,11 @@ export function createBtwStore(command: TabCommand = activeTabCommand) {
 			const data = (response.data ?? {}) as { cancelled?: boolean };
 			if (data.cancelled !== true) set({ branchableId: null });
 			return data;
+		},
+		inject: async recordId => {
+			const response = await command({ type: "btw_inject", recordId });
+			if (!response.success) throw new Error(response.error);
+			return (response.data ?? { sent: false }) as { sent: boolean; reason?: string };
 		},
 		applyFrame: frame => {
 			if (frame.type === "btw_delta") {
