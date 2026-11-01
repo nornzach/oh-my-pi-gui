@@ -103,7 +103,17 @@ export class SessionIndex {
 	 */
 	async list(scope: "local" | "global", cwd?: string): Promise<SessionInfo[]> {
 		const entries = await this.#scanDir();
-		const parsed = await Promise.all(entries.map(entry => this.#parseSessionFile(entry.path)));
+		const parsed = await Promise.all(
+			entries.map(async entry => {
+				const info = await this.#parseSessionFile(entry.path);
+				// A transcript inside a session's artifact directory belongs to that
+				// session even when its header omitted parentSession or named it by
+				// an id. The on-disk parent is what the sidebar nests under, and it
+				// is still there after a restart.
+				if (!info || !entry.parentFile || info.parentSessionPath === entry.parentFile) return info;
+				return { ...info, parentSessionPath: entry.parentFile };
+			}),
+		);
 		const localCwd = cwd !== undefined ? resolve(cwd) : this.#cwd;
 		const infos = parsed.filter((info): info is SessionInfo => {
 			if (!info) return false;
@@ -208,7 +218,7 @@ export class SessionIndex {
 		}
 	}
 
-	async #scanDir(): Promise<{ path: string }[]> {
+	async #scanDir(): Promise<{ path: string; parentFile?: string }[]> {
 		try {
 			const projectDirs = (await readdir(this.#sessionsDir, { withFileTypes: true })).filter(entry =>
 				entry.isDirectory(),
@@ -222,10 +232,42 @@ export class SessionIndex {
 						.map(entry => ({ path: join(projectPath, entry.name) }));
 				}),
 			);
-			return projectFiles.flat();
+			const sessions = projectFiles.flat();
+			// Subagent transcripts sit beside the session file (`<name>.jsonl` →
+			// `<name>/<agentId>.jsonl`, and the same again for a nested spawn).
+			// They are real sessions with their own first message, which is why a
+			// flat listing showed them as peers of the main session. Read them
+			// here; the watcher still ignores the artifact tree (thousands of
+			// tool files) and a parent append refreshes the list.
+			const children = await Promise.all(sessions.map(session => this.#subagentFiles(session.path)));
+			return [...sessions, ...children.flat()];
 		} catch {
 			return [];
 		}
+	}
+
+	/** Subagent session files under `sessionFile`'s artifact directory, each pointing at its parent file. */
+	async #subagentFiles(sessionFile: string, depth = 0): Promise<{ path: string; parentFile: string }[]> {
+		if (depth >= 8 || !sessionFile.endsWith(".jsonl")) return [];
+		const dir = sessionFile.slice(0, -".jsonl".length);
+		let dirents: { name: string; isFile: () => boolean; isDirectory: () => boolean }[];
+		try {
+			dirents = await readdir(dir, { withFileTypes: true });
+		} catch {
+			return [];
+		}
+		const directories = new Set(dirents.filter(entry => entry.isDirectory()).map(entry => entry.name));
+		const found: { path: string; parentFile: string }[] = [];
+		for (const entry of dirents) {
+			if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+			// Advisors and backup copies share the directory and are not sessions.
+			if (entry.name.startsWith("__advisor") || entry.name.includes(".bak")) continue;
+			const path = join(dir, entry.name);
+			found.push({ path, parentFile: sessionFile });
+			const stem = entry.name.slice(0, -".jsonl".length);
+			if (directories.has(stem)) found.push(...(await this.#subagentFiles(path, depth + 1)));
+		}
+		return found;
 	}
 
 	/**

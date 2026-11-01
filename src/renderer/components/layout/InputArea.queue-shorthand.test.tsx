@@ -769,3 +769,26 @@ describe("InputArea run settings", () => {
 		expect(useSessionStore.getState().planModeEnabled).toBe(true);
 	});
 });
+
+describe("InputArea pasted images", () => {
+	it("opens a pasted image in the viewer without removing it", async () => {
+		useComposerStore.getState().setImages([
+			{
+				content: { type: "image", data: "abc", mimeType: "image/png" },
+				preview: "data:image/png;base64,abc",
+			},
+		]);
+		await mount();
+
+		const image = document.querySelector('img[alt="attachment 1"]') as unknown as TestElement | null;
+		expect(image?.getAttribute("role")).toBe("button");
+		expect(image?.getAttribute("title")).toBe("Click to enlarge");
+		if (!image) throw new Error("pasted image missing");
+		await click(image);
+		await flush();
+
+		expect(document.querySelector("[data-image-viewer]")).not.toBeNull();
+		expect(document.querySelector('img[alt="attachment 1"]')).not.toBeNull();
+		expect(document.querySelector('button[title="Remove"]')).not.toBeNull();
+	});
+});

@@ -13,6 +13,7 @@ import {
 	Coins,
 	Columns2,
 	Command,
+	CornerDownRight,
 	ExternalLink,
 	Folder,
 	GitBranchPlus,
@@ -62,6 +63,7 @@ import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { compileKeymap, KEYMAP_ACTIONS, onEscape } from "../../lib/keymap";
 import { sessionDisplayTitle } from "../../lib/session-title";
+import { buildSessionTree, orderSessionForest, type SessionNode } from "../../lib/session-tree";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { tabSignalPresentation } from "../../lib/tab-signal";
 import { useAgentPagesStore } from "../../stores/agent-pages";
@@ -121,6 +123,19 @@ interface SessionPair {
 	axis: SplitAxis;
 	/** The pair is the one on screen. */
 	onScreen: boolean;
+}
+
+/** One drawn session row. A pair's two roots are adjacent specs; children follow their parent. */
+interface SessionRowSpec {
+	session: SessionInfo;
+	depth: number;
+	childCount: number;
+	expanded: boolean;
+	parentPath?: string;
+	inPair: boolean;
+	pair?: SessionPair;
+	/** The first spec of a pair frame. The next spec is the partner and is not drawn on its own. */
+	pairLead?: boolean;
 }
 
 function modifiedAt(session: SessionInfo): number {
@@ -203,6 +218,13 @@ export function Sidebar() {
 	const [selection, setSelection] = useState<ReadonlySet<string> | null>(null);
 	const selectionAnchor = useRef<string | null>(null);
 	const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+	// Subagent (and other child) sessions start open under their parent so the
+	// hierarchy is visible; the chevron on the parent hides that family.
+	const [collapsedFamilies, setCollapsedFamilies] = useState<Record<string, boolean>>({});
+	const familyCollapsed = (sessionPath: string) => collapsedFamilies[sessionPath] === true;
+	const toggleFamily = (sessionPath: string) => {
+		setCollapsedFamilies(prev => ({ ...prev, [sessionPath]: prev[sessionPath] !== true }));
+	};
 	// Deleting a session hard-deletes its transcript file, so the row and menu
 	// clicks only queue it: the dialog names the target and states the
 	// consequence before anything is removed.
@@ -238,26 +260,6 @@ export function Sidebar() {
 		}
 		return pairs;
 	}, [tabGroups, tabs, shownPair]);
-	/** A list's sessions with each pair's rows adjacent, in pane order, where the earlier one was. */
-	const pairedOrder = (list: readonly SessionInfo[]): SessionInfo[] => {
-		const byPath = new Map(list.map(session => [session.path, session]));
-		const placed = new Set<string>();
-		const ordered: SessionInfo[] = [];
-		for (const session of list) {
-			if (placed.has(session.path)) continue;
-			const pair = sessionPairs.get(session.path);
-			const members =
-				pair && byPath.has(pair.first) && byPath.has(pair.second)
-					? [byPath.get(pair.first), byPath.get(pair.second)]
-					: [session];
-			for (const member of members) {
-				if (!member) continue;
-				placed.add(member.path);
-				ordered.push(member);
-			}
-		}
-		return ordered;
-	};
 	const [hoveredPair, setHoveredPair] = useState<string | null>(null);
 	const activeTabKind = activeTab?.kind;
 	const pinnedGroups = useSidebarPrefs(s => s.pinnedGroups);
@@ -389,14 +391,69 @@ export function Sidebar() {
 	const visibleGroups = mode === "code" ? groups : [];
 	const chatsCollapsed = collapsed.__chats__ ?? false;
 	const archivedCollapsed = collapsed.__archived__ ?? true;
+	// Child sessions nest under the parent named by parentSessionPath. Roots are
+	// ordered by the family's newest activity, so a subagent that just ran does
+	// not leave its parent behind in the list.
+	const rowsOf = (list: readonly SessionInfo[]): SessionRowSpec[] => {
+		const forest = orderSessionForest(buildSessionTree(list), {
+			pinned: session => pinnedSessions.includes(session.path),
+			recency: recencyForSession,
+		});
+		const byPath = new Map(forest.map(node => [node.session.path, node]));
+		const placed = new Set<string>();
+		const specs: SessionRowSpec[] = [];
+		const appendNode = (node: SessionNode, depth: number, parentPath: string | undefined) => {
+			const expanded = !familyCollapsed(node.session.path);
+			specs.push({
+				session: node.session,
+				depth,
+				childCount: node.children.length,
+				expanded,
+				parentPath,
+				inPair: false,
+			});
+			if (!expanded) return;
+			for (const child of node.children) appendNode(child, depth + 1, node.session.path);
+		};
+		for (const node of forest) {
+			if (placed.has(node.session.path)) continue;
+			const pair = sessionPairs.get(node.session.path);
+			if (pair && byPath.has(pair.first) && byPath.has(pair.second)) {
+				const first = byPath.get(pair.first);
+				const second = byPath.get(pair.second);
+				if (!first || !second) continue;
+				placed.add(pair.first);
+				placed.add(pair.second);
+				const specFor = (member: SessionNode, pairLead: boolean): SessionRowSpec => ({
+					session: member.session,
+					depth: 0,
+					childCount: member.children.length,
+					expanded: !familyCollapsed(member.session.path),
+					inPair: true,
+					pair,
+					pairLead,
+				});
+				specs.push(specFor(first, true));
+				specs.push(specFor(second, false));
+				for (const member of [first, second]) {
+					if (familyCollapsed(member.session.path)) continue;
+					for (const child of member.children) appendNode(child, 1, member.session.path);
+				}
+				continue;
+			}
+			placed.add(node.session.path);
+			appendNode(node, 0, undefined);
+		}
+		return specs;
+	};
 	// Rows in the order they are drawn: what "select all" and a ⇧-click range cover.
 	// Within a section a pair's rows are drawn together, and a ⇧-click range follows that.
 	const visibleSessions = [
-		...(mode === "work" ? pairedOrder(workSessions) : []),
-		...visibleGroups.flatMap(group => (isCollapsedGroup(group.cwd) ? [] : pairedOrder(group.sessions))),
-		...(mode === "code" && !chatsCollapsed ? pairedOrder(chatSessions) : []),
-		...(archivedCollapsed ? [] : pairedOrder(archivedSessions)),
-	];
+		...(mode === "work" ? rowsOf(workSessions) : []),
+		...visibleGroups.flatMap(group => (isCollapsedGroup(group.cwd) ? [] : rowsOf(group.sessions))),
+		...(mode === "code" && !chatsCollapsed ? rowsOf(chatSessions) : []),
+		...(archivedCollapsed ? [] : rowsOf(archivedSessions)),
+	].map(spec => spec.session);
 	const selectedSessions = selection ? sessions.filter(session => selection.has(session.path)) : [];
 	const bulkLabel =
 		selectedSessions.length > 0
@@ -624,47 +681,48 @@ export function Sidebar() {
 	const rowActionButton =
 		"omp-sidebar-action flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]";
 
-	const renderSessionRow = (session: SessionInfo, inPairFrame = false) => {
+	const renderSessionRow = (spec: SessionRowSpec) => {
 		// Sessions open in a tab list this turn's agents under them (plan/24 §3.1).
-		const tab = tabForSession(session);
-		if (!tab) return sessionRowElement(session, null, inPairFrame);
+		const tab = tabForSession(spec.session);
+		if (!tab) return sessionRowElement(spec, null);
 		return (
-			<SessionAgentsScope key={session.path} sessionKey={session.path} tabId={tab.id}>
-				{agents => sessionRowElement(session, agents, inPairFrame)}
+			<SessionAgentsScope key={spec.session.path} sessionKey={spec.session.path} tabId={tab.id}>
+				{agents => sessionRowElement(spec, agents)}
 			</SessionAgentsScope>
 		);
 	};
 
-	/** One section's rows; a pair whose two sessions are both in it shares a frame. */
+	/** One section's rows. Child sessions sit under their parent; a pair's two roots share a frame. */
 	const renderSessionRows = (list: readonly SessionInfo[]) => {
-		const ordered = pairedOrder(list);
+		const specs = rowsOf(list);
 		const rows: ReactNode[] = [];
-		for (let index = 0; index < ordered.length; index++) {
-			const session = ordered[index];
-			if (!session) continue;
-			const pair = sessionPairs.get(session.path);
-			const partner = ordered[index + 1];
-			if (pair && partner && pair.first === session.path && pair.second === partner.path) {
+		for (let index = 0; index < specs.length; index++) {
+			const spec = specs[index];
+			if (!spec) continue;
+			if (spec.pairLead && spec.pair) {
+				const partner = specs[index + 1];
 				rows.push(
 					<div
-						key={pair.key}
+						key={spec.pair.key}
 						data-sidebar-pair
-						data-on-screen={pair.onScreen || undefined}
+						data-on-screen={spec.pair.onScreen || undefined}
 						className="omp-sidebar-pair space-y-px"
 					>
-						{renderSessionRow(session, true)}
-						{renderSessionRow(partner, true)}
+						{renderSessionRow(spec)}
+						{partner && renderSessionRow(partner)}
 					</div>,
 				);
 				index++;
 				continue;
 			}
-			rows.push(renderSessionRow(session));
+			rows.push(renderSessionRow(spec));
 		}
 		return rows;
 	};
 
-	const sessionRowElement = (session: SessionInfo, agents: SidebarAgentsInfo | null, inPairFrame: boolean) => {
+	const sessionRowElement = (spec: SessionRowSpec, agents: SidebarAgentsInfo | null) => {
+		const session = spec.session;
+		const inPairFrame = spec.inPair;
 		const active = session.id === sessionId;
 		const tabSignal = sessionTabSignal(session);
 		const waiting = active && awaitingConfirmation;
@@ -734,6 +792,9 @@ export function Sidebar() {
 				data-has-actions={hasActions && !selecting}
 				data-actions-open={renaming}
 				data-session-kind={session.kind ?? "agent"}
+				data-session-depth={spec.depth > 0 ? spec.depth : undefined}
+				data-session-parent={spec.parentPath}
+				style={spec.depth > 0 ? { paddingLeft: 8 + Math.min(spec.depth, 6) * 14 } : undefined}
 				className={cx(
 					"omp-sidebar-session-row omp-color-fade group flex h-[30px] cursor-pointer items-center rounded-lg px-2 select-none",
 					selected || (active && !selecting && !agents?.pageShown)
@@ -787,6 +848,33 @@ export function Sidebar() {
 						/>
 					)}
 				</span>
+				{spec.childCount > 0 && !selecting && (
+					<button
+						type="button"
+						tabIndex={-1}
+						aria-expanded={spec.expanded}
+						aria-label={spec.expanded ? t("sidebar.subsessions.collapse") : t("sidebar.subsessions.expand")}
+						onClick={event => {
+							event.stopPropagation();
+							toggleFamily(session.path);
+						}}
+						className="mr-1 flex h-4 w-4 shrink-0 items-center justify-center rounded text-[var(--omp-dim)] hover:text-[var(--omp-text)]"
+					>
+						{spec.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+					</button>
+				)}
+				{spec.depth > 0 && (
+					<CornerDownRight
+						size={12}
+						className="mr-1.5 shrink-0 text-[var(--omp-dim)]"
+						aria-label={t("sidebar.subsessions.label", {
+							title: sessionDisplayTitle(
+								sessions.find(entry => entry.path === spec.parentPath) ?? session,
+								t("sidebar.untitled"),
+							),
+						})}
+					/>
+				)}
 				{pinned && (
 					<Pin size={11} className="mr-1.5 shrink-0 text-[var(--omp-dim)]" aria-label={t("sidebar.pinned")} />
 				)}

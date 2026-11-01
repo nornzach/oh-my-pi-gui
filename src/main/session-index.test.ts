@@ -145,6 +145,62 @@ describe("SessionIndex headers and watching", () => {
 		}
 	});
 
+	it("nests subagent transcripts under the session file they were saved beside", async () => {
+		const { index, dir } = await makeIndex();
+		const parent = await writeSession(dir, "parent");
+		const artifacts = parent.slice(0, -".jsonl".length);
+		await fs.mkdir(path.join(artifacts, "agent"), { recursive: true });
+		const child = path.join(artifacts, "agent.jsonl");
+		const nested = path.join(artifacts, "agent", "helper.jsonl");
+		const advisor = path.join(artifacts, "__advisor.jsonl");
+		const write = async (file: string, id: string) => {
+			const header = {
+				type: "session",
+				version: 3,
+				id,
+				timestamp: new Date().toISOString(),
+				cwd: dir,
+				parentSession: "not-the-file",
+			};
+			const message = { type: "message", message: { role: "user", content: `task ${id}` } };
+			await fs.writeFile(
+				file,
+				`${JSON.stringify({ type: "title", title: "" })}\n${JSON.stringify(header)}\n${JSON.stringify(message)}\n`,
+			);
+		};
+		await write(child, "agent");
+		await write(nested, "helper");
+		await write(advisor, "advisor");
+		// A sibling fork records the parent by session id, not by living in the artifact directory.
+		const fork = path.join(path.dirname(parent), "fork.jsonl");
+		const forkHeader = {
+			type: "session",
+			version: 3,
+			id: "fork",
+			timestamp: new Date().toISOString(),
+			cwd: dir,
+			parentSession: "parent",
+		};
+		await fs.writeFile(
+			fork,
+			`${JSON.stringify({ type: "title", title: "Fork" })}\n${JSON.stringify(forkHeader)}\n${JSON.stringify({ type: "message", message: { role: "user", content: "forked" } })}\n`,
+		);
+
+		const listed = await index.list("global");
+		const byId = (id: string) => listed.find(info => info.id === id);
+		expect(listed.map(info => info.id).sort()).toEqual(["agent", "fork", "helper", "parent"]);
+		expect(byId("agent")?.parentSessionPath).toBe(parent);
+		expect(byId("helper")?.parentSessionPath).toBe(child);
+		expect(byId("fork")?.parentSessionPath).toBe("parent");
+		expect(byId("advisor")).toBeUndefined();
+
+		// A new index is what a restart does: the link is read from disk, not from a live roster.
+		const reloaded = new SessionIndex(dir, dir);
+		const again = await reloaded.list("global");
+		expect(again.find(info => info.id === "agent")?.parentSessionPath).toBe(parent);
+		expect(again.find(info => info.id === "helper")?.parentSessionPath).toBe(child);
+	});
+
 	it("watches session files without holding a handle per artifact file", async () => {
 		const { index, dir } = await makeIndex();
 		const file = await writeSession(dir, "with-artifacts");
