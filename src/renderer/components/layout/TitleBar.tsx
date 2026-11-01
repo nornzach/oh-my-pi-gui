@@ -35,6 +35,7 @@ import { useUiStore } from "../../stores/ui";
 import { AgentCrumbs, AgentTitleFacts, AgentTitleStatus } from "../agents/AgentTitle";
 import { ContextMenu, type ContextMenuAnchor, type ContextMenuItem } from "../common/ContextMenu";
 import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
+import { NotificationBell } from "./NotificationBell";
 import { sessionCacheHitPercent, sessionExecutionDurationMs } from "./session-metrics";
 
 /**
@@ -459,6 +460,7 @@ export function TitleBar() {
 					))}
 				</span>
 			)}
+			<NotificationBell className={iconButton} />
 			<button
 				type="button"
 				aria-label={t("titlebar.actions")}

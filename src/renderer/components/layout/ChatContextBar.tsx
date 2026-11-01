@@ -2,15 +2,15 @@
  * Context row under a chat tab's composer, in place of the agent's strategy row:
  * what each message sends (left) and how full the context is now (right).
  * Clicking the left side opens the chat's controls — whether earlier turns go
- * with each message and how many, and the system prompt. All three are the
- * agent's `chat.*` settings, shared by every chat tab and written through
- * `set_setting`; the transcript always keeps every turn.
+ * with each message and how many, and the system prompt. All three belong to
+ * this chat alone (`set_chat_config`); a chat that never set them follows the
+ * defaults in Settings. The transcript always keeps every turn.
  */
 
 import { ChevronRight, MessagesSquare } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CHAT_SETTING_PATHS, type ChatConfig, chatHistoryLimit, useChatConfig } from "../../hooks/use-chat-config";
+import { type ChatConfig, chatHistoryLimit, useChatConfig } from "../../hooks/use-chat-config";
 import { useAutoCompactAt } from "../../hooks/use-compaction-config";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { cx } from "../../lib/format";
@@ -89,7 +89,7 @@ export function ChatContextBar() {
 	const customPrompt = config.systemPrompt.trim() !== "";
 	const promptDirty = draft !== null && draft !== config.systemPrompt;
 	const savePrompt = async (value: string) => {
-		if (await write([{ path: CHAT_SETTING_PATHS.systemPrompt, value }])) setDraft(null);
+		if (await write({ systemPrompt: value })) setDraft(null);
 	};
 
 	return (
@@ -136,14 +136,14 @@ export function ChatContextBar() {
 								description={t("chatContext.continuous.desc")}
 								selected={!single}
 								disabled={saving}
-								onSelect={() => void write([{ path: CHAT_SETTING_PATHS.history, value: "continuous" }])}
+								onSelect={() => void write({ history: "continuous" })}
 							/>
 							<HistoryRow
 								title={t("chatContext.single")}
 								description={t("chatContext.single.desc")}
 								selected={single}
 								disabled={saving}
-								onSelect={() => void write([{ path: CHAT_SETTING_PATHS.history, value: "single" }])}
+								onSelect={() => void write({ history: "single" })}
 							/>
 						</div>
 						<div className="mt-2 px-1">
@@ -153,7 +153,7 @@ export function ChatContextBar() {
 								options={DEPTH_CHOICES}
 								format={value => (value === 0 ? t("chatContext.depth.all") : String(value))}
 								disabled={saving || single}
-								onChange={value => void write([{ path: CHAT_SETTING_PATHS.historyTurns, value }])}
+								onChange={value => void write({ historyTurns: value })}
 							/>
 						</div>
 						{limited && (

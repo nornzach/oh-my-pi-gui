@@ -1,32 +1,21 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { RpcChatConfig } from "../../shared/rpc-types";
 import { useT } from "../lib/i18n";
+import { useTabRpc } from "../lib/tab-rpc";
+import { useSessionStore } from "../stores/session";
 import { useActiveTabKind } from "../stores/tabs";
-import { type LiveSettingsHandle, useLiveSettings } from "./use-live-settings";
+import { toast } from "../stores/toast";
 
-/** The agent's `chat.*` settings, shared by every chat tab. */
-export interface ChatConfig {
-	/** Sent as the whole system prompt; blank keeps the default chat prompt. */
-	systemPrompt: string;
-	/** `single` sends every message on its own. */
-	history: "continuous" | "single";
-	/** Earlier turns a continuous chat sends with each message; 0 sends them all. */
-	historyTurns: number;
-}
+/** One chat's own settings; a chat that saved none follows the agent's `chat.*` defaults. */
+export type ChatConfig = RpcChatConfig;
 
-export const CHAT_SETTING_PATHS = {
-	systemPrompt: "chat.systemPrompt",
-	history: "chat.history",
-	historyTurns: "chat.historyTurns",
-} as const;
-const CHAT_SETTING_PATH_LIST: string[] = Object.values(CHAT_SETTING_PATHS);
-
-function parseChatConfig(values: Record<string, unknown> | undefined): ChatConfig {
-	const systemPrompt = values?.[CHAT_SETTING_PATHS.systemPrompt];
-	const turns = values?.[CHAT_SETTING_PATHS.historyTurns];
-	return {
-		systemPrompt: typeof systemPrompt === "string" ? systemPrompt : "",
-		history: values?.[CHAT_SETTING_PATHS.history] === "single" ? "single" : "continuous",
-		historyTurns: typeof turns === "number" && Number.isInteger(turns) && turns > 0 ? turns : 0,
-	};
+export interface ChatConfigHandle {
+	/** `null` until the first read lands, outside a chat, or while the sidecar is not ready. */
+	config: ChatConfig | null;
+	/** True while a save is in flight. */
+	saving: boolean;
+	/** Save `patch` into this chat only; resolves true when it was saved. */
+	write: (patch: Partial<ChatConfig>) => Promise<boolean>;
 }
 
 /** Earlier turns each chat message carries, or `null` for the whole conversation (the agent's `chatHistoryLimit`). */
@@ -35,10 +24,63 @@ export function chatHistoryLimit(config: ChatConfig): number | null {
 	return config.historyTurns > 0 ? config.historyTurns : null;
 }
 
-/** Live chat settings for the focused task. */
-export function useChatConfig(): LiveSettingsHandle<ChatConfig> {
+/**
+ * The focused chat's own settings (`enabled` false outside a chat). Re-read on
+ * sidecar ready, session change and every `config_update` push, so a change to
+ * the defaults shows up in a chat that still follows them. A failed save toasts.
+ */
+export function useChatConfig(enabled = true): ChatConfigHandle {
 	const t = useT();
-	return useLiveSettings(CHAT_SETTING_PATH_LIST, parseChatConfig, t("settings.saveFailed"));
+	const rpc = useTabRpc();
+	const ready = useSessionStore(state => state.status) === "ready";
+	const sessionId = useSessionStore(state => state.sessionId);
+	const [config, setConfig] = useState<ChatConfig | null>(null);
+	const [saving, setSaving] = useState(false);
+	const version = useRef(0);
+
+	const read = useCallback(async () => {
+		const mine = ++version.current;
+		try {
+			const response = await rpc.getChatConfig();
+			// A newer read, or a save that landed meanwhile, supersedes this one.
+			if (mine !== version.current || !response.success) return;
+			setConfig(response.data as ChatConfig);
+		} catch {
+			// An unreadable config leaves the last known one in place.
+		}
+	}, [rpc]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a new session re-reads even when the sidecar stays ready
+	useEffect(() => {
+		if (!ready || !enabled) {
+			setConfig(null);
+			return;
+		}
+		void read();
+		return window.omp.events.onConfigUpdate(() => void read());
+	}, [ready, enabled, sessionId, read]);
+
+	const write = useCallback(
+		async (patch: Partial<ChatConfig>) => {
+			setSaving(true);
+			const mine = ++version.current;
+			try {
+				const response = await rpc.setChatConfig(patch);
+				if (!response.success) throw new Error(response.error);
+				if (mine === version.current) setConfig(response.data as ChatConfig);
+				return true;
+			} catch (cause) {
+				toast({ variant: "error", title: t("settings.saveFailed"), message: String(cause) });
+				void read();
+				return false;
+			} finally {
+				setSaving(false);
+			}
+		},
+		[rpc, read, t],
+	);
+
+	return { config, saving, write };
 }
 
 /**
@@ -46,7 +88,6 @@ export function useChatConfig(): LiveSettingsHandle<ChatConfig> {
  * never auto-compacts: its stored history beyond those turns never reaches a request.
  */
 export function useChatHistoryLimited(): boolean {
-	const isChat = useActiveTabKind() === "chat";
-	const { config } = useChatConfig();
-	return isChat && config !== null && chatHistoryLimit(config) !== null;
+	const { config } = useChatConfig(useActiveTabKind() === "chat");
+	return config !== null && chatHistoryLimit(config) !== null;
 }

@@ -18,6 +18,7 @@ import {
 	defaultChords,
 	detectConflicts,
 	isFollowUpSend,
+	isSelectAll,
 	KEYMAP_ACTIONS,
 	keymapActionsForGroup,
 	parseChord,
@@ -137,6 +138,22 @@ describe("isFollowUpSend", () => {
 		["AltGr+Enter", false, { metaKey: false, ctrlKey: true, altKey: true }, false],
 	])("%s → follow-up: %s", (_name, mac, event, followUp) => {
 		expect(isFollowUpSend(event, mac)).toBe(followUp);
+	});
+});
+
+describe("isSelectAll", () => {
+	const keys = { key: "a", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
+	it.each([
+		["⌘A on macOS", true, { ...keys, metaKey: true }, true],
+		// ⌃A moves to the line start on macOS; it never selects.
+		["⌃A on macOS", true, { ...keys, ctrlKey: true }, false],
+		["Ctrl+A on Windows and Linux", false, { ...keys, ctrlKey: true }, true],
+		["Win+A on Windows and Linux", false, { ...keys, metaKey: true }, false],
+		// Caps Lock or Shift reports an upper-case key.
+		["⌘⇧A on macOS", true, { ...keys, key: "A", metaKey: true, shiftKey: true }, false],
+		["⌘A with Caps Lock", true, { ...keys, key: "A", metaKey: true }, true],
+	])("%s → select all: %s", (_name, mac, event, selectAll) => {
+		expect(isSelectAll(event, mac)).toBe(selectAll);
 	});
 });
 

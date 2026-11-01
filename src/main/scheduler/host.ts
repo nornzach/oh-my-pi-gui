@@ -1,6 +1,7 @@
 /**
  * The scheduler inside Electron (plan/23 §2): owns scheduler.db, spawns run
- * sidecars, turns finished runs into notifications and the dock badge, pushes
+ * sidecars, turns finished runs into notifications (the system's and the
+ * window's own list, kept in scheduler.db with its read state) and the dock badge, pushes
  * snapshots to every window, and carries out agents' `schedule_task` and
  * `manage_scheduled_tasks` calls.
  */
@@ -17,11 +18,12 @@ import type {
 	RpcCommand,
 	RpcResponse,
 } from "../../shared/rpc-types";
-import type { SchedulerLimits, SchedulerOpenTarget, TaskRun } from "../../shared/scheduler-types";
+import type { SchedulerLimits, SchedulerOpenTarget, TaskNotice, TaskRun } from "../../shared/scheduler-types";
 import { type MainTextKey, mainT } from "../i18n";
 import type { SpawnWindow, WindowManager } from "../window";
 import { asTaskConfig, asTaskDraft } from "./guards";
 import { MANAGE_TASKS_TOOL, MANAGE_TASKS_TOOL_DEFINITION, runManageTasksTool } from "./manage-tasks-tool";
+import { addNotice, markNoticesRead, parseNotices } from "./notices";
 import {
 	executeRun,
 	type RunnerDeps,
@@ -35,6 +37,8 @@ import { Scheduler, type SchedulerNotice } from "./scheduler";
 import { SchedulerStore } from "./store";
 
 const SNAPSHOT_DEBOUNCE_MS = 100;
+/** scheduler.db meta key of the notification list. */
+const NOTICES_KEY = "notices";
 
 /** The host tools agent tabs get. */
 const SCHEDULER_TOOLS = new Set([SCHEDULE_TASK_TOOL, MANAGE_TASKS_TOOL]);
@@ -73,10 +77,12 @@ export class SchedulerHost {
 	#snapshotTimer: NodeJS.Timeout | null = null;
 	#badge = -1;
 	#disposed = false;
+	#notices: TaskNotice[];
 
 	constructor(deps: SchedulerHostDeps) {
 		this.#deps = deps;
 		this.#store = new SchedulerStore(deps.dbPath);
+		this.#notices = parseNotices(this.#store.getMeta(NOTICES_KEY));
 		const runnerDeps: RunnerDeps = {
 			createSidecar: spec => this.#trackedSidecar(spec),
 			now: Date.now,
@@ -262,19 +268,32 @@ export class SchedulerHost {
 	}
 
 	#notify(notice: SchedulerNotice): void {
-		if (!Notification.isSupported()) return;
 		const { task, run } = notice;
-		const params = { title: task.title };
 		const [titleKey, body] = noticeText(notice);
-		const notification = new Notification({ title: mainT(titleKey, undefined, params), body, silent: false });
-		notification.on("click", () =>
-			this.open({
-				view: notice.kind === "run" && run.review.state === "pending" ? "review" : "runs",
-				taskId: task.id,
-				runId: run.id,
+		const title = mainT(titleKey, undefined, { title: task.title });
+		const review = notice.kind === "run" && run.review.state === "pending";
+		const target: SchedulerOpenTarget = { view: review ? "review" : "runs", taskId: task.id, runId: run.id };
+		this.#setNotices(
+			addNotice(this.#notices, {
+				id: randomUUID(),
+				target,
+				title,
+				body,
+				tone: review ? "review" : titleKey === "tasks.notify.done" ? "done" : "failed",
+				createdAt: Date.now(),
+				read: false,
 			}),
 		);
+		if (!Notification.isSupported()) return;
+		const notification = new Notification({ title, body, silent: false });
+		notification.on("click", () => this.open(target));
 		notification.show();
+	}
+
+	#setNotices(notices: TaskNotice[]): void {
+		this.#notices = notices;
+		this.#store.setMeta(NOTICES_KEY, JSON.stringify(notices));
+		this.#broadcast(IPC_EVENTS.SCHEDULER_NOTICES, notices);
 	}
 
 	/** Bring a window forward and land it in the Tasks window. */
@@ -354,6 +373,15 @@ export class SchedulerHost {
 		ipcMain.handle(IPC_COMMANDS.SCHEDULER_REVISIONS, (_event, payload: unknown) =>
 			scheduler.listRevisions(idOf(payload, "taskId")),
 		);
+		ipcMain.handle(IPC_COMMANDS.SCHEDULER_GET_NOTICES, () => this.#notices);
+		ipcMain.handle(IPC_COMMANDS.SCHEDULER_MARK_NOTICES_READ, (_event, payload: unknown) => {
+			const ids =
+				isRecord(payload) && Array.isArray(payload.ids)
+					? payload.ids.filter(id => typeof id === "string")
+					: undefined;
+			const next = markNoticesRead(this.#notices, ids);
+			if (next.some((notice, index) => notice !== this.#notices[index])) this.#setNotices(next);
+		});
 	}
 }
 

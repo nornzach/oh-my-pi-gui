@@ -24,6 +24,7 @@ import type {
 	ModelCatalogUpdateFrame,
 	PromptResultFrame,
 	RpcBtwFrame,
+	RpcChatConfig,
 	RpcCommand,
 	RpcDebugParams,
 	RpcDictationFrame,
@@ -51,6 +52,7 @@ import type {
 	SchedulerSnapshot,
 	TaskConfig,
 	TaskDraft,
+	TaskNotice,
 	TaskRevision,
 	TaskRun,
 	TaskSaveResult,
@@ -77,6 +79,8 @@ export const IPC_EVENTS = {
 	SCHEDULER_PROGRESS: "scheduler:progress",
 	/** Open the Tasks window at a task or run (notification click). */
 	SCHEDULER_OPEN: "scheduler:open",
+	/** The notification list of finished runs changed (a new notice, or some read). */
+	SCHEDULER_NOTICES: "scheduler:notices",
 	/** Host tool call request */
 	HOST_TOOL_CALL: "host-tool:call",
 	/** Host URI request */
@@ -164,6 +168,8 @@ export const IPC_COMMANDS = {
 	SCHEDULER_GET_RUN: "scheduler:get-run",
 	SCHEDULER_TASK_RUNS: "scheduler:task-runs",
 	SCHEDULER_REVISIONS: "scheduler:revisions",
+	SCHEDULER_GET_NOTICES: "scheduler:get-notices",
+	SCHEDULER_MARK_NOTICES_READ: "scheduler:mark-notices-read",
 	/** Send host tool result */
 	HOST_TOOL_RESULT: "host-tool:result",
 	/** Send host tool update */
@@ -1279,6 +1285,8 @@ export interface OmpApi {
 		abortBash(): Promise<RpcResponse>;
 		getSessionStats(): Promise<RpcResponse>;
 		setSessionPinned(sessionId: string, pinned: boolean): Promise<RpcResponse>;
+		getChatConfig(): Promise<RpcResponse>;
+		setChatConfig(config: Partial<RpcChatConfig>): Promise<RpcResponse>;
 		exportHtml(outputPath?: string): Promise<RpcResponse>;
 		getBranchMessages(): Promise<RpcResponse>;
 		getLastAssistantText(): Promise<RpcResponse>;
@@ -1476,6 +1484,11 @@ export interface OmpApi {
 		onSnapshot(callback: (snapshot: SchedulerSnapshot) => void): () => void;
 		onProgress(callback: (runId: string, progress: RunProgress) => void): () => void;
 		onOpen(callback: (target: SchedulerOpenTarget) => void): () => void;
+		/** Finished runs worth a look, newest first, with their read state. */
+		notices(): Promise<TaskNotice[]>;
+		/** Mark these notices read, or all of them when `ids` is omitted. */
+		markNoticesRead(ids?: string[]): Promise<void>;
+		onNotices(callback: (notices: TaskNotice[]) => void): () => void;
 	};
 	sessions: {
 		list(scope: "local" | "global"): Promise<SessionInfo[]>;

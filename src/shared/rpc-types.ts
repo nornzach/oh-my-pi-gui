@@ -8,6 +8,16 @@
 // RPC Commands (GUI → omp stdin)
 // ============================================================================
 
+/** One chat's own settings (`get_chat_config`, `set_chat_config`); a chat that saved none follows `chat.*`. */
+export interface RpcChatConfig {
+	/** Sent as the whole system prompt; blank sends the built-in chat prompt. */
+	systemPrompt: string;
+	/** `single` sends every message on its own. */
+	history: "continuous" | "single";
+	/** Earlier turns a continuous chat sends with each message; 0 sends all of them. */
+	historyTurns: number;
+}
+
 export type RpcCommand =
 	| { id?: string; type: "negotiate_protocol"; protocolVersion: number }
 	| { id?: string; type: "prompt"; message: string; images?: ImageContent[]; streamingBehavior?: "steer" | "followUp" }
@@ -126,6 +136,8 @@ export type RpcCommand =
 	| { id?: string; type: "share_session"; snapshotId?: string }
 	| { id?: string; type: "get_jobs" }
 	| { id?: string; type: "set_session_pinned"; sessionId: string; pinned: boolean }
+	| { id?: string; type: "get_chat_config" }
+	| { id?: string; type: "set_chat_config"; config: Partial<RpcChatConfig> }
 
 	// One-shot session actions (TUI /prewalk /fresh /shake /reload-plugins
 	// /force parity). set_force_tool takes exactly one of `tool` or

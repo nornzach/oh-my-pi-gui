@@ -21,6 +21,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { FsTreeEntry } from "../../../shared/ipc-types";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isSelectAll } from "../../lib/keymap";
 import { MarkdownRenderer } from "../../lib/markdown";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
@@ -60,6 +61,16 @@ export function searchFiles(entries: FsTreeEntry[], query: string): FsTreeEntry[
 				: []
 			: searchFiles(entry.children ?? [], query),
 	);
+}
+
+/** Select exactly `node`'s text, as the browser's own select-all would select the page. */
+function selectContents(node: Node): void {
+	const selection = window.getSelection();
+	if (!selection) return;
+	const range = document.createRange();
+	range.selectNodeContents(node);
+	selection.removeAllRanges();
+	selection.addRange(range);
 }
 
 export function FilesPanel() {
@@ -217,6 +228,11 @@ export function FilesPanel() {
 	// a third of the way down, with the line marked.
 	const markedLine = filePreviewLine !== null && filePreviewLine <= previewLines ? filePreviewLine : null;
 	const previewScrollRef = useRef<HTMLDivElement>(null);
+	/** The file's text (code or rendered Markdown), without the line numbers. */
+	const previewContentRef = useRef<HTMLElement | null>(null);
+	const setPreviewContent = useCallback((node: HTMLElement | null) => {
+		previewContentRef.current = node;
+	}, []);
 	const gutterRef = useRef<HTMLDivElement>(null);
 	const [lineBand, setLineBand] = useState<{ top: number; height: number } | null>(null);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the rows are measured from the DOM, so a newly loaded file at the same line must measure again.
@@ -273,14 +289,25 @@ export function FilesPanel() {
 						<ExternalLinkIcon size={14} />
 					</PathLink>
 				</PanelToolbar>
-				<div ref={previewScrollRef} className="min-h-0 flex-1 overflow-auto bg-(--omp-code-bg)">
+				{/* Focusable so a click puts ⌘A here: it selects the file, not the whole window. */}
+				<div
+					ref={previewScrollRef}
+					tabIndex={-1}
+					data-file-preview=""
+					onKeyDown={event => {
+						if (!isSelectAll(event) || !previewContentRef.current) return;
+						event.preventDefault();
+						selectContents(previewContentRef.current);
+					}}
+					className="min-h-0 flex-1 overflow-auto bg-(--omp-code-bg) outline-none"
+				>
 					{!activePreview || activePreview.loading ? (
 						<div className="flex items-center gap-2 p-4">
 							<Spinner size="sm" />
 							<span className="text-omp-sm text-(--omp-dim)">{t("filesPanel.reading")}</span>
 						</div>
 					) : previewIsMarkdown ? (
-						<div className="mx-auto max-w-3xl px-5 py-4 text-omp-md text-(--omp-text)">
+						<div ref={setPreviewContent} className="mx-auto max-w-3xl px-5 py-4 text-omp-md text-(--omp-text)">
 							<MarkdownRenderer content={activePreview.content ?? ""} />
 							{activePreview.truncated && (
 								<div className="mt-3 text-omp-xs text-(--omp-dim)">
@@ -313,7 +340,7 @@ export function FilesPanel() {
 									</div>
 								))}
 							</div>
-							<pre className="m-0 pr-4 whitespace-pre text-(--omp-text) [tab-size:4]">
+							<pre ref={setPreviewContent} className="m-0 pr-4 whitespace-pre text-(--omp-text) [tab-size:4]">
 								{activePreview.content}
 								{activePreview.truncated && (
 									<span className="text-(--omp-dim)">

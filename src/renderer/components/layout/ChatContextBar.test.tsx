@@ -2,7 +2,7 @@ import { parseHTML } from "linkedom";
 import { act } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ModelInfo, RpcResponse } from "../../../shared/rpc-types";
+import type { ModelInfo, RpcChatConfig, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
 import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
@@ -21,16 +21,17 @@ Object.assign(globalThis as Record<string, unknown>, {
 	IS_REACT_ACT_ENVIRONMENT: true,
 });
 
-/** The agent's live settings, as `get_settings` returns them. */
-let values: Record<string, unknown> = {};
+const DEFAULTS: RpcChatConfig = { systemPrompt: "", history: "continuous", historyTurns: 0 };
+/** This chat's own settings, as `get_chat_config` returns them. */
+let config: RpcChatConfig = DEFAULTS;
 const ok = (data?: unknown): RpcResponse => ({ type: "response", command: "x", success: true, data });
-const getSettings = vi.fn(async () => ok({ values }));
-const setSetting = vi.fn(async (path: string, value: unknown) => {
-	values = { ...values, [path]: value };
-	return ok();
+const getChatConfig = vi.fn(async () => ok(config));
+const setChatConfig = vi.fn(async (patch: Partial<RpcChatConfig>) => {
+	config = { ...config, ...patch };
+	return ok(config);
 });
 (window as unknown as { omp: unknown }).omp = {
-	rpc: { getSettings, setSetting },
+	rpc: { getChatConfig, setChatConfig },
 	events: { onConfigUpdate: () => () => {} },
 };
 
@@ -49,8 +50,8 @@ const model: ModelInfo = {
 	contextWindow: 400_000,
 };
 
-async function mount(settings: Record<string, unknown>): Promise<void> {
-	values = { "chat.systemPrompt": "", "chat.history": "continuous", "chat.historyTurns": 0, ...settings };
+async function mount(saved: Partial<RpcChatConfig>): Promise<void> {
+	config = { ...DEFAULTS, ...saved };
 	useModelStore.setState({ model });
 	useSessionStore.setState({ status: "ready", sessionId: "s1" });
 	container = document.createElement("div") as unknown as HTMLElement;
@@ -94,7 +95,7 @@ afterEach(async () => {
 	await act(async () => root?.unmount());
 	container?.remove();
 	for (const node of [...document.querySelectorAll("[role='dialog']")]) node.remove();
-	values = {};
+	config = DEFAULTS;
 	vi.clearAllMocks();
 	useModelStore.getState().reset();
 	useSessionStore.getState().reset();
@@ -104,14 +105,14 @@ afterEach(async () => {
 
 describe("ChatContextBar", () => {
 	it("switches a single-turn chat back to the depth it had", async () => {
-		await mount({ "chat.history": "single", "chat.historyTurns": 3 });
+		await mount({ history: "single", historyTurns: 3 });
 		expect(trigger()).toContain("Single turn");
 		// Depth only applies to a continuous chat.
 		expect(radio("3")?.disabled).toBe(true);
 
 		await act(async () => radioStartingWith("Continuous")?.click());
 
-		expect(setSetting.mock.calls).toEqual([["chat.history", "continuous"]]);
+		expect(setChatConfig.mock.calls).toEqual([[{ history: "continuous" }]]);
 		expect(trigger()).toContain("Last 3 turns");
 	});
 
@@ -123,10 +124,7 @@ describe("ChatContextBar", () => {
 		expect(trigger()).toContain("Last turn");
 
 		await act(async () => radio("All")?.click());
-		expect(setSetting.mock.calls).toEqual([
-			["chat.historyTurns", 1],
-			["chat.historyTurns", 0],
-		]);
+		expect(setChatConfig.mock.calls).toEqual([[{ historyTurns: 1 }], [{ historyTurns: 0 }]]);
 		expect(trigger()).toContain("All turns");
 	});
 
@@ -136,11 +134,11 @@ describe("ChatContextBar", () => {
 
 		await typePrompt("Answer like a ship's cook.");
 		await act(async () => button("Save")?.click());
-		expect(setSetting.mock.calls).toEqual([["chat.systemPrompt", "Answer like a ship's cook."]]);
+		expect(setChatConfig.mock.calls).toEqual([[{ systemPrompt: "Answer like a ship's cook." }]]);
 		expect(trigger()).toContain("Custom system prompt");
 
 		await act(async () => button("Use default")?.click());
-		expect(setSetting.mock.calls.at(-1)).toEqual(["chat.systemPrompt", ""]);
+		expect(setChatConfig.mock.calls.at(-1)).toEqual([{ systemPrompt: "" }]);
 		expect(trigger()).not.toContain("Custom system prompt");
 	});
 });

@@ -3,6 +3,7 @@ import type { SessionModelOverride } from "./model-restore";
 import type {
 	ImageContent,
 	MessagesPage,
+	RpcChatConfig,
 	RpcCommand,
 	RpcDebugParams,
 	RpcMcpServerInput,
@@ -213,6 +214,8 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		getSessionStats: () => rpcCommand({ type: "get_session_stats" }),
 		setSessionPinned: (sessionId: string, pinned: boolean) =>
 			rpcCommand({ type: "set_session_pinned", sessionId, pinned }),
+		getChatConfig: () => rpcCommand({ type: "get_chat_config" }),
+		setChatConfig: (config: Partial<RpcChatConfig>) => rpcCommand({ type: "set_chat_config", config }),
 		exportHtml: (outputPath?: string) => rpcCommand({ type: "export_html", outputPath }),
 		getBranchMessages: () => rpcCommand({ type: "get_branch_messages" }),
 		getLastAssistantText: () => rpcCommand({ type: "get_last_assistant_text" }),

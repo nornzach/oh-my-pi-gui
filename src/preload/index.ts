@@ -85,6 +85,7 @@ import type {
 	SchedulerSnapshot,
 	TaskConfig,
 	TaskDraft,
+	TaskNotice,
 	TaskRevision,
 	TaskRun,
 	TaskSaveResult,
@@ -311,6 +312,11 @@ const api: OmpApi = {
 			),
 		onOpen: (callback: (target: SchedulerOpenTarget) => void) =>
 			subscribe<SchedulerOpenTarget>(IPC_EVENTS.SCHEDULER_OPEN, callback),
+		notices: () => ipcRenderer.invoke(IPC_COMMANDS.SCHEDULER_GET_NOTICES) as Promise<TaskNotice[]>,
+		markNoticesRead: (ids?: string[]) =>
+			ipcRenderer.invoke(IPC_COMMANDS.SCHEDULER_MARK_NOTICES_READ, { ids }) as Promise<void>,
+		onNotices: (callback: (notices: TaskNotice[]) => void) =>
+			subscribe<TaskNotice[]>(IPC_EVENTS.SCHEDULER_NOTICES, callback),
 	},
 	sessions: {
 		list: (scope: "local" | "global") =>

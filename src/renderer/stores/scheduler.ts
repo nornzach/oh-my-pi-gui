@@ -5,6 +5,7 @@ import type {
 	SchedulerSnapshot,
 	TaskConfig,
 	TaskDraft,
+	TaskNotice,
 	TaskSaveResult,
 } from "../../shared/scheduler-types";
 import { translate } from "../lib/i18n";
@@ -26,6 +27,8 @@ export type TaskEditorState =
 interface SchedulerStore {
 	snapshot: SchedulerSnapshot | null;
 	progress: Record<string, RunProgress>;
+	/** Finished runs worth a look, newest first; main keeps the read state. */
+	notices: TaskNotice[];
 	open: boolean;
 	view: TasksView;
 	selectedTaskId: string | null;
@@ -49,6 +52,9 @@ interface SchedulerStore {
 	cancelRun: (runId: string) => Promise<void>;
 	review: (runId: string, decision: "accepted" | "rejected", note?: string) => Promise<boolean>;
 	setPaused: (paused: boolean) => Promise<void>;
+	/** Land on a notice's run and mark it read. */
+	openNotice: (notice: TaskNotice) => void;
+	markAllNoticesRead: () => void;
 }
 
 const failed = (error: unknown) =>
@@ -76,6 +82,7 @@ function configOf(draft: TaskDraft): TaskConfig {
 export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 	snapshot: null,
 	progress: {},
+	notices: [],
 	open: false,
 	view: "tasks",
 	selectedTaskId: null,
@@ -88,7 +95,12 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 			snapshot => set({ snapshot }),
 			() => {},
 		);
+		void api.notices().then(
+			notices => set({ notices }),
+			() => {},
+		);
 		const unsubscribers = [
+			api.onNotices(notices => set({ notices })),
 			api.onSnapshot(snapshot =>
 				set(state => {
 					// Progress only lives while a run does; drop entries for runs that ended.
@@ -115,6 +127,13 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 			selectedTaskId: target?.taskId ?? get().selectedTaskId,
 			selectedRunId: target?.runId ?? (view === "runs" || view === "review" ? get().selectedRunId : null),
 		});
+	},
+	openNotice: notice => {
+		get().openTasks(notice.target);
+		if (!notice.read) void window.omp.scheduler.markNoticesRead([notice.id]).catch(failed);
+	},
+	markAllNoticesRead: () => {
+		if (get().notices.some(notice => !notice.read)) void window.omp.scheduler.markNoticesRead().catch(failed);
 	},
 	close: () => set({ open: false, editor: null }),
 	setView: view => set({ view, selectedRunId: null }),

@@ -78,6 +78,7 @@ import { ConfirmDialog } from "../common/ConfirmDialog";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
 import { LangSwitcher } from "../common/LangSwitcher";
 import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
+import { useUnreadNoticeCount } from "./NotificationBell";
 import { SidebarQuotas } from "./SidebarQuotas";
 
 const STATUS_COLOR: Record<SessionInfo["status"], string> = {
@@ -281,6 +282,7 @@ export function Sidebar() {
 	const openSessionPicker = useUiStore(s => s.openSessionPicker);
 	const pendingSkillReviews = usePendingSkillReviews();
 	const pendingTaskReviews = useSchedulerStore(state => state.snapshot?.reviewCount ?? 0);
+	const unreadNotices = useUnreadNoticeCount();
 
 	useEffect(() => {
 		void window.omp.sidecar
@@ -965,6 +967,8 @@ export function Sidebar() {
 		shortcut?: string;
 		/** Count of things waiting for the person (e.g. learned skills to review). */
 		badge?: number;
+		/** Something finished that the user has not looked at yet: a red dot. */
+		unread?: boolean;
 		onClick: () => void;
 	}
 	// Session work stays one click away; app-wide tools live in the More menu
@@ -1021,6 +1025,7 @@ export function Sidebar() {
 			label: t("tasks.title"),
 			title: pendingTaskReviews > 0 ? t("tasks.sidebar.review", { count: pendingTaskReviews }) : undefined,
 			badge: pendingTaskReviews,
+			unread: unreadNotices > 0,
 			onClick: () => useSchedulerStore.getState().openTasks(pendingTaskReviews > 0 ? { view: "review" } : undefined),
 		},
 	];
@@ -1075,6 +1080,14 @@ export function Sidebar() {
 			>
 				<Icon aria-hidden="true" className="shrink-0 text-[var(--omp-muted)]" size={16} strokeWidth={1.75} />
 				<span className="min-w-0 flex-1 truncate">{item.label}</span>
+				{item.unread && (
+					<span
+						role="img"
+						aria-label={t("notices.unread", { count: unreadNotices })}
+						data-nav-unread=""
+						className="size-2 shrink-0 rounded-full bg-(--omp-error)"
+					/>
+				)}
 				{item.badge ? (
 					<span className="shrink-0 rounded-full bg-(--omp-accent-dim) px-1.5 text-omp-xxs font-medium tabular-nums text-(--omp-accent)">
 						{item.badge}

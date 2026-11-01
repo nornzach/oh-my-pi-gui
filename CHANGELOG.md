@@ -4,7 +4,8 @@
 
 ### Added
 
-- Chat tabs can use your own system prompt and limit what each message sends. Click the row under a chat's composer to pick **Continuous** or **Single turn**, cap how many earlier turns go with each message, and write a system prompt that replaces the default one. The chat still shows every turn. The settings are shared by every chat tab and are also in Settings → Context → Chat.
+- Chat tabs can use your own system prompt and limit what each message sends. Click the row under a chat's composer to pick **Continuous** or **Single turn**, cap how many earlier turns go with each message, and write a system prompt that replaces the default one. The chat still shows every turn. Each chat keeps its own settings; Settings → Context → Chat sets the defaults for chats that have not changed theirs.
+- A bell at the top right of the window lists scheduled runs that finished, with a red count of the ones you have not opened. Click one to see its run, or mark them all read. Scheduled Tasks in the sidebar shows a red dot while any are unread.
 
 ### Changed
 
@@ -14,6 +15,8 @@
 
 - Text boxes that grow with their text, in Settings, Memory, Modes and plugin details, no longer show a scrollbar while their text fits.
 - A message sent right after opening a tab no longer shows twice while its reply streams.
+- Chat tabs no longer behave like the coding agent: they send only the chat system prompt, with no tools and no working directory.
+- ⌘A (Ctrl+A on Windows and Linux) in an open file's preview selects only the file's text, not the rest of the window.
 
 ## [0.9.33] - 2026-10-29
 

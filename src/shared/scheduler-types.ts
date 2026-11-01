@@ -223,6 +223,19 @@ export interface TaskRevision {
 }
 
 /** Where a notification click or a link should land in the Tasks window. */
+/** A finished run worth a look, kept in the window's notification list until read. */
+export interface TaskNotice {
+	id: string;
+	/** Where clicking it lands in the Tasks window. */
+	target: SchedulerOpenTarget;
+	title: string;
+	body: string;
+	/** `review`: waiting for a person; `failed`: the run, its check or the task broke. */
+	tone: "done" | "review" | "failed";
+	createdAt: number;
+	read: boolean;
+}
+
 export interface SchedulerOpenTarget {
 	view?: "tasks" | "runs" | "review" | "insights";
 	taskId?: string;

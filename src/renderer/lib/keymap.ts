@@ -373,6 +373,15 @@ export function isFollowUpSend(event: { metaKey: boolean; ctrlKey: boolean; altK
 	return mac ? event.metaKey || event.ctrlKey : event.ctrlKey;
 }
 
+/** Whether a keydown is the platform's select-all: ⌘A on macOS, Ctrl+A elsewhere. */
+export function isSelectAll(
+	event: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean },
+	mac = IS_MAC,
+): boolean {
+	if (event.altKey || event.shiftKey || event.key.toLowerCase() !== "a") return false;
+	return mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+}
+
 /** `chord` as the platform's keyboard has it: off macOS a default's ⌘ is ⌃. */
 export function platformChord(chord: string, mac = IS_MAC): string {
 	const parsed = parseChord(chord);
