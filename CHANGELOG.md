@@ -2,10 +2,17 @@
 
 ## [Unreleased]
 
+## [0.9.35] - 2026-11-03
+
 ### Added
 
 - Custom themes: add `.json` files to `~/.omp/gui/themes` and pick them from the theme picker. A theme starts from a built-in one (`"extends": "nord"`) and overrides any of the GUI's colors, from the accent to the sidebar and title bar; edits apply while the app runs, and colors that are not valid are skipped and listed in the picker. A file saved with a typo keeps the theme's last working version on screen, and the picker says when the theme you picked is broken or its file is gone. **Open folder** at the bottom of the picker creates the folder. See the README's Custom themes section ([#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)).
 - The window opens on the chosen theme's background instead of plain dark or light, custom themes included.
+- Bash cards say when the agent's output minimizer shortened a command's output, with the filter that ran and the size before and after (`Minimized: git 120.4 KB → 3.2 KB`).
+
+### Changed
+
+- Bundled agent rebuilt from monorepo `6f004615`, on upstream omp main after 18.15.0 (156 commits), with its native addon from npm 18.15.0. Among upstream's changes: `write` refuses to save the output of a `read` whose long lines were shown cut, browser tabs left open with `persist: true` stay in your Chrome when the session ends, right-clicks and double-clicks in browser tabs press the button and count asked for, and a session resumed on a later day keeps its earlier messages' dates, so Claude keeps its earlier thinking and the prompt cache. Upstream's new native SQLite lock protection and macOS front-app hold need a newer native addon and are not in this build.
 
 ### Fixed
 
