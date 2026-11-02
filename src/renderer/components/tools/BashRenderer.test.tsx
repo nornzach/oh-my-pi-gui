@@ -67,6 +67,27 @@ describe("BashRenderer", () => {
 		expect(container.textContent).toContain("Exit: 1");
 	});
 
+	it("states the output minimizer's rewrite on one plain line", async () => {
+		await mount(
+			<BashRenderer
+				args={{ command: "git log" }}
+				result={bashResult("abc123 fix parser", {
+					wallTimeMs: 300,
+					// A rehydrated session may carry any label: colors, a line break, a home path.
+					meta: {
+						minimized: {
+							filter: "\x1b[31mgit\x1b[0m\n/Users/zach/notes",
+							inputBytes: 123_290,
+							outputBytes: 3_277,
+							artifactId: "a1",
+						},
+					},
+				})}
+			/>,
+		);
+		expect(container.textContent).toContain("Minimized: git ~/notes 120.4 KB → 3.2 KB");
+	});
+
 	it("strips the background-job trailer and restates the job id", async () => {
 		await mount(
 			<BashRenderer

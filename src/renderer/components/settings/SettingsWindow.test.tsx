@@ -173,6 +173,7 @@ describe("GUI settings visibility", () => {
 			"statusLine.rightSegments",
 			"statusLine.segmentOptions",
 			"composer.predictions",
+			"composer.predictionAlternatives",
 			"terminal.programStatus",
 			"input.bareExitOnEmptySession",
 			"input.bareSlashCommands",

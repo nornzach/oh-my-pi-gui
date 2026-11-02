@@ -1,6 +1,7 @@
 import { Terminal } from "lucide-react";
+import { truncateMiddle } from "../../../shared/text";
 import { OutputText } from "../../lib/ansi";
-import { cx, extractImageDataUrls, resultText } from "../../lib/format";
+import { cx, extractImageDataUrls, formatBytes, resultText, sanitizeToolText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_MD } from "../../lib/preview";
 import { ResultImages } from "./ResultImages";
@@ -10,7 +11,7 @@ import type { ToolRendererProps } from "./ToolCard";
 /**
  * Bash wire shape: `{ content: [{ type: "text", text }], details }` where
  * `details` is `BashToolDetails` (packages/coding-agent/src/tools/bash.ts):
- *   { meta?: { truncation? }, timeoutSeconds?, requestedTimeoutSeconds?,
+ *   { meta?: { truncation?, minimized? }, timeoutSeconds?, requestedTimeoutSeconds?,
  *     timeoutDisabled?, wallTimeMs?, exitCode?, timedOut?, terminalId?,
  *     async?: { state, jobId } }
  * The text body carries the combined stdout/stderr stream plus LLM-facing
@@ -28,6 +29,23 @@ interface BashParsed {
 
 function asNumber(value: unknown): number | undefined {
 	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * `git 120.4 KB → 3.2 KB`: the output minimizer's filter and the bytes it took
+ * the output from and to (`meta.minimized`). The label is a short word from the
+ * agent, but a rehydrated session or extension may carry any text, so it is
+ * kept to one plain line with home paths shortened.
+ */
+function formatMinimized(minimized: Record<string, unknown> | undefined): string | null {
+	const inputBytes = asNumber(minimized?.inputBytes);
+	const outputBytes = asNumber(minimized?.outputBytes);
+	if (typeof minimized?.filter !== "string" || inputBytes == null || outputBytes == null) return null;
+	const label = sanitizeToolText(minimized.filter)
+		.replace(/\/(?:Users|home)\/[^/\s]+/g, "~")
+		.replace(/\s+/g, " ")
+		.trim();
+	return `${truncateMiddle(label, 40)} ${formatBytes(inputBytes)} → ${formatBytes(outputBytes)}`;
 }
 
 /**
@@ -143,6 +161,12 @@ function parseBashResult(result: unknown, isError: boolean | undefined): BashPar
 		);
 	}
 	if (artifactId) stats.push(`Artifact: ${artifactId}`);
+	const minimized = formatMinimized(
+		meta?.minimized != null && typeof meta.minimized === "object"
+			? (meta.minimized as Record<string, unknown>)
+			: undefined,
+	);
+	if (minimized) stats.push(`Minimized: ${minimized}`);
 	if (isError && exitCode != null) stats.push(`Exit: ${exitCode}`);
 
 	return {

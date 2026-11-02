@@ -65,8 +65,9 @@ const TERMINAL_DISPLAY_SETTINGS = new Set([
 	"statusLine.rightSegments",
 	"statusLine.segmentOptions",
 	// Predictions render as TUI composer ghost text and only interactive mode
-	// runs them; in the GUI the toggle would do nothing.
+	// runs them; in the GUI the toggles would do nothing.
 	"composer.predictions",
+	"composer.predictionAlternatives",
 	// OSC 7501 status goes to the hosting terminal, which the GUI is not.
 	"terminal.programStatus",
 	// Consumed only by the TUI input controller; GUI submission goes through RPC.
