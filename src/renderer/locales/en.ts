@@ -482,7 +482,7 @@ export const en: Record<string, string> = {
 	"sidebar.pairedWith": "Split with “{title}”",
 	"sidebar.subsessions.expand": "Show sessions started from this one",
 	"sidebar.subsessions.collapse": "Hide sessions started from this one",
-	"sidebar.subsessions.label": "Started from {title}",
+	"sidebar.subsessions.count": "{count} sessions started from this one",
 	"sidebar.archived": "Archived",
 	"sidebar.archiveFailed": "Could not save the archive list.",
 	"sidebar.menu.archive": "Archive",

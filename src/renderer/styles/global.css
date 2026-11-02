@@ -563,18 +563,26 @@ kbd,
 		linear-gradient(to right, transparent, var(--omp-sidebar-bg) 14px);
 }
 
-/* Recency and counts are resting information: they step aside for actions. */
+/* Recency and counts are resting information: they step aside for actions.
+   A row's family count goes too; the chevron in its status slot opens it. */
 .omp-sidebar-time,
-.omp-sidebar-group-count {
+.omp-sidebar-group-count,
+.omp-sidebar-session-row .omp-sidebar-agent-pill {
 	transition: opacity var(--omp-motion-fast) var(--omp-ease);
 }
 
 .omp-sidebar-session-row[data-has-actions="true"]:hover .omp-sidebar-time,
 .omp-sidebar-session-row[data-has-actions="true"]:is(:focus-visible, :has(:focus-visible)) .omp-sidebar-time,
 .omp-sidebar-session-row[data-actions-open="true"] .omp-sidebar-time,
+.omp-sidebar-session-row[data-has-actions="true"]:hover .omp-sidebar-agent-pill,
+.omp-sidebar-session-row[data-has-actions="true"]:is(:focus-visible, :has(:focus-visible)) .omp-sidebar-agent-pill,
 .omp-sidebar-workspace-row:hover .omp-sidebar-group-count,
 .omp-sidebar-workspace-row:has(:focus-visible) .omp-sidebar-group-count {
 	opacity: 0;
+}
+
+.omp-sidebar-session-row[data-has-actions="true"]:hover .omp-sidebar-agent-pill {
+	pointer-events: none;
 }
 
 /* Group headers show their icon at rest and the disclosure chevron on hover. */

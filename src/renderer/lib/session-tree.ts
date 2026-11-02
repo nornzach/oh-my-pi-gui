@@ -78,6 +78,17 @@ export function buildSessionTree(sessions: readonly SessionInfo[]): SessionNode[
 	return roots.map(nodeFor);
 }
 
+/**
+ * A subagent transcript lives in its parent's artifact directory
+ * (`<name>.jsonl` → `<name>/<agentId>.jsonl`); a fork or continuation of the
+ * parent is a session file of its own beside it.
+ */
+export function isSubagentTranscript(child: SessionInfo, parent: SessionInfo): boolean {
+	const parentPath = pathKey(parent.path);
+	if (!parentPath.endsWith(".jsonl")) return false;
+	return pathKey(child.path).startsWith(`${parentPath.slice(0, -".jsonl".length)}/`);
+}
+
 export interface SessionRank {
 	pinned: (session: SessionInfo) => boolean;
 	recency: (session: SessionInfo) => number;

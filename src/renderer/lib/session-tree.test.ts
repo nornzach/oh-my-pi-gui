@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionInfo } from "../../shared/ipc-types";
-import { buildSessionTree, orderSessionForest } from "./session-tree";
+import { buildSessionTree, isSubagentTranscript, orderSessionForest } from "./session-tree";
 
 function session(path: string, overrides: Partial<SessionInfo> = {}): SessionInfo {
 	return {
@@ -83,5 +83,16 @@ describe("orderSessionForest", () => {
 
 		expect(ordered.map(node => node.session.path)).toEqual(["/s/pinned.jsonl", "/s/parent.jsonl"]);
 		expect(ordered[1]?.children.map(node => node.session.path)).toEqual(["/s/child.jsonl"]);
+	});
+});
+
+describe("isSubagentTranscript", () => {
+	it("tells a transcript in the parent's artifact directory from a fork beside it", () => {
+		const parent = session("/s/parent.jsonl");
+		expect(isSubagentTranscript(session("/s/parent/agent.jsonl"), parent)).toBe(true);
+		expect(isSubagentTranscript(session("/s/parent/agent/helper.jsonl"), parent)).toBe(true);
+		expect(isSubagentTranscript(session("C:\\s\\parent\\agent.jsonl"), session("C:\\s\\parent.jsonl"))).toBe(true);
+		expect(isSubagentTranscript(session("/s/fork.jsonl"), parent)).toBe(false);
+		expect(isSubagentTranscript(session("/s/parent-2/agent.jsonl"), parent)).toBe(false);
 	});
 });

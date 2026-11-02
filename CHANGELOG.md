@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Sessions in the sidebar line up again, each row with one arrow. A session's subagent sessions, forks and continuations start folded behind a count, so the list shows your main sessions; hover the row and click the arrow, or the count, to open them, and the family of the session you are in opens by itself. A session open in a tab lists its agents once, not again as subagent sessions, and nested sessions hang from tree lines ([#36](https://github.com/nornzach/oh-my-pi-gui/issues/36), [#39](https://github.com/nornzach/oh-my-pi-gui/issues/39)).
+
 ## [0.9.34] - 2026-11-02
 
 ### Added

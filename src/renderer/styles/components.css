@@ -1842,6 +1842,17 @@
 	top: 0;
 }
 
+/* Child session rows reuse the guides; their list keeps a 1px gap between
+   rows, which each line reaches up across so the tree reads unbroken. */
+.omp-sidebar-session-row > .omp-sidebar-agent-elbow {
+	top: -1px;
+	height: calc(50% + 1px);
+}
+
+.omp-sidebar-session-row > .omp-sidebar-agent-guide--full {
+	top: -1px;
+}
+
 .omp-sidebar-agent-pill {
 	display: inline-flex;
 	height: 16px;

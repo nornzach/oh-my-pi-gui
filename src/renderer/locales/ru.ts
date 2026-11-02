@@ -472,7 +472,7 @@ export const ru: Record<string, string> = {
 	"sidebar.pairedWith": "В паре с «{title}»",
 	"sidebar.subsessions.expand": "Показать сессии, начатые отсюда",
 	"sidebar.subsessions.collapse": "Скрыть сессии, начатые отсюда",
-	"sidebar.subsessions.label": "Начата от {title}",
+	"sidebar.subsessions.count": "Сессий, начатых отсюда: {count}",
 	"sidebar.archived": "Архив",
 	"sidebar.archiveFailed": "Не удалось сохранить список архива.",
 	"sidebar.menu.archive": "Архивировать",

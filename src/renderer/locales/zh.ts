@@ -462,7 +462,7 @@ export const zh: Record<string, string> = {
 	"sidebar.pairedWith": "与「{title}」分屏",
 	"sidebar.subsessions.expand": "展开由此会话派生的会话",
 	"sidebar.subsessions.collapse": "收起由此会话派生的会话",
-	"sidebar.subsessions.label": "派生自 {title}",
+	"sidebar.subsessions.count": "由此会话派生的 {count} 个会话",
 	"sidebar.archived": "已归档",
 	"sidebar.archiveFailed": "未能保存归档列表。",
 	"sidebar.menu.archive": "归档",
