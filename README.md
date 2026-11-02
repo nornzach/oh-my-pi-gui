@@ -24,7 +24,7 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [What's new in 0.9.34](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+[Features](#en-features) · [What's new in 0.9.34](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
 > **v0.9.34 release.** The improvements below are included in v0.9.34, with the bundled agent built from monorepo `27cd662e` (upstream omp 18.15.0). The gallery screenshots are captured from v0.9.27; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
@@ -212,6 +212,34 @@ Windows packages are currently unsigned. Windows SmartScreen may require **More 
 | `⌥⇧⌘←` / `⌥⇧⌘→` | Move the current tab |
 | `Esc` | Context-dependent close or abort; not an unconditional abort shortcut |
 
+<a id="en-themes"></a>
+### Custom themes
+
+Add your own color themes as `.json` files in `~/.omp/gui/themes` (**Open folder** at the bottom of the theme picker creates and opens it). Each file shows up under **Custom themes** in the picker, and edits apply while the app runs. A theme starts from a built-in one and overrides the colors you list:
+
+```json
+{
+  "name": "Midnight",
+  "description": "Deep navy with a violet accent.",
+  "extends": "dark",
+  "tokens": {
+    "accent": "#c792ea",
+    "bg-primary": "#13151f",
+    "sidebar-bg": "#0f111a",
+    "titlebar-bg": "#0f111a"
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `name`, `description` | Shown in the picker; `name` defaults to the file name. |
+| `extends` | Built-in theme to start from: `dark`, `light`, `titanium`, `nord`, `solarized`, `paper`, `dawn`, `latte`, `gruvbox`, `frost`, `matcha`, `rosePine`. Defaults to `dark`, or `light` when `scheme` is `light`. |
+| `scheme` | `dark` or `light`, for native controls, charts and diagrams. Defaults to the base theme's. |
+| `tokens` | Any of the GUI's color tokens, with or without the `--omp-` prefix; the full list is `THEME_TOKEN_KEYS` in [`src/renderer/lib/themes.ts`](src/renderer/lib/themes.ts). |
+
+Values are hex colors, `rgb()`/`hsl()`/`oklch()`-style colors, `color-mix()`, `transparent`, or `var(--omp-…)` references to another token; the `shadow-*` tokens take box shadows. An unknown name or any other value is skipped and listed under the theme in the picker, and the rest of the theme still applies. Charts and diagrams follow the theme's light or dark scheme rather than its colors. With **Follow the current task's terminal palette** on (Settings → GUI), the agent's theme still recolors the conversation on top.
+
 <a id="en-development"></a>
 ### Development
 
@@ -339,7 +367,7 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG、NSIS 或便携版安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [0.9.34 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.34 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
 > **v0.9.34 功能展示。** 下文改进均纳入 v0.9.34，内置 Agent 基于 monorepo `27cd662e` 构建（上游 omp 18.15.0）。界面导览截图取自 v0.9.27；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
@@ -527,6 +555,34 @@ Windows 包当前未签名。首次启动前请确认下载来源；Windows Smar
 | `⌃Tab` / `⌃⇧Tab` | 下一个 / 上一个标签页 |
 | `⌥⇧⌘←` / `⌥⇧⌘→` | 移动当前标签页 |
 | `Esc` | 按当前上下文关闭界面或中止执行，不是无条件中止快捷键 |
+
+<a id="zh-themes"></a>
+### 自定义主题
+
+在 `~/.omp/gui/themes` 中放入 `.json` 文件即可添加自己的配色主题（主题选择器底部的**打开文件夹**会创建并打开该目录）。每个文件都会出现在选择器的**自定义主题**分组中，应用运行时修改文件也会立即生效。主题以某个内置主题为基础，只覆盖你列出的颜色：
+
+```json
+{
+  "name": "Midnight",
+  "description": "Deep navy with a violet accent.",
+  "extends": "dark",
+  "tokens": {
+    "accent": "#c792ea",
+    "bg-primary": "#13151f",
+    "sidebar-bg": "#0f111a",
+    "titlebar-bg": "#0f111a"
+  }
+}
+```
+
+| 字段 | 含义 |
+|---|---|
+| `name`、`description` | 显示在选择器中；`name` 默认为文件名。 |
+| `extends` | 作为基础的内置主题：`dark`、`light`、`titanium`、`nord`、`solarized`、`paper`、`dawn`、`latte`、`gruvbox`、`frost`、`matcha`、`rosePine`。默认为 `dark`；`scheme` 为 `light` 时默认为 `light`。 |
+| `scheme` | `dark` 或 `light`，用于系统控件、图表和流程图。默认沿用基础主题。 |
+| `tokens` | GUI 的任意颜色 token，可带或不带 `--omp-` 前缀；完整列表见 [`src/renderer/lib/themes.ts`](src/renderer/lib/themes.ts) 中的 `THEME_TOKEN_KEYS`。 |
+
+取值可以是十六进制颜色、`rgb()`/`hsl()`/`oklch()` 等颜色函数、`color-mix()`、`transparent`，或引用其他 token 的 `var(--omp-…)`；`shadow-*` token 使用 box-shadow 写法。未知的 token 名或其他取值会被跳过并在选择器中列出，主题的其余部分照常生效。图表和流程图只跟随主题的浅色/深色方案，不跟随具体颜色。开启**跟随当前任务的终端配色**（设置 → 界面）时，Agent 主题仍会在其上为对话区域重新着色。
 
 <a id="zh-development"></a>
 ### 开发

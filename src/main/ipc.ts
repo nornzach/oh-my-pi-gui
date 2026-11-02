@@ -56,6 +56,7 @@ import { requestQuit } from "./app-quit";
 import { BenchmarkRunner } from "./benchmark-runner";
 import type { BrowserHost } from "./browser-host";
 import type { ConversationIndex } from "./conversation-index";
+import { type CustomThemesWatcher, readCustomThemes } from "./custom-themes";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { openInExternalEditor } from "./editor";
 import { mainT } from "./i18n";
@@ -88,6 +89,7 @@ export interface IpcDeps {
 	statsRestart: () => Revive;
 	logWatcher: LogWatcher;
 	memoryWatcher: MemoryWatcher;
+	customThemesWatcher: CustomThemesWatcher;
 	/** Message-level session search; null when its database could not be opened. */
 	conversationIndex: ConversationIndex | null;
 	windowManager: WindowManager;
@@ -370,7 +372,8 @@ function aggregateProgress(states: RunProgressState[]): RunProgressState {
 
 export function registerIpcHandlers(deps: IpcDeps): void {
 	const benchmarkRunners = new Map<number, BenchmarkRunner>();
-	const { sidecarPool, sessionIndex, statsClient, logWatcher, memoryWatcher, windowManager } = deps;
+	const { sidecarPool, sessionIndex, statsClient, logWatcher, memoryWatcher, customThemesWatcher, windowManager } =
+		deps;
 	const prefsStore = new Store<PrefsSchema>({ name: "prefs" });
 
 	// Drop a closed window's tray/progress snapshot so the aggregate reflects
@@ -414,6 +417,21 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	memoryWatcher.onChange = change => {
 		broadcast(windowManager, IPC_EVENTS.MEMORY_CHANGED, change);
 	};
+
+	customThemesWatcher.onChange = themes => {
+		broadcast(windowManager, IPC_EVENTS.THEMES_CHANGED, themes);
+	};
+	ipcMain.handle(IPC_COMMANDS.THEMES_LIST, () => readCustomThemes(customThemesWatcher.dir));
+	ipcMain.handle(IPC_COMMANDS.THEMES_OPEN_FOLDER, async (): Promise<IpcOpenPathResult> => {
+		const dir = customThemesWatcher.dir;
+		try {
+			await fsp.mkdir(dir, { recursive: true });
+		} catch (err) {
+			return { ok: false, error: err instanceof Error ? err.message : String(err) };
+		}
+		const openError = await shell.openPath(dir);
+		return openError ? { ok: false, error: openError } : { ok: true, resolvedPath: dir };
+	});
 
 	logWatcher.onLines = lines => {
 		broadcast(windowManager, IPC_EVENTS.LOG_LINE, { lines, nextSequence: logWatcher.getSnapshot().nextSequence });

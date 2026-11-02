@@ -23,7 +23,14 @@
 import type { RpcThemeColorsResult } from "../../shared/rpc-types";
 import { saveGuiPreference } from "./display-preferences";
 import { acceptsActiveTabEvents, onActiveTabRouteSettled, onActiveTabRouteState } from "./tab-routing";
-import { applyTheme, markCustomThemeTokens, resolveTheme, THEME_SCHEME_STORAGE_KEY } from "./theme";
+import {
+	applyTheme,
+	markCustomThemeTokens,
+	readPrepaintThemeMode,
+	resolveTheme,
+	THEME_BACKGROUND_STORAGE_KEY,
+	THEME_SCHEME_STORAGE_KEY,
+} from "./theme";
 
 /** Canonical token keys, in stylesheet order. Every theme defines all of them. */
 export const THEME_TOKEN_KEYS = [
@@ -1703,16 +1710,51 @@ export const THEMES = {
 
 export type ThemeName = keyof typeof THEMES;
 
-/** A picker selection: a named theme, or "system" to follow the OS. */
-export type ThemeSelection = ThemeName | "system";
+/** A theme file in the custom themes folder, by file name without `.json`. */
+export type CustomThemeSelection = `custom:${string}`;
 
-export function isThemeSelection(value: unknown): value is ThemeSelection {
-	return typeof value === "string" && (value === "system" || value in THEMES);
+/** A picker selection: a named theme, a custom theme file, or "system" to follow the OS. */
+export type ThemeSelection = ThemeName | CustomThemeSelection | "system";
+
+export function isCustomThemeSelection(value: string): value is CustomThemeSelection {
+	return value.startsWith("custom:") && value.length > "custom:".length;
 }
 
-/** The theme actually shown for a selection ("system" resolves via the OS). */
+export function isThemeSelection(value: unknown): value is ThemeSelection {
+	return typeof value === "string" && (value === "system" || value in THEMES || isCustomThemeSelection(value));
+}
+
+/** Custom themes read from disk, already checked and filled from their base theme. */
+const customThemes = new Map<CustomThemeSelection, ThemeDefinition>();
+/** The selection on screen; a custom one is re-applied when its file changes. */
+let shownSelection: ThemeSelection | null = null;
+
+export function customTheme(selection: CustomThemeSelection): ThemeDefinition | undefined {
+	return customThemes.get(selection);
+}
+
+/**
+ * Replaces the custom theme set. A custom theme on screen follows its file:
+ * an edit shows at once, and a removed or broken file falls back to the
+ * built-in theme of the last scheme until it comes back.
+ */
+export function setCustomThemes(themes: ReadonlyMap<CustomThemeSelection, ThemeDefinition>): void {
+	customThemes.clear();
+	for (const [selection, theme] of themes) customThemes.set(selection, theme);
+	if (shownSelection && isCustomThemeSelection(shownSelection)) showSelection(shownSelection);
+}
+
+/**
+ * The theme actually shown for a selection: "system" resolves via the OS, and
+ * a custom theme that is not loaded (yet) shows the built-in theme of the
+ * scheme it last painted.
+ */
 export function resolveThemeSelection(selection: ThemeSelection): ThemeDefinition {
-	return THEMES[selection === "system" ? resolveTheme("system") : selection];
+	if (selection === "system") return THEMES[resolveTheme("system")];
+	if (isCustomThemeSelection(selection)) {
+		return customThemes.get(selection) ?? THEMES[resolveTheme(readPrepaintThemeMode())];
+	}
+	return THEMES[selection];
 }
 
 /**
@@ -1740,9 +1782,30 @@ export function getThemeSelectionVersion(): number {
 export function applyThemeByName(selection: ThemeSelection, opts: { persist?: boolean } = {}): void {
 	themeSelectionVersion++;
 	const { persist = true } = opts;
-	const legacyTheme = selection === "system" ? "system" : THEMES[selection].scheme;
+	const theme = showSelection(selection);
+	if (persist) {
+		const scheme = theme ? theme.scheme : "system";
+		void saveGuiPreference("themeName", selection, () => {});
+		void saveGuiPreference("theme", scheme, () => {});
+		try {
+			localStorage.setItem(THEME_SCHEME_STORAGE_KEY, scheme);
+			// The pre-paint script paints this before the theme loads, so a
+			// colored theme does not open on the plain dark or light canvas.
+			const background = theme ? resolveTokenColor(theme, "--omp-bg-primary") : "";
+			if (background) localStorage.setItem(THEME_BACKGROUND_STORAGE_KEY, background);
+			else localStorage.removeItem(THEME_BACKGROUND_STORAGE_KEY);
+		} catch {
+			// localStorage unavailable — the async path still applies the theme.
+		}
+	}
+}
+
+/** Writes a selection's tokens on <html>; returns the theme shown, or null for "system". */
+function showSelection(selection: ThemeSelection): ThemeDefinition | null {
+	shownSelection = selection;
+	let theme: ThemeDefinition | null = null;
 	if (selection !== "system") {
-		const theme = THEMES[selection];
+		theme = resolveThemeSelection(selection);
 		applyTheme(theme.scheme);
 		const style = document.documentElement.style;
 		for (const key of THEME_TOKEN_KEYS) style.setProperty(key, theme.tokens[key]);
@@ -1753,15 +1816,7 @@ export function applyThemeByName(selection: ThemeSelection, opts: { persist?: bo
 		applyTheme("system");
 	}
 	writeOverlay();
-	if (persist) {
-		void saveGuiPreference("themeName", selection, () => {});
-		void saveGuiPreference("theme", legacyTheme, () => {});
-		try {
-			localStorage.setItem(THEME_SCHEME_STORAGE_KEY, selection === "system" ? "system" : THEMES[selection].scheme);
-		} catch {
-			// localStorage unavailable — the async path still applies the theme.
-		}
-	}
+	return theme;
 }
 
 /**
@@ -1973,6 +2028,32 @@ function overlayIntact(): boolean {
 const PLUGIN_THEME_VALUE_RE =
 	/^(#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|(?:rgba?|hsla?|oklch|oklab|lab|lch|color-mix|color)\((?:[^()]|\([^()]*\))*\)|var\(--[a-zA-Z0-9-]+\))$/;
 
+function isColorValue(value: string): boolean {
+	return PLUGIN_THEME_VALUE_RE.test(value) && (typeof CSS === "undefined" || CSS.supports("color", value));
+}
+
+/**
+ * Shadows are offsets, blur lengths and colors (`0 6px 18px rgba(…)`, `none`):
+ * word characters, numbers, commas and color functions only, so a value can
+ * never fetch a `url()`.
+ */
+const SHADOW_VALUE_RE = /^[\w\s.,%#()-]+$/;
+
+/**
+ * Whether a custom theme may set `key` to `value`: the color shapes plugin
+ * themes accept, plus `transparent`, and box shadows for the shadow tokens.
+ */
+export function isThemeTokenValue(key: ThemeTokenKey, value: string): boolean {
+	if (key.startsWith("--omp-shadow-")) {
+		return (
+			SHADOW_VALUE_RE.test(value) &&
+			!/url\(/i.test(value) &&
+			(typeof CSS === "undefined" || CSS.supports("box-shadow", value))
+		);
+	}
+	return value === "transparent" || isColorValue(value);
+}
+
 export interface ValidatedPluginTheme {
 	tokens: Partial<Record<ThemeTokenKey, string>>;
 	rejected: string[];
@@ -1993,7 +2074,7 @@ export function validatePluginThemeTokens(tokens: Record<string, unknown>): Vali
 			continue;
 		}
 		const trimmed = typeof value === "string" ? value.trim() : "";
-		if (!PLUGIN_THEME_VALUE_RE.test(trimmed) || (typeof CSS !== "undefined" && !CSS.supports("color", trimmed))) {
+		if (!isColorValue(trimmed)) {
 			validated.rejected.push(key);
 			continue;
 		}

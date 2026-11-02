@@ -111,6 +111,8 @@ export const IPC_EVENTS = {
 	SESSIONS_CHANGED: "sessions:changed",
 	/** Learned skills or a project's memory changed on disk (any omp process). */
 	MEMORY_CHANGED: "memory:changed",
+	/** A file in the custom themes folder changed (IpcCustomThemes). */
+	THEMES_CHANGED: "themes:changed",
 	/** Log line appended */
 	LOG_LINE: "log:line",
 	/** Stats data ready */
@@ -212,6 +214,10 @@ export const IPC_COMMANDS = {
 	SYSTEM_CLIPBOARD_READ: "system:clipboard-read",
 	/** Show notification */
 	SYSTEM_NOTIFY: "system:notify",
+	/** Read the custom themes folder (IpcCustomThemes) */
+	THEMES_LIST: "themes:list",
+	/** Create the custom themes folder if needed and open it in the file manager */
+	THEMES_OPEN_FOLDER: "themes:open-folder",
 	/** Get GUI preferences */
 	PREFS_GET: "prefs:get",
 	/** Set GUI preferences */
@@ -1124,6 +1130,26 @@ export interface IpcMemoryChange {
 	memoryRoots: string[];
 }
 
+/**
+ * One `.json` file in the custom themes folder, as read from disk. The
+ * renderer checks its colors and fills it from a built-in theme.
+ */
+export interface IpcCustomThemeFile {
+	/** File name without `.json`: the theme's stable id. */
+	id: string;
+	fileName: string;
+	/** Parsed JSON; absent when the file could not be read or parsed. */
+	data?: unknown;
+	/** Why the file could not be read or parsed. */
+	error?: string;
+}
+
+export interface IpcCustomThemes {
+	/** The custom themes folder (~/.omp/gui/themes). */
+	dir: string;
+	files: IpcCustomThemeFile[];
+}
+
 export interface SessionInfo {
 	path: string;
 	id: string;
@@ -1554,6 +1580,11 @@ export interface OmpApi {
 		/** Write a finished recording blob to the user-picked path. */
 		recorderSave(path: string, data: ArrayBuffer): Promise<{ ok: boolean; error?: string }>;
 		notify(title: string, body?: string): void;
+	};
+	themes: {
+		list(): Promise<IpcCustomThemes>;
+		openFolder(): Promise<IpcOpenPathResult>;
+		onChanged(callback: (themes: IpcCustomThemes) => void): () => void;
 	};
 	prefs: {
 		get(key?: string): Promise<unknown>;

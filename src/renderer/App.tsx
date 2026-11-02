@@ -80,6 +80,7 @@ import {
 	resolveThemeSelection,
 } from "./lib/themes";
 import { startVoiceAutoSpeak } from "./lib/voice";
+import { initCustomThemes } from "./stores/custom-themes";
 import { openHandoffDialog } from "./stores/fork-handoff";
 import { useModelStore } from "./stores/model";
 import { useSchedulerStore } from "./stores/scheduler";
@@ -317,6 +318,8 @@ export function App() {
 			unsubscribe();
 		};
 	}, []);
+
+	useEffect(() => initCustomThemes(), []);
 
 	// Terminal palettes affect the application only when explicitly requested.
 	useEffect(

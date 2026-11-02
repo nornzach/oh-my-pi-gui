@@ -1452,6 +1452,16 @@ export const en: Record<string, string> = {
 	"themePicker.system": "System",
 	"themePicker.systemDesc": "Follow the OS light / dark preference.",
 	"themePicker.applied": "Theme: {name}",
+	"themePicker.custom.heading": "Custom themes",
+	"themePicker.custom.from": "From {file}",
+	"themePicker.custom.skipped": "Skipped {count} entr{plural}: {names}",
+	"themePicker.custom.hint": "Add your own themes as JSON files in {dir}.",
+	"themePicker.custom.openFolder": "Open folder",
+	"themePicker.custom.openFailed": "Could not open the themes folder: {error}",
+	"themePicker.custom.problem.unreadable": "{file} could not be read: {detail}",
+	"themePicker.custom.problem.notObject": "{file} is not a theme: it must hold a JSON object.",
+	"themePicker.custom.problem.unknownBase": "{file} extends “{detail}”, which is not a built-in theme.",
+	"themePicker.custom.problem.badScheme": "{file} sets a scheme other than “dark” or “light”.",
 
 	// Plan approval dialog
 	"planApproval.failed": "Plan approval failed",

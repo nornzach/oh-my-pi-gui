@@ -1418,6 +1418,16 @@ export const zh: Record<string, string> = {
 	"themePicker.system": "跟随系统",
 	"themePicker.systemDesc": "跟随操作系统的浅色 / 深色偏好。",
 	"themePicker.applied": "主题：{name}",
+	"themePicker.custom.heading": "自定义主题",
+	"themePicker.custom.from": "来自 {file}",
+	"themePicker.custom.skipped": "已跳过 {count} 项：{names}",
+	"themePicker.custom.hint": "在 {dir} 中放入 JSON 文件即可添加自定义主题。",
+	"themePicker.custom.openFolder": "打开文件夹",
+	"themePicker.custom.openFailed": "无法打开主题文件夹：{error}",
+	"themePicker.custom.problem.unreadable": "无法读取 {file}：{detail}",
+	"themePicker.custom.problem.notObject": "{file} 不是主题：文件内容必须是 JSON 对象。",
+	"themePicker.custom.problem.unknownBase": "{file} 的 extends 为「{detail}」，这不是内置主题。",
+	"themePicker.custom.problem.badScheme": "{file} 的 scheme 只能是「dark」或「light」。",
 
 	// Plan approval dialog
 	"planApproval.failed": "计划审批失败",

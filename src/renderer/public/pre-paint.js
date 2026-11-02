@@ -3,7 +3,8 @@
  * module. The prefs IPC that resolves the real theme is async, so without
  * this every cold start painted the light default first: a white flash for
  * dark-theme users. Mirrors the scheme written by lib/themes.ts
- * (applyThemeByName → localStorage "omp.themeScheme").
+ * (applyThemeByName → localStorage "omp.themeScheme"), and the chosen
+ * theme's background ("omp.themeBackground") when it is a plain color.
  */
 (function () {
 	try {
@@ -16,7 +17,9 @@
 		}
 		if (scheme === "dark" || scheme === "light") {
 			document.documentElement.dataset.theme = scheme;
-			document.documentElement.style.backgroundColor = scheme === "dark" ? "#1f1f1f" : "#ffffff";
+			var background = localStorage.getItem("omp.themeBackground");
+			var plain = background && window.CSS && CSS.supports("color", background) && !/var\(/.test(background);
+			document.documentElement.style.backgroundColor = plain ? background : scheme === "dark" ? "#1f1f1f" : "#ffffff";
 			document.documentElement.style.colorScheme = scheme;
 		}
 	} catch (e) {

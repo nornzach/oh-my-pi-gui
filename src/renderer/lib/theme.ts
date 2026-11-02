@@ -11,6 +11,8 @@ export type ThemeMode = "dark" | "light" | "system";
 export type ResolvedTheme = "dark" | "light";
 
 export const THEME_SCHEME_STORAGE_KEY = "omp.themeScheme";
+/** The chosen theme's window background, painted by pre-paint.js before the theme loads. */
+export const THEME_BACKGROUND_STORAGE_KEY = "omp.themeBackground";
 
 /** Synchronous boot mode mirrored by pre-paint.js before preferences IPC exists. */
 export function readPrepaintThemeMode(): ThemeMode {

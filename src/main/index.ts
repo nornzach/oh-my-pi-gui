@@ -14,6 +14,7 @@ import { installQuitGuard, requestQuit } from "./app-quit";
 import { BrowserHost } from "./browser-host";
 import { bundledOmpFilename, resolveOmpCandidate } from "./bundled-omp-path";
 import { type ConversationIndex, openConversationIndex } from "./conversation-index";
+import { CustomThemesWatcher } from "./custom-themes";
 import { setupDeepLinks, startupFolder } from "./deep-link";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { applyGpuFallbackIfNeeded, handleGpuProcessGone } from "./gpu-fallback";
@@ -220,6 +221,7 @@ let sessionIndex: SessionIndex;
 let statsClient: StatsClient;
 let logWatcher: LogWatcher;
 let memoryWatcher: MemoryWatcher | undefined;
+let customThemesWatcher: CustomThemesWatcher | undefined;
 let conversationIndex: ConversationIndex | null = null;
 let schedulerHost: SchedulerHost | null = null;
 
@@ -448,6 +450,7 @@ app.whenReady().then(() => {
 	}
 	logWatcher = new LogWatcher();
 	memoryWatcher = new MemoryWatcher();
+	customThemesWatcher = new CustomThemesWatcher();
 	conversationIndex = openConversationIndex(
 		join(app.getPath("userData"), "conversation-index.db"),
 		sessionIndex.sessionsDir,
@@ -463,6 +466,7 @@ app.whenReady().then(() => {
 		statsRestart: () => statsServer?.ensureRunning() ?? "exhausted",
 		logWatcher,
 		memoryWatcher,
+		customThemesWatcher,
 		conversationIndex,
 		windowManager,
 		benchmarkBinaryPath: bundledOmp,
@@ -496,6 +500,7 @@ app.whenReady().then(() => {
 	sessionIndex.start();
 	logWatcher.start();
 	memoryWatcher.start();
+	void customThemesWatcher.start();
 	// /record: renderer getDisplayMedia resolves to the window that asked, so a
 	// recording always captures the window the user is looking at (no picker).
 	session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
@@ -560,6 +565,7 @@ installQuitGuard(
 		sessionIndex?.stop();
 		logWatcher?.stop();
 		memoryWatcher?.stop();
+		customThemesWatcher?.stop();
 		conversationIndex?.close();
 		destroyTray();
 	},

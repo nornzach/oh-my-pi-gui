@@ -18,6 +18,7 @@ import type {
 	IpcBrowserState,
 	IpcBrowserViewportPayload,
 	IpcConversationSearchPayload,
+	IpcCustomThemes,
 	IpcFsListResult,
 	IpcFsReadImageResult,
 	IpcFsReadPlanPayload,
@@ -393,6 +394,12 @@ const api: OmpApi = {
 		notify: (title: string, body?: string) => {
 			ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_NOTIFY, { title, body });
 		},
+	},
+
+	themes: {
+		list: () => ipcRenderer.invoke(IPC_COMMANDS.THEMES_LIST) as Promise<IpcCustomThemes>,
+		openFolder: () => ipcRenderer.invoke(IPC_COMMANDS.THEMES_OPEN_FOLDER) as Promise<IpcOpenPathResult>,
+		onChanged: callback => subscribe<IpcCustomThemes>(IPC_EVENTS.THEMES_CHANGED, callback),
 	},
 
 	prefs: {
