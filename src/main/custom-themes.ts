@@ -25,23 +25,36 @@ export async function readCustomThemes(dir: string = customThemesDir()): Promise
 	let names: string[];
 	try {
 		names = (await fs.readdir(dir, { withFileTypes: true }))
-			.filter(entry => entry.isFile() && entry.name.toLowerCase().endsWith(".json"))
+			// A symlink (dotfile managers link themes in) is read through; one to a
+			// folder is reported, not dropped.
+			.filter(entry => (entry.isFile() || entry.isSymbolicLink()) && entry.name.toLowerCase().endsWith(".json"))
 			.map(entry => entry.name)
 			.sort((a, b) => a.localeCompare(b))
 			.slice(0, MAX_FILES);
 	} catch {
 		return { dir, files: [] };
 	}
-	const files = await Promise.all(names.map(name => readThemeFile(dir, name)));
+	// A theme is known by its file name without `.json`. A name that leaves
+	// nothing (`.json`) or repeats another's (`a.json` and `a.JSON`) keeps its
+	// whole file name, so every file has its own id.
+	const ids = new Set<string>();
+	const files = await Promise.all(
+		names.map(name => {
+			const stem = name.slice(0, -".json".length);
+			const id = stem && !ids.has(stem) ? stem : name;
+			ids.add(id);
+			return readThemeFile(dir, name, id);
+		}),
+	);
 	return { dir, files };
 }
 
-async function readThemeFile(dir: string, fileName: string): Promise<IpcCustomThemeFile> {
-	const id = fileName.slice(0, -".json".length);
+async function readThemeFile(dir: string, fileName: string, id: string): Promise<IpcCustomThemeFile> {
 	try {
 		const filePath = path.join(dir, fileName);
-		const { size } = await fs.stat(filePath);
-		if (size > MAX_FILE_BYTES) return { id, fileName, error: "File is larger than 256 KB" };
+		const stats = await fs.stat(filePath);
+		if (!stats.isFile()) return { id, fileName, error: "Not a file" };
+		if (stats.size > MAX_FILE_BYTES) return { id, fileName, error: "File is larger than 256 KB" };
 		const text = await fs.readFile(filePath, "utf8");
 		try {
 			return { id, fileName, data: JSON.parse(text) as unknown };
@@ -78,6 +91,8 @@ export class CustomThemesWatcher {
 		if (this.#stopped) return;
 		const watcher = watch(this.#dir, { ignoreInitial: true, depth: 0 });
 		this.#watcher = watcher;
+		// A folder that turns unreadable must not take main down; the next change re-reads it.
+		watcher.on("error", () => {});
 		watcher.on("all", () => {
 			if (this.#timer) clearTimeout(this.#timer);
 			this.#timer = setTimeout(() => {

@@ -1721,11 +1721,15 @@ export function isCustomThemeSelection(value: string): value is CustomThemeSelec
 }
 
 export function isThemeSelection(value: unknown): value is ThemeSelection {
-	return typeof value === "string" && (value === "system" || value in THEMES || isCustomThemeSelection(value));
+	return (
+		typeof value === "string" && (value === "system" || Object.hasOwn(THEMES, value) || isCustomThemeSelection(value))
+	);
 }
 
 /** Custom themes read from disk, already checked and filled from their base theme. */
 const customThemes = new Map<CustomThemeSelection, ThemeDefinition>();
+/** Whether the theme files have been read once; until then a custom selection waits for them. */
+let customThemesLoaded = false;
 /** The selection on screen; a custom one is re-applied when its file changes. */
 let shownSelection: ThemeSelection | null = null;
 
@@ -1741,7 +1745,12 @@ export function customTheme(selection: CustomThemeSelection): ThemeDefinition | 
 export function setCustomThemes(themes: ReadonlyMap<CustomThemeSelection, ThemeDefinition>): void {
 	customThemes.clear();
 	for (const [selection, theme] of themes) customThemes.set(selection, theme);
-	if (shownSelection && isCustomThemeSelection(shownSelection)) showSelection(shownSelection);
+	customThemesLoaded = true;
+	if (shownSelection && isCustomThemeSelection(shownSelection)) {
+		const theme = showSelection(shownSelection);
+		// The file is what is on screen now: the next launch paints it first.
+		if (theme && customThemes.has(shownSelection)) rememberForPrepaint(theme);
+	}
 }
 
 /**
@@ -1779,30 +1788,45 @@ export function getThemeSelectionVersion(): number {
  * Pass `{ persist: false }` for ephemeral previews (settings-window theme
  * browsing) so the user's stored selection is left untouched.
  */
-export function applyThemeByName(selection: ThemeSelection, opts: { persist?: boolean } = {}): void {
+export function applyThemeByName(
+	selection: ThemeSelection,
+	opts: { persist?: boolean; remember?: boolean } = {},
+): void {
 	themeSelectionVersion++;
-	const { persist = true } = opts;
+	const { persist = true, remember = persist } = opts;
 	const theme = showSelection(selection);
-	if (persist) {
-		const scheme = theme ? theme.scheme : "system";
-		void saveGuiPreference("themeName", selection, () => {});
-		void saveGuiPreference("theme", scheme, () => {});
-		try {
-			localStorage.setItem(THEME_SCHEME_STORAGE_KEY, scheme);
-			// The pre-paint script paints this before the theme loads, so a
-			// colored theme does not open on the plain dark or light canvas.
-			const background = theme ? resolveTokenColor(theme, "--omp-bg-primary") : "";
-			if (background) localStorage.setItem(THEME_BACKGROUND_STORAGE_KEY, background);
-			else localStorage.removeItem(THEME_BACKGROUND_STORAGE_KEY);
-		} catch {
-			// localStorage unavailable — the async path still applies the theme.
-		}
+	if (persist) void saveGuiPreference("themeName", selection, () => {});
+	// A custom theme whose file is still being read is saved once it shows (setCustomThemes).
+	if (theme === undefined) return;
+	if (persist) void saveGuiPreference("theme", theme ? theme.scheme : "system", () => {});
+	if (remember) rememberForPrepaint(theme);
+}
+
+/**
+ * Keeps the scheme and background of the theme on screen for the pre-paint
+ * script, which paints them before the theme loads, so a colored theme does
+ * not open on the plain dark or light canvas.
+ */
+function rememberForPrepaint(theme: ThemeDefinition | null): void {
+	try {
+		localStorage.setItem(THEME_SCHEME_STORAGE_KEY, theme ? theme.scheme : "system");
+		const background = theme ? resolveTokenColor(theme, "--omp-bg-primary") : "";
+		if (background) localStorage.setItem(THEME_BACKGROUND_STORAGE_KEY, background);
+		else localStorage.removeItem(THEME_BACKGROUND_STORAGE_KEY);
+	} catch {
+		// localStorage unavailable — the async path still applies the theme.
 	}
 }
 
-/** Writes a selection's tokens on <html>; returns the theme shown, or null for "system". */
-function showSelection(selection: ThemeSelection): ThemeDefinition | null {
+/**
+ * Writes a selection's tokens on <html>; returns the theme shown, null for
+ * "system", or undefined for a custom theme whose file has not been read yet.
+ */
+function showSelection(selection: ThemeSelection): ThemeDefinition | null | undefined {
 	shownSelection = selection;
+	// The pre-paint canvas stays until the files are read, instead of a
+	// built-in theme flashing first; setCustomThemes then shows the theme.
+	if (isCustomThemeSelection(selection) && !customThemesLoaded) return undefined;
 	let theme: ThemeDefinition | null = null;
 	if (selection !== "system") {
 		theme = resolveThemeSelection(selection);

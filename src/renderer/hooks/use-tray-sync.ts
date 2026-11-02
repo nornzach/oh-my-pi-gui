@@ -14,6 +14,7 @@ import { contextUsageView } from "../lib/context-usage";
 import { basename } from "../lib/format";
 import { useLang } from "../lib/i18n";
 import { providerQuotas } from "../lib/quota-rows";
+import { isSubagentSession } from "../lib/session-tree";
 import { useModelStore } from "../stores/model";
 import { useQuotaStore } from "../stores/quotas";
 import { useSessionStore } from "../stores/session";
@@ -49,6 +50,7 @@ export function useTraySync(): void {
 		// Unique workspaces by cwd, most-recently-active first, current flagged.
 		const byCwd = new Map<string, number>();
 		for (const session of sessions) {
+			if (isSubagentSession(session)) continue;
 			const modified = Date.parse(session.modified) || 0;
 			if (modified > (byCwd.get(session.cwd) ?? -1)) byCwd.set(session.cwd, modified);
 		}

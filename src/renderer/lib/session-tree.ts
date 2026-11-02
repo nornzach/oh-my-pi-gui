@@ -29,8 +29,13 @@ function resolveParent(
 	return parent && parent.path !== session.path ? parent : undefined;
 }
 
-/** Roots in input order; each parent's children in the order they were given. */
-export function buildSessionTree(sessions: readonly SessionInfo[]): SessionNode[] {
+/**
+ * Each session's parent within `sessions`, keyed by session path. A link that
+ * would close a cycle is dropped at the session the loop comes back to, which
+ * becomes a root with the rest of the loop under it; a session that only
+ * leads into the loop keeps its parent.
+ */
+export function sessionParents(sessions: readonly SessionInfo[]): Map<string, SessionInfo> {
 	const byPath = new Map<string, SessionInfo>();
 	const byId = new Map<string, SessionInfo>();
 	for (const session of sessions) {
@@ -43,20 +48,24 @@ export function buildSessionTree(sessions: readonly SessionInfo[]): SessionNode[
 		const parent = resolveParent(session, byPath, byId);
 		if (parent) parentOf.set(session.path, parent);
 	}
-	// Drop the link that closes a cycle. The session whose walk discovered it
-	// becomes a root; the other side of the loop stays nested.
 	for (const session of sessions) {
 		const seen = new Set<string>([session.path]);
 		let cursor = parentOf.get(session.path);
 		while (cursor) {
 			if (seen.has(cursor.path)) {
-				parentOf.delete(session.path);
+				parentOf.delete(cursor.path);
 				break;
 			}
 			seen.add(cursor.path);
 			cursor = parentOf.get(cursor.path);
 		}
 	}
+	return parentOf;
+}
+
+/** Roots in input order; each parent's children in the order they were given. */
+export function buildSessionTree(sessions: readonly SessionInfo[]): SessionNode[] {
+	const parentOf = sessionParents(sessions);
 
 	const childrenOf = new Map<string, SessionInfo[]>();
 	const roots: SessionInfo[] = [];
@@ -84,9 +93,23 @@ export function buildSessionTree(sessions: readonly SessionInfo[]): SessionNode[
  * parent is a session file of its own beside it.
  */
 export function isSubagentTranscript(child: SessionInfo, parent: SessionInfo): boolean {
-	const parentPath = pathKey(parent.path);
-	if (!parentPath.endsWith(".jsonl")) return false;
-	return pathKey(child.path).startsWith(`${parentPath.slice(0, -".jsonl".length)}/`);
+	return insideArtifactDir(child.path, parent.path);
+}
+
+/**
+ * A subagent transcript, by the parent the session index points it at. Lists
+ * of sessions to browse (the resume picker, recent projects) leave these out:
+ * the sidebar shows them under their session.
+ */
+export function isSubagentSession(session: SessionInfo): boolean {
+	const parent = session.parentSessionPath?.trim();
+	return parent !== undefined && insideArtifactDir(session.path, parent);
+}
+
+function insideArtifactDir(childPath: string, parentPath: string): boolean {
+	const parent = pathKey(parentPath);
+	if (!parent.endsWith(".jsonl")) return false;
+	return pathKey(childPath).startsWith(`${parent.slice(0, -".jsonl".length)}/`);
 }
 
 export interface SessionRank {

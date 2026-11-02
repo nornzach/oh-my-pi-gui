@@ -25,6 +25,28 @@ test("reads every theme file in name order and reports the ones it cannot use", 
 	}
 });
 
+test("gives every file its own id and reads a linked theme", async () => {
+	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-themes-test-"));
+	const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), "omp-themes-linked-"));
+	try {
+		await fs.writeFile(path.join(dir, ".json"), "{}");
+		await fs.writeFile(path.join(dir, "Dusk.json"), "{}");
+		await fs.writeFile(path.join(elsewhere, "linked.json"), '{ "extends": "nord" }');
+		await fs.symlink(path.join(elsewhere, "linked.json"), path.join(dir, "linked.json"));
+		await fs.symlink(elsewhere, path.join(dir, "folder.json"));
+
+		const { files } = await readCustomThemes(dir);
+		const byName = new Map(files.map(file => [file.fileName, file]));
+		expect(byName.get(".json")?.id).toBe(".json");
+		expect(byName.get("linked.json")?.data).toEqual({ extends: "nord" });
+		expect(byName.get("folder.json")?.error).toBeDefined();
+		expect(new Set(files.map(file => file.id)).size).toBe(files.length);
+	} finally {
+		await fs.rm(dir, { recursive: true, force: true });
+		await fs.rm(elsewhere, { recursive: true, force: true });
+	}
+});
+
 test("a missing folder lists no themes", async () => {
 	const dir = path.join(os.tmpdir(), `omp-themes-missing-${process.pid}-${Date.now()}`);
 	expect(await readCustomThemes(dir)).toEqual({ dir, files: [] });

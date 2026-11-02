@@ -62,7 +62,14 @@ import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { compileKeymap, KEYMAP_ACTIONS, onEscape } from "../../lib/keymap";
 import { sessionDisplayTitle } from "../../lib/session-title";
-import { buildSessionTree, isSubagentTranscript, orderSessionForest, type SessionNode } from "../../lib/session-tree";
+import {
+	buildSessionTree,
+	isSubagentSession,
+	isSubagentTranscript,
+	orderSessionForest,
+	type SessionNode,
+	sessionParents,
+} from "../../lib/session-tree";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { tabSignalPresentation } from "../../lib/tab-signal";
 import { useAgentPagesStore } from "../../stores/agent-pages";
@@ -74,7 +81,12 @@ import { usePendingSkillReviews } from "../../stores/skill-review";
 import { type SplitAxis, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { SessionAgentsScope, type SidebarAgentsInfo } from "../agents/SidebarAgents";
+import {
+	SessionAgentsScope,
+	type SidebarAgentsInfo,
+	transcriptKey,
+	useSidebarAgentTranscripts,
+} from "../agents/SidebarAgents";
 import { Button } from "../common";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
@@ -125,7 +137,7 @@ interface SessionPair {
 	onScreen: boolean;
 }
 
-/** One drawn session row. A pair's two roots are adjacent specs; children follow their parent. */
+/** One drawn session row. Children follow their parent; a pair's rows share a frame key. */
 interface SessionRowSpec {
 	session: SessionInfo;
 	depth: number;
@@ -137,10 +149,17 @@ interface SessionRowSpec {
 	moreSiblings: boolean;
 	/** Depths of the ancestors whose tree line runs past this row. */
 	guides: readonly number[];
+	/** A folded family that holds the session on screen. */
+	holdsActive: boolean;
 	inPair: boolean;
 	pair?: SessionPair;
-	/** The first spec of a pair frame. The next spec is the partner and is not drawn on its own. */
-	pairLead?: boolean;
+	/** Rows drawn inside a pair's frame: both roots, each followed by its open family. */
+	frame?: string;
+}
+
+/** Tree lines line up with the parent's signal dot, as the agent rows under a session do. */
+function treeLineX(depth: number): number {
+	return 1 + Math.min(depth, 6) * 14;
 }
 
 function modifiedAt(session: SessionInfo): number {
@@ -278,6 +297,7 @@ export function Sidebar() {
 	const renameRef = useRef<HTMLInputElement>(null);
 	const { sessions, isLoading, error: listError, refresh, deleteSession, renameSession } = useSessionList("global");
 	const sessionId = useSessionStore(s => s.sessionId);
+	const agentTranscripts = useSidebarAgentTranscripts();
 	const cwd = useSessionStore(s => s.cwd);
 	const isStreaming = useSessionStore(s => s.isStreaming);
 	const isCompacting = useSessionStore(s => s.isCompacting);
@@ -313,49 +333,81 @@ export function Sidebar() {
 		(session: SessionInfo) => sessionLastUsed[session.path] ?? modifiedAt(session),
 		[sessionLastUsed],
 	);
+	// A child session goes where its family goes: its root's lane and project,
+	// and into Archived with an archived ancestor. Archiving a session takes its
+	// family along instead of leaving the children behind as top-level rows.
+	const parentOf = useMemo(() => sessionParents(sessions), [sessions]);
+	const familyRoot = useCallback(
+		(session: SessionInfo) => {
+			let root = session;
+			for (let parent = parentOf.get(root.path); parent; parent = parentOf.get(root.path)) {
+				root = parent;
+			}
+			return root;
+		},
+		[parentOf],
+	);
+	/** The archived sessions among `session` and its ancestors: what keeps it in Archived. */
+	const archivedLine = useCallback(
+		(session: SessionInfo) => {
+			const line: string[] = [];
+			for (let cursor: SessionInfo | undefined = session; cursor; cursor = parentOf.get(cursor.path)) {
+				if (archived.has(cursor.path)) line.push(cursor.path);
+			}
+			return line;
+		},
+		[archived, parentOf],
+	);
+	const isArchived = useCallback((session: SessionInfo) => archivedLine(session).length > 0, [archivedLine]);
+	// Opening a session undoes an earlier fold of the family that holds it.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a new session on screen is the trigger.
+	useEffect(() => {
+		setOpenFamilies(prev => Object.fromEntries(Object.entries(prev).filter(([, open]) => open)));
+	}, [sessionId]);
 	const agentSessions = useMemo(
-		() => sessions.filter(session => session.kind !== "chat" && !archived.has(session.path)),
-		[sessions, archived],
+		() => sessions.filter(session => familyRoot(session).kind !== "chat" && !isArchived(session)),
+		[sessions, familyRoot, isArchived],
 	);
 	const codeSessions = useMemo(
-		() => agentSessions.filter(session => !defaultWorkspace || session.cwd !== defaultWorkspace),
-		[agentSessions, defaultWorkspace],
+		() => agentSessions.filter(session => !defaultWorkspace || familyRoot(session).cwd !== defaultWorkspace),
+		[agentSessions, defaultWorkspace, familyRoot],
 	);
 	const workSessions = useMemo(
 		() =>
 			agentSessions
-				.filter(session => defaultWorkspace !== null && session.cwd === defaultWorkspace)
+				.filter(session => defaultWorkspace !== null && familyRoot(session).cwd === defaultWorkspace)
 				.toSorted((a, b) => {
 					const aPinned = pinnedSessions.includes(a.path) ? 0 : 1;
 					const bPinned = pinnedSessions.includes(b.path) ? 0 : 1;
 					if (aPinned !== bPinned) return aPinned - bPinned;
 					return recencyForSession(b) - recencyForSession(a);
 				}),
-		[agentSessions, defaultWorkspace, pinnedSessions, recencyForSession],
+		[agentSessions, defaultWorkspace, familyRoot, pinnedSessions, recencyForSession],
 	);
 	const chatSessions = useMemo(
 		() =>
 			sessions
-				.filter(session => session.kind === "chat" && !archived.has(session.path))
+				.filter(session => familyRoot(session).kind === "chat" && !isArchived(session))
 				.toSorted((a, b) => {
 					const aPinned = pinnedSessions.includes(a.path) ? 0 : 1;
 					const bPinned = pinnedSessions.includes(b.path) ? 0 : 1;
 					if (aPinned !== bPinned) return aPinned - bPinned;
 					return recencyForSession(b) - recencyForSession(a);
 				}),
-		[sessions, archived, pinnedSessions, recencyForSession],
+		[sessions, familyRoot, isArchived, pinnedSessions, recencyForSession],
 	);
 	// Archived sessions of the lane on screen, newest first.
 	const archivedSessions = useMemo(
 		() =>
 			sessions
 				.filter(session => {
-					if (!archived.has(session.path)) return false;
-					const inWork = session.kind !== "chat" && defaultWorkspace !== null && session.cwd === defaultWorkspace;
+					if (!isArchived(session)) return false;
+					const root = familyRoot(session);
+					const inWork = root.kind !== "chat" && defaultWorkspace !== null && root.cwd === defaultWorkspace;
 					return mode === "work" ? inWork : !inWork;
 				})
 				.toSorted((a, b) => recencyForSession(b) - recencyForSession(a)),
-		[sessions, archived, defaultWorkspace, mode, recencyForSession],
+		[sessions, defaultWorkspace, familyRoot, isArchived, mode, recencyForSession],
 	);
 
 	// Code sessions stay grouped by project. Pins remain a priority partition,
@@ -363,9 +415,10 @@ export function Sidebar() {
 	const groups = useMemo<WorkspaceGroup[]>(() => {
 		const byCwd = new Map<string, SessionInfo[]>();
 		for (const session of codeSessions) {
-			const list = byCwd.get(session.cwd) ?? [];
+			const groupCwd = familyRoot(session).cwd;
+			const list = byCwd.get(groupCwd) ?? [];
 			list.push(session);
-			byCwd.set(session.cwd, list);
+			byCwd.set(groupCwd, list);
 		}
 		const result: WorkspaceGroup[] = [...byCwd.entries()].map(([groupCwd, groupSessions]) => ({
 			cwd: groupCwd,
@@ -386,13 +439,15 @@ export function Sidebar() {
 			return bRecency - aRecency;
 		});
 		return result;
-	}, [codeSessions, groupAliases, pinnedGroups, pinnedSessions, recencyForSession, workspaceLastUsed]);
+	}, [codeSessions, familyRoot, groupAliases, pinnedGroups, pinnedSessions, recencyForSession, workspaceLastUsed]);
 	function isCollapsedGroup(groupCwd: string): boolean {
 		if (groupCwd in collapsed) return collapsed[groupCwd] === true;
 		// Default: current workspace expanded, others collapsed (Codex-style).
 		return groupCwd !== cwd;
 	}
 	const totalCount = mode === "work" ? workSessions.length : codeSessions.length + chatSessions.length;
+	// Counts name the sessions you started; subagent transcripts sit inside them.
+	const listedCount = (list: readonly SessionInfo[]) => list.filter(session => !isSubagentSession(session)).length;
 	const visibleGroups = mode === "code" ? groups : [];
 	const chatsCollapsed = collapsed.__chats__ ?? false;
 	const archivedCollapsed = collapsed.__archived__ ?? true;
@@ -403,8 +458,10 @@ export function Sidebar() {
 	// Child sessions nest under the parent named by parentSessionPath. Roots are
 	// ordered by the family's newest activity, so a subagent that just ran does
 	// not leave its parent behind in the list. A session open in a tab lists its
-	// agents live under its row (SidebarAgents), so its subagent transcripts are
-	// not listed a second time; its forks and continuations still are.
+	// agents live under its row (SidebarAgents), so the transcripts of the
+	// agents shown there are not listed a second time. Its other transcripts
+	// (agents of earlier turns), forks and continuations still are, and so is a
+	// transcript open in a tab of its own.
 	const rowsOf = (list: readonly SessionInfo[]): SessionRowSpec[] => {
 		const forest = orderSessionForest(buildSessionTree(list), {
 			pinned: session => pinnedSessions.includes(session.path),
@@ -416,7 +473,14 @@ export function Sidebar() {
 		const listedChildren = (node: SessionNode): SessionNode[] => {
 			const tab = tabForSession(node.session);
 			if (!tab || !sessionRuntime(tab.id)) return node.children;
-			return node.children.filter(child => !isSubagentTranscript(child.session, node.session));
+			// Until the agent rows have said which transcripts they show: all of them.
+			const shown = agentTranscripts[node.session.path];
+			return node.children.filter(
+				child =>
+					!isSubagentTranscript(child.session, node.session) ||
+					tabForSession(child.session) !== undefined ||
+					(shown !== undefined && !shown.has(transcriptKey(child.session.path))),
+			);
 		};
 		const holdsActive = (node: SessionNode): boolean =>
 			listedChildren(node).some(child => child.session.id === sessionId || holdsActive(child));
@@ -431,6 +495,8 @@ export function Sidebar() {
 				appendNode(child, depth, node.session.path, index < children.length - 1, guides);
 			});
 		};
+		// The pair frame the rows being appended are drawn in.
+		let frame: string | undefined;
 		const appendNode = (
 			node: SessionNode,
 			depth: number,
@@ -448,7 +514,9 @@ export function Sidebar() {
 				parentPath,
 				moreSiblings,
 				guides,
+				holdsActive: !expanded && holdsActive(node),
 				inPair: false,
+				frame,
 			});
 			if (!expanded) return;
 			// Below a child that has a later sibling, that sibling line runs on.
@@ -463,26 +531,15 @@ export function Sidebar() {
 				if (!first || !second) continue;
 				placed.add(pair.first);
 				placed.add(pair.second);
-				const members = [first, second].map(member => {
-					const children = listedChildren(member);
-					return { member, children, expanded: children.length > 0 && familyOpen(member) };
-				});
-				members.forEach(({ member, children, expanded }, index) => {
-					specs.push({
-						session: member.session,
-						depth: 0,
-						childCount: children.length,
-						expanded,
-						moreSiblings: false,
-						guides: [],
-						inPair: true,
-						pair,
-						pairLead: index === 0,
-					});
-				});
-				for (const { member, children, expanded } of members) {
-					if (expanded) appendChildren(member, children, 1, []);
+				// Each member is followed by its own family, inside the frame.
+				frame = pair.key;
+				for (const member of [first, second]) {
+					const start = specs.length;
+					appendNode(member, 0, undefined, false, []);
+					const lead = specs[start];
+					if (lead) specs[start] = { ...lead, inPair: true, pair };
 				}
+				frame = undefined;
 				continue;
 			}
 			placed.add(node.session.path);
@@ -503,7 +560,7 @@ export function Sidebar() {
 		selectedSessions.length > 0
 			? t("sidebar.bulk.count", { count: selectedSessions.length })
 			: t("sidebar.bulk.empty");
-	const allSelectedArchived = selectedSessions.length > 0 && selectedSessions.every(s => archived.has(s.path));
+	const allSelectedArchived = selectedSessions.length > 0 && selectedSessions.every(isArchived);
 
 	const toggleGroup = (groupCwd: string) => {
 		setCollapsed(prev => ({ ...prev, [groupCwd]: !isCollapsedGroup(groupCwd) }));
@@ -673,10 +730,12 @@ export function Sidebar() {
 		setSelection(next);
 	};
 	const archiveSelection = (archive: boolean) => {
-		void useSidebarPrefs.getState().setSessionsArchived(
-			selectedSessions.map(session => session.path),
-			archive,
-		);
+		void useSidebarPrefs
+			.getState()
+			.setSessionsArchived(
+				archive ? selectedSessions.map(session => session.path) : selectedSessions.flatMap(archivedLine),
+				archive,
+			);
 		endSelection();
 	};
 	// Keys in selection mode, ahead of the window's own handlers (capture), so
@@ -725,22 +784,30 @@ export function Sidebar() {
 		// Sessions open in a tab list this turn's agents under them (plan/24 §3.1).
 		const tab = tabForSession(spec.session);
 		if (!tab) return sessionRowElement(spec, null);
+		const level = Math.min(spec.depth, 6);
+		const layout = {
+			offset: level * 14,
+			lines: [...spec.guides.map(treeLineX), ...(spec.depth > 0 && spec.moreSiblings ? [treeLineX(level)] : [])],
+			trunk: spec.expanded && spec.childCount > 0,
+		};
 		return (
-			<SessionAgentsScope key={spec.session.path} sessionKey={spec.session.path} tabId={tab.id}>
+			<SessionAgentsScope key={spec.session.path} layout={layout} sessionKey={spec.session.path} tabId={tab.id}>
 				{agents => sessionRowElement(spec, agents)}
 			</SessionAgentsScope>
 		);
 	};
 
-	/** One section's rows. Child sessions sit under their parent; a pair's two roots share a frame. */
+	/** One section's rows. Child sessions sit under their parent; a pair's rows share a frame. */
 	const renderSessionRows = (list: readonly SessionInfo[]) => {
 		const specs = rowsOf(list);
 		const rows: ReactNode[] = [];
 		for (let index = 0; index < specs.length; index++) {
 			const spec = specs[index];
 			if (!spec) continue;
-			if (spec.pairLead && spec.pair) {
-				const partner = specs[index + 1];
+			if (spec.frame && spec.pair) {
+				const framed: SessionRowSpec[] = [];
+				while (specs[index]?.frame === spec.frame) framed.push(specs[index++] as SessionRowSpec);
+				index--;
 				rows.push(
 					<div
 						key={spec.pair.key}
@@ -748,11 +815,9 @@ export function Sidebar() {
 						data-on-screen={spec.pair.onScreen || undefined}
 						className="omp-sidebar-pair space-y-px"
 					>
-						{renderSessionRow(spec)}
-						{partner && renderSessionRow(partner)}
+						{framed.map(renderSessionRow)}
 					</div>,
 				);
-				index++;
 				continue;
 			}
 			rows.push(renderSessionRow(spec));
@@ -793,30 +858,35 @@ export function Sidebar() {
 			: undefined;
 		const PairIcon = pair?.axis === "rows" ? Rows2 : Columns2;
 		// One disclosure per row: this turn's agents of an open tab, the child
-		// sessions listed under it, or both, open and close together.
+		// sessions listed under it, or both. It shows open while either is, and
+		// opens or closes both together.
+		const agentsOpen = agents?.expanded === true;
+		const familyShown = spec.childCount > 0 && spec.expanded;
+		const setDisclosure = (open: boolean) => {
+			if (agents && agents.expanded !== open) agents.toggle();
+			if (spec.childCount > 0) setFamilyOpen(session.path, open);
+		};
 		const disclosure =
 			agents || spec.childCount > 0
 				? {
-						expanded: agents ? agents.expanded : spec.expanded,
+						expanded: agentsOpen || familyShown,
+						allOpen: (!agents || agentsOpen) && (spec.childCount === 0 || familyShown),
 						count: (agents?.count ?? 0) + spec.childCount,
 						working: agents?.working === true,
-						toggle: () => {
-							const next = !(agents ? agents.expanded : spec.expanded);
-							agents?.toggle();
-							if (spec.childCount > 0) setFamilyOpen(session.path, next);
-						},
+						set: setDisclosure,
+						toggle: () => setDisclosure(!(agentsOpen || familyShown)),
 					}
 				: null;
 		const disclosureLabel = disclosure?.expanded
 			? t(agents ? "agents.sidebar.collapse" : "sidebar.subsessions.collapse")
 			: t(agents ? "agents.sidebar.expand" : "sidebar.subsessions.expand");
-		const pillLabel =
-			agents && spec.childCount === 0
+		const pillLabel = !agents
+			? t("sidebar.subsessions.count", { count: spec.childCount, plural: spec.childCount === 1 ? "" : "s" })
+			: spec.childCount === 0
 				? t("agents.sidebar.pill", { count: agents.count })
-				: t("sidebar.subsessions.count", { count: disclosure?.count ?? 0 });
+				: t("sidebar.subsessions.countWithAgents", { count: disclosure?.count ?? 0 });
 		const level = Math.min(spec.depth, 6);
-		// Tree lines line up with the parent's signal dot, as the agent rows under a session do.
-		const lineX = (depth: number) => 1 + Math.min(depth, 6) * 14;
+		const lineX = treeLineX;
 		return (
 			<div
 				key={session.path}
@@ -843,7 +913,8 @@ export function Sidebar() {
 					if (event.target !== event.currentTarget) return;
 					if (disclosure && !selecting && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
 						event.preventDefault();
-						if (disclosure.expanded !== (event.key === "ArrowRight")) disclosure.toggle();
+						if (event.key === "ArrowRight" && !disclosure.allOpen) disclosure.set(true);
+						if (event.key === "ArrowLeft" && disclosure.expanded) disclosure.set(false);
 						return;
 					}
 					if (selecting && (event.key === "Enter" || event.key === " ")) {
@@ -978,6 +1049,7 @@ export function Sidebar() {
 							event.stopPropagation();
 							disclosure.toggle();
 						}}
+						data-holds-active={spec.holdsActive || undefined}
 						className="omp-sidebar-agent-pill ml-1.5 shrink-0 hover:text-[var(--omp-text)]"
 					>
 						{disclosure.working && (
@@ -1415,7 +1487,7 @@ export function Sidebar() {
 								{renderGroupHeader({
 									id: group.cwd,
 									name: group.name,
-									count: group.sessions.length,
+									count: listedCount(group.sessions),
 									icon: Folder,
 									collapsedState: groupCollapsed,
 									onToggle: () => toggleGroup(group.cwd),
@@ -1508,7 +1580,7 @@ export function Sidebar() {
 							{renderGroupHeader({
 								id: "__archived__",
 								name: t("sidebar.archived"),
-								count: archivedSessions.length,
+								count: listedCount(archivedSessions),
 								icon: Archive,
 								collapsedState: archivedCollapsed,
 								onToggle: () => setCollapsed(prev => ({ ...prev, __archived__: !archivedCollapsed })),
@@ -1791,17 +1863,19 @@ export function Sidebar() {
 								},
 								{
 									id: "session-archive",
-									label: archived.has(sessionMenu.session.path)
+									label: isArchived(sessionMenu.session)
 										? t("sidebar.menu.unarchive")
 										: t("sidebar.menu.archive"),
-									icon: archived.has(sessionMenu.session.path) ? ArchiveRestore : Archive,
+									icon: isArchived(sessionMenu.session) ? ArchiveRestore : Archive,
 									onSelect: () => {
 										setSessionMenu(null);
+										// Unarchiving a session in an archived family brings the family back.
+										const line = archivedLine(sessionMenu.session);
 										void useSidebarPrefs
 											.getState()
 											.setSessionsArchived(
-												[sessionMenu.session.path],
-												!archived.has(sessionMenu.session.path),
+												line.length > 0 ? line : [sessionMenu.session.path],
+												line.length === 0,
 											);
 									},
 								},
@@ -1849,7 +1923,7 @@ export function Sidebar() {
 					) : pendingDelete?.kind === "group" ? (
 						t("sidebar.deleteGroupMessage", {
 							name: pendingDelete.group.name,
-							count: pendingDelete.group.sessions.length,
+							count: listedCount(pendingDelete.group.sessions),
 						})
 					) : pendingDelete?.kind === "selection" ? (
 						t("sidebar.bulk.deleteMessage", { count: pendingDelete.sessions.length })

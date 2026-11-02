@@ -894,6 +894,45 @@ describe("Sidebar split pairs (gui#30)", () => {
 		);
 		expect(one?.querySelector('[aria-label="Split with “Session /work/beta/three.jsonl”"]')).not.toBeNull();
 	});
+
+	it("keeps a paired session's family under it, inside the frame", async () => {
+		installMockOmp([
+			session("/work/alpha/newest.jsonl", "/work/alpha", { modified: "2026-01-05T00:00:00Z" }),
+			session("/work/alpha/fork.jsonl", "/work/alpha", {
+				title: "Fork of two",
+				parentSessionPath: "/work/alpha/two.jsonl",
+			}),
+			...LIST,
+		]);
+		seedStores();
+		const tab = (id: string, sessionPath: string) => ({
+			id,
+			cwd: "/work/alpha",
+			status: "ready" as const,
+			kind: "agent" as const,
+			unreadDone: false,
+			sessionPath,
+		});
+		const shown = { axis: "columns" as const, firstTabId: "t1", secondTabId: "t0", ratio: 0.5 };
+		useTabsStore.setState({
+			tabs: [tab("t0", "/work/alpha/newest.jsonl"), tab("t1", "/work/alpha/two.jsonl")],
+			activeTabId: "t0",
+			groups: [shown],
+			split: shown,
+		});
+		await mount(<Sidebar />);
+
+		const two = [...document.querySelectorAll(".omp-sidebar-session-row")].find(el =>
+			(el.textContent ?? "").includes("alpha/two"),
+		);
+		await fire(two?.querySelector(".omp-sidebar-agent-pill") as unknown as Element, "onClick");
+		const frame = document.querySelector("[data-sidebar-pair]");
+		expect(titles(frame as ParentNode, ".omp-sidebar-session-row")).toEqual([
+			"Session /work/alpha/two.jsonl",
+			"Fork of two",
+			"Session /work/alpha/newest.jsonl",
+		]);
+	});
 });
 
 describe("Sidebar bulk selection", () => {
@@ -1107,7 +1146,7 @@ describe("Sidebar session hierarchy", () => {
 		expect(titles()).toEqual(["Main session", "Other session"]);
 		const parentRow = rowOf("Main session");
 		expect(parentRow?.getAttribute("aria-expanded")).toBe("false");
-		const pill = button("1 sessions started from this one", parentRow);
+		const pill = button("1 session started from this one", parentRow);
 		expect(pill?.textContent).toBe("1");
 		// One disclosure per row, in the status slot: the title column does not move.
 		expect(parentRow?.querySelectorAll("button[aria-label='Show sessions started from this one']").length).toBe(1);
@@ -1129,11 +1168,18 @@ describe("Sidebar session hierarchy", () => {
 		expect(titles()).toEqual(["Main session", "Other session"]);
 	});
 
-	it("lists an open tab's agents once, under its one arrow, with its forks", async () => {
+	it("lists an open tab's agents once, under its one arrow, with its forks and earlier transcripts", async () => {
 		const parent = session("/work/alpha/parent.jsonl", "/work/alpha", { id: "parent-id", title: "Main session" });
 		const transcript = session("/work/alpha/parent/Rain.jsonl", "/work/alpha", {
 			id: "rain-id",
 			title: "Rain transcript",
+			parentSessionPath: "/work/alpha/parent.jsonl",
+		});
+		// A transcript no agent row stands for (an agent of an earlier turn) stays listed.
+		const earlier = session("/work/alpha/parent/Snow.jsonl", "/work/alpha", {
+			id: "snow-id",
+			title: "Snow transcript",
+			modified: "2026-01-02T00:00:00Z",
 			parentSessionPath: "/work/alpha/parent.jsonl",
 		});
 		const fork = session("/work/alpha/fork.jsonl", "/work/alpha", {
@@ -1141,7 +1187,7 @@ describe("Sidebar session hierarchy", () => {
 			title: "Forked session",
 			parentSessionPath: "/work/alpha/parent.jsonl",
 		});
-		installMockOmp([parent, transcript, fork]);
+		installMockOmp([parent, transcript, earlier, fork]);
 		seedStores();
 		useTabsStore.setState({
 			tabs: [
@@ -1175,6 +1221,7 @@ describe("Sidebar session hierarchy", () => {
 					status: "completed",
 					lastUpdate: 1,
 					parentToolCallId: "c1",
+					sessionFile: "/work/alpha/parent/Rain.jsonl",
 				},
 			]);
 		try {
@@ -1182,9 +1229,10 @@ describe("Sidebar session hierarchy", () => {
 			const parentRow = [...document.querySelectorAll(".omp-sidebar-session-row")].find(row =>
 				(row.textContent ?? "").includes("Main session"),
 			);
-			// One agent plus one fork behind one arrow; the transcript is the agent, not a third entry.
+			// One agent, one earlier transcript and one fork behind one arrow; the
+			// agent's own transcript is the agent row, not another entry.
 			expect(parentRow?.getAttribute("aria-expanded")).toBe("false");
-			expect(parentRow?.querySelector(".omp-sidebar-agent-pill")?.textContent).toBe("2");
+			expect(parentRow?.querySelector(".omp-sidebar-agent-pill")?.textContent).toBe("3");
 			expect(parentRow?.querySelectorAll("[data-sidebar-session-icon] button").length).toBe(1);
 
 			await fire(parentRow?.querySelector(".omp-sidebar-agent-pill") as unknown as Element, "onClick");
@@ -1195,10 +1243,59 @@ describe("Sidebar session hierarchy", () => {
 						? `agent:${row.textContent}`
 						: row.querySelector(".omp-sidebar-title")?.textContent,
 				),
-			).toEqual(["Main session", "agent:Essay Rain", "Forked session"]);
+			).toEqual(["Main session", "agent:Essay Rain", "Snow transcript", "Forked session"]);
 		} finally {
 			deleteSessionRuntime("t1");
 		}
+	});
+
+	it("archives a session with its family and brings the family back from a child", async () => {
+		const parent = session("/work/alpha/parent.jsonl", "/work/alpha", { id: "parent-id", title: "Main session" });
+		const transcript = session("/work/alpha/parent/Rain.jsonl", "/work/alpha", {
+			id: "rain-id",
+			title: "Rain transcript",
+			parentSessionPath: "/work/alpha/parent.jsonl",
+		});
+		// A subagent that ran in another folder still belongs to its session's project.
+		const fork = session("/work/alpha/fork.jsonl", "/tmp/worktree", {
+			id: "fork-id",
+			title: "Forked session",
+			parentSessionPath: "/work/alpha/parent.jsonl",
+		});
+		const other = session("/work/alpha/other.jsonl", "/work/alpha", { title: "Other session" });
+		installMockOmp([parent, transcript, fork, other]);
+		seedStores();
+		useSidebarPrefs.setState({ archivedSessions: ["/work/alpha/parent.jsonl"], hydrated: true });
+		useSidebarPrefs.setState({ setSessionsArchived: vi.fn(async () => {}) });
+		await mount(<Sidebar />);
+
+		const titlesIn = (selector: string) =>
+			[...document.querySelectorAll(`${selector} .omp-sidebar-session-row .omp-sidebar-title`)].map(
+				element => element.textContent,
+			);
+		expect(titlesIn('[data-session-group="/work/alpha"]')).toEqual(["Other session"]);
+		expect(document.querySelector('[data-session-group="/tmp/worktree"]')).toBeNull();
+
+		const archivedHeader = [...document.querySelectorAll("[data-archived-section] button")].find(element =>
+			(element.textContent ?? "").includes("Archived"),
+		);
+		// The parent and its fork count; the subagent transcript sits inside the parent.
+		expect(document.querySelector("[data-archived-section] .omp-sidebar-group-count")?.textContent).toBe("2");
+		await fire(archivedHeader as unknown as Element, "onClick");
+		expect(titlesIn("[data-archived-section]")).toEqual(["Main session"]);
+		const parentRow = [...document.querySelectorAll("[data-archived-section] .omp-sidebar-session-row")][0];
+		await fire(parentRow?.querySelector(".omp-sidebar-agent-pill") as unknown as Element, "onClick");
+		expect(titlesIn("[data-archived-section]").sort()).toEqual(["Forked session", "Main session", "Rain transcript"]);
+
+		const forkRow = [...document.querySelectorAll("[data-archived-section] .omp-sidebar-session-row")].find(row =>
+			(row.textContent ?? "").includes("Forked session"),
+		);
+		await fire(forkRow as unknown as Element, "onContextMenu");
+		const unarchive = [...document.body.querySelectorAll('[role="menu"] button')].find(
+			item => (item.textContent ?? "").trim() === "Unarchive",
+		);
+		await fire(unarchive as unknown as Element, "onClick");
+		expect(useSidebarPrefs.getState().setSessionsArchived).toHaveBeenCalledWith(["/work/alpha/parent.jsonl"], false);
 	});
 
 	it("opens the family that holds the session on screen", async () => {

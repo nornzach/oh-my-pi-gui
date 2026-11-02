@@ -1830,9 +1830,11 @@
 	pointer-events: none;
 }
 
+/* The trunk on to the next sibling starts where the elbow's corner begins to
+   curve, so it runs on unbroken without doubling the elbow's straight part. */
 .omp-sidebar-agent-guide {
 	position: absolute;
-	top: 50%;
+	top: calc(50% - 6px);
 	bottom: 0;
 	border-left: 1px solid var(--omp-border);
 	pointer-events: none;
@@ -1864,4 +1866,10 @@
 	font-size: var(--text-omp-xxs);
 	font-variant-numeric: tabular-nums;
 	color: var(--omp-muted);
+}
+
+/* A folded family that holds the session on screen. */
+.omp-sidebar-agent-pill[data-holds-active] {
+	border-color: color-mix(in srgb, var(--omp-accent) 45%, transparent);
+	color: var(--omp-accent);
 }

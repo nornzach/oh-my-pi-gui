@@ -47,19 +47,21 @@ describe("parseCustomThemeFile", () => {
 				"bg-elevated": "transparent",
 				"shadow-md": "0 6px 18px rgba(0, 0, 0, 0.4)",
 				"not-a-token": "#ffffff",
-				"text-primary": 42,
+				text: 42,
 				"bg-secondary": "url(https://example.com/x.png)",
 				"shadow-sm": "0 0 0 url(https://example.com/x.png)",
-				"border-subtle": "#12345",
+				"border-muted": "#12345",
 			},
 		});
-		expect(entry.skipped).toEqual(["not-a-token", "text-primary", "bg-secondary", "shadow-sm", "border-subtle"]);
+		expect(entry.skipped).toEqual(["not-a-token", "text", "bg-secondary", "shadow-sm", "border-muted"]);
 		expect(entry.theme?.tokens).toMatchObject({
 			"--omp-accent": "#123456",
 			"--omp-bg-elevated": "transparent",
 			"--omp-shadow-md": "0 6px 18px rgba(0, 0, 0, 0.4)",
+			"--omp-text": THEMES.dark.tokens["--omp-text"],
 			"--omp-bg-secondary": THEMES.dark.tokens["--omp-bg-secondary"],
 			"--omp-shadow-sm": THEMES.dark.tokens["--omp-shadow-sm"],
+			"--omp-border-muted": THEMES.dark.tokens["--omp-border-muted"],
 		});
 	});
 
@@ -97,31 +99,58 @@ describe("parseCustomThemeFile", () => {
 
 describe("a custom theme on screen", () => {
 	const { document } = parseHTML("<html><head></head><body></body></html>");
-	const accent = () => document.documentElement.style.getPropertyValue("--omp-accent");
+	const style = document.documentElement.style;
+	const accent = () => style.getPropertyValue("--omp-accent");
+	const storage = new Map<string, string>();
+	const localStorage = {
+		getItem: (key: string) => storage.get(key) ?? null,
+		setItem: (key: string, value: string) => void storage.set(key, value),
+		removeItem: (key: string) => void storage.delete(key),
+	};
 	const themes = (theme?: ThemeDefinition) => new Map(theme ? [["custom:midnight" as const, theme]] : []);
-	const withAccent = (value: string) => parse({ extends: "dark", tokens: { accent: value } }).theme;
+	const midnight = (accent: string, background = "#0b1020") =>
+		parse({ extends: "nord", tokens: { accent, "bg-primary": background } }).theme;
 
-	beforeEach(() => vi.stubGlobal("document", document));
+	beforeEach(() => {
+		vi.stubGlobal("document", document);
+		vi.stubGlobal("localStorage", localStorage);
+		vi.stubGlobal("window", { localStorage });
+	});
 	afterEach(() => {
 		setCustomThemes(new Map());
+		storage.clear();
 		vi.unstubAllGlobals();
 	});
 
-	it("follows edits to its file and falls back to a built-in theme when the file goes", () => {
-		setCustomThemes(themes(withAccent("#111111")));
-		applyThemeByName("custom:midnight", { persist: false });
-		expect(accent()).toBe("#111111");
+	// First in the file: no theme files have been read in this module yet.
+	it("waits at launch for the theme files instead of showing a built-in theme first", () => {
+		style.setProperty("background-color", "#0b1020");
+		applyThemeByName("custom:midnight", { persist: false, remember: true });
+		expect(accent()).toBe("");
+		expect(style.getPropertyValue("background-color")).toBe("#0b1020");
 
-		setCustomThemes(themes(withAccent("#222222")));
+		setCustomThemes(themes(midnight("#111111")));
+		expect(accent()).toBe("#111111");
+	});
+
+	it("follows edits to its file, remembers its background, and falls back to the scheme it showed", () => {
+		setCustomThemes(themes(midnight("#111111")));
+		applyThemeByName("custom:midnight", { persist: false, remember: true });
+		expect(accent()).toBe("#111111");
+		expect(storage.get("omp.themeBackground")).toBe("#0b1020");
+
+		setCustomThemes(themes(midnight("#222222", "#202840")));
 		expect(accent()).toBe("#222222");
+		// The next launch paints the edited background first.
+		expect(storage.get("omp.themeBackground")).toBe("#202840");
 
 		setCustomThemes(themes());
-		expect(accent()).toBe(THEMES.light.tokens["--omp-accent"]);
+		expect(accent()).toBe(THEMES.dark.tokens["--omp-accent"]);
 	});
 
 	it("leaves a built-in theme on screen when theme files change", () => {
 		applyThemeByName("nord", { persist: false });
-		setCustomThemes(themes(withAccent("#111111")));
+		setCustomThemes(themes(midnight("#111111")));
 		expect(accent()).toBe(THEMES.nord.tokens["--omp-accent"]);
 	});
 });

@@ -4,12 +4,14 @@
 
 ### Added
 
-- Custom themes: add `.json` files to `~/.omp/gui/themes` and pick them from the theme picker. A theme starts from a built-in one (`"extends": "nord"`) and overrides any of the GUI's colors, from the accent to the sidebar and title bar; edits apply while the app runs, and colors that are not valid are skipped and listed in the picker. **Open folder** at the bottom of the picker creates the folder. See the README's Custom themes section ([#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)).
-- The window opens on the chosen theme's background instead of plain dark or light.
+- Custom themes: add `.json` files to `~/.omp/gui/themes` and pick them from the theme picker. A theme starts from a built-in one (`"extends": "nord"`) and overrides any of the GUI's colors, from the accent to the sidebar and title bar; edits apply while the app runs, and colors that are not valid are skipped and listed in the picker. A file saved with a typo keeps the theme's last working version on screen, and the picker says when the theme you picked is broken or its file is gone. **Open folder** at the bottom of the picker creates the folder. See the README's Custom themes section ([#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)).
+- The window opens on the chosen theme's background instead of plain dark or light, custom themes included.
 
 ### Fixed
 
-- Sessions in the sidebar line up again, each row with one arrow. A session's subagent sessions, forks and continuations start folded behind a count, so the list shows your main sessions; hover the row and click the arrow, or the count, to open them, and the family of the session you are in opens by itself. A session open in a tab lists its agents once, not again as subagent sessions, and nested sessions hang from tree lines ([#36](https://github.com/nornzach/oh-my-pi-gui/issues/36), [#39](https://github.com/nornzach/oh-my-pi-gui/issues/39)).
+- Sessions in the sidebar line up again, each row with one arrow. A session's subagent sessions, forks and continuations start folded behind a count, so the list shows your main sessions; hover the row and click the arrow to open them, and the family of the session you are in opens by itself. A session open in a tab lists its agents once, not again as subagent sessions, and nested sessions hang from tree lines ([#36](https://github.com/nornzach/oh-my-pi-gui/issues/36), [#39](https://github.com/nornzach/oh-my-pi-gui/issues/39)).
+- Archiving a session in the sidebar archives the sessions started from it too, and unarchiving any of them brings the whole family back.
+- Subagent sessions no longer show up on their own in the session picker, the workspace list, the tray's recent sessions or Memory's project list.
 
 ## [0.9.34] - 2026-11-02
 

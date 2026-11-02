@@ -10,6 +10,7 @@ import { useMemo } from "react";
 import { useSessionList } from "../../hooks/use-session-list";
 import { basename, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isSubagentSession } from "../../lib/session-tree";
 import { pickWorkspaceDirectory } from "../../lib/workspace-dirs";
 import { useSessionStore } from "../../stores/session";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
@@ -44,6 +45,8 @@ export function WorkspaceDialog({
 	const workspaces = useMemo<WorkspaceRow[]>(() => {
 		const byCwd = new Map<string, WorkspaceRow>();
 		for (const session of sessions) {
+			// A subagent may run in a worktree of its own; it is not a project you opened.
+			if (isSubagentSession(session)) continue;
 			const modified = Date.parse(session.modified) || 0;
 			const existing = byCwd.get(session.cwd);
 			if (existing) {

@@ -8,13 +8,15 @@
  */
 
 import { AlertTriangle, Check, FolderOpen, Monitor, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { cx, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import {
 	applyThemeByName,
+	customTheme,
 	getPersistedThemeSelection,
+	isCustomThemeSelection,
 	resolveTokenColor,
 	THEMES,
 	type ThemeDefinition,
@@ -39,6 +41,21 @@ interface ThemeEntry {
 	skipped?: string[];
 }
 
+/**
+ * Where the list opens when the chosen theme has no row (its file is broken
+ * or gone): on its notice, until a key moves the cursor or a search starts.
+ */
+type NoticeLanding = "none" | "pending" | "landed";
+
+/** Scrolls the chosen theme's notice into view once it is pending and rendered. */
+function landOnNotice(landing: RefObject<NoticeLanding>, list: HTMLElement | null): void {
+	if (landing.current !== "pending") return;
+	const notice = list?.querySelector("[data-chosen-theme]");
+	if (!notice) return;
+	landing.current = "landed";
+	notice.scrollIntoView({ block: "nearest" });
+}
+
 export function ThemePickerDialog() {
 	const t = useT();
 	const open = useUiStore(s => s.themePickerOpen);
@@ -53,6 +70,7 @@ export function ThemePickerDialog() {
 	const [active, setActive] = useState(0);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
+	const landingRef = useRef<NoticeLanding>("none");
 
 	const entries = useMemo<ThemeEntry[]>(
 		() => [
@@ -84,6 +102,13 @@ export function ThemePickerDialog() {
 	const entriesRef = useRef(entries);
 	entriesRef.current = entries;
 	const broken = customEntries.filter(entry => !entry.theme);
+	// The chosen custom theme's file is gone or broken: say what is on screen instead.
+	const chosenId = isCustomThemeSelection(current) && customDir !== null ? current.slice("custom:".length) : null;
+	const chosenFile = chosenId === null || /\.json$/i.test(chosenId) ? chosenId : `${chosenId}.json`;
+	const chosenMissing = chosenFile !== null && !customEntries.some(entry => entry.selection === current);
+	const chosenNote = isCustomThemeSelection(current)
+		? t(customTheme(current) ? "themePicker.custom.keptLastGood" : "themePicker.custom.fallback")
+		: "";
 
 	const filtered = useMemo(() => {
 		const q = query.trim().toLowerCase();
@@ -97,16 +122,16 @@ export function ThemePickerDialog() {
 		let cancelled = false;
 		setQuery("");
 		setActive(0);
+		landingRef.current = "none";
 		void getPersistedThemeSelection().then(sel => {
 			if (cancelled) return;
 			setCurrent(sel);
 			// Read once per open: the custom list changing underneath keeps the cursor where it is.
-			setActive(
-				Math.max(
-					0,
-					entriesRef.current.findIndex(e => e.selection === sel),
-				),
-			);
+			const index = entriesRef.current.findIndex(e => e.selection === sel);
+			if (index < 0 && isCustomThemeSelection(sel)) landingRef.current = "pending";
+			setActive(Math.max(0, index));
+			// Reopened on the same theme, nothing re-renders, so the effect below would not run.
+			requestAnimationFrame(() => landOnNotice(landingRef, listRef.current));
 		});
 		requestAnimationFrame(() => inputRef.current?.focus());
 		return () => {
@@ -125,6 +150,7 @@ export function ThemePickerDialog() {
 
 	const onKey = (e: React.KeyboardEvent) => {
 		if (isImeKeyEvent(e)) return;
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") landingRef.current = "none";
 		if (e.key === "ArrowDown") {
 			e.preventDefault();
 			setActive(i => Math.min(filtered.length - 1, i + 1));
@@ -139,8 +165,12 @@ export function ThemePickerDialog() {
 	};
 
 	useEffect(() => {
+		if (landingRef.current !== "none") return;
 		listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
 	}, [active]);
+
+	// The notice renders once the theme files are in, so this checks after every render until it lands.
+	useEffect(() => landOnNotice(landingRef, listRef.current));
 
 	return (
 		<Modal
@@ -159,6 +189,7 @@ export function ThemePickerDialog() {
 						ref={inputRef}
 						value={query}
 						onChange={e => {
+							landingRef.current = "none";
 							setQuery(e.target.value);
 							setActive(0);
 						}}
@@ -253,6 +284,7 @@ export function ThemePickerDialog() {
 							<div
 								key={entry.selection}
 								data-custom-theme-problem={entry.problem}
+								data-chosen-theme={entry.selection === current || undefined}
 								className="flex items-start gap-3 px-3 py-2 text-omp-md text-[var(--omp-muted)]"
 							>
 								<AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--omp-warning)]" />
@@ -261,9 +293,24 @@ export function ThemePickerDialog() {
 										file: entry.fileName,
 										detail: entry.detail ?? "",
 									})}
+									{entry.selection === current && (
+										<span className="block text-[var(--omp-text-secondary)]">{chosenNote}</span>
+									)}
 								</span>
 							</div>
 						))}
+					{!query.trim() && chosenMissing && (
+						<div
+							data-custom-theme-problem="missing"
+							data-chosen-theme
+							className="flex items-start gap-3 px-3 py-2 text-omp-md text-[var(--omp-muted)]"
+						>
+							<AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--omp-warning)]" />
+							<span className="min-w-0 break-words">
+								{t("themePicker.custom.missing", { file: chosenFile ?? "" })}
+							</span>
+						</div>
+					)}
 				</div>
 				<div className="flex items-center gap-3 border-t border-[var(--omp-border-muted)] px-4 py-2.5">
 					<span className="min-w-0 flex-1 text-omp-sm text-[var(--omp-dim)]">

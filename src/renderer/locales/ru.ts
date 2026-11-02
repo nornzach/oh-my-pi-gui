@@ -473,6 +473,7 @@ export const ru: Record<string, string> = {
 	"sidebar.subsessions.expand": "Показать сессии, начатые отсюда",
 	"sidebar.subsessions.collapse": "Скрыть сессии, начатые отсюда",
 	"sidebar.subsessions.count": "Сессий, начатых отсюда: {count}",
+	"sidebar.subsessions.countWithAgents": "Агентов и сессий, начатых отсюда: {count}",
 	"sidebar.archived": "Архив",
 	"sidebar.archiveFailed": "Не удалось сохранить список архива.",
 	"sidebar.menu.archive": "Архивировать",
@@ -1406,6 +1407,10 @@ export const ru: Record<string, string> = {
 	"themePicker.custom.hint": "Добавьте свои темы как JSON-файлы в {dir}.",
 	"themePicker.custom.openFolder": "Открыть папку",
 	"themePicker.custom.openFailed": "Не удалось открыть папку тем: {error}",
+	"themePicker.custom.keptLastGood":
+		"Это ваша тема: пока файл не исправлен, на экране остаётся её последняя рабочая версия.",
+	"themePicker.custom.fallback": "Это ваша тема: пока файл не исправлен, показана встроенная тема.",
+	"themePicker.custom.missing": "Вашей темы {file} больше нет в папке; вместо неё показана встроенная тема.",
 	"themePicker.custom.problem.unreadable": "Не удалось прочитать {file}: {detail}",
 	"themePicker.custom.problem.notObject": "{file} — не тема: файл должен содержать JSON-объект.",
 	"themePicker.custom.problem.unknownBase": "{file} расширяет «{detail}», но такой встроенной темы нет.",

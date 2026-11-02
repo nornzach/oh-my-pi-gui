@@ -260,7 +260,8 @@ export function App() {
 				const selection = await getPersistedThemeSelection(prefs);
 				if (cancelled) return;
 				if (getThemeSelectionVersion() === initialThemeVersion) {
-					applyThemeByName(selection, { persist: false });
+					// Remembered for the pre-paint canvas, so the next launch opens on it.
+					applyThemeByName(selection, { persist: false, remember: true });
 					useUiStore.setState({
 						theme: selection === "system" ? "system" : resolveThemeSelection(selection).scheme,
 					});

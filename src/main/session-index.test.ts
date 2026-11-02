@@ -201,6 +201,24 @@ describe("SessionIndex headers and watching", () => {
 		expect(again.find(info => info.id === "helper")?.parentSessionPath).toBe(child);
 	});
 
+	it("keeps a subagent under the session that ran it when a fork copied its transcript", async () => {
+		const { index, dir } = await makeIndex();
+		const parent = await writeSession(dir, "parent");
+		const fork = await writeSession(dir, "fork");
+		const transcript = (session: string) => path.join(session.slice(0, -".jsonl".length), "agent.jsonl");
+		const header = { type: "session", version: 3, id: "agent", timestamp: new Date().toISOString(), cwd: dir };
+		const body = `${JSON.stringify({ type: "title", title: "" })}\n${JSON.stringify(header)}\n${JSON.stringify({ type: "message", message: { role: "user", content: "task" } })}\n`;
+		for (const session of [parent, fork]) await fs.mkdir(path.dirname(transcript(session)), { recursive: true });
+		await fs.writeFile(transcript(parent), body);
+		// The fork's copy is written later, as copying the artifact folder does.
+		await fs.writeFile(transcript(fork), body);
+		const hourAgo = new Date(Date.now() - 3_600_000);
+		await fs.utimes(transcript(parent), hourAgo, hourAgo);
+
+		const agents = (await index.list("global")).filter(info => info.id === "agent");
+		expect(agents.map(info => info.parentSessionPath)).toEqual([parent]);
+	});
+
 	it("watches session files without holding a handle per artifact file", async () => {
 		const { index, dir } = await makeIndex();
 		const file = await writeSession(dir, "with-artifacts");

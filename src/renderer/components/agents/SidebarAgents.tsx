@@ -39,27 +39,69 @@ export interface SidebarAgentsInfo {
 	pageShown: boolean;
 }
 
-/** Your choice sticks per session while it is open; nothing expands on its own later. */
-const useSidebarAgentsStore = create<{ expanded: Record<string, boolean> }>()(() => ({ expanded: {} }));
+/**
+ * Where the agent rows sit under their session row: the session's indent, the
+ * tree lines that run past it (its ancestors', and its own on to a later
+ * sibling), and whether its child sessions follow the agent rows.
+ */
+export interface SidebarAgentsLayout {
+	offset: number;
+	lines: readonly number[];
+	trunk: boolean;
+}
+
+const FLAT_LAYOUT: SidebarAgentsLayout = { offset: 0, lines: [], trunk: false };
+
+interface SidebarAgentsState {
+	/** Your choice sticks per session while it is open; nothing expands on its own later. */
+	expanded: Record<string, boolean>;
+	/** Per session, the transcripts its agent rows stand for (see transcriptKey). */
+	transcripts: Record<string, ReadonlySet<string>>;
+}
+
+const useSidebarAgentsStore = create<SidebarAgentsState>()(() => ({ expanded: {}, transcripts: {} }));
 
 function setExpanded(key: string, value: boolean): void {
 	useSidebarAgentsStore.setState(state => ({ expanded: { ...state.expanded, [key]: value } }));
 }
 
+function setTranscripts(key: string, files: ReadonlySet<string> | undefined): void {
+	useSidebarAgentsStore.setState(state => {
+		const { [key]: _previous, ...rest } = state.transcripts;
+		return { transcripts: files ? { ...rest, [key]: files } : rest };
+	});
+}
+
+/**
+ * The transcripts each open session's agent rows stand for, so the sidebar
+ * does not list them a second time. A session missing here has not drawn its
+ * agent rows yet.
+ */
+export function useSidebarAgentTranscripts(): Record<string, ReadonlySet<string>> {
+	return useSidebarAgentsStore(state => state.transcripts);
+}
+
+/** A transcript's folder and file name: its session's artifact folder makes it unique, whatever the path's prefix. */
+export function transcriptKey(file: string): string {
+	return file.replaceAll("\\", "/").split("/").slice(-2).join("/");
+}
+
 export function SessionAgentsScope({
 	tabId,
 	sessionKey,
+	layout = FLAT_LAYOUT,
 	children,
 }: {
 	tabId: string;
 	sessionKey: string;
+	layout?: SidebarAgentsLayout;
 	children: (info: SidebarAgentsInfo | null) => ReactNode;
 }) {
 	const runtime = sessionRuntime(tabId);
 	if (!runtime) return <>{children(null)}</>;
 	return (
 		<SessionRuntimeProvider runtime={runtime}>
-			<SessionAgents sessionKey={sessionKey} tabId={tabId}>
+			<SessionAgents layout={layout} sessionKey={sessionKey} tabId={tabId}>
 				{children}
 			</SessionAgents>
 		</SessionRuntimeProvider>
@@ -69,10 +111,12 @@ export function SessionAgentsScope({
 function SessionAgents({
 	tabId,
 	sessionKey,
+	layout,
 	children,
 }: {
 	tabId: string;
 	sessionKey: string;
+	layout: SidebarAgentsLayout;
 	children: (info: SidebarAgentsInfo | null) => ReactNode;
 }) {
 	const projection = useAgentProjection();
@@ -86,6 +130,12 @@ function SessionAgents({
 		if (thisTurn && stored === undefined) setExpanded(sessionKey, true);
 	}, [thisTurn, sessionKey, stored]);
 	const expanded = stored ?? thisTurn;
+	// The sidebar lists this session's subagent transcripts only where no agent row stands for one.
+	const files = rows.flatMap(row => (row.agent.sessionFile ? [transcriptKey(row.agent.sessionFile)] : [])).join("\n");
+	useEffect(() => {
+		setTranscripts(sessionKey, new Set(files ? files.split("\n") : []));
+		return () => setTranscripts(sessionKey, undefined);
+	}, [files, sessionKey]);
 	const working = rows.some(row => !row.context && row.activity === "working");
 	const info = useMemo<SidebarAgentsInfo | null>(
 		() =>
@@ -103,7 +153,7 @@ function SessionAgents({
 	return (
 		<>
 			{children(info)}
-			{info?.expanded && <SidebarAgentRows rows={rows} shownPage={shownPage} tabId={tabId} />}
+			{info?.expanded && <SidebarAgentRows layout={layout} rows={rows} shownPage={shownPage} tabId={tabId} />}
 		</>
 	);
 }
@@ -112,21 +162,32 @@ function SidebarAgentRows({
 	tabId,
 	rows,
 	shownPage,
+	layout,
 }: {
 	tabId: string;
 	rows: readonly AgentTreeRow[];
 	shownPage: string | null;
+	layout: SidebarAgentsLayout;
 }) {
 	const t = useT();
 	const cut = useMemo(() => cutAgentTree(rows, SIDEBAR_AGENT_LIMIT), [rows]);
 	const openDrawer = () => useUiStore.getState().setPanelTab("agents");
 	return (
 		<div className="omp-sidebar-agents relative" role="group">
+			{layout.lines.map(x => (
+				<span
+					aria-hidden
+					className="omp-sidebar-agent-guide omp-sidebar-agent-guide--full"
+					key={x}
+					style={{ left: x, top: -1 }}
+				/>
+			))}
 			{cut.rows.map((row, index) => (
 				<SidebarAgentRow
-					hasNextSibling={hasNextSibling(cut.rows, index) || (cut.hidden > 0 && row.depth === 0)}
+					hasNextSibling={hasNextSibling(cut.rows, index) || ((cut.hidden > 0 || layout.trunk) && row.depth === 0)}
 					key={row.agent.id}
-					rootGuide={row.depth > 0 && (cut.hidden > 0 || laterRoot(cut.rows, index))}
+					offset={layout.offset}
+					rootGuide={row.depth > 0 && (cut.hidden > 0 || layout.trunk || laterRoot(cut.rows, index))}
 					row={row}
 					selected={shownPage === row.agent.id}
 					tabId={tabId}
@@ -136,10 +197,13 @@ function SidebarAgentRows({
 				<button
 					className="omp-sidebar-agent-row omp-color-fade relative flex h-7 w-full items-center rounded-lg pr-2 text-left text-omp-sm text-[var(--omp-dim)] hover:bg-[var(--omp-sidebar-item-hover)]"
 					onClick={openDrawer}
-					style={{ paddingLeft: 8 + INDENT + 16 + 8 }}
+					style={{ paddingLeft: 8 + INDENT + 16 + 8 + layout.offset }}
 					type="button"
 				>
-					<span aria-hidden className="omp-sidebar-agent-elbow" style={{ left: 15 }} />
+					<span aria-hidden className="omp-sidebar-agent-elbow" style={{ left: 15 + layout.offset }} />
+					{layout.trunk && (
+						<span aria-hidden className="omp-sidebar-agent-guide" style={{ left: 15 + layout.offset }} />
+					)}
 					<span className="min-w-0 truncate">
 						{t("agents.sidebar.more", { count: cut.hidden })}
 						{cut.hiddenWorking > 0 && <> · {t("agents.sidebar.moreWorking", { count: cut.hiddenWorking })}</>}
@@ -177,11 +241,14 @@ function SidebarAgentRow({
 	selected,
 	hasNextSibling,
 	rootGuide,
+	offset,
 }: {
 	tabId: string;
 	row: AgentTreeRow;
 	selected: boolean;
 	hasNextSibling: boolean;
+	/** The session row's indent. */
+	offset: number;
 	/** A first-level sibling follows this nested row: the first level's guide runs through it. */
 	rootGuide: boolean;
 }) {
@@ -190,7 +257,7 @@ function SidebarAgentRow({
 	const hover = useAgentHoverCard(tabId, row.agent.id, "right");
 	const level = Math.min(row.depth, MAX_LEVEL - 1) + 1;
 	// The session's signal dot sits at 16 px; each level's dot 14 px further in.
-	const parentDot = 16 + (level - 1) * INDENT;
+	const parentDot = 16 + (level - 1) * INDENT + offset;
 	const title = subagentPrimaryLabel(row.agent);
 	const state = activityLabel(row.agent);
 	return (
@@ -203,14 +270,18 @@ function SidebarAgentRow({
 				selected ? "bg-[var(--omp-selected-bg)]" : "hover:bg-[var(--omp-sidebar-item-hover)]",
 			)}
 			onClick={event => useAgentPagesStore.getState().open(tabId, row.agent.id, { beside: event.altKey })}
-			style={{ paddingLeft: 8 + level * INDENT }}
+			style={{ paddingLeft: 8 + level * INDENT + offset }}
 			title={title}
 			type="button"
 		>
 			<span aria-hidden className="omp-sidebar-agent-elbow" style={{ left: parentDot - 1 }} />
 			{hasNextSibling && <span aria-hidden className="omp-sidebar-agent-guide" style={{ left: parentDot - 1 }} />}
 			{rootGuide && (
-				<span aria-hidden className="omp-sidebar-agent-guide omp-sidebar-agent-guide--full" style={{ left: 15 }} />
+				<span
+					aria-hidden
+					className="omp-sidebar-agent-guide omp-sidebar-agent-guide--full"
+					style={{ left: 15 + offset }}
+				/>
 			)}
 			<span aria-hidden className="mr-2 flex w-4 shrink-0 justify-center">
 				<AgentSignal activity={row.activity} />

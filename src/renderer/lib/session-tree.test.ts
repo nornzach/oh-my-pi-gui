@@ -64,6 +64,17 @@ describe("buildSessionTree", () => {
 		expect(paths.sort()).toEqual(["/s/a.jsonl", "/s/b.jsonl", "/s/orphan.jsonl"]);
 		expect(roots.some(node => node.session.path === "/s/orphan.jsonl" && node.children.length === 0)).toBe(true);
 	});
+
+	it("keeps a session that only leads into a cycle under its parent", () => {
+		const a = session("/s/a.jsonl", { id: "a", parentSessionPath: "b" });
+		const b = session("/s/b.jsonl", { id: "b", parentSessionPath: "a" });
+		const c = session("/s/c.jsonl", { id: "c", parentSessionPath: "a" });
+
+		const roots = buildSessionTree([c, a, b]);
+
+		expect(roots.map(node => node.session.path)).toEqual(["/s/a.jsonl"]);
+		expect(roots[0]?.children.map(node => node.session.path).sort()).toEqual(["/s/b.jsonl", "/s/c.jsonl"]);
+	});
 });
 
 describe("orderSessionForest", () => {

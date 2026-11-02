@@ -235,10 +235,10 @@ Add your own color themes as `.json` files in `~/.omp/gui/themes` (**Open folder
 |---|---|
 | `name`, `description` | Shown in the picker; `name` defaults to the file name. |
 | `extends` | Built-in theme to start from: `dark`, `light`, `titanium`, `nord`, `solarized`, `paper`, `dawn`, `latte`, `gruvbox`, `frost`, `matcha`, `rosePine`. Defaults to `dark`, or `light` when `scheme` is `light`. |
-| `scheme` | `dark` or `light`, for native controls, charts and diagrams. Defaults to the base theme's. |
+| `scheme` | `dark` or `light`, for native controls and diagrams. Defaults to the base theme's. |
 | `tokens` | Any of the GUI's color tokens, with or without the `--omp-` prefix; the full list is `THEME_TOKEN_KEYS` in [`src/renderer/lib/themes.ts`](src/renderer/lib/themes.ts). |
 
-Values are hex colors, `rgb()`/`hsl()`/`oklch()`-style colors, `color-mix()`, `transparent`, or `var(--omp-…)` references to another token; the `shadow-*` tokens take box shadows. An unknown name or any other value is skipped and listed under the theme in the picker, and the rest of the theme still applies. Charts and diagrams follow the theme's light or dark scheme rather than its colors. With **Follow the current task's terminal palette** on (Settings → GUI), the agent's theme still recolors the conversation on top.
+Values are hex colors, `rgb()`/`hsl()`/`oklch()`-style colors, `color-mix()`, `transparent`, or `var(--omp-…)` references to another token; the `shadow-*` tokens take box shadows. An unknown name or any other value is skipped and listed under the theme in the picker, and the rest of the theme still applies. Files are plain JSON, without comments or trailing commas; a file that doesn't parse is listed in the picker with its error, and while it is broken a theme already on screen keeps its last working version. Charts use the theme's colors; diagrams follow only its light or dark scheme. With **Follow the current task's terminal palette** on (Settings → GUI), the agent's theme still recolors the conversation on top.
 
 <a id="en-development"></a>
 ### Development
@@ -579,10 +579,10 @@ Windows 包当前未签名。首次启动前请确认下载来源；Windows Smar
 |---|---|
 | `name`、`description` | 显示在选择器中；`name` 默认为文件名。 |
 | `extends` | 作为基础的内置主题：`dark`、`light`、`titanium`、`nord`、`solarized`、`paper`、`dawn`、`latte`、`gruvbox`、`frost`、`matcha`、`rosePine`。默认为 `dark`；`scheme` 为 `light` 时默认为 `light`。 |
-| `scheme` | `dark` 或 `light`，用于系统控件、图表和流程图。默认沿用基础主题。 |
+| `scheme` | `dark` 或 `light`，用于系统控件和流程图。默认沿用基础主题。 |
 | `tokens` | GUI 的任意颜色 token，可带或不带 `--omp-` 前缀；完整列表见 [`src/renderer/lib/themes.ts`](src/renderer/lib/themes.ts) 中的 `THEME_TOKEN_KEYS`。 |
 
-取值可以是十六进制颜色、`rgb()`/`hsl()`/`oklch()` 等颜色函数、`color-mix()`、`transparent`，或引用其他 token 的 `var(--omp-…)`；`shadow-*` token 使用 box-shadow 写法。未知的 token 名或其他取值会被跳过并在选择器中列出，主题的其余部分照常生效。图表和流程图只跟随主题的浅色/深色方案，不跟随具体颜色。开启**跟随当前任务的终端配色**（设置 → 界面）时，Agent 主题仍会在其上为对话区域重新着色。
+取值可以是十六进制颜色、`rgb()`/`hsl()`/`oklch()` 等颜色函数、`color-mix()`、`transparent`，或引用其他 token 的 `var(--omp-…)`；`shadow-*` token 使用 box-shadow 写法。未知的 token 名或其他取值会被跳过并在选择器中列出，主题的其余部分照常生效。文件须为标准 JSON，不能有注释或末尾逗号；无法解析的文件会连同错误信息列在选择器中，文件损坏期间，正在使用的主题保留上一次可用的版本。图表使用主题的颜色；流程图只跟随主题的浅色/深色方案。开启**跟随当前任务的终端配色**（设置 → 界面）时，Agent 主题仍会在其上为对话区域重新着色。
 
 <a id="zh-development"></a>
 ### 开发

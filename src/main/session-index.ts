@@ -134,12 +134,18 @@ export class SessionIndex {
 		// directories. After the modified-desc sort, the first occurrence of each
 		// id is the newest copy — keep it and drop the stale duplicates so one
 		// session never renders as two sidebar rows.
-		const seen = new Set<string>();
-		return infos.filter(info => {
-			if (!info.id || seen.has(info.id)) return false;
-			seen.add(info.id);
-			return true;
-		});
+		// A fork copies its parent's artifact folder, subagent transcripts
+		// included, and the copies get fresh mtimes. Of two copies of a
+		// transcript the older one is the original, so the subagents stay under
+		// the session that ran them.
+		const transcripts = new Set(entries.flatMap(entry => (entry.parentFile ? [entry.path] : [])));
+		const kept = new Map<string, SessionInfo>();
+		for (const info of infos) {
+			if (!info.id) continue;
+			const first = kept.get(info.id);
+			if (!first || (transcripts.has(first.path) && transcripts.has(info.path))) kept.set(info.id, info);
+		}
+		return infos.filter(info => kept.get(info.id) === info);
 	}
 
 	/**

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import type { IpcCustomThemes } from "../../shared/ipc-types";
-import { setCustomThemes } from "../lib/themes";
-import { initCustomThemes, useCustomThemesStore } from "./custom-themes";
+import { customTheme, setCustomThemes } from "../lib/themes";
+import { initCustomThemes, loadCustomThemes, useCustomThemesStore } from "./custom-themes";
 
 afterEach(() => {
 	useCustomThemesStore.getState().reset();
@@ -30,4 +30,16 @@ it("keeps a change pushed while the first read is still out", async () => {
 	await Promise.resolve();
 
 	expect(useCustomThemesStore.getState().entries.map(entry => entry.selection)).toEqual(["custom:midnight"]);
+});
+
+it("keeps a theme's last working version while its file is broken, and drops it with the file", () => {
+	const file = { id: "midnight", fileName: "midnight.json" };
+	loadCustomThemes({ dir: "/themes", files: [{ ...file, data: { tokens: { accent: "#111111" } } }] });
+	loadCustomThemes({ dir: "/themes", files: [{ ...file, error: "Unexpected token } in JSON" }] });
+
+	expect(customTheme("custom:midnight")?.tokens["--omp-accent"]).toBe("#111111");
+	expect(useCustomThemesStore.getState().entries.map(entry => entry.problem)).toEqual(["unreadable"]);
+
+	loadCustomThemes({ dir: "/themes", files: [] });
+	expect(customTheme("custom:midnight")).toBeUndefined();
 });

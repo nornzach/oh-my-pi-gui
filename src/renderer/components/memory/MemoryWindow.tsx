@@ -22,6 +22,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSessionList } from "../../hooks/use-session-list";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { isSubagentSession } from "../../lib/session-tree";
 import { useSessionStore } from "../../stores/session";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { usePendingSkillReviews } from "../../stores/skill-review";
@@ -116,7 +117,11 @@ function ProjectPicker({ cwd, onChange }: { cwd: string | null; onChange: (cwd: 
 	}, []);
 
 	const projects = useMemo(
-		() => memoryProjects(sessions, { current: cwd, aliases, workCwd, workLabel: t("sidebar.mode.work") }),
+		() =>
+			memoryProjects(
+				sessions.filter(session => !isSubagentSession(session)),
+				{ current: cwd, aliases, workCwd, workLabel: t("sidebar.mode.work") },
+			),
 		[aliases, cwd, sessions, t, workCwd],
 	);
 	const current = projects.find(project => project.cwd === cwd);
