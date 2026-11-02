@@ -218,6 +218,10 @@ export const IPC_COMMANDS = {
 	THEMES_LIST: "themes:list",
 	/** Create the custom themes folder if needed and open it in the file manager */
 	THEMES_OPEN_FOLDER: "themes:open-folder",
+	/** Write a theme made in the theme editor (IpcSaveCustomThemeRequest → IpcSaveCustomThemeResult) */
+	THEMES_SAVE: "themes:save",
+	/** Move a custom theme file to the trash ({ fileName } → IpcDeleteCustomThemeResult) */
+	THEMES_DELETE: "themes:delete",
 	/** Get GUI preferences */
 	PREFS_GET: "prefs:get",
 	/** Set GUI preferences */
@@ -1150,6 +1154,19 @@ export interface IpcCustomThemes {
 	files: IpcCustomThemeFile[];
 }
 
+export interface IpcSaveCustomThemeRequest {
+	/** The file to replace; a new theme leaves it out and gets a file named after it. */
+	fileName?: string;
+	/** The theme file's JSON. */
+	theme: Record<string, unknown>;
+}
+
+export type IpcSaveCustomThemeResult =
+	| { ok: true; fileName: string; themes: IpcCustomThemes }
+	| { ok: false; error: string };
+
+export type IpcDeleteCustomThemeResult = { ok: true; themes: IpcCustomThemes } | { ok: false; error: string };
+
 export interface SessionInfo {
 	path: string;
 	id: string;
@@ -1584,6 +1601,9 @@ export interface OmpApi {
 	themes: {
 		list(): Promise<IpcCustomThemes>;
 		openFolder(): Promise<IpcOpenPathResult>;
+		save(request: IpcSaveCustomThemeRequest): Promise<IpcSaveCustomThemeResult>;
+		/** Moves the file to the trash. */
+		delete(fileName: string): Promise<IpcDeleteCustomThemeResult>;
 		onChanged(callback: (themes: IpcCustomThemes) => void): () => void;
 	};
 	prefs: {

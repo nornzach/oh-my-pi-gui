@@ -16,6 +16,7 @@ import type {
 	IpcBrowserViewportPayload,
 	IpcCloseTabPayload,
 	IpcConversationSearchPayload,
+	IpcDeleteCustomThemeResult,
 	IpcExtensionUiRespondPayload,
 	IpcFsListPayload,
 	IpcFsReadImagePayload,
@@ -34,6 +35,8 @@ import type {
 	IpcResolvedPath,
 	IpcRpcCommandForTabPayload,
 	IpcRpcCommandPayload,
+	IpcSaveCustomThemeRequest,
+	IpcSaveCustomThemeResult,
 	IpcSessionOpenNewWindowPayload,
 	IpcSessionsDeletePayload,
 	IpcSessionsListPayload,
@@ -56,7 +59,7 @@ import { requestQuit } from "./app-quit";
 import { BenchmarkRunner } from "./benchmark-runner";
 import type { BrowserHost } from "./browser-host";
 import type { ConversationIndex } from "./conversation-index";
-import { type CustomThemesWatcher, readCustomThemes } from "./custom-themes";
+import { type CustomThemesWatcher, deleteCustomTheme, readCustomThemes, saveCustomTheme } from "./custom-themes";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { openInExternalEditor } from "./editor";
 import { mainT } from "./i18n";
@@ -432,6 +435,30 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		const openError = await shell.openPath(dir);
 		return openError ? { ok: false, error: openError } : { ok: true, resolvedPath: dir };
 	});
+	ipcMain.handle(
+		IPC_COMMANDS.THEMES_SAVE,
+		async (_event, request: IpcSaveCustomThemeRequest): Promise<IpcSaveCustomThemeResult> => {
+			const dir = customThemesWatcher.dir;
+			try {
+				const fileName = await saveCustomTheme(dir, request);
+				return { ok: true, fileName, themes: await readCustomThemes(dir) };
+			} catch (err) {
+				return { ok: false, error: err instanceof Error ? err.message : String(err) };
+			}
+		},
+	);
+	ipcMain.handle(
+		IPC_COMMANDS.THEMES_DELETE,
+		async (_event, request: { fileName: string }): Promise<IpcDeleteCustomThemeResult> => {
+			const dir = customThemesWatcher.dir;
+			try {
+				await deleteCustomTheme(dir, request.fileName, filePath => shell.trashItem(filePath));
+				return { ok: true, themes: await readCustomThemes(dir) };
+			} catch (err) {
+				return { ok: false, error: err instanceof Error ? err.message : String(err) };
+			}
+		},
+	);
 
 	logWatcher.onLines = lines => {
 		broadcast(windowManager, IPC_EVENTS.LOG_LINE, { lines, nextSequence: logWatcher.getSnapshot().nextSequence });

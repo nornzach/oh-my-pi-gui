@@ -214,7 +214,9 @@ Windows packages are currently unsigned. Windows SmartScreen may require **More 
 <a id="en-themes"></a>
 ### Custom themes
 
-Add your own color themes as `.json` files in `~/.omp/gui/themes` (**Open folder** at the bottom of the theme picker creates and opens it). Each file shows up under **Custom themes** in the picker, and edits apply while the app runs. A theme starts from a built-in one and overrides the colors you list:
+**Make one in the app.** Open the theme picker and click **New theme**. Give any part of the window a color — background, text, accent, sidebar, title bar, borders, your messages, or the success, warning, error and info colors — and the rest of the theme follows: hover and selection shades, links, diff and syntax colors, buttons and secondary text are worked out from your picks, and text the editor derives stays readable. **Generate from accent** tints the background, text, sidebar, title bar, borders and your messages with the accent color. The preview updates as you pick, a warning marks a color that is hard to read on, and **Save theme** writes the theme to `~/.omp/gui/themes` and applies it. The pencil beside a custom theme in the picker opens it again to change or delete it; a deleted theme goes to the trash.
+
+**Or write the file yourself.** Add `.json` files to `~/.omp/gui/themes` (**Open folder** at the bottom of the theme picker creates and opens it). Each file shows up under **Custom themes** in the picker, and edits apply while the app runs. A theme starts from a built-in one and overrides the colors you list:
 
 ```json
 {
@@ -557,7 +559,9 @@ Windows 包当前未签名。首次启动前请确认下载来源；Windows Smar
 <a id="zh-themes"></a>
 ### 自定义主题
 
-在 `~/.omp/gui/themes` 中放入 `.json` 文件即可添加自己的配色主题（主题选择器底部的**打开文件夹**会创建并打开该目录）。每个文件都会出现在选择器的**自定义主题**分组中，应用运行时修改文件也会立即生效。主题以某个内置主题为基础，只覆盖你列出的颜色：
+**在应用里制作。** 打开主题选择器，点击**新建主题**。为窗口的任意部分选一个颜色——背景、文字、强调色、侧边栏、标题栏、边框、你的消息，或成功、警告、错误、信息色——主题的其余部分会随之生成：悬停与选中色、链接、差异与语法高亮、按钮和次要文字都根据你的选择推算，推算出的文字保持清晰可读。**根据强调色生成**会用强调色为背景、文字、侧边栏、标题栏、边框和你的消息着色。预览随选择实时更新，不易阅读的颜色会给出提示，**保存主题**会把主题写入 `~/.omp/gui/themes` 并立即应用。选择器中自定义主题旁的铅笔按钮可再次打开它进行修改或删除；删除的主题会移到废纸篓。
+
+**或者手写文件。** 在 `~/.omp/gui/themes` 中放入 `.json` 文件（主题选择器底部的**打开文件夹**会创建并打开该目录）。每个文件都会出现在选择器的**自定义主题**分组中，应用运行时修改文件也会立即生效。主题以某个内置主题为基础，只覆盖你列出的颜色：
 
 ```json
 {

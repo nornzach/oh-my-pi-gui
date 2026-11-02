@@ -5,9 +5,10 @@
  * live (inline `--omp-*` tokens), persists the choice, and keeps the legacy
  * dark/light/system store coherent so the App effect and the settings window
  * stay in sync. A custom theme file that cannot be used is listed with why.
+ * "New theme" and a custom row's pencil open the theme editor.
  */
 
-import { AlertTriangle, Check, FolderOpen, Monitor, Search } from "lucide-react";
+import { AlertTriangle, Check, FolderOpen, Monitor, Palette, Pencil, Search } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { cx, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -61,6 +62,7 @@ export function ThemePickerDialog() {
 	const open = useUiStore(s => s.themePickerOpen);
 	const close = useUiStore(s => s.closeThemePicker);
 	const setTheme = useUiStore(s => s.setTheme);
+	const openThemeEditor = useUiStore(s => s.openThemeEditor);
 
 	const customDir = useCustomThemesStore(s => s.dir);
 	const customEntries = useCustomThemesStore(s => s.entries);
@@ -217,6 +219,7 @@ export function ThemePickerDialog() {
 								onMouseEnter={() => setActive(i)}
 								className={cx(
 									"flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+									entry.custom && "pr-11",
 									i === active ? "bg-[var(--omp-selected-bg)]" : "hover:bg-[var(--omp-bg-tertiary)]",
 								)}
 							>
@@ -268,7 +271,29 @@ export function ThemePickerDialog() {
 								</span>
 							</button>
 						);
-						if (i !== firstCustom) return row;
+						const selection = entry.selection;
+						const item =
+							entry.custom && isCustomThemeSelection(selection) ? (
+								<div key={selection} className="group relative">
+									{row}
+									<button
+										type="button"
+										data-edit-theme={selection}
+										onClick={() => openThemeEditor(selection)}
+										aria-label={t("themePicker.custom.edit", { name: entry.label })}
+										title={t("themePicker.custom.edit", { name: entry.label })}
+										className={cx(
+											"absolute top-1/2 right-3 -translate-y-1/2 rounded-lg p-1.5 text-[var(--omp-muted)] transition-opacity hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-text)] focus-visible:opacity-100",
+											i === active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+										)}
+									>
+										<Pencil size={13} />
+									</button>
+								</div>
+							) : (
+								row
+							);
+						if (i !== firstCustom) return item;
 						return [
 							<div
 								key="custom-heading"
@@ -276,7 +301,7 @@ export function ThemePickerDialog() {
 							>
 								{t("themePicker.custom.heading")}
 							</div>,
-							row,
+							item,
 						];
 					})}
 					{!query.trim() &&
@@ -316,6 +341,10 @@ export function ThemePickerDialog() {
 					<span className="min-w-0 flex-1 text-omp-sm text-[var(--omp-dim)]">
 						{t("themePicker.custom.hint", { dir: customDir ? shortenPath(customDir) : "~/.omp/gui/themes" })}
 					</span>
+					<Button size="sm" variant="secondary" onClick={() => openThemeEditor()}>
+						<Palette size={13} />
+						{t("themePicker.custom.create")}
+					</Button>
 					<Button
 						size="sm"
 						variant="secondary"

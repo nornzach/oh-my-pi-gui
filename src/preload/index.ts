@@ -19,6 +19,7 @@ import type {
 	IpcBrowserViewportPayload,
 	IpcConversationSearchPayload,
 	IpcCustomThemes,
+	IpcDeleteCustomThemeResult,
 	IpcFsListResult,
 	IpcFsReadImageResult,
 	IpcFsReadPlanPayload,
@@ -27,6 +28,7 @@ import type {
 	IpcMemoryChange,
 	IpcOpenPathResult,
 	IpcResolvedPath,
+	IpcSaveCustomThemeResult,
 	IpcSessionOpenNewWindowPayload,
 	IpcSessionOwner,
 	IpcSetTabOrderPayload,
@@ -399,6 +401,9 @@ const api: OmpApi = {
 	themes: {
 		list: () => ipcRenderer.invoke(IPC_COMMANDS.THEMES_LIST) as Promise<IpcCustomThemes>,
 		openFolder: () => ipcRenderer.invoke(IPC_COMMANDS.THEMES_OPEN_FOLDER) as Promise<IpcOpenPathResult>,
+		save: request => ipcRenderer.invoke(IPC_COMMANDS.THEMES_SAVE, request) as Promise<IpcSaveCustomThemeResult>,
+		delete: fileName =>
+			ipcRenderer.invoke(IPC_COMMANDS.THEMES_DELETE, { fileName }) as Promise<IpcDeleteCustomThemeResult>,
 		onChanged: callback => subscribe<IpcCustomThemes>(IPC_EVENTS.THEMES_CHANGED, callback),
 	},
 

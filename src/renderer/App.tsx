@@ -32,6 +32,7 @@ import { SessionPickerDialog } from "./components/dialogs/SessionPickerDialog";
 import { SessionSwitchDialog } from "./components/dialogs/SessionSwitchDialog";
 import { SessionTreeDialog } from "./components/dialogs/SessionTreeDialog";
 import { ShareSessionDialog } from "./components/dialogs/ShareSessionDialog";
+import { ThemeEditorDialog } from "./components/dialogs/ThemeEditorDialog";
 import { ThemePickerDialog } from "./components/dialogs/ThemePickerDialog";
 import { WorkspaceDirsDialog } from "./components/dialogs/WorkspaceDirsDialog";
 import { WorktreeCloseDialog } from "./components/dialogs/WorktreeCloseDialog";
@@ -906,6 +907,7 @@ export function App() {
 				/>
 			</Suspense>
 			<ThemePickerDialog />
+			<ThemeEditorDialog />
 			<PlanApprovalDialog />
 			<HotkeysDialog open={hotkeysOpen} />
 			{importDialogOpen && <ImportForeignDialog />}

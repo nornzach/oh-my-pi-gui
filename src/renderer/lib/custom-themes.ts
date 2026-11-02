@@ -40,6 +40,8 @@ export interface CustomThemeEntry {
 	fileName: string;
 	/** The theme, filled from its base; absent when the file has a problem. */
 	theme?: ThemeDefinition;
+	/** The built-in theme it is filled from; set with `theme`. */
+	extends?: ThemeName;
 	problem?: CustomThemeProblem;
 	detail?: string;
 	/** Token entries left out: unknown names or values that are not colors. */
@@ -68,14 +70,15 @@ export function parseCustomThemeFile(file: IpcCustomThemeFile): CustomThemeEntry
 	if (json.scheme !== undefined && json.scheme !== "dark" && json.scheme !== "light") {
 		return { ...entry, problem: "badScheme" };
 	}
-	let base: ThemeDefinition;
+	let baseName: ThemeName;
 	if (json.extends !== undefined) {
 		const name = typeof json.extends === "string" ? json.extends : "";
 		if (!isBuiltin(name)) return { ...entry, problem: "unknownBase", detail: String(json.extends) };
-		base = THEMES[name];
+		baseName = name;
 	} else {
-		base = THEMES[json.scheme === "light" ? "light" : "dark"];
+		baseName = json.scheme === "light" ? "light" : "dark";
 	}
+	const base = THEMES[baseName];
 
 	const tokens = { ...base.tokens };
 	const overrides = json.tokens;
@@ -95,6 +98,7 @@ export function parseCustomThemeFile(file: IpcCustomThemeFile): CustomThemeEntry
 
 	return {
 		...entry,
+		extends: baseName,
 		theme: {
 			label: text(json.name, MAX_LABEL) || file.id,
 			description: text(json.description, MAX_DESCRIPTION),

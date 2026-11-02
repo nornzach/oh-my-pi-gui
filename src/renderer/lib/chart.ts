@@ -1,3 +1,4 @@
+import { hexColor } from "./color";
 import { formatCost } from "./format";
 import { getFormattingLocale } from "./i18n";
 /**
@@ -22,25 +23,6 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement
 
 const css = (name: string, fallback: string): string =>
 	hexColor(getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback);
-
-let colorProbe: CanvasRenderingContext2D | null | undefined;
-
-/**
- * A theme color as six-digit hex. Charts add alpha by appending two hex
- * digits (`${color}26`), and a custom theme may write any CSS color (rgb(),
- * oklch(), a three-digit hex…), so the canvas reads it back as plain sRGB.
- */
-export function hexColor(value: string): string {
-	if (/^#[0-9a-f]{6}$/i.test(value)) return value;
-	colorProbe ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-	if (!colorProbe) return value;
-	colorProbe.clearRect(0, 0, 1, 1);
-	colorProbe.fillStyle = "#000000";
-	colorProbe.fillStyle = value;
-	colorProbe.fillRect(0, 0, 1, 1);
-	const [red = 0, green = 0, blue = 0] = colorProbe.getImageData(0, 0, 1, 1).data;
-	return `#${[red, green, blue].map(channel => channel.toString(16).padStart(2, "0")).join("")}`;
-}
 
 /** Scheme-aware fallbacks, used only when the theme stylesheets failed to load. */
 const FALLBACK_DARK = {

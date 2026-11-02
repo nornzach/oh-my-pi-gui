@@ -3,6 +3,7 @@ import type { CustomProviderView, SessionInfo } from "../../shared/ipc-types";
 import type { SidecarRestartProgress } from "../../shared/rpc-types";
 import { KEYMAP_ACTIONS, type KeymapOverrides, sanitizeOverrides } from "../lib/keymap";
 import { readPrepaintThemeMode, type ThemeMode } from "../lib/theme";
+import type { CustomThemeSelection } from "../lib/themes";
 import { useTabsStore } from "./tabs";
 
 export type { ThemeMode };
@@ -68,6 +69,8 @@ interface UiStore {
 	inventoryOpen: boolean;
 	inventoryTab: "plugins" | "marketplaces" | "templates" | "memory";
 	themePickerOpen: boolean;
+	/** The theme editor; null when closed. `selection` is the custom theme being changed, null for a new one. */
+	themeEditor: { selection: CustomThemeSelection | null } | null;
 	modesOpen: boolean;
 	modesTab: "vibe" | "goal" | "loop";
 	agentHubOpen: boolean;
@@ -197,6 +200,10 @@ interface UiStore {
 	closeInventory: () => void;
 	openThemePicker: () => void;
 	closeThemePicker: () => void;
+	/** Opens the theme editor in place of the picker: on a custom theme to change it, or empty for a new one. */
+	openThemeEditor: (selection?: CustomThemeSelection) => void;
+	/** Closes the theme editor; `backToPicker` returns to the theme picker it was opened from. */
+	closeThemeEditor: (backToPicker?: boolean) => void;
 	openModes: (tab?: "vibe" | "goal" | "loop") => void;
 	closeModes: () => void;
 	openAgentHub: (tab?: "definitions" | "hub") => void;
@@ -402,6 +409,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	themePickerOpen: false,
 	openThemePicker: () => set({ themePickerOpen: true }),
 	closeThemePicker: () => set({ themePickerOpen: false }),
+	themeEditor: null,
+	openThemeEditor: selection => set({ themePickerOpen: false, themeEditor: { selection: selection ?? null } }),
+	closeThemeEditor: backToPicker => set({ themeEditor: null, themePickerOpen: backToPicker === true }),
 	modesOpen: false,
 	modesTab: "vibe" as const,
 	openModes: tab => set({ modesOpen: true, modesTab: tab ?? "vibe" }),
