@@ -6,6 +6,11 @@
 
 - Theme editor: click **New theme** in the theme picker to make a theme without writing JSON. Pick colors for the background, text, accent, sidebar, title bar, borders, your messages and the status colors, and every other color follows, with a live preview; text stays readable and a warning marks a color that is hard to read on. **Generate from accent** builds matching surfaces from one color. Saved themes appear under Custom themes, and the pencil beside one changes or deletes it ([#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)).
 
+### Fixed
+
+- Pressing Enter on **Open folder** in the theme picker opens the folder instead of applying the highlighted theme.
+- When a dialog opens another in its place, such as the theme picker opening the theme editor, closing them returns keyboard focus to where you were instead of losing it.
+
 ## [0.9.35] - 2026-11-03
 
 ### Added

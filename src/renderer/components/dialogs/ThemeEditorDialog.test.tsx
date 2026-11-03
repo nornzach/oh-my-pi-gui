@@ -1,7 +1,7 @@
 /**
  * Theme editor contract: a new theme is saved as a file holding only the
  * tokens it changes and goes on screen; a saved theme is changed in its own
- * file; deleting one asks first.
+ * file; deleting one asks first; closing over unsaved changes asks first.
  */
 import { parseHTML } from "linkedom";
 import { act } from "react";
@@ -9,7 +9,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, type Mock, vi } from "vitest";
 import type { IpcSaveCustomThemeRequest, IpcSaveCustomThemeResult } from "../../../shared/ipc-types";
 import { I18nProvider } from "../../lib/i18n";
-import { customTheme, setCustomThemes } from "../../lib/themes";
+import { componentColor } from "../../lib/theme-generator";
+import { customTheme, setCustomThemes, THEMES } from "../../lib/themes";
 import { loadCustomThemes, useCustomThemesStore } from "../../stores/custom-themes";
 import { useToastStore } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
@@ -82,6 +83,12 @@ async function enterColor(label: string, value: string): Promise<void> {
 	await act(async () => reactProps(field).onChange?.({ target: field, currentTarget: field }));
 	await act(async () => reactProps(field).onBlur?.({ target: field, currentTarget: field }));
 	await flush();
+}
+
+function field(label: string): TestElement {
+	const input = document.querySelector(`input[aria-label="${label} color code"]`) as unknown as TestElement | null;
+	if (!input) throw new Error(`No color field for ${label}`);
+	return input;
 }
 
 function buttons(text: string): TestElement[] {
@@ -179,4 +186,62 @@ it("changes a saved theme in its own file and deletes it only after asking", asy
 	await click(confirm);
 	expect(trash).toHaveBeenCalledWith("clay.json");
 	expect(useCustomThemesStore.getState().entries).toEqual([]);
+});
+
+it("closes at once when nothing changed, and asks once before dropping changes", async () => {
+	useUiStore.setState({ themeEditor: { selection: null } });
+	await mount();
+	await click(buttons("Cancel")[0]);
+	expect(useUiStore.getState().themeEditor).toBeNull();
+	expect(useUiStore.getState().themePickerOpen).toBe(true);
+
+	await act(async () => useUiStore.setState({ themeEditor: { selection: null }, themePickerOpen: false }));
+	await flush();
+	await enterColor("Accent", "#e06c75");
+	await click(buttons("Cancel")[0]);
+	expect(useUiStore.getState().themeEditor).not.toBeNull();
+	expect(document.querySelector('[role="status"]')?.textContent).toBe("Unsaved changes — close again to discard them");
+
+	await click(buttons("Cancel")[0]);
+	expect(useUiStore.getState().themeEditor).toBeNull();
+	expect(save).not.toHaveBeenCalled();
+});
+
+it("keeps the theme being edited when its file breaks on disk meanwhile", async () => {
+	const clay = { id: "clay", fileName: "clay.json" };
+	loadCustomThemes({
+		dir: "/themes",
+		files: [{ ...clay, data: { name: "Clay", extends: "nord", tokens: { accent: "#b4552d" } } }],
+	});
+	useUiStore.setState({ themeEditor: { selection: "custom:clay" } });
+	await mount();
+
+	await act(async () =>
+		loadCustomThemes({ dir: "/themes", files: [{ ...clay, error: "Unexpected end of JSON input" }] }),
+	);
+	await flush();
+	expect(field("Accent").value).toBe("#b4552d");
+	await enterColor("Borders", "#556677");
+	await click(buttons("Save theme")[0]);
+
+	expect(save.mock.calls[0]![0].fileName).toBe("clay.json");
+	expect(save.mock.calls[0]![0].theme).toMatchObject({
+		extends: "nord",
+		tokens: { accent: "#b4552d", border: "#556677" },
+	});
+});
+
+it("starts over from a theme on the other side of light and dark, keeping the accent", async () => {
+	useUiStore.setState({ themeEditor: { selection: null } });
+	await mount();
+	await enterColor("Accent", "#e06c75");
+	await enterColor("Background", "#f7f3ea");
+
+	const select = document.querySelector("select") as unknown as TestElement;
+	await act(async () => reactProps(select).onChange?.({ target: { value: "nord" }, currentTarget: select }));
+	await flush();
+
+	expect(field("Background").value).toBe(componentColor(THEMES.nord.tokens, "background"));
+	expect(document.querySelector('[data-theme-component="background"]')?.getAttribute("data-picked")).toBeNull();
+	expect(field("Accent").value).toBe("#e06c75");
 });

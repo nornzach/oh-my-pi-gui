@@ -54,8 +54,16 @@ export function parseCssColor(value: string): Rgba | null {
 	if (typeof document === "undefined" || typeof CSS === "undefined" || !CSS.supports("color", text)) return null;
 	colorProbe ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
 	if (!colorProbe) return null;
-	colorProbe.clearRect(0, 0, 1, 1);
+	// CSS.supports passes var() and the like, which the canvas drops, keeping the
+	// fill it had: a value that reads back differently after two different
+	// fills did not take.
+	colorProbe.fillStyle = "#000000";
 	colorProbe.fillStyle = text;
+	const taken = colorProbe.fillStyle;
+	colorProbe.fillStyle = "#ffffff";
+	colorProbe.fillStyle = text;
+	if (colorProbe.fillStyle !== taken) return null;
+	colorProbe.clearRect(0, 0, 1, 1);
 	colorProbe.fillRect(0, 0, 1, 1);
 	const [r = 0, g = 0, b = 0, alpha = 0] = colorProbe.getImageData(0, 0, 1, 1).data;
 	return { r: r / 255, g: g / 255, b: b / 255, alpha: alpha / 255 };

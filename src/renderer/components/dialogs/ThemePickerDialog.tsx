@@ -160,6 +160,8 @@ export function ThemePickerDialog() {
 			e.preventDefault();
 			setActive(i => Math.max(0, i - 1));
 		} else if (e.key === "Enter") {
+			// A focused button (a theme row, Edit, New theme, Open folder) answers Enter itself.
+			if (e.target !== inputRef.current) return;
 			e.preventDefault();
 			const entry = filtered[active];
 			if (entry) select(entry);

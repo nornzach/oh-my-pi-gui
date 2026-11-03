@@ -7,7 +7,7 @@
  */
 
 import { AlertTriangle, RotateCcw, Trash2, WandSparkles } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { resolveTheme } from "../../lib/theme";
@@ -51,8 +51,33 @@ function normalizeHex(value: string): string | null {
 
 type BaseChoice = ThemeName | CustomThemeSelection;
 
+/** A saved theme offered under "Start from", as it read when the editor opened. */
+interface CustomBase {
+	selection: CustomThemeSelection;
+	label: string;
+	base: ThemeBase;
+}
+
 /** Picks that only fit one side of light and dark. */
 const SCHEME_BOUND: readonly ThemeComponent[] = ["text", "sidebar", "titlebar", "border", "userMessage"];
+
+function baseFor(choice: BaseChoice, customBases: readonly CustomBase[]): ThemeBase {
+	if (!isCustomThemeSelection(choice))
+		return { extends: choice, scheme: THEMES[choice].scheme, tokens: THEMES[choice].tokens };
+	return (
+		customBases.find(b => b.selection === choice)?.base ?? {
+			extends: "dark",
+			scheme: "dark",
+			tokens: THEMES.dark.tokens,
+		}
+	);
+}
+
+function withoutSchemeBound(picks: ThemePicks): ThemePicks {
+	const next = { ...picks };
+	for (const bound of SCHEME_BOUND) delete next[bound];
+	return next;
+}
 
 function ColorRow({
 	component,
@@ -238,18 +263,22 @@ function ThemePreview({ theme }: { theme: GeneratedTheme }) {
 
 export function ThemeEditorDialog() {
 	const t = useT();
+	const tRef = useRef(t);
+	tRef.current = t;
 	const editor = useUiStore(s => s.themeEditor);
 	const close = useUiStore(s => s.closeThemeEditor);
 	const setTheme = useUiStore(s => s.setTheme);
 	const entries = useCustomThemesStore(s => s.entries);
 
 	const editing = editor?.selection ? entries.find(entry => entry.selection === editor.selection) : undefined;
-	const usableCustom = entries.filter(entry => entry.theme && entry.extends);
 
+	const [customBases, setCustomBases] = useState<CustomBase[]>([]);
 	const [baseChoice, setBaseChoice] = useState<BaseChoice>("dark");
 	const [picks, setPicks] = useState<ThemePicks>({});
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
+	const [changed, setChanged] = useState(false);
+	const [discardArmed, setDiscardArmed] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -257,64 +286,97 @@ export function ThemeEditorDialog() {
 	useEffect(() => {
 		if (!editor) return;
 		setPicks({});
+		setChanged(false);
+		setDiscardArmed(false);
 		setSaving(false);
 		setConfirmDelete(false);
-		const entry = editor.selection
-			? useCustomThemesStore.getState().entries.find(e => e.selection === editor.selection)
-			: undefined;
+		const { entries } = useCustomThemesStore.getState();
+		// Read once per open: a theme file changed or broken on disk meanwhile leaves what is being edited alone.
+		const bases = entries.flatMap(entry =>
+			entry.theme && entry.extends
+				? [
+						{
+							selection: entry.selection,
+							label: entry.theme.label,
+							base: { extends: entry.extends, scheme: entry.theme.scheme, tokens: entry.theme.tokens },
+						},
+					]
+				: [],
+		);
+		setCustomBases(bases);
+		const entry = editor.selection ? entries.find(e => e.selection === editor.selection) : undefined;
 		if (entry?.theme) {
 			setBaseChoice(entry.selection);
 			setName(entry.theme.label);
 			setDescription(entry.theme.description);
 			return;
 		}
-		setName(t("themeEditor.defaultName"));
+		setName(tRef.current("themeEditor.defaultName"));
 		setDescription("");
 		let cancelled = false;
 		void getPersistedThemeSelection().then(selection => {
 			if (cancelled) return;
 			if (selection === "system") setBaseChoice(resolveTheme("system"));
-			else if (isCustomThemeSelection(selection)) {
-				const onScreen = useCustomThemesStore.getState().entries.find(e => e.selection === selection);
-				setBaseChoice(onScreen?.theme ? selection : "dark");
-			} else setBaseChoice(selection);
+			else if (isCustomThemeSelection(selection))
+				setBaseChoice(bases.some(b => b.selection === selection) ? selection : "dark");
+			else setBaseChoice(selection);
 		});
 		return () => {
 			cancelled = true;
 		};
-	}, [editor, t]);
+	}, [editor]);
 
-	const base = useMemo<ThemeBase>(() => {
-		if (isCustomThemeSelection(baseChoice)) {
-			const entry = entries.find(e => e.selection === baseChoice);
-			if (entry?.theme && entry.extends) {
-				return { extends: entry.extends, scheme: entry.theme.scheme, tokens: entry.theme.tokens };
-			}
-			return { extends: "dark", scheme: "dark", tokens: THEMES.dark.tokens };
-		}
-		return { extends: baseChoice, scheme: THEMES[baseChoice].scheme, tokens: THEMES[baseChoice].tokens };
-	}, [baseChoice, entries]);
+	const base = useMemo(() => baseFor(baseChoice, customBases), [baseChoice, customBases]);
 	const generated = useMemo(() => generateTheme(base, picks), [base, picks]);
 	const lowContrast = useMemo(() => lowContrastComponents(generated.tokens, picks), [generated, picks]);
 
-	const pick = (component: ThemeComponent, hex: string) =>
+	// Any change disarms a pending discard, so a later stray Escape asks again.
+	const edited = () => {
+		setChanged(true);
+		setDiscardArmed(false);
+	};
+	const pick = (component: ThemeComponent, hex: string) => {
+		edited();
 		setPicks(current => {
 			const next = { ...current, [component]: hex };
 			// Text or a sidebar picked for a dark theme would not fit a light one: crossing over starts them again.
-			if (component === "background" && schemeForBackground(hex) !== generated.scheme) {
-				for (const bound of SCHEME_BOUND) delete next[bound];
-			}
-			return next;
+			return component === "background" && schemeForBackground(hex) !== generated.scheme
+				? withoutSchemeBound(next)
+				: next;
 		});
-	const unpick = (component: ThemeComponent) =>
+	};
+	const unpick = (component: ThemeComponent) => {
+		edited();
 		setPicks(current => {
 			const next = { ...current };
 			delete next[component];
 			return next;
 		});
+	};
+	const startFrom = (choice: BaseChoice) => {
+		edited();
+		setBaseChoice(choice);
+		// A background from the other side of light and dark would keep the theme there and the new start would not show.
+		if (baseFor(choice, customBases).scheme !== generated.scheme) {
+			setPicks(current => {
+				const next = withoutSchemeBound(current);
+				delete next.background;
+				return next;
+			});
+		}
+	};
 	const fromAccent = () => {
+		edited();
 		const accent = componentColor(generated.tokens, "accent");
 		setPicks(current => ({ ...current, accent, ...surfacesFromAccent(accent, generated.scheme) }));
+	};
+	// Same guard as the composer editor: the first close of unsaved changes asks, the second discards them.
+	const requestClose = () => {
+		if (changed && !discardArmed) {
+			setDiscardArmed(true);
+			return;
+		}
+		close(true);
 	};
 
 	const trimmedName = name.trim();
@@ -333,8 +395,11 @@ export function ThemeEditorDialog() {
 			if (id) {
 				applyThemeByName(`custom:${id}`);
 				setTheme(generated.scheme);
+				toast({ variant: "success", message: t("themeEditor.saved", { name: trimmedName }) });
+			} else {
+				// Past the first 100 files the folder read leaves it out, so there is nothing to apply.
+				toast({ variant: "warning", message: t("themeEditor.savedNotListed", { file: result.fileName }) });
 			}
-			toast({ variant: "success", message: t("themeEditor.saved", { name: trimmedName }) });
 			close();
 		} catch (cause) {
 			toast({ variant: "error", message: t("themeEditor.saveFailed", { error: String(cause) }) });
@@ -374,7 +439,7 @@ export function ThemeEditorDialog() {
 		<>
 			<Modal
 				open={open}
-				onClose={() => close(true)}
+				onClose={requestClose}
 				title={t(editing ? "themeEditor.titleEdit" : "themeEditor.titleNew")}
 				size="lg"
 				bodyClassName="p-0"
@@ -385,7 +450,10 @@ export function ThemeEditorDialog() {
 							label={t("themeEditor.name")}
 							value={name}
 							maxLength={60}
-							onChange={e => setName(e.target.value)}
+							onChange={e => {
+								edited();
+								setName(e.target.value);
+							}}
 							error={trimmedName ? undefined : t("themeEditor.nameRequired")}
 						/>
 						<Input
@@ -393,7 +461,10 @@ export function ThemeEditorDialog() {
 							value={description}
 							maxLength={200}
 							placeholder={t("themeEditor.descriptionPlaceholder")}
-							onChange={e => setDescription(e.target.value)}
+							onChange={e => {
+								edited();
+								setDescription(e.target.value);
+							}}
 						/>
 						<label className="block">
 							<span className="mb-1.5 block text-omp-md font-medium text-(--omp-text-secondary)">
@@ -402,7 +473,7 @@ export function ThemeEditorDialog() {
 							<select
 								className={SELECT_CLASS}
 								value={baseChoice}
-								onChange={e => setBaseChoice(e.target.value as BaseChoice)}
+								onChange={e => startFrom(e.target.value as BaseChoice)}
 							>
 								<optgroup label={t("themeEditor.builtinGroup")}>
 									{(Object.keys(THEMES) as ThemeName[]).map(theme => (
@@ -411,11 +482,11 @@ export function ThemeEditorDialog() {
 										</option>
 									))}
 								</optgroup>
-								{usableCustom.length > 0 && (
+								{customBases.length > 0 && (
 									<optgroup label={t("themeEditor.customGroup")}>
-										{usableCustom.map(entry => (
-											<option key={entry.selection} value={entry.selection}>
-												{entry.theme?.label}
+										{customBases.map(custom => (
+											<option key={custom.selection} value={custom.selection}>
+												{custom.label}
 											</option>
 										))}
 									</optgroup>
@@ -452,7 +523,10 @@ export function ThemeEditorDialog() {
 								<Button
 									size="sm"
 									variant="ghost"
-									onClick={() => setPicks({})}
+									onClick={() => {
+										edited();
+										setPicks({});
+									}}
 									disabled={Object.keys(picks).length === 0}
 								>
 									<RotateCcw size={13} />
@@ -481,8 +555,10 @@ export function ThemeEditorDialog() {
 							{t("themeEditor.delete")}
 						</Button>
 					)}
-					<span className="flex-1" />
-					<Button size="sm" variant="ghost" onClick={() => close(true)}>
+					<span role="status" className="min-w-0 flex-1 text-omp-sm text-(--omp-warning)">
+						{discardArmed && t("themeEditor.discardArmed")}
+					</span>
+					<Button size="sm" variant="ghost" onClick={requestClose}>
 						{t("common.cancel")}
 					</Button>
 					<Button size="sm" variant="primary" onClick={() => void save()} disabled={!trimmedName} loading={saving}>

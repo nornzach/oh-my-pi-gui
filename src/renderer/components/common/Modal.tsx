@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
-import { DIALOG_OVERLAY_Z, isTopmostDialog, registerDialogLayer } from "./dialog-layer";
+import { DIALOG_OVERLAY_Z, handOffRestoreTarget, isTopmostDialog, registerDialogLayer } from "./dialog-layer";
 
 export type ModalSize = "sm" | "md" | "lg" | "full" | "picker";
 
@@ -86,7 +86,10 @@ export function Modal({
 	useEffect(() => {
 		if (!open) return;
 		const unregisterLayer = registerDialogLayer(panelRef.current);
-		restoreRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		restoreRef.current = handOffRestoreTarget(
+			panelRef.current,
+			document.activeElement instanceof HTMLElement ? document.activeElement : null,
+		);
 		const panel = panelRef.current;
 		const active = document.activeElement;
 		// Preserve a caller-autofocused control inside the new dialog, but never

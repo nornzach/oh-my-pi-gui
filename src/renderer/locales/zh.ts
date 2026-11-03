@@ -1480,6 +1480,8 @@ export const zh: Record<string, string> = {
 	"themeEditor.preview.send": "发送",
 	"themeEditor.save": "保存主题",
 	"themeEditor.saved": "已保存并应用 {name}",
+	"themeEditor.savedNotListed": "已保存 {file}，但只读取前 100 个主题文件，因此未应用。",
+	"themeEditor.discardArmed": "有未保存的修改 — 再次关闭即丢弃",
 	"themeEditor.saveFailed": "无法保存主题：{error}",
 	"themeEditor.delete": "删除",
 	"themeEditor.deleteTitle": "删除 {name}？",

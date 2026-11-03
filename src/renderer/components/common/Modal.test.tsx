@@ -187,6 +187,35 @@ describe("Modal", () => {
 		trigger.remove();
 	});
 
+	it("returns focus to the first trigger after dialogs hand over to each other", async () => {
+		const trigger = document.createElement("button");
+		document.body.appendChild(trigger);
+		activeElement = trigger;
+		vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement) {
+			activeElement = this;
+		});
+		const handOff = (shown: "picker" | "editor" | null) => (
+			<>
+				<Modal open={shown === "picker"} onClose={() => {}} title="Picker">
+					<button type="button">New theme</button>
+				</Modal>
+				<Modal open={shown === "editor"} onClose={() => {}} title="Editor">
+					<button type="button">Cancel</button>
+				</Modal>
+			</>
+		);
+
+		// Picker → editor → picker, each swap in one commit, then the picker closes.
+		await mount(handOff("picker"));
+		expect(document.querySelector("[aria-label='Picker']")?.contains(activeElement)).toBe(true);
+		await render(handOff("editor"));
+		expect(document.querySelector("[aria-label='Editor']")?.contains(activeElement)).toBe(true);
+		await render(handOff("picker"));
+		await render(handOff(null));
+		expect(activeElement).toBe(trigger);
+		trigger.remove();
+	});
+
 	it("closes only the topmost dialog for each Escape press", async () => {
 		const closeBottom = vi.fn();
 		const closeTop = vi.fn();

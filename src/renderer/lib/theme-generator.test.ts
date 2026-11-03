@@ -57,6 +57,17 @@ describe("generateTheme", () => {
 		expect(tokens["--omp-input-focus-border"]).toBe(THEMES.dark.tokens["--omp-input-focus-border"]);
 	});
 
+	it("turns the overlays tinted with the accent, not the plain white ones", () => {
+		const accent = parseCssColor("#e5484d")!;
+		const nord = generateTheme(builtin("nord"), { accent: "#e5484d" }).tokens;
+		for (const key of ["--omp-selected-bg", "--omp-input-glow", "--omp-streaming-highlight"] as const) {
+			expect(Math.abs(hueDegrees(color(nord, key)) - hueDegrees(accent)), key).toBeLessThan(10);
+			expect(color(nord, key).alpha, key).toBeCloseTo(color(THEMES.nord.tokens, key).alpha, 3);
+		}
+		const dark = generateTheme(builtin("dark"), { accent: "#e5484d" }).tokens;
+		expect(dark["--omp-selected-bg"]).toBe(THEMES.dark.tokens["--omp-selected-bg"]);
+	});
+
 	it("builds a light background on a light theme and keeps its text readable", () => {
 		const theme = generateTheme(builtin("dark"), { background: "#fdf6e3" });
 

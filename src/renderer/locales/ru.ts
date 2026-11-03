@@ -1464,6 +1464,9 @@ export const ru: Record<string, string> = {
 	"themeEditor.preview.send": "Отправить",
 	"themeEditor.save": "Сохранить тему",
 	"themeEditor.saved": "Тема {name} сохранена и применена",
+	"themeEditor.savedNotListed":
+		"Файл {file} сохранён, но читаются только первые 100 файлов тем, поэтому тема не применена.",
+	"themeEditor.discardArmed": "Есть несохранённые изменения — закрой ещё раз, чтобы отменить их",
 	"themeEditor.saveFailed": "Не удалось сохранить тему: {error}",
 	"themeEditor.delete": "Удалить",
 	"themeEditor.deleteTitle": "Удалить {name}?",

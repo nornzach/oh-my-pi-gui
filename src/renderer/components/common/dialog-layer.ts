@@ -14,6 +14,27 @@ const dialogLayers: HTMLElement[] = [];
  */
 export const DIALOG_OVERLAY_Z = "z-[120]";
 
+// Where each dialog sends focus back to when it closes.
+const restoreTargets = new WeakMap<HTMLElement, HTMLElement | null>();
+
+/**
+ * Records and returns where a dialog opening now sends focus back to. One
+ * dialog that hands over to another (a picker opening an editor, and back)
+ * closes in the same commit, so focus still sits on a control inside the
+ * closing one, which is about to go: take that dialog's own target instead.
+ */
+export function handOffRestoreTarget(dialog: HTMLElement | null, active: HTMLElement | null): HTMLElement | null {
+	let target = active;
+	for (let hops = 0; hops < 8 && target; hops++) {
+		let owner: HTMLElement | null = target;
+		while (owner && !restoreTargets.has(owner)) owner = owner.parentElement;
+		if (!owner || dialogLayers.includes(owner)) break;
+		target = restoreTargets.get(owner) ?? null;
+	}
+	if (dialog) restoreTargets.set(dialog, target);
+	return target;
+}
+
 /** Register a visible dialog as the newest interaction layer. */
 export function registerDialogLayer(dialog: HTMLElement | null): () => void {
 	if (!dialog) return () => {};

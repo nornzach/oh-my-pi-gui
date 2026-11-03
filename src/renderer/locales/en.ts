@@ -1516,6 +1516,8 @@ export const en: Record<string, string> = {
 	"themeEditor.preview.send": "Send",
 	"themeEditor.save": "Save theme",
 	"themeEditor.saved": "Saved and applied {name}",
+	"themeEditor.savedNotListed": "Saved {file}, but only the first 100 theme files are read, so it was not applied.",
+	"themeEditor.discardArmed": "Unsaved changes — close again to discard them",
 	"themeEditor.saveFailed": "Could not save the theme: {error}",
 	"themeEditor.delete": "Delete",
 	"themeEditor.deleteTitle": "Delete {name}?",
