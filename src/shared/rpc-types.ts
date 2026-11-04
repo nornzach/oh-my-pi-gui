@@ -2387,6 +2387,35 @@ export interface SessionStats {
 	};
 	routedModels?: Record<string, number>;
 	contextUsage?: ContextUsage;
+	/** What the next request finds in the prompt cache (`/session`'s Prompt Cache section); absent when omp cannot tell. */
+	promptCache?: PromptCacheStatus;
+}
+
+/** Why the next request re-sends the cached prefix. */
+export interface PromptCacheColdReason {
+	kind: "expired" | "refresh-missed" | "model" | "thinking" | "tools" | "system-prompt" | "retention" | "compaction";
+	/** `expired`: when the entry lapsed (epoch ms). */
+	at?: number;
+	/** `model` / `thinking`: the value the entry was written under, and the one the next request uses. */
+	from?: string;
+	to?: string;
+}
+
+export interface PromptCacheStatus {
+	/** `cold`: the next request rewrites the cached prefix. */
+	state: "warm" | "cold";
+	reason?: PromptCacheColdReason;
+	/** Read off the transcript of a reopened session, not a reply this sidecar saw. */
+	inferred: boolean;
+	tier: "short" | "long";
+	/** Send time of the last request that read or wrote the entry (epoch ms). */
+	touchedAt: number;
+	/** Lifetime after the last touch; absent when the provider never expires the entry. */
+	ttlMs?: number;
+	/** Prompt tokens a warm cache serves. */
+	cachedTokens: number;
+	/** Estimated prompt tokens of the next request. */
+	nextTokens: number;
 }
 
 // ============================================================================

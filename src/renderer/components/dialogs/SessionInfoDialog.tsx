@@ -2,15 +2,17 @@ import { getFormattingLocale } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 /**
  * Session info panel: native rendering of rpc.getSessionStats() — identity,
- * message/tool counts, token breakdown, premium requests, cost, and context
- * window usage. Replaces the forwarded "/session info" text command.
+ * message/tool counts, token breakdown, whether the next message reads the
+ * prompt cache, premium requests, cost, and context window usage. Replaces the
+ * forwarded "/session info" text command.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import type { SessionStats } from "../../../shared/rpc-types";
 import { contextUsageView } from "../../lib/context-usage";
-import { basename, formatCost, formatPercent, formatTokens } from "../../lib/format";
+import { basename, cx, formatCost, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { promptCacheRows } from "../../lib/prompt-cache";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
 import { AsyncSection, Modal, ProgressBar } from "../common";
@@ -18,6 +20,7 @@ import { AsyncSection, Modal, ProgressBar } from "../common";
 interface Row {
 	label: string;
 	value: string;
+	tone?: "warning";
 }
 
 function Section({ title, rows }: { title: string; rows: Row[] }) {
@@ -31,7 +34,14 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
 						key={row.label}
 					>
 						<span className="flex-1 text-omp-sm text-(--omp-muted)">{row.label}</span>
-						<span className="font-mono text-omp-sm font-medium tabular-nums text-(--omp-text)">{row.value}</span>
+						<span
+							className={cx(
+								"font-mono text-omp-sm font-medium tabular-nums",
+								row.tone === "warning" ? "text-(--omp-warning)" : "text-(--omp-text)",
+							)}
+						>
+							{row.value}
+						</span>
 					</div>
 				))}
 			</div>
@@ -143,6 +153,12 @@ export function SessionInfoDialog() {
 								{ label: t("sessionInfo.total"), value: formatTokens(stats.tokens.total) },
 							]}
 						/>
+						{stats.promptCache && (
+							<Section
+								title={t("sessionInfo.section.promptCache")}
+								rows={promptCacheRows(stats.promptCache, t)}
+							/>
+						)}
 						<Section
 							title={t("sessionInfo.section.usage")}
 							rows={[

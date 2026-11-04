@@ -2,9 +2,16 @@
 
 ## [Unreleased]
 
+## [0.9.36] - 2026-11-04
+
 ### Added
 
 - Theme editor: click **New theme** in the theme picker to make a theme without writing JSON. Pick colors for the background, text, accent, sidebar, title bar, borders, your messages and the status colors, and every other color follows, with a live preview; text stays readable and a warning marks a color that is hard to read on. **Generate from accent** builds matching surfaces from one color. Saved themes appear under Custom themes, and the pencil beside one changes or deletes it ([#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)).
+- Session Info says whether your next message reads the prompt cache: until when, or why not (another model or thinking level, changed tools or system prompt, an expired cache, compaction), and how many tokens it reads or re-sends.
+
+### Changed
+
+- Bundled agent rebuilt from monorepo `44d44921`, on upstream omp main 290 commits after 18.16.0, with its native addon from npm 18.16.0. Among upstream's changes: when many subagents run at once they move into worker threads, so they no longer slow the main session (`task.workerThreads`, default 4); an out-of-credit provider error ends the turn with that error instead of waiting out a 30-minute retry, and Retry tries again at once; a large session exports to HTML without running out of memory; and a subagent closing all its browser tabs no longer closes its parent's. Upstream's own bash engine (bash 5.3 semantics), its fix for garbled Windows output on non-UTF-8 code pages, and case-insensitive file extensions in `ast_grep` landed in the native addon after 18.16.0 and are not in this build.
 
 ### Fixed
 
