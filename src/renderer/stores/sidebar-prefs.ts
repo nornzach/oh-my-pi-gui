@@ -37,6 +37,8 @@ interface SidebarPrefsStore {
 	setSessionsArchived: (paths: readonly string[], archived: boolean) => Promise<void>;
 	/** Drop deleted session files from the pinned and archived lists. */
 	forgetSessions: (paths: readonly string[]) => void;
+	/** Move pins and archive marks from files no longer listed to the sessions that carry them on. */
+	inheritSessions: (heirs: ReadonlyMap<string, string>) => void;
 	setGroupAlias: (cwd: string, alias: string | null) => Promise<void>;
 	touchWorkspace: (cwd: string) => void;
 	touchSession: (path: string, cwd?: string) => void;
@@ -173,6 +175,22 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 		set({
 			pinnedSessions: state.pinnedSessions.filter(path => !gone.has(path)),
 			archivedSessions: state.archivedSessions.filter(path => !gone.has(path)),
+		});
+		persist(get);
+	},
+
+	inheritSessions: heirs => {
+		const state = get();
+		if (
+			!state.pinnedSessions.some(path => heirs.has(path)) &&
+			!state.archivedSessions.some(path => heirs.has(path))
+		) {
+			return;
+		}
+		const inherited = (paths: readonly string[]) => [...new Set(paths.map(path => heirs.get(path) ?? path))];
+		set({
+			pinnedSessions: inherited(state.pinnedSessions),
+			archivedSessions: inherited(state.archivedSessions),
 		});
 		persist(get);
 	},

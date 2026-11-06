@@ -158,11 +158,11 @@ export function PanelContainer() {
 		>
 			{/* One header row: the view switcher and the close control. The panel's
 			    name is announced, not printed — the tabs already say what it holds. */}
-			<div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--omp-border-muted)] pl-3 pr-2">
+			<div className="omp-inspector-header drag-region flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--omp-border-muted)] pl-3">
 				<h2 className="sr-only">
 					{t("panel.title")} — {t("panel.subtitle")}
 				</h2>
-				<div className="omp-segmented">
+				<div className="omp-segmented no-drag">
 					{visibleTabs.map(({ id, labelKey, icon: Icon }) => {
 						const active = visiblePanelTab === id;
 						return (
@@ -204,7 +204,7 @@ export function PanelContainer() {
 					type="button"
 					onClick={togglePanel}
 					title={t("panel.close")}
-					className="omp-pressable ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+					className="omp-pressable no-drag ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
 				>
 					<X size={16} />
 				</button>

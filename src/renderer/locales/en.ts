@@ -51,6 +51,7 @@ export const en: Record<string, string> = {
 	"tools.ask.timedOut": "Automatically selected after the question timed out.",
 	"tools.ask.chatRedirect": "Continued as a conversation.",
 	// TitleBar
+	"titlebar.appMenu": "Application menu",
 	"titlebar.commands": "Commands",
 	"titlebar.commandsHint": "Open Command Center ({shortcut})",
 	"titlebar.actions": "Session actions",
@@ -1613,19 +1614,32 @@ export const en: Record<string, string> = {
 	"providerCfg.form.apiKeyRemoving": "Stored key will be removed",
 	"providerCfg.form.apiKeyRemovingHint":
 		"Saving deletes the key from models.yml. Requests fail until a new one is set.",
+	"providerCfg.fetch.action": "Fetch models",
+	"providerCfg.fetch.server": "Server type",
+	"providerCfg.fetch.hint":
+		"Pull the list from this endpoint, pick the ones you want, then adjust any row before saving.",
+	"providerCfg.fetch.found": "Models found: {count}",
+	"providerCfg.fetch.filter": "Filter models",
+	"providerCfg.fetch.noMatch": "No model matches this filter.",
+	"providerCfg.fetch.empty": "The endpoint answered, but listed no models.",
+	"providerCfg.fetch.failed": "Couldn't fetch models: {error}. You can still add them by hand.",
+	"providerCfg.fetch.selectAll": "Select all",
+	"providerCfg.fetch.selectNone": "Clear",
+	"providerCfg.fetch.added": "Added",
+	"providerCfg.fetch.add": "Add {count}",
 	"providerCfg.form.models": "Models",
 	"providerCfg.form.modelAdd": "Add model",
 	"providerCfg.form.modelRemove": "Remove model",
 	"providerCfg.form.modelsRequired": "Add at least one model",
 	"providerCfg.form.modelsDiscoveryOptional":
-		"Optional while model discovery is enabled. Models returned by the upstream endpoint are added automatically.",
+		"Optional while automatic updates are on: the endpoint supplies its own list.",
 	"providerCfg.form.modelIdRequired": "Every model with a display name also needs an id",
 	"providerCfg.form.modelDuplicate": 'Duplicate model id "{id}"',
 	"providerCfg.form.costAllRequired":
 		"All four cost fields (input, output, cacheRead, cacheWrite) are required when any cost is specified. Each must be a finite number ≥ 0.",
 	"providerCfg.form.advanced": "Advanced options",
 	"providerCfg.form.advancedHint":
-		"Authorization header, strict tool schemas, transport, extra request parameters, custom headers.",
+		"Automatic model updates, Authorization header, strict tool schemas, transport, extra request parameters, custom headers.",
 	"providerCfg.form.headers": "Custom headers",
 	"providerCfg.form.headerName": "Header name",
 	"providerCfg.form.headerValue": "Value",
@@ -1636,11 +1650,10 @@ export const en: Record<string, string> = {
 	"providerCfg.form.authHint": "How requests to this provider are authenticated.",
 	"providerCfg.form.authHeader": "Send key in Authorization header",
 	"providerCfg.form.authHeaderHint": "Enable if the provider expects Bearer auth instead of its default key field.",
-	"providerCfg.form.discovery": "Model discovery",
-	"providerCfg.form.discoveryNone": "Do not fetch (manual models only)",
+	"providerCfg.form.discovery": "Keep the list updated automatically",
+	"providerCfg.form.discoveryNone": "Off (only the models listed above)",
 	"providerCfg.form.discoveryTimeout": "Timeout (ms)",
-	"providerCfg.form.discoveryHint":
-		"Off by default. Enable to add upstream models to the picker; manual models with the same ID take precedence.",
+	"providerCfg.form.discoveryHint": "Off by default. When on, omp asks this endpoint for its models by itself and offers them in the model picker alongside the ones above, where they can't be edited. A model listed above wins over one with the same ID.",
 	"providerCfg.form.disableStrictTools": "Disable strict tool schemas",
 	"providerCfg.form.disableStrictToolsHint":
 		"Some providers reject strict JSON Schema; enable this to send permissive schemas.",

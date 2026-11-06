@@ -15,6 +15,7 @@ import { create } from "zustand";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useAgentPagesStore } from "../../stores/agent-pages";
+import { useSessionStore } from "../../stores/session";
 import { SessionRuntimeProvider, sessionRuntime } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { subagentPrimaryLabel } from "../panels/subagent-graph";
@@ -125,11 +126,7 @@ function SessionAgents({
 	const thisTurn = projection.turnCount > 0;
 	const rows = thisTurn ? projection.turn : projection.all;
 	const count = thisTurn ? projection.turnCount : projection.allCount;
-	// The first time a session has this turn's agents in view, it opens.
-	useEffect(() => {
-		if (thisTurn && stored === undefined) setExpanded(sessionKey, true);
-	}, [thisTurn, sessionKey, stored]);
-	const expanded = stored ?? thisTurn;
+	const streaming = useSessionStore(state => state.isStreaming);
 	// The sidebar lists this session's subagent transcripts only where no agent row stands for one.
 	const files = rows.flatMap(row => (row.agent.sessionFile ? [transcriptKey(row.agent.sessionFile)] : [])).join("\n");
 	useEffect(() => {
@@ -137,6 +134,8 @@ function SessionAgents({
 		return () => setTranscripts(sessionKey, undefined);
 	}, [files, sessionKey]);
 	const working = rows.some(row => !row.context && row.activity === "working");
+	// Open while this turn is at it. When it is done its agents fold away, unless the arrow was used.
+	const expanded = stored ?? (thisTurn && (streaming || working));
 	const info = useMemo<SidebarAgentsInfo | null>(
 		() =>
 			count === 0

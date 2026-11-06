@@ -1911,8 +1911,8 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 			"精确选择器：`provider/model-id`，仅固定的 OpenRouter/Vercel 路由可带 `@upstream`（如 `openrouter/x@y`）。设置后，按调用指定的模型还必须在此列表中。留空表示配置允许的所有模型。项目列表只能进一步收窄。",
 	},
 	"title.refreshAfterPrompts": {
-		label: "定期刷新标题",
+		label: "每 N 次提示刷新标题",
 		description:
-			"每隔这么多次用户提示，让判断模型检查自动生成的会话标题是否仍符合对话，不符合时重新生成。你自己设置的标题不会被替换。",
+			"单位是你发送的提示次数，不是时间；0 表示关闭。每隔这么多次提示，让判断模型检查自动生成的会话标题是否仍符合对话，不符合时重新生成。你自己设置的标题不会被替换。",
 	},
 };

@@ -65,7 +65,7 @@ import { sessionDisplayTitle } from "../../lib/session-title";
 import {
 	buildSessionTree,
 	isSubagentSession,
-	isSubagentTranscript,
+	listedSessions,
 	orderSessionForest,
 	type SessionNode,
 	sessionParents,
@@ -295,7 +295,24 @@ export function Sidebar() {
 	const sessionLastUsed = useSidebarPrefs(s => s.sessionLastUsed);
 	const touchSession = useSidebarPrefs(s => s.touchSession);
 	const renameRef = useRef<HTMLInputElement>(null);
-	const { sessions, isLoading, error: listError, refresh, deleteSession, renameSession } = useSessionList("global");
+	const {
+		sessions: sessionFiles,
+		isLoading,
+		error: listError,
+		refresh,
+		deleteSession,
+		renameSession,
+	} = useSessionList("global");
+	// A string, so a tab's other changes don't recompute the list.
+	const openSessionKeys = tabs.flatMap(tab => [tab.sessionPath ?? [], tab.sessionId ?? []]).join("\n");
+	const { sessions, heirs } = useMemo(() => {
+		const open = new Set(openSessionKeys.split("\n"));
+		return listedSessions(sessionFiles, session => open.has(session.path) || open.has(session.id));
+	}, [openSessionKeys, sessionFiles]);
+	const prefsHydrated = useSidebarPrefs(s => s.hydrated);
+	useEffect(() => {
+		if (prefsHydrated) useSidebarPrefs.getState().inheritSessions(heirs);
+	}, [heirs, prefsHydrated]);
 	const sessionId = useSessionStore(s => s.sessionId);
 	const agentTranscripts = useSidebarAgentTranscripts();
 	const cwd = useSessionStore(s => s.cwd);
@@ -477,7 +494,7 @@ export function Sidebar() {
 			const shown = agentTranscripts[node.session.path];
 			return node.children.filter(
 				child =>
-					!isSubagentTranscript(child.session, node.session) ||
+					!isSubagentSession(child.session) ||
 					tabForSession(child.session) !== undefined ||
 					(shown !== undefined && !shown.has(transcriptKey(child.session.path))),
 			);
@@ -623,6 +640,18 @@ export function Sidebar() {
 			.catch(error => toast({ variant: "error", title: t("sidebar.renameFailed"), message: String(error) }));
 	};
 
+	// A row's older files go with it: left behind, they would come back as rows.
+	const deleteRow = async (session: SessionInfo): Promise<string[]> => {
+		if (session.id === sessionId) await dropSessionNow();
+		else await deleteSession(session.path);
+		const older = [...heirs].flatMap(([path, heir]) => (heir === session.path ? [path] : []));
+		for (const path of older) {
+			// eslint-disable-next-line no-await-in-loop -- sequential, keep FS load bounded
+			await deleteSession(path);
+		}
+		return [session.path, ...older];
+	};
+
 	const confirmDeleteSession = async (session: SessionInfo) => {
 		if (isSessionBusy(session)) {
 			toast({ variant: "warning", message: t("sidebar.menu.taskRunning") });
@@ -631,12 +660,7 @@ export function Sidebar() {
 		}
 		setDeleting(true);
 		try {
-			if (session.id === sessionId) {
-				await dropSessionNow();
-			} else {
-				await deleteSession(session.path);
-			}
-			useSidebarPrefs.getState().forgetSessions([session.path]);
+			useSidebarPrefs.getState().forgetSessions(await deleteRow(session));
 			setPendingDelete(null);
 		} catch (error) {
 			toast({ variant: "error", title: t("sidebar.deleteFailed"), message: String(error) });
@@ -654,12 +678,12 @@ export function Sidebar() {
 		setDeleting(true);
 		try {
 			// Delete every session file in this workspace, then dismiss the group.
+			const deleted: string[] = [];
 			for (const session of group.sessions) {
 				// eslint-disable-next-line no-await-in-loop -- sequential, keep FS load bounded
-				if (session.id === sessionId) await dropSessionNow();
-				else await deleteSession(session.path);
+				deleted.push(...(await deleteRow(session)));
 			}
-			useSidebarPrefs.getState().forgetSessions(group.sessions.map(session => session.path));
+			useSidebarPrefs.getState().forgetSessions(deleted);
 			setPendingDelete(null);
 		} catch (error) {
 			toast({ variant: "error", title: t("sidebar.deleteFailed"), message: String(error) });
@@ -678,12 +702,10 @@ export function Sidebar() {
 		setDeleting(true);
 		setDeleteProgress({ done: 0, total: idle.length });
 		try {
-			for (const session of idle) {
+			for (const [index, session] of idle.entries()) {
 				// eslint-disable-next-line no-await-in-loop -- sequential, keep FS load bounded
-				if (session.id === sessionId) await dropSessionNow();
-				else await deleteSession(session.path);
-				deleted.push(session.path);
-				setDeleteProgress({ done: deleted.length, total: idle.length });
+				deleted.push(...(await deleteRow(session)));
+				setDeleteProgress({ done: index + 1, total: idle.length });
 			}
 			setPendingDelete(null);
 			setSelection(null);
@@ -1328,6 +1350,7 @@ export function Sidebar() {
 				className="omp-session-sidebar relative flex h-full shrink-0 flex-col border-r border-[var(--omp-border-muted)] bg-[var(--omp-sidebar-bg)]"
 				style={{ width: sidebarWidth }}
 			>
+				<div aria-hidden className="omp-window-caption drag-region" />
 				{/* Header: the lane switch and session search. */}
 				<div className="drag-region flex h-12 shrink-0 items-center gap-1 px-2.5">
 					<div role="group" aria-label={t("sidebar.mode.aria")} className="omp-segmented no-drag">

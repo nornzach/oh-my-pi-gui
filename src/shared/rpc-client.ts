@@ -1,6 +1,7 @@
 import type { OmpApi } from "./ipc-types";
 import type { SessionModelOverride } from "./model-restore";
 import type {
+	DiscoverProviderModelsParams,
 	ImageContent,
 	MessagesPage,
 	RpcChatConfig,
@@ -198,6 +199,8 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		collabLeave: () => rpcCommand({ type: "collab_leave" }, 60_000),
 		getCollabState: () => rpcCommand({ type: "get_collab_state" }),
 		getAvailableModels: (forceRefresh?: boolean) => rpcCommand({ type: "get_available_models", forceRefresh }),
+		discoverProviderModels: (params: DiscoverProviderModelsParams) =>
+			rpcCommand({ type: "discover_provider_models", ...params }, 30_000),
 		setThinkingLevel: (level: ThinkingLevel | "auto") => rpcCommand({ type: "set_thinking_level", level }),
 		cycleThinkingLevel: () => rpcCommand({ type: "cycle_thinking_level" }),
 		setFastMode: (enabled: boolean) => rpcCommand({ type: "set_fast_mode", enabled }),

@@ -92,4 +92,12 @@ describe("subagent list projection", () => {
 		const agent = { ...snapshot("running", 1), assignment: "Inspect session switching" };
 		expect(subagentPrimaryLabel(agent)).toBe("Inspect session switching");
 	});
+
+	it("heads a delegated assignment with its gist, not its markdown scaffolding", () => {
+		const agent = {
+			...snapshot("running", 1),
+			assignment: "# Target\n`src/retry.ts`\n\n# Change\n- Stop retrying on a 4xx\n\n# Acceptance\nTests pass",
+		};
+		expect(subagentPrimaryLabel(agent)).toBe("Stop retrying on a 4xx");
+	});
 });

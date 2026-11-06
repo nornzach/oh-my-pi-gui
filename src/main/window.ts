@@ -5,9 +5,19 @@
 
 import * as fs from "node:original-fs";
 import { join } from "node:path";
-import { app, BrowserWindow, dialog, Menu, type MessageBoxOptions, screen, shell } from "electron";
+import {
+	app,
+	BrowserWindow,
+	type BrowserWindowConstructorOptions,
+	dialog,
+	Menu,
+	type MessageBoxOptions,
+	nativeTheme,
+	screen,
+	shell,
+} from "electron";
 import Store from "electron-store";
-import type { RunProgressState, SessionKind } from "../shared/ipc-types";
+import { type CaptionColors, IPC_EVENTS, type RunProgressState, type SessionKind } from "../shared/ipc-types";
 import { quitRisk, requestQuit } from "./app-quit";
 import { editableContextMenuTemplate } from "./editable-context-menu";
 import { getMainLanguage, mainT } from "./i18n";
@@ -31,6 +41,7 @@ interface WindowState {
 
 interface StoreSchema {
 	windowState: WindowState;
+	captionColors?: CaptionColors;
 	[key: string]: unknown;
 }
 
@@ -38,6 +49,8 @@ const DEFAULT_WIDTH = 1400;
 const DEFAULT_HEIGHT = 900;
 const MIN_WIDTH = 800;
 const MIN_HEIGHT = 600;
+/** The header row the window controls sit in; the renderer lays out around them (`--omp-caption-*`). */
+const CAPTION_HEIGHT = 48;
 
 /** Work areas with the primary display first — it is the recentering target. */
 /** The window's page address for logs; a window can close while its renderer's events still arrive. */
@@ -125,7 +138,7 @@ export class WindowManager {
 			minWidth: MIN_WIDTH,
 			minHeight: MIN_HEIGHT,
 			show: false,
-			autoHideMenuBar: process.platform === "win32",
+			...this.#captionOptions(),
 			webPreferences: {
 				contextIsolation: true,
 				nodeIntegration: false,
@@ -157,6 +170,9 @@ export class WindowManager {
 			win.show();
 		});
 
+		win.on("enter-full-screen", () => win.webContents.send(IPC_EVENTS.WINDOW_FULLSCREEN, true));
+		win.on("leave-full-screen", () => win.webContents.send(IPC_EVENTS.WINDOW_FULLSCREEN, false));
+
 		// Open external links in browser. Scheme-checked: renderer surfaces
 		// (OSC 8 anchors, target=_blank) must not be able to launch arbitrary
 		// protocols via middle-click / new-window activation.
@@ -179,6 +195,37 @@ export class WindowManager {
 		});
 
 		return win;
+	}
+
+	/**
+	 * No native title bar on any platform: the header runs to the window's top
+	 * edge with the window controls over it. macOS draws its own; on Windows and
+	 * Linux Electron draws them, starting in the colors the header last had.
+	 */
+	#captionOptions(): Pick<
+		BrowserWindowConstructorOptions,
+		"titleBarStyle" | "titleBarOverlay" | "trafficLightPosition"
+	> {
+		if (process.platform === "darwin") {
+			return { titleBarStyle: "hidden", trafficLightPosition: { x: 16, y: 17 } };
+		}
+		const fallback = nativeTheme.shouldUseDarkColors
+			? { color: "#1f1f1f", symbolColor: "#ececec" }
+			: { color: "#ffffff", symbolColor: "#0d0d0d" };
+		const colors = this.#store.get("captionColors") ?? fallback;
+		return { titleBarStyle: "hidden", titleBarOverlay: { ...colors, height: CAPTION_HEIGHT } };
+	}
+
+	/** Paint the window controls to match the header. */
+	setCaptionColors(win: BrowserWindow, colors: CaptionColors): void {
+		if (process.platform === "darwin") return;
+		try {
+			win.setTitleBarOverlay({ ...colors, height: CAPTION_HEIGHT });
+			this.#store.set("captionColors", colors);
+		} catch (error) {
+			// A window without overlay controls has nothing to paint; never worth failing a theme change.
+			writeRuntimeLog({ source: "main-process", message: `Window controls not painted: ${String(error)}` });
+		}
 	}
 
 	#observeRuntimeFailures(record: WindowRecord): void {

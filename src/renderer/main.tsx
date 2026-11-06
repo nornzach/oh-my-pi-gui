@@ -3,12 +3,14 @@ import { App } from "./App";
 import { RootErrorBoundary } from "./components/common/RootErrorBoundary";
 import { I18nProvider } from "./lib/i18n";
 import { installGlobalRuntimeErrorHandlers, reportRuntimeError } from "./lib/runtime-errors";
+import { startWindowChrome } from "./lib/window-chrome";
 import "./styles/global.css";
 import "./styles/theme-dark.css";
 import "./styles/theme-light.css";
 import "./styles/components.css";
 
 installGlobalRuntimeErrorHandlers();
+startWindowChrome();
 
 const container = document.getElementById("root");
 if (!container) {

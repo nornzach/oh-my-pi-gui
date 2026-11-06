@@ -16,7 +16,7 @@
  *           dialog and leave the caller (the Providers window) where it was.
  */
 
-import { ChevronDown, ChevronRight, Eye, EyeOff, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, CloudDownload, Eye, EyeOff, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { customProviderNeedsApiKey } from "../../../shared/custom-provider";
 import type {
@@ -26,13 +26,16 @@ import type {
 	CustomProviderView,
 } from "../../../shared/ipc-types";
 import { CUSTOM_PROVIDER_APIS } from "../../../shared/ipc-types";
+import type { DiscoveredModel } from "../../../shared/rpc-types";
 import { ipcErrorMessage } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { useTabRpc } from "../../lib/tab-rpc";
 import { useModelStore } from "../../stores/model";
 import { toast } from "../../stores/toast";
 import { Button, Input, Modal, Spinner } from "../common";
 import { FieldError, FieldLabel } from "./providers/FormFields";
 import { ModelEditor, type ModelRow } from "./providers/ModelEditor";
+import { ModelFetchPanel, mergeFetchedModels } from "./providers/ModelFetchPanel";
 import { ProviderConfigRow } from "./providers/ProviderConfigRow";
 
 /** Protocols accepted by models.yml (re-export from shared types). */
@@ -53,6 +56,21 @@ const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 // Same box as common/Input, so selects and text fields line up in one column.
 const SELECT_CLASS =
 	"w-full rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-3 py-[9px] text-omp-lg leading-[1.45] text-(--omp-text) shadow-(--omp-shadow-sm) transition-[border-color,box-shadow] duration-150 hover:border-(--omp-border-strong) focus:border-(--omp-input-focus-border) focus:shadow-[0_0_0_3px_var(--omp-input-glow)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+
+/** Model-list protocols a server can speak, for fetching once and for keeping the list updated. */
+function DiscoveryTypeOptions() {
+	const t = useT();
+	return (
+		<>
+			<option value="openai-models-list">{t("providerCfg.form.discoveryOpenAiList")}</option>
+			<option value="ollama">Ollama</option>
+			<option value="llama.cpp">llama.cpp</option>
+			<option value="lm-studio">LM Studio</option>
+			<option value="proxy">{t("providerCfg.form.discoveryProxy")}</option>
+			<option value="litellm">LiteLLM</option>
+		</>
+	);
+}
 
 // ============================================================================
 // Small field helpers (label/error markup matches common/Input's FieldShell)
@@ -109,6 +127,7 @@ interface ProviderFormProps {
 function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel, onDelete }: ProviderFormProps) {
 	const t = useT();
 	const refreshProviders = useModelStore(state => state.refreshProviders);
+	const rpc = useTabRpc();
 	const nextKey = useRef(1);
 	const readonly = editing?.builtin ?? false;
 
@@ -126,6 +145,12 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 		editing ? editing.discovery?.type : defaultProviderDiscovery(),
 	);
 	const [discoveryTimeout, setDiscoveryTimeout] = useState<number | undefined>(editing?.discovery?.timeoutMs);
+	const [fetchType, setFetchType] = useState<CustomProviderDiscoveryType>(
+		editing?.discovery?.type ?? "openai-models-list",
+	);
+	const [fetching, setFetching] = useState(false);
+	const [fetched, setFetched] = useState<DiscoveredModel[] | null>(null);
+	const [fetchError, setFetchError] = useState<string | null>(null);
 	const [disableStrictTools, setDisableStrictTools] = useState(editing?.disableStrictTools ?? false);
 	const [transport, setTransport] = useState<"pi-native" | undefined>(editing?.transport);
 	const [extraBody, setExtraBody] = useState(() =>
@@ -148,6 +173,7 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 		() =>
 			Object.keys(editing?.headers ?? {}).length > 0 ||
 			editing?.authHeader === true ||
+			editing?.discovery !== undefined ||
 			editing?.disableStrictTools === true ||
 			editing?.transport !== undefined ||
 			editing?.extraBody !== undefined,
@@ -164,6 +190,49 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 	const addModel = () => setModels(prev => [...prev, { key: nextKey.current++, id: "", name: "" }]);
 	const removeModel = (key: number) =>
 		setModels(prev => (prev.length > 1 ? prev.filter(row => row.key !== key) : prev));
+
+	const fetchModels = async () => {
+		const url = baseUrl.trim();
+		if (!isValidHttpUrl(url)) {
+			setErrors(prev => ({
+				...prev,
+				baseUrl: url ? t("providerCfg.form.baseUrlInvalid") : t("providerCfg.form.baseUrlRequired"),
+			}));
+			return;
+		}
+		const headerEntries = headers.filter(row => row.name.trim().length > 0);
+		setFetching(true);
+		setFetchError(null);
+		setFetched(null);
+		try {
+			const response = await rpc.discoverProviderModels({
+				// A saved key only ever goes with the provider it was saved for.
+				...(editing && !clearKey ? { provider: editing.id } : {}),
+				api,
+				baseUrl: url,
+				...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+				...(authHeader ? { authHeader: true } : {}),
+				...(headerEntries.length > 0
+					? { headers: Object.fromEntries(headerEntries.map(row => [row.name.trim(), row.value])) }
+					: {}),
+				discoveryType: fetchType,
+				...(discoveryTimeout ? { timeoutMs: discoveryTimeout } : {}),
+			});
+			if (!response.success) throw new Error(response.error);
+			const found = (response.data as { models: DiscoveredModel[] }).models;
+			if (found.length === 0) setFetchError(t("providerCfg.fetch.empty"));
+			else setFetched(found.toSorted((a, b) => a.id.localeCompare(b.id)));
+		} catch (cause) {
+			setFetchError(t("providerCfg.fetch.failed", { error: ipcErrorMessage(cause) }));
+		} finally {
+			setFetching(false);
+		}
+	};
+	const addFetchedModels = (picked: DiscoveredModel[]) => {
+		setModels(prev => mergeFetchedModels(prev, picked, () => nextKey.current++));
+		setErrors(prev => dropKey(prev, "models"));
+		setFetched(null);
+	};
 
 	const updateHeader = (key: number, patch: Partial<Omit<HeaderRow, "key">>) => {
 		setHeaders(prev => prev.map(row => (row.key === key ? { ...row, ...patch } : row)));
@@ -469,7 +538,48 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 				</div>
 
 				<div>
-					<FieldLabel>{t("providerCfg.form.models")}</FieldLabel>
+					<div className="flex items-end justify-between gap-2">
+						<FieldLabel>{t("providerCfg.form.models")}</FieldLabel>
+						{!readonly && (
+							<div className="mb-1 flex shrink-0 items-center gap-1.5">
+								<select
+									aria-label={t("providerCfg.fetch.server")}
+									className="h-7 max-w-52 rounded-md border border-(--omp-input-border) bg-(--omp-input-bg) px-1.5 text-omp-sm text-(--omp-text) outline-none focus:border-(--omp-input-focus-border) disabled:opacity-50"
+									disabled={fetching || submitting}
+									onChange={event => setFetchType(event.target.value as CustomProviderDiscoveryType)}
+									value={fetchType}
+								>
+									<DiscoveryTypeOptions />
+								</select>
+								<Button
+									disabled={submitting}
+									icon={<CloudDownload size={12} />}
+									loading={fetching}
+									onClick={() => void fetchModels()}
+									size="sm"
+									variant="ghost"
+								>
+									{t("providerCfg.fetch.action")}
+								</Button>
+							</div>
+						)}
+					</div>
+					{!readonly && !fetched && !fetchError && !models.some(row => row.id.trim()) && (
+						<span className="mb-1.5 block text-omp-sm text-(--omp-dim)">{t("providerCfg.fetch.hint")}</span>
+					)}
+					{fetchError && (
+						<p className="mb-1.5 text-omp-sm text-(--omp-error)" role="alert">
+							{fetchError}
+						</p>
+					)}
+					{fetched && (
+						<ModelFetchPanel
+							existingIds={new Set(models.map(row => row.id.trim()))}
+							models={fetched}
+							onAdd={addFetchedModels}
+							onClose={() => setFetched(null)}
+						/>
+					)}
 					<div className="flex flex-col gap-2">
 						{models.map(row => (
 							<ModelEditor
@@ -504,40 +614,6 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 				</div>
 
 				<div>
-					<FieldLabel>{t("providerCfg.form.discovery")}</FieldLabel>
-					<div className="flex gap-2">
-						<select
-							className={SELECT_CLASS}
-							style={{ flex: "2" }}
-							value={discoveryType ?? ""}
-							disabled={readonly || submitting}
-							onChange={event =>
-								setDiscoveryType((event.target.value || undefined) as CustomProviderDiscoveryType | undefined)
-							}
-						>
-							<option value="">{t("providerCfg.form.discoveryNone")}</option>
-							<option value="ollama">Ollama</option>
-							<option value="llama.cpp">llama.cpp</option>
-							<option value="lm-studio">LM Studio</option>
-							<option value="openai-models-list">{t("providerCfg.form.discoveryOpenAiList")}</option>
-							<option value="proxy">{t("providerCfg.form.discoveryProxy")}</option>
-							<option value="litellm">LiteLLM</option>
-						</select>
-						<Input
-							type="number"
-							value={discoveryTimeout ?? ""}
-							onChange={e =>
-								setDiscoveryTimeout(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
-							}
-							placeholder={t("providerCfg.form.discoveryTimeout")}
-							disabled={readonly || submitting || !discoveryType}
-							style={{ flex: "1" }}
-						/>
-					</div>
-					<span className="mt-1 block text-omp-sm text-(--omp-dim)">{t("providerCfg.form.discoveryHint")}</span>
-				</div>
-
-				<div>
 					<button
 						type="button"
 						aria-expanded={advancedOpen}
@@ -554,6 +630,41 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 					)}
 					{advancedOpen && (
 						<div className="mt-2 flex flex-col gap-3">
+							<div>
+								<FieldLabel>{t("providerCfg.form.discovery")}</FieldLabel>
+								<div className="flex gap-2">
+									<select
+										className={SELECT_CLASS}
+										style={{ flex: "2" }}
+										value={discoveryType ?? ""}
+										disabled={readonly || submitting}
+										onChange={event => {
+											const type = (event.target.value || undefined) as
+												| CustomProviderDiscoveryType
+												| undefined;
+											setDiscoveryType(type);
+											if (type) setFetchType(type);
+										}}
+									>
+										<option value="">{t("providerCfg.form.discoveryNone")}</option>
+										<DiscoveryTypeOptions />
+									</select>
+									<Input
+										type="number"
+										value={discoveryTimeout ?? ""}
+										onChange={e =>
+											setDiscoveryTimeout(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
+										}
+										placeholder={t("providerCfg.form.discoveryTimeout")}
+										disabled={readonly || submitting || !discoveryType}
+										style={{ flex: "1" }}
+									/>
+								</div>
+								<span className="mt-1 block text-omp-sm text-(--omp-dim)">
+									{t("providerCfg.form.discoveryHint")}
+								</span>
+							</div>
+
 							<label className="flex items-center gap-2">
 								<input
 									type="checkbox"
@@ -727,11 +838,24 @@ export interface ProviderConfigDialogProps {
 	editProvider?: CustomProviderView | "new" | null;
 }
 
+function viewFor(editProvider: CustomProviderView | "new" | null): View {
+	if (editProvider === "new") return { kind: "form", editing: null };
+	return editProvider ? { kind: "form", editing: editProvider } : { kind: "list" };
+}
+
 export function ProviderConfigDialog({ open, onClose, editProvider = null }: ProviderConfigDialogProps) {
 	const t = useT();
 	const refreshProviders = useModelStore(state => state.refreshProviders);
 	const activeModel = useModelStore(state => state.model);
-	const [view, setView] = useState<View>({ kind: "list" });
+	const [view, setView] = useState<View>(() => viewFor(editProvider));
+	// Decided while rendering, not in an effect: a form mounted on the last request's
+	// view keeps that provider's fields under this one's title, and saves them over it.
+	const request = open ? editProvider : undefined;
+	const [lastRequest, setLastRequest] = useState(request);
+	if (request !== lastRequest) {
+		setLastRequest(request);
+		if (request !== undefined) setView(viewFor(request));
+	}
 	const [providers, setProviders] = useState<CustomProviderView[] | null>(null);
 	const [listError, setListError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -751,16 +875,8 @@ export function ProviderConfigDialog({ open, onClose, editProvider = null }: Pro
 	}, []);
 
 	useEffect(() => {
-		if (!open) return;
-		setView(
-			editProvider === "new"
-				? { kind: "form", editing: null }
-				: editProvider
-					? { kind: "form", editing: editProvider }
-					: { kind: "list" },
-		);
-		void load();
-	}, [open, editProvider, load]);
+		if (open) void load();
+	}, [open, load]);
 
 	const handleClose = () => {
 		setPendingDelete(null);
@@ -815,6 +931,7 @@ export function ProviderConfigDialog({ open, onClose, editProvider = null }: Pro
 			<Modal bodyClassName="p-0" open={open} onClose={handleClose} title={title} size="lg">
 				{view.kind === "form" ? (
 					<ProviderForm
+						key={view.editing?.id ?? "new"}
 						editing={view.editing}
 						existing={providers ?? []}
 						directEdit={editProvider !== null}

@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- Custom providers have a **Fetch models** button: pull the list from your endpoint, pick the models you want, then edit any row before saving. Keeping the list updated automatically is now a separate choice under Advanced options ([#40](https://github.com/nornzach/oh-my-pi-gui/issues/40)).
+
+### Changed
+
+- The window header looks the same on macOS, Windows and Linux: it lines up with the window controls, the panel and settings headers match its height and drag the window, and Windows and Linux open the app menu from a header button instead of a menu bar ([#44](https://github.com/nornzach/oh-my-pi-gui/issues/44)).
+- The sidebar keeps forks one level under their first session, labels subagents by their task instead of "# Target", and folds a subagent's row once it finishes ([#42](https://github.com/nornzach/oh-my-pi-gui/issues/42)).
+
+### Fixed
+
+- New sessions get a generated title in the sidebar and the tab, instead of keeping their first message ([#41](https://github.com/nornzach/oh-my-pi-gui/issues/41)).
+- A session that moved to a new file shows as one row with its pin and archive state, and deleting it removes both files ([#42](https://github.com/nornzach/oh-my-pi-gui/issues/42)).
+- The provider form no longer opens with the previous form's values, which saving would have written over the provider you were editing ([#40](https://github.com/nornzach/oh-my-pi-gui/issues/40)).
+
 ## [0.9.36] - 2026-11-04
 
 ### Added

@@ -193,6 +193,13 @@ describe("SessionIndex headers and watching", () => {
 		expect(byId("helper")?.parentSessionPath).toBe(child);
 		expect(byId("fork")?.parentSessionPath).toBe("parent");
 		expect(byId("advisor")).toBeUndefined();
+		// Lists tell transcripts from forks by this, wherever the transcript hangs.
+		expect(
+			listed
+				.filter(info => info.subagent)
+				.map(info => info.id)
+				.sort(),
+		).toEqual(["agent", "helper"]);
 
 		// A new index is what a restart does: the link is read from disk, not from a live roster.
 		const reloaded = new SessionIndex(dir, dir);

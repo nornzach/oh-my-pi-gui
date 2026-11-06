@@ -16,6 +16,7 @@ export * from "../../stores/subagent-graph";
 
 import type { AgentMessage, SubagentSnapshot } from "../../../shared/rpc-types";
 import { formatCost, formatTokens } from "../../lib/format";
+import { assignmentHeadline } from "../../lib/session-title";
 import type { BadgeVariant } from "../common";
 
 /**
@@ -151,10 +152,9 @@ export function parentSubagentIdOf(agent: SubagentSnapshot): string | undefined 
 /** Human task label used consistently by list, graph, and hub surfaces. */
 export function subagentPrimaryLabel(agent: SubagentSnapshot, maxLength = 60): string {
 	// `description` is the sidecar's tiny-model UI label. `assignment` is the
-	// complete delegated prompt and may include markdown/system scaffolding, so
-	// it belongs in the transcript rather than the compact row heading.
-	const raw = agent.description ?? agent.assignment ?? agent.task ?? agent.agent;
-	const text = raw.trim() || agent.agent;
+	// complete delegated prompt with its markdown scaffolding, which belongs in
+	// the transcript: a compact heading gets only its gist.
+	const text = agent.description?.trim() || assignmentHeadline(agent.assignment ?? agent.task ?? "") || agent.agent;
 	return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
 }
 

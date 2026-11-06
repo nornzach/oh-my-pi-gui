@@ -12,6 +12,7 @@ import type {
 	AvailableCommand,
 	CommandOutputFrame,
 	ConfigUpdateFrame,
+	DiscoverProviderModelsParams,
 	ExtensionErrorFrame,
 	ExtensionUIRequest,
 	ExtensionUIResponse,
@@ -125,6 +126,12 @@ export const IPC_EVENTS = {
 	TRAY_STATE_PUSH: "tray:state-push",
 	/** Renderer → main fire-and-forget run-progress state (dock badge + progress bar) */
 	PROGRESS_SET: "progress:set",
+	/** Main → renderer: the window entered or left fullscreen (boolean). */
+	WINDOW_FULLSCREEN: "window:fullscreen",
+	/** Renderer → main: colors for the window controls drawn over the header (CaptionColors). */
+	WINDOW_CAPTION_COLORS: "window:caption-colors",
+	/** Renderer → main: open the app menu at a point in the window ({ x, y }). */
+	WINDOW_APP_MENU: "window:app-menu",
 	/** Auto-update status machine push (idle/checking/available/downloading/downloaded/not-available/error) */
 	UPDATER_STATUS: "updater:status",
 	/** Sidecar terminal frame for any tab of the window, visible or not (IpcTerminalFramePayload). */
@@ -140,6 +147,7 @@ export const IPC_EVENTS = {
 // ============================================================================
 
 export const IPC_COMMANDS = {
+	WINDOW_IS_FULLSCREEN: "window:is-fullscreen",
 	/** Persist a renderer runtime failure in the main-process crash log */
 	RUNTIME_ERROR_REPORT: "runtime:error-report",
 	/** Absolute path to the main-process crash log */
@@ -1180,6 +1188,10 @@ export interface SessionInfo {
 	/** Session kind read from the file header; absent = agent (legacy sessions). */
 	kind?: "chat";
 	parentSessionPath?: string;
+	/** The session this file carries on: the agent moved off that file and kept going here. */
+	continuationOf?: string;
+	/** A subagent's transcript, found in a session's artifact directory. */
+	subagent?: boolean;
 	firstMessage: string;
 }
 
@@ -1203,7 +1215,21 @@ export interface SystemInfo {
 	node: string;
 }
 
+/** Colors of the window controls Electron draws over the header on Windows and Linux, as `#rrggbb`. */
+export interface CaptionColors {
+	color: string;
+	symbolColor: string;
+}
+
 export interface OmpApi {
+	/** `process.platform`: which window controls sit over the header. */
+	platform: string;
+	windowChrome: {
+		isFullScreen(): Promise<boolean>;
+		onFullScreenChange(callback: (fullScreen: boolean) => void): () => void;
+		setCaptionColors(colors: CaptionColors): void;
+		showAppMenu(anchor: { x: number; y: number }): void;
+	};
 	runtime: {
 		/** Best-effort fire-and-forget reporting so fatal render paths never wait on IPC. */
 		report(error: RuntimeErrorReport): void;
@@ -1313,6 +1339,7 @@ export interface OmpApi {
 		collabLeave(): Promise<RpcResponse>;
 		getCollabState(): Promise<RpcResponse>;
 		getAvailableModels(forceRefresh?: boolean): Promise<RpcResponse>;
+		discoverProviderModels(params: DiscoverProviderModelsParams): Promise<RpcResponse>;
 		setThinkingLevel(level: ThinkingLevel | "auto"): Promise<RpcResponse>;
 		cycleThinkingLevel(): Promise<RpcResponse>;
 		setFastMode(enabled: boolean): Promise<RpcResponse>;

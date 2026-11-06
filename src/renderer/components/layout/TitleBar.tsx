@@ -6,6 +6,7 @@ import {
 	Gauge,
 	GitBranch,
 	Info,
+	Menu,
 	MoreHorizontal,
 	PanelLeft,
 	PanelRight,
@@ -24,6 +25,7 @@ import { onEscape } from "../../lib/keymap";
 import { isRecording, subscribeRecording, toggleRecording } from "../../lib/recording";
 import { sessionDisplayTitle } from "../../lib/session-title";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { headerHasAppMenu } from "../../lib/window-chrome";
 import { useAgentPagesStore, useShownAgentPage } from "../../stores/agent-pages";
 import { useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
@@ -327,6 +329,20 @@ export function TitleBar() {
 
 	return (
 		<header className="omp-titlebar drag-region flex h-12 min-w-0 shrink-0 items-center gap-1 overflow-hidden bg-[var(--omp-titlebar-bg)] px-2.5">
+			{headerHasAppMenu() && (
+				<button
+					type="button"
+					aria-label={t("titlebar.appMenu")}
+					onClick={event => {
+						const { left, bottom } = event.currentTarget.getBoundingClientRect();
+						window.omp.windowChrome.showAppMenu({ x: left, y: bottom });
+					}}
+					title={t("titlebar.appMenu")}
+					className={iconButton}
+				>
+					<Menu size={18} />
+				</button>
+			)}
 			<button
 				type="button"
 				aria-label={t("titlebar.toggleSidebar")}

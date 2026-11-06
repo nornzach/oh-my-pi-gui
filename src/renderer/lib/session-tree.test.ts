@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionInfo } from "../../shared/ipc-types";
-import { buildSessionTree, isSubagentTranscript, orderSessionForest } from "./session-tree";
+import { browsableSessions, buildSessionTree, listedSessions, orderSessionForest } from "./session-tree";
 
 function session(path: string, overrides: Partial<SessionInfo> = {}): SessionInfo {
 	return {
@@ -97,13 +97,116 @@ describe("orderSessionForest", () => {
 	});
 });
 
-describe("isSubagentTranscript", () => {
-	it("tells a transcript in the parent's artifact directory from a fork beside it", () => {
-		const parent = session("/s/parent.jsonl");
-		expect(isSubagentTranscript(session("/s/parent/agent.jsonl"), parent)).toBe(true);
-		expect(isSubagentTranscript(session("/s/parent/agent/helper.jsonl"), parent)).toBe(true);
-		expect(isSubagentTranscript(session("C:\\s\\parent\\agent.jsonl"), session("C:\\s\\parent.jsonl"))).toBe(true);
-		expect(isSubagentTranscript(session("/s/fork.jsonl"), parent)).toBe(false);
-		expect(isSubagentTranscript(session("/s/parent-2/agent.jsonl"), parent)).toBe(false);
+describe("listedSessions", () => {
+	const shape = (sessions: readonly SessionInfo[]) =>
+		Object.fromEntries(sessions.map(item => [item.path, item.parentSessionPath]));
+
+	// The move the agent makes when its file is taken: parent and continuation both name the old id.
+	const moved = (path: string, from: string, overrides: Partial<SessionInfo> = {}) =>
+		session(path, {
+			id: path,
+			parentSessionPath: from,
+			continuationOf: from,
+			created: "2026-01-02T00:00:30Z",
+			modified: "2026-01-03T00:00:00Z",
+			...overrides,
+		});
+	const old = (path: string, overrides: Partial<SessionInfo> = {}) =>
+		session(path, { created: "2026-01-02T00:00:00Z", modified: "2026-01-02T00:00:01Z", ...overrides });
+
+	it("draws an edited branch that moved to a new file as one row under the root", () => {
+		// The nesting from gui#42: root → untouched branch copy → the continuation you actually worked in.
+		const root = session("/s/root.jsonl");
+		const copy = old("/s/copy.jsonl", { parentSessionPath: "/s/root.jsonl" });
+		const continuation = moved("/s/next.jsonl", "/s/copy.jsonl");
+
+		const { sessions, heirs } = listedSessions([root, copy, continuation]);
+
+		expect(shape(sessions)).toEqual({ "/s/root.jsonl": undefined, "/s/next.jsonl": "/s/root.jsonl" });
+		expect([...heirs]).toEqual([["/s/copy.jsonl", "/s/next.jsonl"]]);
+	});
+
+	it("makes the newest file of a moved session the root of its family", () => {
+		const first = old("/s/first.jsonl");
+		const second = moved("/s/second.jsonl", "/s/first.jsonl", { modified: "2026-01-02T00:00:31Z" });
+		const third = moved("/s/third.jsonl", "/s/second.jsonl", { created: "2026-01-02T00:01:00Z" });
+		const fork = session("/s/fork.jsonl", { parentSessionPath: "/s/first.jsonl" });
+		const transcript = session("/s/first/agent.jsonl", { parentSessionPath: "/s/first.jsonl", subagent: true });
+
+		const { sessions, heirs } = listedSessions([first, second, third, fork, transcript]);
+
+		// The index keeps the first file's copy of a transcript, so it has to follow the conversation.
+		expect(shape(sessions)).toEqual({
+			"/s/third.jsonl": undefined,
+			"/s/fork.jsonl": "/s/third.jsonl",
+			"/s/first/agent.jsonl": "/s/third.jsonl",
+		});
+		expect(heirs.get("/s/first.jsonl")).toBe("/s/third.jsonl");
+		expect(heirs.get("/s/second.jsonl")).toBe("/s/third.jsonl");
+	});
+
+	it("keeps a file someone is still working in, with the continuation as its child", () => {
+		const stillWritten = old("/s/old.jsonl", { modified: "2026-01-02T00:05:00Z" });
+		const continuation = moved("/s/next.jsonl", "/s/old.jsonl");
+
+		const { sessions, heirs } = listedSessions([stillWritten, continuation]);
+
+		expect(shape(sessions)).toEqual({ "/s/old.jsonl": undefined, "/s/next.jsonl": "/s/old.jsonl" });
+		expect(heirs.size).toBe(0);
+	});
+
+	it("keeps a file open in a tab", () => {
+		const open = old("/s/old.jsonl");
+		const continuation = moved("/s/next.jsonl", "/s/old.jsonl");
+
+		const { sessions } = listedSessions([open, continuation], item => item.path === "/s/old.jsonl");
+
+		expect(shape(sessions)).toEqual({ "/s/old.jsonl": undefined, "/s/next.jsonl": "/s/old.jsonl" });
+	});
+
+	it("flattens forks of forks onto the root and leaves subagents under the session that ran them", () => {
+		const root = session("/s/root.jsonl", { id: "root-id" });
+		const fork = session("/s/fork.jsonl", { id: "fork-id", parentSessionPath: "root-id" });
+		const forkOfFork = session("/s/fork2.jsonl", { parentSessionPath: "/s/fork.jsonl" });
+		const agent = session("/s/fork/agent.jsonl", { parentSessionPath: "/s/fork.jsonl", subagent: true });
+		const nested = session("/s/fork/agent/helper.jsonl", {
+			parentSessionPath: "/s/fork/agent.jsonl",
+			subagent: true,
+		});
+
+		const { sessions } = listedSessions([root, fork, forkOfFork, agent, nested]);
+
+		expect(shape(sessions)).toEqual({
+			"/s/root.jsonl": undefined,
+			"/s/fork.jsonl": "/s/root.jsonl",
+			"/s/fork2.jsonl": "/s/root.jsonl",
+			"/s/fork/agent.jsonl": "/s/fork.jsonl",
+			"/s/fork/agent/helper.jsonl": "/s/fork/agent.jsonl",
+		});
+	});
+
+	it("does not lose a session whose continuation link is malformed", () => {
+		const a = session("/s/a.jsonl", { id: "a", continuationOf: "b" });
+		const b = session("/s/b.jsonl", { id: "b", continuationOf: "a" });
+		const self = session("/s/self.jsonl", { id: "self", continuationOf: "self" });
+		const undated = session("/s/undated.jsonl", { created: "not a date", continuationOf: "a" });
+
+		const { sessions, heirs } = listedSessions([a, b, self, undated]);
+
+		expect(sessions.map(item => item.path)).toEqual([
+			"/s/a.jsonl",
+			"/s/b.jsonl",
+			"/s/self.jsonl",
+			"/s/undated.jsonl",
+		]);
+		expect(heirs.size).toBe(0);
+	});
+
+	it("gives a picker only the conversations", () => {
+		const first = old("/s/first.jsonl");
+		const second = moved("/s/second.jsonl", "/s/first.jsonl");
+		const agent = session("/s/second/agent.jsonl", { parentSessionPath: "/s/second.jsonl", subagent: true });
+
+		expect(browsableSessions([first, second, agent]).map(item => item.path)).toEqual(["/s/second.jsonl"]);
 	});
 });

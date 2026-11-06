@@ -935,6 +935,7 @@ export function SettingsWindow() {
 		>
 			<div className="flex min-h-0 flex-1">
 				<nav className="settings-sidebar flex shrink-0 flex-col border-r border-(--omp-border-muted)">
+					<div aria-hidden className="omp-window-caption drag-region" />
 					<div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
 						{navGroups.map((group, groupIndex) => (
 							<section className={groupIndex === 0 ? "" : "settings-nav-group mt-4"} key={group.id}>
@@ -999,7 +1000,7 @@ export function SettingsWindow() {
 					</div>
 				</nav>
 				<main className="settings-main-canvas flex min-w-0 flex-1 flex-col overflow-hidden">
-					<header className="omp-column omp-column-workspace flex h-14 shrink-0 items-center gap-3 border-b border-(--omp-border-muted)">
+					<header className="omp-column omp-column-workspace drag-region flex h-14 shrink-0 items-center gap-3 border-b border-(--omp-border-muted)">
 						<div className="min-w-0 flex-1">
 							{!managementTab && (
 								<h1 className="truncate text-omp-xl font-semibold tracking-[-0.015em] text-(--omp-text)">
@@ -1008,7 +1009,7 @@ export function SettingsWindow() {
 							)}
 						</div>
 						{showGlobalSearch && (
-							<div className="relative w-[clamp(13rem,32vw,20rem)] max-w-full min-w-0 shrink">
+							<div className="no-drag relative w-[clamp(13rem,32vw,20rem)] max-w-full min-w-0 shrink">
 								<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-(--omp-dim)" size={13} />
 								<input
 									aria-label={t("settings.searchPlaceholder")}
@@ -1026,7 +1027,7 @@ export function SettingsWindow() {
 						)}
 						<button
 							aria-label={t("settings.close")}
-							className="flex h-8 w-8 items-center justify-center rounded-lg text-(--omp-muted) transition-colors hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)"
+							className="no-drag flex h-8 w-8 items-center justify-center rounded-lg text-(--omp-muted) transition-colors hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)"
 							onClick={close}
 							type="button"
 						>

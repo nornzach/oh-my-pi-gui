@@ -41,8 +41,8 @@ function RootErrorFallback({ error }: { error: Error }) {
 	}, []);
 
 	return (
-		<main className="flex h-full w-full items-center justify-center px-6 text-[var(--omp-text)]">
-			<section className="w-full max-w-xl rounded-2xl border border-[var(--omp-border)] p-6 shadow-2xl">
+		<main className="drag-region flex h-full w-full items-center justify-center px-6 text-[var(--omp-text)]">
+			<section className="no-drag w-full max-w-xl rounded-2xl border border-[var(--omp-border)] p-6 shadow-2xl">
 				<div className="mb-4 h-1 w-12 rounded-full bg-[var(--omp-error)]" />
 				<h1 className="font-display text-lg font-semibold">{translate("appError.title")}</h1>
 				<p className="mt-2 text-sm leading-relaxed text-[var(--omp-muted)]">{translate("appError.description")}</p>

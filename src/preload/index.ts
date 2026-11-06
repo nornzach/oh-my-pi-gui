@@ -53,7 +53,7 @@ import type {
 	TrayState,
 	UpdateStatus,
 } from "../shared/ipc-types";
-import { IPC_COMMANDS, IPC_EVENTS } from "../shared/ipc-types";
+import { type CaptionColors, IPC_COMMANDS, IPC_EVENTS } from "../shared/ipc-types";
 import type { Language } from "../shared/languages";
 import { createSessionRpcClient, timeoutForCommand } from "../shared/rpc-client";
 import type {
@@ -428,6 +428,15 @@ const api: OmpApi = {
 
 	progress: {
 		set: (state: RunProgressState) => ipcRenderer.send(IPC_EVENTS.PROGRESS_SET, state),
+	},
+
+	platform: process.platform,
+	windowChrome: {
+		isFullScreen: () => ipcRenderer.invoke(IPC_COMMANDS.WINDOW_IS_FULLSCREEN) as Promise<boolean>,
+		onFullScreenChange: (callback: (fullScreen: boolean) => void) =>
+			subscribe<boolean>(IPC_EVENTS.WINDOW_FULLSCREEN, callback),
+		setCaptionColors: (colors: CaptionColors) => ipcRenderer.send(IPC_EVENTS.WINDOW_CAPTION_COLORS, colors),
+		showAppMenu: (anchor: { x: number; y: number }) => ipcRenderer.send(IPC_EVENTS.WINDOW_APP_MENU, anchor),
 	},
 
 	models: {

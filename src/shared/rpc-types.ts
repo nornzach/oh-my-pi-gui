@@ -47,6 +47,7 @@ export type RpcCommand =
 	| { id?: string; type: "set_model"; provider: string; modelId: string }
 	| { id?: string; type: "cycle_model"; direction?: "forward" | "backward" }
 	| { id?: string; type: "get_available_models"; forceRefresh?: boolean }
+	| ({ id?: string; type: "discover_provider_models" } & DiscoverProviderModelsParams)
 	| { id?: string; type: "set_thinking_level"; level: ThinkingLevel | "auto" }
 	| { id?: string; type: "cycle_thinking_level" }
 	| { id?: string; type: "set_steering_mode"; mode: "all" | "one-at-a-time" }
@@ -1532,6 +1533,28 @@ export interface ModelCost {
 	output?: number;
 	cacheRead?: number;
 	cacheWrite?: number;
+}
+
+export interface DiscoverProviderModelsParams {
+	/** A saved provider whose credential authenticates the request when `apiKey` is absent. */
+	provider?: string;
+	api: string;
+	baseUrl: string;
+	apiKey?: string;
+	authHeader?: boolean;
+	headers?: Record<string, string>;
+	discoveryType?: "ollama" | "llama.cpp" | "lm-studio" | "openai-models-list" | "proxy" | "litellm";
+	timeoutMs?: number;
+}
+
+/** A model an endpoint offers, as `discover_provider_models` reports it. */
+export interface DiscoveredModel {
+	id: string;
+	name: string;
+	reasoning: boolean;
+	input: string[];
+	contextWindow: number | null;
+	maxTokens: number | null;
 }
 
 export interface ModelInfo {

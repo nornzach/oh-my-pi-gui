@@ -110,8 +110,8 @@ export class SessionIndex {
 				// session even when its header omitted parentSession or named it by
 				// an id. The on-disk parent is what the sidebar nests under, and it
 				// is still there after a restart.
-				if (!info || !entry.parentFile || info.parentSessionPath === entry.parentFile) return info;
-				return { ...info, parentSessionPath: entry.parentFile };
+				if (!info || !entry.parentFile) return info;
+				return { ...info, parentSessionPath: entry.parentFile, subagent: true };
 			}),
 		);
 		const localCwd = cwd !== undefined ? resolve(cwd) : this.#cwd;
@@ -328,6 +328,7 @@ export class SessionIndex {
 				timestamp?: string;
 				cwd?: string;
 				parentSession?: string;
+				continuationOf?: string;
 				kind?: "chat";
 			} | null = null;
 
@@ -376,6 +377,7 @@ export class SessionIndex {
 				status,
 				kind: header?.kind,
 				parentSessionPath: header?.parentSession,
+				continuationOf: header?.continuationOf,
 				firstMessage,
 			};
 

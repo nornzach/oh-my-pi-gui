@@ -190,6 +190,72 @@ kbd,
 	-webkit-app-region: no-drag;
 }
 
+/* Drag regions ignore stacking, so whatever floats over the header has to opt out. */
+.omp-dialog-overlay,
+[role="dialog"],
+[role="menu"],
+[role="listbox"] {
+	-webkit-app-region: no-drag;
+}
+
+/* ============================================================================
+   Window controls: over the page's top corner, with no native title bar
+   ============================================================================ */
+
+:root {
+	--omp-caption-left: 0px;
+	--omp-caption-right: 0px;
+}
+
+:root[data-platform="darwin"]:not([data-fullscreen]) {
+	--omp-caption-left: 78px;
+}
+
+:root:is([data-platform="win32"], [data-platform="linux"]):not([data-fullscreen]) {
+	--omp-caption-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+}
+
+/* The row the macOS controls have to themselves, where a column reaches the top left. */
+.omp-window-caption {
+	display: none;
+	flex-shrink: 0;
+	height: 46px; /* The rows under it line up with the header's second row. */
+}
+
+:root[data-platform="darwin"]:not([data-fullscreen]) .omp-window-caption {
+	display: block;
+}
+
+/* Whichever pane reaches a top corner leaves room for the controls there. */
+[data-sidebar="closed"] .omp-titlebar {
+	padding-left: calc(var(--omp-caption-left) + 0.625rem);
+}
+
+[data-inspector="closed"] .omp-titlebar {
+	padding-right: calc(var(--omp-caption-right) + 0.625rem);
+}
+
+.omp-inspector-header {
+	padding-right: calc(var(--omp-caption-right) + 0.5rem);
+}
+
+.settings-main-canvas > header {
+	padding-right: max(var(--omp-column-pad), var(--omp-caption-right));
+}
+
+.omp-image-viewer-tools {
+	right: calc(var(--omp-caption-right) + 0.75rem);
+}
+
+/* A centered dialog tall or wide enough to reach the controls stays below them. */
+:root[data-platform]:not([data-fullscreen]) .omp-dialog-overlay.items-center {
+	padding-top: 3rem;
+}
+
+:root[data-platform]:not([data-fullscreen]) .omp-dialog-size-full {
+	height: calc(100dvh - 4rem);
+}
+
 /* ============================================================================
    Motion system
 

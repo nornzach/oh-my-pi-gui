@@ -27,15 +27,10 @@ import { basename, cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { mergeContentMatches, rankSessions, type SessionSortMode } from "../../lib/session-search";
-import { isSubagentSession } from "../../lib/session-tree";
+import { browsableSessions } from "../../lib/session-tree";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
 import { Badge, Button, Modal, Spinner } from "../common";
-
-/** Subagent transcripts are opened from their session in the sidebar, not resumed on their own. */
-function resumable(sessions: SessionInfo[]): SessionInfo[] {
-	return sessions.filter(session => !isSubagentSession(session));
-}
 
 type SessionScope = "local" | "global";
 
@@ -92,7 +87,7 @@ export function SessionPickerDialog() {
 		let cancelled = false;
 		void (async () => {
 			try {
-				const global = resumable(await window.omp.sessions.list("global"));
+				const global = browsableSessions(await window.omp.sessions.list("global"));
 				if (cancelled) return;
 				listsRef.current.global = global;
 				setSessions(global);
@@ -114,7 +109,7 @@ export function SessionPickerDialog() {
 		setError(null);
 		setActiveIndex(0);
 		try {
-			const list = listsRef.current[target] ?? resumable(await window.omp.sessions.list(target));
+			const list = listsRef.current[target] ?? browsableSessions(await window.omp.sessions.list(target));
 			listsRef.current[target] = list;
 			setSessions(list);
 			setScope(target);

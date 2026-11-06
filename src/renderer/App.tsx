@@ -841,7 +841,11 @@ export function App() {
 
 	const focusedRuntime = useTabRuntime(activeTabId);
 	const surface = (
-		<div className="flex h-screen w-screen overflow-hidden text-[var(--omp-text)]">
+		<div
+			className="flex h-screen w-screen overflow-hidden text-[var(--omp-text)]"
+			data-inspector={panelVisible ? "open" : "closed"}
+			data-sidebar={sidebarVisible ? "open" : "closed"}
+		>
 			{focusedRuntime && <FocusedSessionEffects />}
 			{sidebarVisible && <Sidebar />}
 

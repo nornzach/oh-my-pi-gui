@@ -8,7 +8,7 @@ import { parseHTML } from "linkedom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AgentMessage } from "../../../shared/rpc-types";
+import type { AgentMessage, SubagentSnapshot } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
 import type { MessagesStore } from "../../stores/messages";
 import { deleteSessionRuntime, sessionRuntimeStore } from "../../stores/session-runtime-context";
@@ -42,23 +42,29 @@ function task(callId: string): AgentMessage {
 	} as AgentMessage;
 }
 
-/** A session open in tab `tabId` whose transcript and roster are given. */
-function seed(tabId: string, messages: AgentMessage[], agents: Array<{ id: string; callId: string }>): void {
-	createTabRuntime(tabId);
-	sessionRuntimeStore<MessagesStore>(tabId, "messages")!.setState({ messages });
+type SeededAgent = { id: string; callId: string; status?: SubagentSnapshot["status"] };
+
+function setAgents(tabId: string, agents: SeededAgent[]): void {
 	sessionRuntimeStore<SubagentsStore>(tabId, "subagents")!
 		.getState()
 		.setSnapshots(
-			agents.map(({ id, callId }, index) => ({
+			agents.map(({ id, callId, status = "completed" }, index) => ({
 				id,
 				index,
 				agent: "task",
 				description: `Essay ${id}`,
-				status: "completed",
+				status,
 				lastUpdate: 1,
 				parentToolCallId: callId,
 			})),
 		);
+}
+
+/** A session open in tab `tabId` whose transcript and roster are given. */
+function seed(tabId: string, messages: AgentMessage[], agents: SeededAgent[]): void {
+	createTabRuntime(tabId);
+	sessionRuntimeStore<MessagesStore>(tabId, "messages")!.setState({ messages });
+	setAgents(tabId, agents);
 }
 
 async function mount(tabId: string, sessionKey: string): Promise<void> {
@@ -91,11 +97,30 @@ afterEach(async () => {
 });
 
 describe("SessionAgentsScope", () => {
-	it("lists this turn's agents open", async () => {
-		seed("t1", [user("write essays"), task("c1")], [{ id: "Rain", callId: "c1" }]);
+	it("lists this turn's agents open while they work and folds them when they finish", async () => {
+		seed("t1", [user("write essays"), task("c1")], [{ id: "Rain", callId: "c1", status: "running" }]);
 		await mount("t1", "/sessions/open.jsonl");
 
 		expect(info).toMatchObject({ count: 1, expanded: true });
+		expect(agentRows()).toEqual(["Essay Rain"]);
+
+		await act(async () => {
+			setAgents("t1", [{ id: "Rain", callId: "c1" }]);
+		});
+
+		expect(info).toMatchObject({ count: 1, expanded: false });
+		expect(agentRows()).toEqual([]);
+	});
+
+	it("keeps finished agents open once the arrow opened them", async () => {
+		seed("t1", [user("write essays"), task("c1")], [{ id: "Rain", callId: "c1" }]);
+		await mount("t1", "/sessions/kept.jsonl");
+		expect(agentRows()).toEqual([]);
+
+		await act(async () => {
+			info?.toggle();
+		});
+
 		expect(agentRows()).toEqual(["Essay Rain"]);
 	});
 

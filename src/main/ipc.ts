@@ -4,7 +4,7 @@
 import { type Dirent, existsSync, promises as fsp } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } from "electron";
+import { BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, shell } from "electron";
 import Store from "electron-store";
 import type {
 	ConversationSearchResponse,
@@ -51,7 +51,13 @@ import type {
 	IpcStatsUrlResult,
 	IpcUpdateLaunchProfilePayload,
 } from "../shared/ipc-types";
-import { IPC_COMMANDS, IPC_EVENTS, type RunProgressState, type TrayState } from "../shared/ipc-types";
+import {
+	type CaptionColors,
+	IPC_COMMANDS,
+	IPC_EVENTS,
+	type RunProgressState,
+	type TrayState,
+} from "../shared/ipc-types";
 import { isLanguage } from "../shared/languages";
 import { parseLaunchProfile } from "../shared/launch-profile";
 import type { RpcCommand, RpcSessionState } from "../shared/rpc-types";
@@ -519,6 +525,21 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		if (winId === undefined) return;
 		progressStates.set(winId, state);
 		windowManager.setRunProgress(aggregateProgress([...progressStates.values()]));
+	});
+
+	ipcMain.handle(
+		IPC_COMMANDS.WINDOW_IS_FULLSCREEN,
+		event => BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false,
+	);
+	ipcMain.on(IPC_EVENTS.WINDOW_CAPTION_COLORS, (event, colors: CaptionColors) => {
+		const win = BrowserWindow.fromWebContents(event.sender);
+		const hex = /^#[0-9a-f]{6}$/i;
+		if (win && hex.test(colors?.color) && hex.test(colors?.symbolColor)) windowManager.setCaptionColors(win, colors);
+	});
+	ipcMain.on(IPC_EVENTS.WINDOW_APP_MENU, (event, anchor: { x: number; y: number }) => {
+		const win = BrowserWindow.fromWebContents(event.sender);
+		if (!win) return;
+		Menu.getApplicationMenu()?.popup({ window: win, x: Math.round(anchor.x), y: Math.round(anchor.y) });
 	});
 
 	const dispatchRpcCommand = async (

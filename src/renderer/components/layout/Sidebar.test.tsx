@@ -813,6 +813,43 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(omp.sessions.delete).toHaveBeenCalledWith("/work/alpha/one.jsonl");
 	});
 
+	it("shows a session that moved files as one row, with its pin, and deletes both files", async () => {
+		const before = session("/work/alpha/before.jsonl", "/work/alpha", {
+			id: "before-id",
+			title: "Moved session",
+			created: "2026-01-01T00:00:00Z",
+			modified: "2026-01-01T00:00:00Z",
+		});
+		const after = session("/work/alpha/after.jsonl", "/work/alpha", {
+			id: "after-id",
+			title: "Moved session",
+			created: "2026-01-02T00:00:00Z",
+			modified: "2026-01-03T00:00:00Z",
+			parentSessionPath: "before-id",
+			continuationOf: "before-id",
+		});
+		const omp = installMockOmp([before, after]);
+		seedStores();
+		useSidebarPrefs.setState({ pinnedSessions: [before.path], hydrated: true });
+		await mount(<Sidebar />);
+
+		const rows = [...document.querySelectorAll(".omp-sidebar-session-row")].filter(el =>
+			(el.textContent ?? "").includes("Moved session"),
+		);
+		expect(rows).toHaveLength(1);
+		expect(useSidebarPrefs.getState().pinnedSessions).toEqual([after.path]);
+
+		await fire(rows[0]?.querySelector('[aria-label="Delete session"]') as unknown as Element, "onClick");
+		const confirm = [...document.body.querySelectorAll('[role="dialog"] button')].find(
+			b => (b.textContent ?? "").trim() === "Delete",
+		) as unknown as Element;
+		await fire(confirm, "onClick");
+
+		// Left on disk, the older file would come straight back as a row.
+		expect(omp.sessions.delete.mock.calls.map(call => call[0])).toEqual([after.path, before.path]);
+		expect(useSidebarPrefs.getState().pinnedSessions).toEqual([]);
+	});
+
 	it("names the whole workspace and its session count before a group delete", async () => {
 		const omp = installMockOmp(LIST);
 		seedStores();
@@ -1112,12 +1149,14 @@ describe("Sidebar session hierarchy", () => {
 		});
 		const child = session("/work/alpha/parent/agent.jsonl", "/work/alpha", {
 			id: "agent",
+			subagent: true,
 			title: "reply with OK only",
 			modified: "2026-01-03T00:00:00Z",
 			parentSessionPath: "/work/alpha/parent.jsonl",
 		});
 		const nested = session("/work/alpha/parent/agent/helper.jsonl", "/work/alpha", {
 			id: "helper",
+			subagent: true,
 			title: "count from 1 to 30",
 			modified: "2026-01-04T00:00:00Z",
 			parentSessionPath: "/work/alpha/parent/agent.jsonl",
@@ -1172,12 +1211,14 @@ describe("Sidebar session hierarchy", () => {
 		const parent = session("/work/alpha/parent.jsonl", "/work/alpha", { id: "parent-id", title: "Main session" });
 		const transcript = session("/work/alpha/parent/Rain.jsonl", "/work/alpha", {
 			id: "rain-id",
+			subagent: true,
 			title: "Rain transcript",
 			parentSessionPath: "/work/alpha/parent.jsonl",
 		});
 		// A transcript no agent row stands for (an agent of an earlier turn) stays listed.
 		const earlier = session("/work/alpha/parent/Snow.jsonl", "/work/alpha", {
 			id: "snow-id",
+			subagent: true,
 			title: "Snow transcript",
 			modified: "2026-01-02T00:00:00Z",
 			parentSessionPath: "/work/alpha/parent.jsonl",
@@ -1253,6 +1294,7 @@ describe("Sidebar session hierarchy", () => {
 		const parent = session("/work/alpha/parent.jsonl", "/work/alpha", { id: "parent-id", title: "Main session" });
 		const transcript = session("/work/alpha/parent/Rain.jsonl", "/work/alpha", {
 			id: "rain-id",
+			subagent: true,
 			title: "Rain transcript",
 			parentSessionPath: "/work/alpha/parent.jsonl",
 		});
