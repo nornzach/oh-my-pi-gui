@@ -315,10 +315,6 @@ const target = resolveTarget();
 const out = argValue("--out") ?? target.out;
 const shouldAdhocSign = process.platform === "darwin" && (!target.target || target.platformTag.startsWith("darwin-"));
 
-const require = createRequire(import.meta.url);
-const transformersVersion = (require("@huggingface/transformers/package.json") as { version?: string }).version;
-if (!transformersVersion) throw new Error("@huggingface/transformers package.json has no version");
-
 await stageNativeAddon(target);
 try {
 	try {
@@ -330,7 +326,6 @@ try {
 			repoRoot,
 			entrypoint: path.join(codingAgentDir, "src", "cli.ts"),
 			outfile: out,
-			transformersVersion,
 			native: { platform: platform!, arch: arch! },
 			...(target.target ? { target: target.target } : {}),
 			skipBuiltinCodesign: shouldAdhocSign,
