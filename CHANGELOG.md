@@ -2,12 +2,15 @@
 
 ## [Unreleased]
 
+## [0.9.38] - 2026-11-07
+
 ### Added
 
 - The Files panel now previews images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG) instead of saying "binary file". Click one to zoom in ([#45](https://github.com/nornzach/oh-my-pi-gui/issues/45)).
 
 ### Changed
 
+- Bundled agent rebuilt from monorepo `3b1f13b1`, on upstream omp main 115 commits after 18.17.0, with its native addon from npm 18.17.0, so upstream's newest native fixes (filesystem walks on their own runtime, `find()` searching 64 levels deep) are not in this build. Among upstream's changes: Keenable as a web search engine; `devin-cli` and `devin-windsurf` logins for the Devin provider; MCP OAuth login and token refresh work against GitHub's token endpoint and request tokens for the MCP server's own resource; subagents keep the blank lines and table spacing in their task instructions, and no longer fail when their model comes from an extension's provider; and a session whose first message has nothing to title it from, such as a greeting or an attached file, is named from the reply.
 - Error messages now say what went wrong and what to do about it, in your language, instead of showing raw text such as `HTTP 401 from http://…`, `getaddrinfo ENOTFOUND`, `Sidecar not connected` or a web page's HTML. Chat errors, the agent banner and crash screens still show the original text in a tooltip or under Technical details, and the Logs panel keeps it in full.
 
 ### Fixed
@@ -15,6 +18,7 @@
 - Fixed toasts covering the Restart, Show all and dismiss buttons on banners at the top of the window.
 - A reply that failed while the agent is still retrying now says so, instead of showing a final "The request failed".
 - Long error messages are no longer cut off in chat, and the original error text is under "Technical details" there and in scheduled task runs.
+- Starting a new session while a queued message is being prepared now cancels it, so that message can't stay stuck in the queue of the new session.
 - A SOCKS proxy no longer breaks Fetch models and chat with `UnsupportedProxyProtocol`. The agent can only use HTTP and HTTPS proxies, so the HTTP proxy setting refuses anything else with an explanation, and a SOCKS proxy from a saved setting, the environment or the system is skipped with a warning.
 
 ## [0.9.37] - 2026-11-06
