@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { _electron as electron, expect, type Page } from "@playwright/test";
+import { $ } from "bun";
 import { en } from "../src/renderer/locales/en";
 import { zh } from "../src/renderer/locales/zh";
 import { projectFiles, showcaseTimestamp } from "./showcase-data";
@@ -137,6 +138,21 @@ async function captureLocale(language: "en" | "zh"): Promise<void> {
 				},
 				[[project, middleEllipsis(project)], "~/projects/aurora-web"] as const,
 			);
+			// macOS draws the window controls over the page, so a page screenshot leaves their
+			// strip blank. Draw them where BrowserWindow.getWindowButtonPosition() says they sit.
+			await page.evaluate(() => {
+				if (document.getElementById("showcase-window-controls")) return;
+				const controls = document.createElement("div");
+				controls.id = "showcase-window-controls";
+				controls.style.cssText =
+					"position:fixed;left:16px;top:17px;display:flex;gap:8px;z-index:2147483647;pointer-events:none";
+				for (const color of ["#ff5f57", "#febc2e", "#28c840"]) {
+					const light = document.createElement("span");
+					light.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color}`;
+					controls.append(light);
+				}
+				document.body.append(controls);
+			});
 			const text = await page.locator("body").innerText();
 			if (privateText.some(value => text.includes(value)) || /\/(?:Users|home)\/(?!demo\b)[^\s/]+/.test(text)) {
 				throw new Error(`Privacy check failed for ${language}/${name}`);
@@ -159,6 +175,24 @@ async function captureLocale(language: "en" | "zh"): Promise<void> {
 		async function close(): Promise<void> {
 			await page.keyboard.press("Escape");
 			await expect(page.getByRole("dialog")).toHaveCount(0);
+		}
+		/** Closes dialogs stacked on each other; an edited form takes a second Escape to discard. */
+		async function closeAll(): Promise<void> {
+			await expect
+				.poll(
+					async () => {
+						const open = await page.getByRole("dialog").count();
+						if (open > 0) await page.keyboard.press("Escape");
+						return open;
+					},
+					{ timeout: 10_000, intervals: [250] },
+				)
+				.toBe(0);
+		}
+		async function command(key: string): Promise<void> {
+			await nav("titlebar.commands");
+			await page.getByPlaceholder(t["palette.search"]).fill(t[key]);
+			await page.keyboard.press("Enter");
 		}
 
 		await shot("01-conversation");
@@ -231,6 +265,53 @@ async function captureLocale(language: "en" | "zh"): Promise<void> {
 		await shot("12-usage");
 		await close();
 
+		await command("cmd.theme");
+		await page.getByRole("button", { name: t["themePicker.custom.create"], exact: true }).click();
+		const themeEditor = page.getByRole("dialog").last();
+		await expect(themeEditor).toContainText(t["themeEditor.titleNew"]);
+		await themeEditor.locator("input").first().fill("Aurora");
+		await themeEditor.getByLabel(t["themeEditor.component.accent"], { exact: true }).fill("#8b5cf6");
+		await themeEditor.getByRole("button", { name: t["themeEditor.fromAccent"] }).click();
+		await themeEditor.getByText(t["themeEditor.name"], { exact: true }).scrollIntoViewIfNeeded();
+		await shot("16-theme-editor");
+		await closeAll();
+
+		await nav("titlebar.providers");
+		await page.getByRole("button", { name: t["providerCfg.title.add"] }).first().click();
+		const providerForm = page.getByRole("dialog").last();
+		const providerFields = providerForm.locator("input");
+		await providerFields.nth(0).fill("aurora-gateway");
+		await providerFields.nth(1).fill("https://gateway.example.test/v1");
+		await providerForm.getByRole("button", { name: t["providerCfg.fetch.action"] }).click();
+		const fetchedModels = providerForm.locator("[data-model-fetch-panel]");
+		await expect(fetchedModels).toContainText("aurora/long-context");
+		await fetchedModels.scrollIntoViewIfNeeded();
+		await shot("17-fetch-models");
+		await closeAll();
+
+		await command("cmd.live");
+		const voice = page.getByRole("dialog");
+		await voice.getByRole("button", { name: t["live.start"] }).click();
+		await expect(voice).toContainText(t["live.assistant"]);
+		await shot("18-voice");
+		await closeAll();
+
+		await command("cmd.collab");
+		const collab = page.getByRole("dialog");
+		await collab.getByRole("button", { name: t["collab.start"], exact: true }).click();
+		await expect(collab).toContainText(t["collab.hosting"]);
+		await shot("19-collab");
+		await collab.getByRole("button", { name: t["collab.leave"], exact: true }).click();
+		await closeAll();
+
+		await command("cmd.debug");
+		const debug = page.getByRole("dialog");
+		await expect(debug).toContainText("demo-1");
+		await debug.getByRole("button", { name: t["debug.stack"], exact: true }).click();
+		await expect(debug).toContainText("renders visible labels");
+		await shot("20-debug");
+		await close();
+
 		await captureSplit(page, t);
 		await shot("11-split");
 
@@ -283,4 +364,37 @@ function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** The landing page's images, cut from the showcase so the two can't drift apart. Needs `cwebp` on PATH. */
+const siteAssets: Record<string, string> = {
+	overview: "en/13-overview",
+	"split-view": "en/11-split",
+	"dock-agents": "en/01-conversation",
+	"agent-hub": "en/06-agent-hub",
+	"scheduled-tasks": "en/14-tasks",
+	"task-insights": "en/15-task-insights",
+	"context-breakdown": "en/08-context",
+	"command-palette-zh": "zh/09-commands",
+	"theme-editor": "en/16-theme-editor",
+	"fetch-models": "en/17-fetch-models",
+	"04-voice": "en/18-voice",
+	"05-collab": "en/19-collab",
+	"06-debug": "en/20-debug",
+};
+
+/**
+ * These dialogs are unreadable at card width inside a full window, so the page shows the part that matters,
+ * at the 16:10 its cards display. Fetch models frames the fetched rows, which sit at the dialog's bottom.
+ */
+const siteAssetCrops: Record<string, string[]> = {
+	"theme-editor": ["-crop", "240", "54", "960", "600"],
+	"fetch-models": ["-crop", "240", "274", "960", "600"],
+};
+
 for (const language of ["en", "zh"] as const) await captureLocale(language);
+for (const [asset, source] of Object.entries(siteAssets)) {
+	const input = path.join(root, "docs", "screenshots", `${source}.png`);
+	const output = path.join(root, "site", "assets", `${asset}.webp`);
+	const crop = siteAssetCrops[asset] ?? [];
+	await $`cwebp -quiet -q 82 -m 6 ${crop} ${input} -o ${output}`;
+	console.log(`Wrote site/assets/${asset}.webp`);
+}

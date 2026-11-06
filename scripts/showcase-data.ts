@@ -826,7 +826,107 @@ export function createShowcaseData(
 		set_subagent_subscription: {},
 		set_host_tools: {},
 		set_host_uri_schemes: {},
+		discover_provider_models: {
+			models: [
+				{
+					id: "aurora/deep-review",
+					name: `Deep Review · ${demo}`,
+					reasoning: true,
+					input: ["text"],
+					contextWindow: 400_000,
+					maxTokens: 32_000,
+				},
+				{
+					id: "aurora/fast-draft",
+					name: `Fast Draft · ${demo}`,
+					reasoning: false,
+					input: ["text"],
+					contextWindow: 128_000,
+					maxTokens: 8_192,
+				},
+				{
+					id: "aurora/long-context",
+					name: `Long Context · ${demo}`,
+					reasoning: true,
+					input: ["text", "image"],
+					contextWindow: 1_000_000,
+					maxTokens: 64_000,
+				},
+				{
+					id: "aurora/vision-small",
+					name: `Vision Small · ${demo}`,
+					reasoning: false,
+					input: ["text", "image"],
+					contextWindow: 200_000,
+					maxTokens: null,
+				},
+			],
+		},
+		live_start: { voice: text("Aria · demo", "Aria · 演示") },
+		live_stop: {},
+		collab_start: {
+			role: "host",
+			readOnly: false,
+			link: "https://relay.example.test/join/aurora-web-demo",
+			viewLink: "https://relay.example.test/view/aurora-web-demo",
+			participants: [
+				{ name: text("You · demo", "你 · 演示"), role: "host" },
+				{ name: text("Mina · demo", "Mina · 演示"), role: "guest" },
+				{ name: text("Jonas · demo", "Jonas · 演示"), role: "guest", readOnly: true },
+			],
+		},
+		collab_leave: collab,
+		debug: {
+			content: [{ type: "text", text: notice }],
+			details: {
+				sessions: [
+					{
+						id: "demo-1",
+						adapter: "bun",
+						status: "stopped",
+						program: testsPath,
+						stopReason: "breakpoint",
+						frameName: "renders visible labels",
+						source: { path: testsPath },
+						line: 14,
+						threadId: 1,
+					},
+					{ id: "demo-2", adapter: "lldb", status: "terminated", program: "aurora-indexer", exitCode: 0 },
+				],
+				stackFrames: [
+					{ id: 1, name: "renders visible labels", source: { path: testsPath }, line: 14, column: 5 },
+					{ id: 2, name: "Preferences", source: { path: preferencesPath }, line: 9, column: 3 },
+					{ id: 3, name: "render", source: { name: "react-dom" }, line: 402 },
+				],
+			},
+		},
 	} satisfies Partial<Record<RpcCommand["type"], unknown>>;
+
+	// Pushed right after the reply to the command they are keyed by, as the agent streams them.
+	const frames: Record<string, unknown[]> = {
+		live_start: [
+			{ type: "live_phase", phase: "listening" },
+			{
+				type: "live_transcript",
+				role: "user",
+				turn: 1,
+				text: text("Did the settings page keep its keyboard order?", "设置页的键盘顺序保留了吗？"),
+				final: true,
+			},
+			{
+				type: "live_transcript",
+				role: "assistant",
+				turn: 1,
+				text: text(
+					"Demo: yes. The native checkboxes kept their order, and the labels now read in the same sequence.",
+					"演示：保留了。原生复选框顺序不变，标签也按相同顺序朗读。",
+				),
+				final: true,
+			},
+			{ type: "live_levels", input: 0.46, output: 0.24 },
+		],
+		live_stop: [{ type: "live_end" }],
+	};
 
 	// The renderer prints agentType verbatim, so localize this display column.
 	const byAgentType: Array<Omit<AgentTypeStats, "agentType"> & { agentType: string }> = [
@@ -876,6 +976,7 @@ export function createShowcaseData(
 	};
 	return {
 		replies,
+		frames,
 		stats: { "/api/stats/overview": { overall, byAgentType, timeSeries, source: notice } },
 	};
 }

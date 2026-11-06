@@ -2,17 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.37] - 2026-11-06
+
 ### Added
 
 - Custom providers have a **Fetch models** button: pull the list from your endpoint, pick the models you want, then edit any row before saving. Keeping the list updated automatically is now a separate choice under Advanced options ([#40](https://github.com/nornzach/oh-my-pi-gui/issues/40)).
 
 ### Changed
 
+- Bundled agent rebuilt from monorepo `4f05e213`, on upstream omp main 22 commits after 18.17.0, with its native addon from npm 18.17.0. Among upstream's changes: answers are shorter by default (Text Verbosity is now low; set `textVerbosity` to `medium` for the old length); `wait` with nothing new returns after 5 seconds instead of blocking for up to 30 minutes; ovnfs turns on by itself when its binary is found; local speech models and the tiny model install their runtimes on first use, which needs network access; and Hindsight `retain` and `learn` memories are kept on disk and retried instead of being lost when delivery fails. Upstream's native fixes since 18.17.0, such as `grep -e "--pattern"` in the bash tool, arrive with the next native addon.
 - The window header looks the same on macOS, Windows and Linux: it lines up with the window controls, the panel and settings headers match its height and drag the window, and Windows and Linux open the app menu from a header button instead of a menu bar ([#44](https://github.com/nornzach/oh-my-pi-gui/issues/44)).
 - The sidebar keeps forks one level under their first session, labels subagents by their task instead of "# Target", and folds a subagent's row once it finishes ([#42](https://github.com/nornzach/oh-my-pi-gui/issues/42)).
 
 ### Fixed
 
+- Joining a shared collaboration session from the GUI works again; an earlier upstream sync had left it failing as the join started.
 - New sessions get a generated title in the sidebar and the tab, instead of keeping their first message ([#41](https://github.com/nornzach/oh-my-pi-gui/issues/41)).
 - A session that moved to a new file shows as one row with its pin and archive state, and deleting it removes both files ([#42](https://github.com/nornzach/oh-my-pi-gui/issues/42)).
 - The provider form no longer opens with the previous form's values, which saving would have written over the provider you were editing ([#40](https://github.com/nornzach/oh-my-pi-gui/issues/40)).

@@ -30,16 +30,21 @@ if (process.argv.includes("stats")) {
 	const write = (frame: unknown) => process.stdout.write(`${JSON.stringify(frame)}\n`);
 	write({ type: "ready", protocolVersion: 1, supportedProtocolVersions: [1] });
 	const input = createInterface({ input: process.stdin });
+	// The collab dialog polls its state, so what the last command set has to stick.
+	let collabState: unknown = data.replies.get_collab_state;
 	input.on("line", line => {
 		const command = JSON.parse(line) as { id?: string; type: string };
+		if (command.type === "collab_start") collabState = data.replies.collab_start;
+		if (command.type === "collab_leave") collabState = data.replies.collab_leave;
 		if (Object.hasOwn(data.replies, command.type)) {
 			write({
 				type: "response",
 				id: command.id,
 				command: command.type,
 				success: true,
-				data: data.replies[command.type],
+				data: command.type === "get_collab_state" ? collabState : data.replies[command.type],
 			});
+			for (const frame of data.frames[command.type] ?? []) write(frame);
 		} else if (
 			["set_subagent_subscription", "set_host_tools", "set_host_uri_schemes", "abort"].includes(command.type)
 		) {

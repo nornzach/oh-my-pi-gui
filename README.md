@@ -24,8 +24,8 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [What's new in 0.9.36](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.36 release.** The improvements below are included in v0.9.36, with the bundled agent built from monorepo `44d44921` (upstream omp main after 18.16.0). The gallery screenshots are captured from v0.9.27; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+[Features](#en-features) · [What's new in 0.9.37](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+> **v0.9.37 release.** The improvements below are included in v0.9.37, with the bundled agent built from monorepo `4f05e213` (upstream omp main after 18.17.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -48,7 +48,7 @@ The distinctive part is not just a chat window: it is being able to **separate p
 | **Scheduled tasks** | Turn a request into a recurring task or create one from the sidebar. Runs happen in the background, read-only or in their own Git worktree, with a report, an optional shell check, a review queue and an insights page. | Runs happen only while omp is running; slots the computer slept through are recorded as missed, never replayed. Runs use the providers and credentials you configured. |
 | **Agent Hub** | Manage agent definitions, enable/disable agents, set model and prewalk overrides, inspect progress/logs, abort work, and wake parked agents. | Available actions follow the agent's current state; role assignments and per-agent overrides serve different purposes. |
 | **Models & roles** | Pick models by provider, assign models to roles, and adjust reasoning/thinking levels. | Reasoning controls appear only for models that support them. |
-| **Providers** | Sign in, add/edit/remove custom providers, and discover models from compatible OpenAI or Anthropic endpoints. | OAuth or API-key support depends on the provider; endpoint compatibility and advertised models vary. |
+| **Providers** | Sign in, add/edit/remove custom providers, and fetch a model list from compatible OpenAI or Anthropic endpoints, then pick models and edit them before saving. | OAuth or API-key support depends on the provider; endpoint compatibility and advertised models vary. |
 | **Session library** | Search history, explore session trees, branches and forks, organize labels, select sessions to archive or delete in bulk, find text in a conversation (⌘F), copy-import Claude/Codex sessions, export HTML, and preview sharing. | Copy import is not live synchronization with another app. Review content before exporting or sharing. |
 | **Context & live accounting** | See the session at a glance in the drawer's Overview tab, break context down by category, and follow live cost/cache updates; retain measured context usage even when model capacity is unknown. | Measured usage and a model's maximum capacity are different facts. |
 | **Statistics & usage** | Open a private local statistics dashboard and session metrics for requests, tokens, cost, cache, and speed; inspect provider usage/quotas. | Provider quotas depend on API/account availability. Local statistics are not a provider billing statement. |
@@ -58,20 +58,23 @@ The distinctive part is not just a chat window: it is being able to **separate p
 | **SSH hosts** | Configure hosts through the native SSH settings page. | `/ssh list`, `/ssh add`, and `/ssh remove` management commands remain disabled; OpenSSH and host access must be configured separately. |
 | **Commands & voice** | Use a searchable palette for supported dialogs, menus, toggles, and argument prompts; dictate into the composer from the mic button, with words appearing as you speak (local or cloud speech models, chosen in the agent's dictation settings). | Some slash commands pass through to the agent or are unsupported. Dictation needs microphone permission and `stt.enabled`; local models download on first use, and cloud models need their provider's key. |
 | **Relay collaboration** | Host or join a shared session with edit or read-only access. | Requires a configured relay service; it is not a purely local collaboration mode. |
-| **Settings & control** | Configure GUI/runtime/tool behavior, switch English/Chinese, choose themes, and access approvals and security scans/settings. | Approvals and scans are **not an OS sandbox**; command coverage is not total CLI parity. |
+| **Settings & control** | Configure GUI/runtime/tool behavior, switch between English, Chinese and Russian, choose a theme or make your own, and access approvals and security scans/settings. | Approvals and scans are **not an OS sandbox**; command coverage is not total CLI parity. |
 
 Model requests still go to the providers you configure. The bundled agent removes the separate runtime install, not the need to configure credentials, project dependencies, external Git/OpenSSH/MCP tools, or optional services. Only connect tools and services you trust.
 
 <a id="en-recent"></a>
-### What's new in 0.9.36
+### What's new in 0.9.37
 
-v0.9.36 adds a visual theme editor, shows in Session Info whether your next message reads the prompt cache, and moves the bundled agent to upstream omp main after 18.16.0:
+v0.9.37 lets you fetch a provider's models and edit them before saving, generates session titles, tidies the sidebar, gives the window one header on every platform, and moves the bundled agent to upstream omp main after 18.17.0:
 
 | In daily use | What has improved |
 |---|---|
-| **Theme editor** | Click **New theme** in the theme picker to make a theme without writing JSON: pick colors for the background, text, accent, sidebar, title bar, borders, your messages and the status colors, and every other color follows, with a live preview. **Generate from accent** builds matching surfaces from one color, and the pencil beside a custom theme changes or deletes it. See [Custom themes](#en-themes) ([#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)). |
-| **Prompt cache** | Session Info says whether your next message reads the prompt cache, until when or why not (another model or thinking level, changed tools or system prompt, an expired cache, compaction), and how many tokens it reads or re-sends. |
-| **Bundled agent** | Rebuilt from monorepo `44d44921` on upstream omp main after 18.16.0. Many subagents at once move into worker threads, an out-of-credit provider error ends the turn instead of waiting out a 30-minute retry, and a large session exports to HTML without running out of memory. |
+| **Fetch models** | A custom provider's form has a **Fetch models** button: pull the list from your endpoint, pick the models you want, then edit any row before saving. Keeping the list updated automatically is now a separate choice under **Advanced options** ([#40](https://github.com/nornzach/oh-my-pi-gui/issues/40)). |
+| **Session titles** | New sessions get a generated title in the sidebar and the tab, instead of keeping their first message ([#41](https://github.com/nornzach/oh-my-pi-gui/issues/41)). |
+| **Sidebar** | Forks stay one level under their first session, subagents are labeled by their task and fold once they finish, and a session that moved to a new file is one row with its pin and archive state ([#42](https://github.com/nornzach/oh-my-pi-gui/issues/42)). |
+| **Window header** | The header looks the same on macOS, Windows and Linux: it lines up with the window controls, the panel and settings headers match its height and drag the window, and Windows and Linux open the app menu from a header button ([#44](https://github.com/nornzach/oh-my-pi-gui/issues/44)). |
+| **Collaboration** | Joining a shared session from the GUI works again. |
+| **Bundled agent** | Rebuilt from monorepo `4f05e213` on upstream omp main after 18.17.0. Answers are shorter by default (set `textVerbosity` to `medium` for the old length), `wait` with nothing new returns after 5 seconds, and local speech models install their runtimes on first use, which needs network access. |
 <a id="en-gallery"></a>
 ### Explore the interface
 
@@ -161,25 +164,49 @@ Search with `⌘K`. Supported commands lead to native controls; pass-through and
 
 </details>
 
+<details>
+<summary><b>Make it yours — fetch models and the theme editor</b></summary>
+
+Pull a model list from a compatible endpoint, pick what you want and edit rows before saving; build a theme from a few colors with a live preview. The endpoint and models shown are scripted examples.
+
+| Fetch models | Theme editor |
+|---|---|
+| ![English provider form with models fetched from a synthetic endpoint](docs/screenshots/en/17-fetch-models.png) | ![English theme editor with a live preview](docs/screenshots/en/16-theme-editor.png) |
+
+</details>
+
+<details>
+<summary><b>Beyond the transcript — voice, collaboration and the debugger</b></summary>
+
+Talk to the agent, share a session over a relay, and work through a debug session. The transcript, participants and debug sessions shown are scripted examples; no call, relay or debugger is running.
+
+| Live voice | Collaboration |
+|---|---|
+| ![English live voice dialog with a scripted transcript](docs/screenshots/en/18-voice.png) | ![English collaboration dialog with synthetic participants](docs/screenshots/en/19-collab.png) |
+
+![English debugger console with a stopped session and its stack](docs/screenshots/en/20-debug.png)
+
+</details>
+
 <a id="en-install"></a>
 ### Install & start
 
-**Documented install baseline: [v0.9.36](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.36).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
+**Documented install baseline: [v0.9.37](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.37).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
 
-| Mac | v0.9.36 download |
+| Mac | v0.9.37 download |
 |---|---|
-| Apple Silicon | [omp-0.9.36-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36-arm64.dmg) |
-| Intel | [omp-0.9.36.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36.dmg) |
+| Apple Silicon | [omp-0.9.37-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37-arm64.dmg) |
+| Intel | [omp-0.9.37.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37.dmg) |
 
-| Windows x64 | v0.9.36 download |
+| Windows x64 | v0.9.37 download |
 |---|---|
-| Installer | [omp-0.9.36-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36-setup.exe) |
-| Portable | [omp-0.9.36-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36-portable.exe) |
+| Installer | [omp-0.9.37-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37-setup.exe) |
+| Portable | [omp-0.9.37-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37-portable.exe) |
 
-| Linux x64 | v0.9.36 download |
+| Linux x64 | v0.9.37 download |
 |---|---|
-| AppImage | [omp-0.9.36.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36.AppImage) |
-| Debian/Ubuntu | [omp_0.9.36_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp_0.9.36_amd64.deb) |
+| AppImage | [omp-0.9.37.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37.AppImage) |
+| Debian/Ubuntu | [omp_0.9.37_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp_0.9.37_amd64.deb) |
 
 Open the DMG and drag **omp** into **Applications**. The app and bundled macOS sidecar are ad-hoc signed but not notarized. If macOS blocks the first launch, use **right-click → Open**, or **System Settings → Privacy & Security → Open Anyway**, after confirming the download's source.
 
@@ -327,7 +354,7 @@ bun run build
 bun scripts/capture-showcase.ts
 ```
 
-The capture script renders the actual Electron GUI using a fresh temporary HOME, Electron profile, synthetic `aurora-web` project, and synthetic sidecar—**no live credentials or personal workspace are used**. It writes localized showcase images to `docs/screenshots/en/` and `docs/screenshots/zh/`. Scripted conversations, model lists, agent states, and metrics make the scenes reproducible; they are not provider tests or real usage records. This fixture setup is not an OS sandbox.
+The capture script renders the actual Electron GUI using a fresh temporary HOME, Electron profile, synthetic `aurora-web` project, and synthetic sidecar—**no live credentials or personal workspace are used**. It writes localized showcase images to `docs/screenshots/en/` and `docs/screenshots/zh/`, then cuts the landing page's images into `site/assets/` (this step needs `cwebp`). macOS draws the window controls outside the page, so the script draws them in where the app places them. Scripted conversations, model lists, agent states, and metrics make the scenes reproducible; they are not provider tests or real usage records. This fixture setup is not an OS sandbox.
 
 </details>
 
@@ -338,7 +365,7 @@ The capture script renders the actual Electron GUI using a fresh temporary HOME,
 |---|---|
 | macOS blocks the first launch | Confirm the download came from the release page, then right-click → Open or use Privacy & Security → Open Anyway. The app and bundled sidecar are ad-hoc signed, not notarized. |
 | Windows SmartScreen blocks the first launch | Confirm the download came from the release page, then choose More info → Run anyway. The Windows package is currently unsigned. |
-| A screenshot shows something absent from the installed app | The showcase is captured from v0.9.27. Check the installed version and its release notes; earlier releases may not include these improvements. |
+| A screenshot shows something absent from the installed app | The showcase is captured from v0.9.37. Check the installed version and its release notes; earlier releases may not include these improvements. |
 | `Built-in omp not found` | In a source checkout, build the sidecar or supply a compatible prebuilt one. In an installed app, reinstall the correct official DMG; a separate system `omp` will not fix a missing bundle resource. |
 | `build:omp` cannot find the monorepo | Put the GUI checkout at the monorepo's `packages/gui/`, alongside `packages/coding-agent/` and `packages/natives/`. |
 | `replacing stale addon … version sentinel ≠ …` | Informational: the builder detected and replaced a mismatched native addon. |
@@ -366,9 +393,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG、NSIS 或便携版安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [0.9.36 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.37 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.36 功能展示。** 下文改进均纳入 v0.9.36，内置 Agent 基于 monorepo `44d44921` 构建（上游 omp 18.16.0 之后的 main）。界面导览截图取自 v0.9.27；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.37 功能展示。** 下文改进均纳入 v0.9.37，内置 Agent 基于 monorepo `4f05e213` 构建（上游 omp 18.17.0 之后的 main）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -391,7 +418,7 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 | **定时任务** | 把一句请求变成周期任务，或在侧边栏新建。任务在后台运行，可只读或在独立 Git worktree 中执行，附带报告、可选的 shell 检查、审查队列与分析页。 | 只有 omp 运行时才会执行；电脑休眠错过的时段记为错过，不会补跑。运行使用你配置的 Provider 与凭据。 |
 | **Agent Hub** | 管理 Agent 定义、启用/停用、覆盖模型与 prewalk 设置，查看进度和日志、中止任务、唤醒已停驻的 Agent。 | 可用操作取决于 Agent 当前状态；角色模型分配与单个 Agent 覆盖是不同层次的控制。 |
 | **模型与角色** | 按 Provider 选择模型，为不同角色分配模型，调整推理/思考等级。 | 只有支持的模型才提供推理等级控制。 |
-| **Provider 管理** | 登录，新增/编辑/删除自定义 Provider，从兼容 OpenAI 或 Anthropic 的端点发现模型。 | OAuth 或 API key 支持取决于 Provider；端点兼容程度与返回的模型列表可能不同。 |
+| **Provider 管理** | 登录，新增/编辑/删除自定义 Provider，从兼容 OpenAI 或 Anthropic 的端点获取模型列表，挑选并修改后再保存。 | OAuth 或 API key 支持取决于 Provider；端点兼容程度与返回的模型列表可能不同。 |
 | **会话资料库** | 搜索历史、查看会话树、分支与分叉、管理标签，批量选择会话以归档或删除，在对话中查找文字（⌘F），复制导入 Claude/Codex 会话、导出 HTML、预览分享内容。 | 复制导入不是与其他应用实时同步；导出或分享前请检查内容。 |
 | **上下文与实时计量** | 在抽屉的概览标签页一眼看清会话，按类别拆分上下文用量，跟踪实时花费/缓存变化；即使模型容量未知，仍可查看已测得的上下文用量。 | 已测用量与模型最大容量是两件事，不应混为一谈。 |
 | **统计与用量** | 内置私有、本地运行的统计仪表盘，查看请求、token、花费、缓存、速度及会话指标，也可查看 Provider 用量/配额。 | 配额信息取决于 API 与账号可用性；本地统计不等于 Provider 账单。 |
@@ -401,20 +428,23 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 | **SSH 主机** | 通过原生 SSH 设置页面配置主机。 | `/ssh list`、`/ssh add`、`/ssh remove` 管理命令仍停用；OpenSSH 与主机访问需另行配置。 |
 | **命令与语音** | 可搜索命令面板提供受支持的对话框、菜单、开关与参数输入；点击输入框旁的麦克风即可语音输入，边说边出字（本地或云端语音模型，在 Agent 的听写设置中选择）。 | 部分 slash 命令转交 Agent 或尚不支持；语音输入需要麦克风权限并开启 `stt.enabled`；本地模型首次使用时下载，云端模型需要对应服务的密钥。 |
 | **Relay 协作** | 主持或加入共享会话，使用可编辑或只读权限。 | 需要已配置的 relay 服务，并非纯本地协作模式。 |
-| **设置与控制** | 配置 GUI、运行时和工具行为，切换中英文与主题，使用审批及安全扫描/设置入口。 | 审批与扫描**不是操作系统沙箱**；GUI 命令覆盖不等于完整 CLI 功能对齐。 |
+| **设置与控制** | 配置 GUI、运行时和工具行为，切换中文、英文或俄文，选择或自建主题，使用审批及安全扫描/设置入口。 | 审批与扫描**不是操作系统沙箱**；GUI 命令覆盖不等于完整 CLI 功能对齐。 |
 
 模型请求仍会发送到你配置的 Provider。内置 Agent 省去了单独安装运行时的步骤，但不替你配置凭据、项目依赖、外部 Git/OpenSSH/MCP 工具或可选服务。请只连接你信任的工具与服务。
 
 <a id="zh-recent"></a>
-### 0.9.36 更新内容
+### 0.9.37 更新内容
 
-v0.9.36 新增可视化主题编辑器，在会话信息中显示下一条消息能否命中提示词缓存，并把内置代理升级到上游 omp 18.16.0 之后的 main：
+v0.9.37 可以获取 Provider 的模型列表并在保存前修改，为会话自动生成标题，理顺侧边栏层级，让窗口标题栏在各平台保持一致，并把内置代理升级到上游 omp 18.17.0 之后的 main：
 
 | 日常场景 | 改进内容 |
 |---|---|
-| **主题编辑器** | 在主题选择器中点击**新建主题**，无需编写 JSON 即可制作主题：为背景、文字、强调色、侧边栏、标题栏、边框、你的消息和状态颜色选色，其余颜色随之生成，并可实时预览。**根据强调色生成**可由一种颜色生成整套配色；自定义主题旁的铅笔按钮用于修改或删除。详见[主题](#zh-themes)（[#38](https://github.com/nornzach/oh-my-pi-gui/issues/38)）。 |
-| **提示词缓存** | 会话信息会显示下一条消息能否命中提示词缓存：缓存有效到何时，或者为何未命中（换了模型或思考级别、工具或系统提示词有变化、缓存已过期、上下文已压缩），以及将读取或重新发送多少 token。 |
-| **内置代理** | 基于 monorepo `44d44921` 重新构建，对应上游 omp 18.16.0 之后的 main。同时运行大量子代理时会移入工作线程；额度不足的 Provider 错误会直接结束本轮，不再等待 30 分钟后重试；大型会话导出为 HTML 时不再内存不足。 |
+| **获取模型** | 自定义 Provider 的表单新增**获取模型**按钮：从你的端点拉取列表，挑选需要的模型，保存前还可以逐行修改。自动保持列表更新现在是**高级选项**里的单独选择（[#40](https://github.com/nornzach/oh-my-pi-gui/issues/40)）。 |
+| **会话标题** | 新会话会在侧边栏和标签页显示自动生成的标题，不再一直显示第一条消息（[#41](https://github.com/nornzach/oh-my-pi-gui/issues/41)）。 |
+| **侧边栏** | 分支只保留在首个会话下一层，子代理按任务命名并在完成后折叠，迁移到新文件的会话只显示一行并保留置顶和归档状态（[#42](https://github.com/nornzach/oh-my-pi-gui/issues/42)）。 |
+| **窗口标题栏** | macOS、Windows 和 Linux 的标题栏外观一致：与窗口控制按钮对齐，面板和设置的标题栏高度相同且可拖动窗口，Windows 和 Linux 通过标题栏按钮打开应用菜单（[#44](https://github.com/nornzach/oh-my-pi-gui/issues/44)）。 |
+| **协作** | 从 GUI 加入共享会话恢复正常。 |
+| **内置代理** | 基于 monorepo `4f05e213` 重新构建，对应上游 omp 18.17.0 之后的 main。回答默认更简短（将 `textVerbosity` 设为 `medium` 可恢复原有长度），`wait` 在没有新内容时 5 秒后返回，本地语音模型在首次使用时安装运行环境（需要联网）。 |
 <a id="zh-gallery"></a>
 ### 界面导览
 
@@ -504,25 +534,49 @@ v0.9.36 新增可视化主题编辑器，在会话信息中显示下一条消息
 
 </details>
 
+<details>
+<summary><b>按你的方式配置 — 获取模型与主题编辑器</b></summary>
+
+从兼容的端点拉取模型列表，挑选后逐行修改再保存；选几种颜色即可实时预览并生成主题。图中的端点和模型均为脚本构造的示例。
+
+| 获取模型 | 主题编辑器 |
+|---|---|
+| ![中文 Provider 表单与从合成端点获取的模型](docs/screenshots/zh/17-fetch-models.png) | ![中文主题编辑器与实时预览](docs/screenshots/zh/16-theme-editor.png) |
+
+</details>
+
+<details>
+<summary><b>不止对话 — 语音、协作与调试器</b></summary>
+
+与 Agent 语音对话，通过中继共享会话，并处理调试会话。图中的转写、参与者和调试会话均为脚本构造的示例；并没有真实的通话、中继或调试器在运行。
+
+| 实时语音 | 协作 |
+|---|---|
+| ![中文实时语音对话框与脚本构造的转写](docs/screenshots/zh/18-voice.png) | ![中文协作对话框与合成参与者](docs/screenshots/zh/19-collab.png) |
+
+![中文调试器控制台与已暂停的会话及其调用栈](docs/screenshots/zh/20-debug.png)
+
+</details>
+
 <a id="zh-install"></a>
 ### 安装与开始使用
 
-**本文安装基线：[v0.9.36](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.36)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+**本文安装基线：[v0.9.37](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.37)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
-| Mac | v0.9.36 下载 |
+| Mac | v0.9.37 下载 |
 |---|---|
-| Apple Silicon | [omp-0.9.36-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36-arm64.dmg) |
-| Intel | [omp-0.9.36.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36.dmg) |
+| Apple Silicon | [omp-0.9.37-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37-arm64.dmg) |
+| Intel | [omp-0.9.37.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37.dmg) |
 
-| Windows x64 | v0.9.36 下载 |
+| Windows x64 | v0.9.37 下载 |
 |---|---|
-| 安装程序 | [omp-0.9.36-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36-setup.exe) |
-| 便携版 | [omp-0.9.36-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36-portable.exe) |
+| 安装程序 | [omp-0.9.37-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37-setup.exe) |
+| 便携版 | [omp-0.9.37-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37-portable.exe) |
 
-| Linux x64 | v0.9.36 下载 |
+| Linux x64 | v0.9.37 下载 |
 |---|---|
-| AppImage | [omp-0.9.36.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp-0.9.36.AppImage) |
-| Debian/Ubuntu | [omp_0.9.36_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.36/omp_0.9.36_amd64.deb) |
+| AppImage | [omp-0.9.37.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp-0.9.37.AppImage) |
+| Debian/Ubuntu | [omp_0.9.37_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.37/omp_0.9.37_amd64.deb) |
 
 打开 DMG，把 **omp** 拖入**应用程序**。应用与内置 macOS sidecar 均采用 ad-hoc 签名，未经公证。如果 macOS 拦截首次启动，请先确认下载来源，再使用**右键 → 打开**，或**系统设置 → 隐私与安全性 → 仍要打开**。
 
@@ -667,7 +721,7 @@ bun run build
 bun scripts/capture-showcase.ts
 ```
 
-截图脚本使用全新的临时 HOME、Electron 配置目录、合成 `aurora-web` 项目与合成 sidecar，渲染真实 Electron GUI，**不使用真实凭据或个人工作区**。本地化图片输出到 `docs/screenshots/en/` 与 `docs/screenshots/zh/`。对话、模型列表、Agent 状态和指标由脚本构造，便于复现；它们不是 Provider 测试或真实使用记录。这套展示数据环境不是操作系统沙箱。
+截图脚本使用全新的临时 HOME、Electron 配置目录、合成 `aurora-web` 项目与合成 sidecar，渲染真实 Electron GUI，**不使用真实凭据或个人工作区**。本地化图片输出到 `docs/screenshots/en/` 与 `docs/screenshots/zh/`，再把官网所用图片生成到 `site/assets/`（这一步需要 `cwebp`）。macOS 的窗口控制按钮不在页面内，脚本会按应用设定的位置把它们画上去。对话、模型列表、Agent 状态和指标由脚本构造，便于复现；它们不是 Provider 测试或真实使用记录。这套展示数据环境不是操作系统沙箱。
 
 </details>
 
@@ -678,7 +732,7 @@ bun scripts/capture-showcase.ts
 |---|---|
 | macOS 拦截首次启动 | 确认来自发布页后，右键 → 打开，或通过隐私与安全性 → 仍要打开。应用与内置 sidecar 均为 ad-hoc 签名，未经公证。 |
 | Windows SmartScreen 拦截首次启动 | 确认来自发布页后，点击更多信息 → 仍要运行。Windows 包当前未签名。 |
-| 截图中的功能在已安装应用中不存在 | 本展示截图取自 v0.9.27；请检查已安装版本及其发布说明，较早版本可能不包含这些改进。 |
+| 截图中的功能在已安装应用中不存在 | 本展示截图取自 v0.9.37；请检查已安装版本及其发布说明，较早版本可能不包含这些改进。 |
 | `Built-in omp not found` | 源码检出中需构建或放入兼容 sidecar；已安装应用请重新安装正确的官方 DMG。另装系统 `omp` 无法补齐包内资源。 |
 | `build:omp` 找不到 monorepo | 将 GUI 放在 monorepo 的 `packages/gui/`，与 `packages/coding-agent/`、`packages/natives/` 同级。 |
 | `replacing stale addon … version sentinel ≠ …` | 提示信息：构建器发现并替换了版本不匹配的原生插件。 |
