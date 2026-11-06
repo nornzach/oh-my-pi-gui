@@ -371,7 +371,7 @@ describe("PluginDetailDrawer", () => {
 			getPluginDetail: vi
 				.fn()
 				.mockResolvedValueOnce(ok(detail))
-				.mockResolvedValue({ type: "response", command: "x", success: false, error: "sidecar went away" }),
+				.mockResolvedValue({ type: "response", command: "x", success: false, error: "the list is unavailable" }),
 		});
 		await mount(<PluginDetailDrawer onChanged={vi.fn(async () => {})} onClose={() => {}} plugin={plugin} />);
 		await flush();
@@ -384,7 +384,7 @@ describe("PluginDetailDrawer", () => {
 
 		const text = document.body.textContent ?? "";
 		expect(text).toContain("Showing the details from the last successful load.");
-		expect(text).toContain("sidecar went away");
+		expect(text).toContain("the list is unavailable");
 		expect(queryAll('input[type="number"]')).toHaveLength(1);
 		// The banner is not decoration: Retry re-runs the same read.
 		await click(byText("button", "Retry"));

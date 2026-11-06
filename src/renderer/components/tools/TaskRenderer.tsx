@@ -1,5 +1,6 @@
 import { Bot, Check, Wrench, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { describeProviderError } from "../../lib/errors";
 import { basename, cx, formatDuration, formatTokens, headLines, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useNowTick } from "../../lib/now-tick";
@@ -26,6 +27,12 @@ import {
 	YIELD_CAP,
 	yieldLabels,
 } from "./task-render-utils";
+
+/** A subagent's retry reason, which the agent may leave empty. */
+function describeRetry(value: unknown): string {
+	const message = asString(value);
+	return message ? describeProviderError(message) : "";
+}
 
 /**
  * Task (subagent spawn): live agent tree. Mirrors the TUI task renderer
@@ -446,7 +453,7 @@ function ProgressAgentRow({ row, depth, ctx }: { row: Record<string, unknown>; d
 							attempt: asNumber(retryState.attempt) ?? 0,
 							max: asNumber(retryState.maxAttempts) ?? 0,
 							duration: formatDuration(retryRemainingMs),
-							message: asString(retryState.errorMessage) ?? "",
+							message: describeRetry(retryState.errorMessage),
 						})}
 					</span>
 				</div>
@@ -458,7 +465,7 @@ function ProgressAgentRow({ row, depth, ctx }: { row: Record<string, unknown>; d
 						{t("tools.task.retryGaveUp", {
 							count: asNumber(retryFailure.attempt) ?? 0,
 							plural: (asNumber(retryFailure.attempt) ?? 0) === 1 ? "" : "s",
-							message: asString(retryFailure.errorMessage) ?? "",
+							message: describeRetry(retryFailure.errorMessage),
 						})}
 					</span>
 				</div>

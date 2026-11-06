@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- The Files panel now previews images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO and SVG) instead of saying "binary file". Click one to zoom in ([#45](https://github.com/nornzach/oh-my-pi-gui/issues/45)).
+
+### Changed
+
+- Error messages now say what went wrong and what to do about it, in your language, instead of showing raw text such as `HTTP 401 from http://…`, `getaddrinfo ENOTFOUND`, `Sidecar not connected` or a web page's HTML. Chat errors, the agent banner and crash screens still show the original text in a tooltip or under Technical details, and the Logs panel keeps it in full.
+
+### Fixed
+
+- Fixed toasts covering the Restart, Show all and dismiss buttons on banners at the top of the window.
+- A reply that failed while the agent is still retrying now says so, instead of showing a final "The request failed".
+- Long error messages are no longer cut off in chat, and the original error text is under "Technical details" there and in scheduled task runs.
+- A SOCKS proxy no longer breaks Fetch models and chat with `UnsupportedProxyProtocol`. The agent can only use HTTP and HTTPS proxies, so the HTTP proxy setting refuses anything else with an explanation, and a SOCKS proxy from a saved setting, the environment or the system is skipped with a warning.
+
 ## [0.9.37] - 2026-11-06
 
 ### Added

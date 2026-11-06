@@ -10,6 +10,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 
 import { useEffect, useRef, useState } from "react";
 import type { RpcWorktreeCreateResult } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
 import { useTabsStore } from "../../stores/tabs";
@@ -75,7 +76,7 @@ export function WorktreeDialog() {
 							: response.code === "invalid_name"
 								? "worktree.invalidName"
 								: "worktree.failed";
-					setError(`${t(key)}: ${response.error}`);
+					setError(`${t(key)}: ${describeError(response.error)}`);
 					return;
 				}
 				result = response.data as RpcWorktreeCreateResult;
@@ -88,7 +89,7 @@ export function WorktreeDialog() {
 			if (tabId) close();
 			else setError(t("worktree.openFailed", { path: result.path }));
 		} catch (error) {
-			setError(String(error));
+			setError(describeError(error));
 		} finally {
 			setCreating(false);
 		}

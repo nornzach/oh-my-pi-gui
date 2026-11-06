@@ -45,7 +45,7 @@ describe("RootErrorBoundary", () => {
 		});
 
 		expect(container.textContent).toContain("broken root surface");
-		expect(container.textContent).toContain("Reload interface");
+		expect(container.textContent).toContain("Reload window");
 		expect(container.textContent).toContain("/tmp/gui-runtime.jsonl");
 		expect(logPath).toHaveBeenCalledOnce();
 	});

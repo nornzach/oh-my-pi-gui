@@ -2,6 +2,7 @@ import "@xterm/xterm/css/xterm.css";
 import { Bot, Plus, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RpcTerminalInfo } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { scrollStripOnWheel, useActiveChipInView } from "../../lib/strip-scroll";
@@ -138,7 +139,7 @@ export function TerminalPanel() {
 		try {
 			await openTerminal(tabId);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : String(err));
+			setError(describeError(err));
 		} finally {
 			setOpening(false);
 		}

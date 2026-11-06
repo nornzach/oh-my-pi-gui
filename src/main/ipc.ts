@@ -60,6 +60,7 @@ import {
 } from "../shared/ipc-types";
 import { isLanguage } from "../shared/languages";
 import { parseLaunchProfile } from "../shared/launch-profile";
+import type { DroppedProxy } from "../shared/proxy";
 import type { RpcCommand, RpcSessionState } from "../shared/rpc-types";
 import { requestQuit } from "./app-quit";
 import { BenchmarkRunner } from "./benchmark-runner";
@@ -68,6 +69,7 @@ import type { ConversationIndex } from "./conversation-index";
 import { type CustomThemesWatcher, deleteCustomTheme, readCustomThemes, saveCustomTheme } from "./custom-themes";
 import { ensureDefaultWorkspace } from "./default-workspace";
 import { openInExternalEditor } from "./editor";
+import { readImageFile } from "./fs-image";
 import { mainT } from "./i18n";
 import type { LogWatcher } from "./log-watcher";
 import type { MemoryWatcher } from "./memory-watcher";
@@ -104,6 +106,8 @@ export interface IpcDeps {
 	windowManager: WindowManager;
 	benchmarkBinaryPath: string | null;
 	benchmarkEnv: () => Promise<NodeJS.ProcessEnv>;
+	/** Proxies kept from the agent on its next spawn, for the configuration banner. */
+	proxyWarnings: () => Promise<DroppedProxy[]>;
 	/** Spawn a window with its own sidecar (index.ts's pool-backed helper). */
 	spawnWindow: SpawnWindow;
 	/** Where to start when the caller has no cwd. Never the volume root: a
@@ -1269,64 +1273,17 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		}
 	});
 
-	// Markdown-image read: model output references images by path (`![alt](…)`)
-	// and the renderer turns them into data URLs for <img>. Relative paths stay
-	// workspace-confined; absolute paths and `~` are readable because the bytes
-	// never leave the local <img> (no exfil channel), but the file must sniff
-	// as a real image type and fit under a size cap.
-	const FS_IMAGE_MAX_BYTES = 25_000_000;
-
-	function sniffImageMime(header: Buffer): string | null {
-		if (header.length >= 8 && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47) {
-			return "image/png";
-		}
-		if (header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return "image/jpeg";
-		if (header.length >= 6 && header.subarray(0, 6).toString("ascii") === "GIF89a") return "image/gif";
-		if (header.length >= 6 && header.subarray(0, 6).toString("ascii") === "GIF87a") return "image/gif";
-		if (
-			header.length >= 12 &&
-			header.subarray(0, 4).toString("ascii") === "RIFF" &&
-			header.subarray(8, 12).toString("ascii") === "WEBP"
-		) {
-			return "image/webp";
-		}
-		if (header.length >= 12 && header.subarray(4, 8).toString("ascii") === "ftyp") {
-			const brand = header.subarray(8, 12).toString("ascii");
-			if (brand === "avif" || brand === "avis") return "image/avif";
-		}
-		if (header.length >= 2 && header[0] === 0x42 && header[1] === 0x4d) return "image/bmp";
-		if (header.length >= 4 && header[0] === 0x00 && header[1] === 0x00 && header[2] === 0x01 && header[3] === 0x00) {
-			return "image/x-icon";
-		}
-		// SVG is text: only when it actually starts with an XML/SVG prolog. Loaded
-		// through <img> it renders in secure static mode (no script execution).
-		const text = header.toString("utf8").trimStart().slice(0, 512).toLowerCase();
-		if (text.startsWith("<svg") || (text.startsWith("<?xml") && text.includes("<svg"))) return "image/svg+xml";
-		return null;
-	}
-
+	// Image read for markdown images in model output (`![alt](…)`) and the Files
+	// panel. Relative paths stay workspace-confined; absolute paths and `~` are
+	// readable because the bytes never leave the local <img> (no exfil channel),
+	// and readImageFile only lets real images under its size cap through.
 	ipcMain.handle(IPC_COMMANDS.FS_READ_IMAGE, async (event, payload: IpcFsReadImagePayload) => {
 		const fail = (error: string): IpcFsReadImageResult => ({ ok: false, dataUrl: null, mime: null, size: 0, error });
 		if (typeof payload?.path !== "string" || payload.path.length === 0) return fail("Invalid path");
 		const absolute = toAbsolutePath(payload.path, cwdFor(deps, event, payload.tabId));
 		if ("error" in absolute) return fail(absolute.error);
-		const abs = absolute.path;
 		try {
-			const stat = await fsp.stat(abs);
-			if (!stat.isFile()) return fail("Not a file");
-			if (stat.size > FS_IMAGE_MAX_BYTES) return fail("Image too large");
-			const handle = await fsp.open(abs, "r");
-			try {
-				const header = Buffer.alloc(512);
-				const { bytesRead } = await handle.read(header, 0, 512, 0);
-				const mime = sniffImageMime(header.subarray(0, bytesRead));
-				if (!mime) return fail("Not a supported image");
-				const body = Buffer.alloc(stat.size);
-				await handle.read(body, 0, stat.size, 0);
-				return { ok: true, dataUrl: `data:${mime};base64,${body.toString("base64")}`, mime, size: stat.size };
-			} finally {
-				await handle.close();
-			}
+			return await readImageFile(absolute.path);
 		} catch (err) {
 			return fail(err instanceof Error ? err.message : String(err));
 		}
@@ -1369,6 +1326,8 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		const sidecar = sidecarFor(deps, event);
 		return { status: sidecar?.status ?? "starting", cwd: cwdFor(deps, event) ?? "" };
 	});
+
+	ipcMain.handle(IPC_COMMANDS.SIDECAR_PROXY_WARNINGS, () => deps.proxyWarnings());
 
 	// External-editor round trip ($VISUAL/$EDITOR, temp file, exit-0 read-back)
 	// for the composer editor dialog. Result shape carries availability +

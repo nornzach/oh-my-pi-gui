@@ -74,6 +74,7 @@ export const RU_MAIN_TEXT: Record<MainTextKey, string> = {
 	"tasks.notify.verifyFailed": "{title}: проверка не пройдена",
 	"tasks.notify.blocked": "{title}: не удалось запустить",
 	"tasks.notify.missed": "{title}: запуск пропущен",
+	"tasks.notify.errorBody": "Откройте задачу, чтобы узнать, что пошло не так.",
 	"tasks.notify.missedBody": "В назначенное время omp был закрыт или компьютер спал.",
 	"tasks.notify.disabled": "{title}: задача отключена",
 	"tasks.notify.disabledFailures": "Она трижды подряд завершилась ошибкой. Исправь её и включи снова.",

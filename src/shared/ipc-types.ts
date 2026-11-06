@@ -7,6 +7,7 @@ import type { KeyEventLike } from "./chord";
 import type { Language } from "./languages";
 import type { LaunchProfile } from "./launch-profile";
 import type { SessionModelOverride } from "./model-restore";
+import type { DroppedProxy } from "./proxy";
 import type {
 	AgentSessionEvent,
 	AvailableCommand,
@@ -239,6 +240,8 @@ export const IPC_COMMANDS = {
 	SIDECAR_RESTART: "sidecar:restart",
 	/** Get sidecar status */
 	SIDECAR_STATUS_GET: "sidecar:status-get",
+	/** Proxies kept from the agent because it can't use them */
+	SIDECAR_PROXY_WARNINGS: "sidecar:proxy-warnings",
 	/** Choose a project directory and restart the sidecar there */
 	SIDECAR_SELECT_PROJECT: "sidecar:select-project",
 	SIDECAR_SET_PROJECT: "sidecar:set-project",
@@ -824,10 +827,11 @@ export interface IpcFsReadImagePayload {
 	/** Visible tab whose workspace resolves relative paths. */
 	tabId?: string;
 	/**
-	 * Image path from a markdown `![alt](src)` in model output. Relative paths
-	 * resolve against the session workspace; absolute paths (and `~`) are read
-	 * as-is — the bytes only ever reach a local <img>, so there is no exfil
-	 * channel, but the file must sniff as a real image type.
+	 * Image path from a markdown `![alt](src)` in model output, or a file opened
+	 * in the Files panel. Relative paths resolve against the session workspace;
+	 * absolute paths (and `~`) are read as-is — the bytes only ever reach a local
+	 * <img>, so there is no exfil channel, but the file must sniff as a real
+	 * image type.
 	 */
 	path: string;
 }
@@ -839,6 +843,8 @@ export interface IpcFsReadImageResult {
 	mime: string | null;
 	/** Total file size in bytes. */
 	size: number;
+	/** A real image, refused only for its size. */
+	tooLarge?: boolean;
 	error?: string;
 }
 
@@ -1645,6 +1651,7 @@ export interface OmpApi {
 		setProject(cwd: string): Promise<boolean>;
 		defaultWorkspace(): Promise<string>;
 		getStatus(): Promise<IpcSidecarStatusPayload>;
+		getProxyWarnings(): Promise<DroppedProxy[]>;
 	};
 	tray: {
 		pushState(state: TrayState): void;

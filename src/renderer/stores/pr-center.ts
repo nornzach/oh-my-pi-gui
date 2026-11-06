@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { RpcPrDetail, RpcPrListItem, RpcPrRepo } from "../../shared/rpc-types";
+import { describeError } from "../lib/errors";
 import { translate } from "../lib/i18n";
 import { useTabsStore } from "./tabs";
 import { toast } from "./toast";
@@ -50,14 +51,14 @@ export const usePrCenterStore = create<PrCenterStore>()((set, get) => ({
 		try {
 			const response = await window.omp.rpc.prRepo();
 			if (!response.success) {
-				set({ repo: null, error: response.error });
+				set({ repo: null, error: describeError(response.error) });
 				return;
 			}
 			const repo = response.data as RpcPrRepo;
 			set({ repo });
 			if (repo.available) await get().refresh();
 		} catch (error) {
-			set({ repo: null, error: String(error) });
+			set({ repo: null, error: describeError(error) });
 		}
 	},
 
@@ -67,12 +68,12 @@ export const usePrCenterStore = create<PrCenterStore>()((set, get) => ({
 		try {
 			const response = await window.omp.rpc.prList(get().listState, 50);
 			if (!response.success) {
-				set({ error: response.error, listLoading: false });
+				set({ error: describeError(response.error), listLoading: false });
 				return;
 			}
 			set({ list: response.data as RpcPrListItem[], listLoading: false });
 		} catch (error) {
-			set({ error: String(error), listLoading: false });
+			set({ error: describeError(error), listLoading: false });
 		}
 	},
 
@@ -87,12 +88,12 @@ export const usePrCenterStore = create<PrCenterStore>()((set, get) => ({
 		try {
 			const response = await window.omp.rpc.prGet(number);
 			if (!response.success) {
-				set({ error: response.error, detailLoading: false });
+				set({ error: describeError(response.error), detailLoading: false });
 				return;
 			}
 			set({ detail: response.data as RpcPrDetail, detailLoading: false });
 		} catch (error) {
-			set({ error: String(error), detailLoading: false });
+			set({ error: describeError(error), detailLoading: false });
 		}
 	},
 

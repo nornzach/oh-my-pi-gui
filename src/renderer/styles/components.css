@@ -1148,6 +1148,12 @@
 	background: color-mix(in srgb, var(--omp-error) 5%, transparent);
 }
 
+/* The same reply while the agent is still trying: a step along the way, not the end. */
+.omp-transcript-editorial .omp-message-error-retrying {
+	border-color: color-mix(in srgb, var(--omp-warning) 28%, transparent);
+	background: color-mix(in srgb, var(--omp-warning) 6%, transparent);
+}
+
 .omp-transcript-editorial .omp-queued-turn {
 	justify-content: flex-end;
 	padding: 10px var(--omp-editorial-edge) 10px var(--omp-editorial-inset) !important;
@@ -1706,6 +1712,13 @@
 
 .omp-panel-empty {
 	animation: omp-fade-up var(--omp-motion-med) var(--omp-ease-enter) both;
+}
+
+/* Behind a previewed image, so a dark logo with a transparent background shows in a dark theme. */
+.omp-image-checker {
+	background-color: var(--omp-panel-bg);
+	background-image: repeating-conic-gradient(var(--omp-border-muted) 0% 25%, transparent 0% 50%);
+	background-size: 16px 16px;
 }
 
 /* Terminal drawer: the xterm (moved in and out of the panel) fills it. */

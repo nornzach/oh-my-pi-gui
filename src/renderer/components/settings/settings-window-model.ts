@@ -171,7 +171,12 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "transcriptDetail tools detail transcript 对话 工具 过程",
 	},
 	{ id: "lineNumbers", labelKey: "codeblock.lineNumbers", aliases: "codeLineNumbers code lines 代码 行号" },
-	{ id: "proxy", labelKey: "settings.gui.proxy", aliases: "proxyUrl proxy network 代理 网络", tabId: ADVANCED_TAB_ID },
+	{
+		id: "proxy",
+		labelKey: "settings.gui.proxy",
+		aliases: "proxyUrl proxy socks network 代理 网络",
+		tabId: ADVANCED_TAB_ID,
+	},
 	{
 		id: "launch",
 		tabId: ADVANCED_TAB_ID,

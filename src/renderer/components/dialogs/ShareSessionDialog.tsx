@@ -1,6 +1,7 @@
 import { AlertTriangle, Copy, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RpcShareSessionPreview, RpcShareSessionResult } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
@@ -39,7 +40,7 @@ export function ShareSessionDialog() {
 			if (!response.success) throw new Error(response.error);
 			setPreview(response.data as RpcShareSessionPreview);
 		} catch (cause) {
-			if (version === generation.current) setError(String(cause));
+			if (version === generation.current) setError(describeError(cause));
 		} finally {
 			if (version === generation.current) setLoading(false);
 		}
@@ -64,7 +65,7 @@ export function ShareSessionDialog() {
 			setResult(response.data as RpcShareSessionResult);
 			setPreview(null);
 		} catch (cause) {
-			if (version === generation.current) setError(String(cause));
+			if (version === generation.current) setError(describeError(cause));
 		} finally {
 			if (version === generation.current) setUploading(false);
 		}

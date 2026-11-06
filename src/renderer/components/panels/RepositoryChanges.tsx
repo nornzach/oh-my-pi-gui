@@ -1,6 +1,7 @@
 import { ChevronsDownUp, ChevronsUpDown, CircleCheck, FolderX, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcGitChanges, RpcGitDiff } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import type { TabRpc } from "../../lib/tab-rpc";
@@ -91,7 +92,7 @@ export function RepositoryChanges({ split = false }: { split?: boolean }) {
 				);
 			})
 			.catch(cause => {
-				if (active) setError(String(cause));
+				if (active) setError(describeError(cause));
 			})
 			.finally(() => {
 				if (active) setLoading(false);
@@ -116,7 +117,7 @@ export function RepositoryChanges({ split = false }: { split?: boolean }) {
 				setDiffs(previous => new Map(previous).set(path, { state: "ready", diff, ...counts }));
 			} catch (cause) {
 				if (owner !== generation.current) return;
-				setDiffs(previous => new Map(previous).set(path, { state: "error", error: String(cause) }));
+				setDiffs(previous => new Map(previous).set(path, { state: "error", error: describeError(cause) }));
 			}
 		},
 		[rpc, t],

@@ -33,6 +33,7 @@ import {
 	type SessionInfoUpdateFrame,
 	type SubagentFrame,
 } from "../../shared/rpc-types";
+import { describeError, describeProviderError } from "../lib/errors";
 import { formatClock } from "../lib/format";
 import { translate } from "../lib/i18n";
 import { normalizeLoopUpdate } from "../lib/loop-mode";
@@ -157,7 +158,7 @@ function notifyOnAgentEnd(tabId: string, event: Extract<AgentSessionEvent, { typ
 		const message =
 			typeof last.errorMessage === "string" && last.errorMessage
 				? translate("events.notificationErrorDetail", {
-						error: last.errorMessage.replace(/\s+/g, " ").slice(0, 120),
+						error: describeProviderError(last.errorMessage).replace(/\s+/g, " ").slice(0, 120),
 					})
 				: translate("events.notificationError");
 		void maybeNotify("error", sessionName, message, runtime.command);
@@ -435,7 +436,7 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 											max: event.maxAttempts,
 											seconds: Math.round(event.delayMs / 1000),
 											time: formatClock(Date.now() + event.delayMs),
-											error: event.errorMessage,
+											error: describeProviderError(event.errorMessage),
 										},
 									),
 								});
@@ -462,7 +463,7 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 								useToastStore.getState().push({
 									variant: "error",
 									message: translate("events.retryFailed", {
-										error: event.finalError ?? translate("common.unknownError"),
+										error: describeProviderError(event.finalError ?? translate("common.unknownError")),
 									}),
 								});
 							}
@@ -689,7 +690,7 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 							if (!sw.success) {
 								useToastStore.getState().push({
 									variant: "error",
-									message: translate("events.sessionOpenFailed", { error: sw.error }),
+									message: translate("events.sessionOpenFailed", { error: describeError(sw.error) }),
 								});
 							}
 						}

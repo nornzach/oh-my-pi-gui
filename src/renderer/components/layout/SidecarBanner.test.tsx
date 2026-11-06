@@ -73,7 +73,11 @@ describe("SidecarBanner", () => {
 
 		expect(container.textContent).toContain("Agent restarting");
 		expect(container.textContent).toContain("Restart attempt 2/3");
-		expect(container.textContent).toContain("Exit code 3 — dyld: Library not loaded");
+		expect(container.textContent).toContain("The agent stopped unexpectedly.");
+		expect(container.textContent).not.toContain("dyld");
+		expect((container as unknown as Element).querySelector("[title]")?.getAttribute("title")).toBe(
+			"Exit code 3 — dyld: Library not loaded",
+		);
 		// Progress is not a failure: amber, and not the "Agent unavailable" error card.
 		expect(bannerDiv().className).toContain("--omp-warning");
 		expect(container.textContent).not.toContain("Agent unavailable");
@@ -89,7 +93,9 @@ describe("SidecarBanner", () => {
 
 		expect(container.textContent).toContain("Agent unavailable");
 		expect(container.textContent).toContain("Gave up after 3 restart attempts");
-		expect(container.textContent).toContain("omp: command not found");
+		expect((container as unknown as Element).querySelector("[title]")?.getAttribute("title")).toContain(
+			"omp: command not found",
+		);
 		expect(bannerDiv().className).toContain("--omp-error");
 	});
 
@@ -115,7 +121,7 @@ describe("SidecarBanner", () => {
 			useUiStore.getState().setSidecarError("Exit code 4", { attempt: 2, maxAttempts: 3 });
 		});
 		expect(container.textContent).toContain("Restart attempt 2/3");
-		expect(container.textContent).toContain("Exit code 4");
+		expect((container as unknown as Element).querySelector("[title]")?.getAttribute("title")).toBe("Exit code 4");
 	});
 
 	it("stays out of the way while the agent is healthy", async () => {

@@ -156,6 +156,18 @@ export function refreshConfigWarnings(tabId = useTabsStore.getState().activeTabI
 	});
 }
 
+/** Ask Main which proxies it is keeping from the agent; a respawn is what changes the answer, and hydrate follows one. */
+async function refreshProxyWarnings(tabId: string): Promise<void> {
+	const runtime = sessionRuntime(tabId);
+	try {
+		const proxyWarnings = await window.omp.sidecar.getProxyWarnings();
+		if (sessionRuntime(tabId) !== runtime) return;
+		withSessionRuntime(tabId, () => useSessionStore.setState({ proxyWarnings }));
+	} catch {
+		// Transient — the next hydration retries.
+	}
+}
+
 /** Re-read advisor roster status and spend (advisor_* events carry none). */
 export function refreshAdvisorStatus(tabId = useTabsStore.getState().activeTabId): Promise<void> {
 	return refreshSidecarSnapshot(tabId, "get_advisor_status", data => ({
@@ -382,6 +394,7 @@ export async function hydrateTabSession(tabId: string, fallbackName?: string): P
 		// Neither has a payload-bearing event: config_warnings_changed and the
 		// advisor_* frames only announce a change, so hydrate reads both.
 		refreshConfigWarnings(tabId),
+		refreshProxyWarnings(tabId),
 		refreshAdvisorStatus(tabId),
 		// Queue snapshot: queue_update frames keep it fresh afterwards;
 		// get_queue is only the hydrate fallback (boot/reconnect/session

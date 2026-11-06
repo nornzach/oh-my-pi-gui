@@ -153,19 +153,19 @@ describe("ModelRolesWindow", () => {
 		await mount(<ModelRolesWindow />);
 
 		expect(getModelRoles).not.toHaveBeenCalled();
-		expect(bodyText()).toContain("Sidecar not connected");
+		expect(bodyText()).toContain("Agent not connected");
 		expect(bodyText()).not.toContain("No model roles configured.");
 	});
 
 	it("shows the load failure with a retry instead of an empty role list", async () => {
-		const { getModelRoles } = installRpc(async () => ({ success: false, error: "rpc socket closed" }));
+		const { getModelRoles } = installRpc(async () => ({ success: false, error: "roles are unavailable" }));
 		useSessionStore.getState().setStatus("ready", "/repo");
 		useUiStore.getState().openModelRoles();
 
 		await mount(<ModelRolesWindow />);
 
 		expect(bodyText()).toContain("Could not load model roles.");
-		expect(bodyText()).toContain("rpc socket closed");
+		expect(bodyText()).toContain("roles are unavailable");
 		expect(bodyText()).not.toContain("No model roles configured.");
 
 		const retry = buttonWithLabel("Retry");
@@ -198,7 +198,7 @@ describe("ModelRolesWindow", () => {
 
 		expect(bodyText()).toContain("Default");
 		expect(bodyText()).toContain("Showing the last roles that loaded successfully.");
-		expect(bodyText()).toContain("timeout");
+		expect(bodyText()).toContain("took too long");
 	});
 
 	it("locks role changes when the sidecar disconnects after a successful load", async () => {
@@ -215,7 +215,7 @@ describe("ModelRolesWindow", () => {
 			button => button.getAttribute("aria-label") === "Model for Default",
 		) as HTMLButtonElement | undefined;
 		expect(trigger?.disabled).toBe(true);
-		expect(trigger?.getAttribute("title")).toBe("Sidecar not connected");
+		expect(trigger?.getAttribute("title")).toBe("Agent not connected");
 		expect(getModelRoles).toHaveBeenCalledTimes(1);
 		await act(async () => trigger?.click());
 		expect(setModelRole).not.toHaveBeenCalled();

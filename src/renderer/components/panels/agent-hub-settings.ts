@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RpcAgentDefinitionInfo, RpcResponse } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
@@ -118,7 +119,7 @@ export function useAgentSettings(open: boolean, active: boolean): AgentSettingsR
 					if (!silent) setError(null);
 				}
 			} catch (cause) {
-				if (!silent) setError(String(cause));
+				if (!silent) setError(describeError(cause));
 			} finally {
 				if (!silent) setLoading(false);
 			}

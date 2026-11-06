@@ -17,6 +17,7 @@ import {
 } from "react";
 import type { LoginProvider, ModelInfo } from "../../../shared/rpc-types";
 import { applyModelInfo, hydrateSession } from "../../hooks/use-rpc-events";
+import { describeProviderError } from "../../lib/errors";
 import { cx, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -88,9 +89,10 @@ export function ModelPicker() {
 			if (modelsResult.status === "fulfilled") return;
 			const reason = (settled: PromiseSettledResult<unknown>): string | null => {
 				if (settled.status === "rejected") {
-					return settled.reason instanceof Error ? settled.reason.message : String(settled.reason);
+					return describeProviderError(settled.reason);
 				}
-				return (settled.value as { error?: string } | undefined)?.error ?? null;
+				const failure = (settled.value as { error?: string } | undefined)?.error;
+				return failure ? describeProviderError(failure) : null;
 			};
 			setError(failedCopy ?? reason(providersResult) ?? reason(modelsResult) ?? t("modelPicker.notResponding"));
 		},

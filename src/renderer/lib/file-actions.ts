@@ -6,6 +6,7 @@
 import type { IpcResolvedPath } from "../../shared/ipc-types";
 import { toast } from "../stores/toast";
 import { useUiStore } from "../stores/ui";
+import { describeError } from "./errors";
 import { translate } from "./i18n";
 import type { FileTarget } from "./link-targets";
 
@@ -19,7 +20,7 @@ async function reportFailure(run: () => Promise<{ ok: boolean; error?: string } 
 		toast({
 			variant: "error",
 			title: translate("tools.path.openFailed"),
-			message: cause instanceof Error ? cause.message : String(cause),
+			message: describeError(cause),
 		});
 	}
 }

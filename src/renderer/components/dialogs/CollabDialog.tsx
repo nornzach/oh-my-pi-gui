@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import type { RpcCollabState } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
+import { describeError } from "../../lib/errors";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
@@ -56,7 +57,7 @@ export function CollabDialog() {
 				if (originTabId) await hydrateTabSession(originTabId);
 				else await hydrateSession();
 			} catch (cause) {
-				if (generation.current === version) setError(cause instanceof Error ? cause.message : String(cause));
+				if (generation.current === version) setError(describeError(cause));
 			} finally {
 				if (generation.current === version) {
 					busyRef.current = false;
@@ -87,7 +88,7 @@ export function CollabDialog() {
 				confirm(response.data as RpcCollabState);
 				setError(null);
 			} catch (cause) {
-				if (generation.current === version) setError(String(cause));
+				if (generation.current === version) setError(describeError(cause));
 			} finally {
 				pending = false;
 			}
@@ -113,7 +114,7 @@ export function CollabDialog() {
 			if (!response.success) throw new Error(response.error);
 			confirm(response.data as RpcCollabState);
 		} catch (cause) {
-			if (generation.current === version) setError(cause instanceof Error ? cause.message : String(cause));
+			if (generation.current === version) setError(describeError(cause));
 		} finally {
 			if (generation.current === version) {
 				busyRef.current = false;
@@ -136,7 +137,7 @@ export function CollabDialog() {
 			if (originTabId) await hydrateTabSession(originTabId);
 			else await hydrateSession();
 		} catch (cause) {
-			if (generation.current === version) setError(cause instanceof Error ? cause.message : String(cause));
+			if (generation.current === version) setError(describeError(cause));
 		} finally {
 			if (generation.current === version) {
 				busyRef.current = false;

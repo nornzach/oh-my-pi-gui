@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSessionList } from "../../hooks/use-session-list";
+import { describeError } from "../../lib/errors";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isSubagentSession } from "../../lib/session-tree";
@@ -75,7 +76,10 @@ function StatusLine({ status }: { status: MemoryStatus }) {
 			);
 		case "failed":
 			return (
-				<span className="flex min-w-0 items-center gap-1.5 text-(--omp-warning)" title={status.error}>
+				<span
+					className="flex min-w-0 items-center gap-1.5 text-(--omp-warning)"
+					title={status.error ? describeError(status.error) : undefined}
+				>
 					<AlertTriangle aria-hidden="true" className="shrink-0" size={13} />
 					<span className="truncate">{t("memory.status.failed")}</span>
 				</span>

@@ -4,6 +4,7 @@
  * installer opens in Finder.
  */
 import { AlertTriangle, Download, FolderOpen, RefreshCw, X } from "lucide-react";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useUpdaterStore } from "../../stores/updater";
 import { Button } from "../common";
@@ -103,7 +104,7 @@ export function UpdateBanner() {
 		return (
 			<div className="flex items-center gap-2 border-b border-(--omp-border-muted) bg-transparent px-3 py-1.5 text-omp-md">
 				<AlertTriangle size={13} className="shrink-0 text-(--omp-error)" />
-				<span className="min-w-0 flex-1 text-(--omp-error)">{status.message}</span>
+				<span className="min-w-0 flex-1 text-(--omp-error)">{describeError(status.message)}</span>
 				<Button size="sm" onClick={() => void window.omp.updater.check()}>
 					{t("updater.retry")}
 				</Button>

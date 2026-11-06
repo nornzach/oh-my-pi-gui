@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useDisplayPreference } from "../../lib/display-preferences";
+import { describeError, describeProviderError } from "../../lib/errors";
 import { cx, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { messageTimestampMs } from "../../lib/message-identity";
@@ -1190,7 +1191,7 @@ export function TurnStatusRow() {
 						</p>
 						{detail && (
 							<p className="mt-0.5 line-clamp-2 break-words text-omp-sm text-[var(--omp-muted)]" title={detail}>
-								{detail}
+								{describeProviderError(detail)}
 							</p>
 						)}
 					</div>
@@ -1334,7 +1335,7 @@ function QueuedMessageBubble({ item, lane }: { item: RpcQueuedMessage; lane: Que
 			if (response.success) return;
 			failure = response.error;
 		} catch (cause) {
-			failure = cause instanceof Error ? cause.message : String(cause);
+			failure = describeError(cause);
 		}
 		setRemoving(false);
 		toast({ variant: "error", title: t("pendingBubble.removeFailed"), message: failure });

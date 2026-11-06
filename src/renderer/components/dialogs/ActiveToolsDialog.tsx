@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcActiveTool, RpcActiveToolsResult, RpcToolSource } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -36,9 +37,9 @@ export function ActiveToolsDialog() {
 		try {
 			const response = await tabRpc.getActiveTools();
 			if (response.success) setTools((response.data as RpcActiveToolsResult).tools);
-			else setError(response.error);
+			else setError(describeError(response.error));
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : String(cause));
+			setError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}

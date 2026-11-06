@@ -9,6 +9,7 @@
  * that must be downloaded first closes the microphone until it is ready instead.
  */
 import type { RpcDictationFrame, RpcDictationStartResult, RpcResponse } from "../../shared/rpc-types";
+import { describeError } from "./errors";
 
 export type DictationPhase =
 	/** Waiting for microphone access. */
@@ -114,7 +115,7 @@ export class DictationSession {
 				// A start that settled idle was cancelled, or failed with a notice already shown.
 				if ((response.data as RpcDictationStartResult | undefined)?.state === "idle") this.#end();
 			},
-			(error: unknown) => this.#fail(error instanceof Error ? error.message : String(error)),
+			(error: unknown) => this.#fail(describeError(error)),
 		);
 	}
 
@@ -131,7 +132,7 @@ export class DictationSession {
 			response => {
 				if (!response.success) this.#fail(response.error);
 			},
-			(error: unknown) => this.#fail(error instanceof Error ? error.message : String(error)),
+			(error: unknown) => this.#fail(describeError(error)),
 		);
 	}
 
@@ -237,7 +238,7 @@ export class DictationSession {
 					if (generation === this.#micGeneration) this.#micOpening = false;
 					if (this.#ended || generation !== this.#micGeneration) return;
 					void this.#deps.rpc.dictationCancel().catch(() => {});
-					this.#fail(error instanceof Error ? error.message : String(error));
+					this.#fail(describeError(error));
 				},
 			);
 	}
@@ -252,7 +253,7 @@ export class DictationSession {
 	#send(pcm: Int16Array): void {
 		void this.#deps.rpc.dictationAudio(pcm16ToBase64(pcm)).catch((error: unknown) => {
 			if (this.#ended) return;
-			this.#fail(error instanceof Error ? error.message : String(error));
+			this.#fail(describeError(error));
 		});
 	}
 

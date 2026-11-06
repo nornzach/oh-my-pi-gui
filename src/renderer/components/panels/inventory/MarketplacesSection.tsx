@@ -13,6 +13,7 @@ import { useTabRpc } from "../../../lib/tab-rpc";
 import { Check, ChevronDown, ChevronRight, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { RpcMarketplaceInfo, RpcMarketplacePluginInfo } from "../../../../shared/rpc-types";
+import { describeError } from "../../../lib/errors";
 import { useT } from "../../../lib/i18n";
 import { isImeKeyEvent } from "../../../lib/ime";
 import {
@@ -63,7 +64,7 @@ export function AddMarketplaceForm({ onAdded, ready = true }: { onAdded: () => P
 			setSource("");
 			await onAdded();
 		} catch (cause) {
-			setError(String(cause));
+			setError(describeError(cause));
 		} finally {
 			setBusy(false);
 		}
@@ -269,10 +270,10 @@ export function MarketplaceCard({
 			if (result.ok) {
 				setAvailable(result.plugins);
 			} else {
-				setListError(result.error);
+				setListError(describeError(result.error));
 			}
 		} catch (cause) {
-			setListError(String(cause));
+			setListError(describeError(cause));
 		} finally {
 			setListLoading(false);
 		}
@@ -302,7 +303,7 @@ export function MarketplaceCard({
 			if (expanded) await fetchAvailable();
 			await reload();
 		} catch (cause) {
-			setCardError(String(cause));
+			setCardError(describeError(cause));
 		} finally {
 			setBusyAction(null);
 		}
@@ -322,7 +323,7 @@ export function MarketplaceCard({
 			}
 			await reload();
 		} catch (cause) {
-			setCardError(String(cause));
+			setCardError(describeError(cause));
 			setConfirmingRemove(false);
 		} finally {
 			setBusyAction(null);
@@ -383,7 +384,7 @@ export function MarketplaceCard({
 			await reload();
 		} catch (cause) {
 			if (isPluginActivationOriginActive(origin)) {
-				setPluginErrors(prev => ({ ...prev, [pluginName]: String(cause) }));
+				setPluginErrors(prev => ({ ...prev, [pluginName]: describeError(cause) }));
 			}
 		} finally {
 			setPluginBusy(null);

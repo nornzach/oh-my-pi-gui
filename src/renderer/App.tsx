@@ -852,9 +852,11 @@ export function App() {
 			<main className="omp-workspace-main relative flex min-w-0 flex-1 flex-col">
 				<TitleBar />
 				<TabBar />
-				<SidecarBanner />
-				<ConfigWarningsBanner />
-				<UpdateBanner />
+				<div className="shrink-0" data-toast-clearance>
+					<SidecarBanner />
+					<ConfigWarningsBanner />
+					<UpdateBanner />
+				</div>
 				<SplitWorkspace />
 			</main>
 

@@ -8,6 +8,7 @@ import type {
 	TaskNotice,
 	TaskSaveResult,
 } from "../../shared/scheduler-types";
+import { describeError } from "../lib/errors";
 import { translate } from "../lib/i18n";
 import { toast } from "./toast";
 
@@ -61,7 +62,7 @@ const failed = (error: unknown) =>
 	toast({
 		variant: "error",
 		title: translate("tasks.error.title"),
-		message: error instanceof Error ? error.message : String(error),
+		message: describeError(error),
 	});
 
 function configOf(draft: TaskDraft): TaskConfig {

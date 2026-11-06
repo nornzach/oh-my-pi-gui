@@ -11,6 +11,7 @@ import {
 	useState,
 } from "react";
 import type { ModelRoleCandidate, ModelRoleEntry, ModelRolesResult, ThinkingLevel } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -378,10 +379,10 @@ export function ModelRolesWindow() {
 				setRoles((res.data as ModelRolesResult).roles);
 				setError(null);
 			} else {
-				setError(res.error);
+				setError(describeError(res.error));
 			}
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : String(cause));
+			setError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}

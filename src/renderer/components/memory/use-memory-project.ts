@@ -15,6 +15,7 @@ import type {
 	RpcResponse,
 } from "../../../shared/rpc-types";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -42,7 +43,7 @@ export interface MemoryProject {
 }
 
 function failure(response: RpcResponse): string | null {
-	return response.success ? null : response.error;
+	return response.success ? null : describeError(response.error);
 }
 
 export function useMemoryProject(open: boolean, cwd: string | null): MemoryProject {
@@ -75,7 +76,7 @@ export function useMemoryProject(open: boolean, cwd: string | null): MemoryProje
 			if (problem) setError(problem);
 			else accept(response.data as RpcMemoryOverview, cwd);
 		} catch (cause) {
-			if (id === request.current) setError(cause instanceof Error ? cause.message : String(cause));
+			if (id === request.current) setError(describeError(cause));
 		} finally {
 			if (id === request.current) setLoading(false);
 		}
@@ -147,7 +148,7 @@ export function useMemoryProject(open: boolean, cwd: string | null): MemoryProje
 				accept(data.overview, cwd);
 				return data.result;
 			} catch (cause) {
-				reportFailure(cause instanceof Error ? cause.message : String(cause));
+				reportFailure(describeError(cause));
 				return null;
 			}
 		},
@@ -166,7 +167,7 @@ export function useMemoryProject(open: boolean, cwd: string | null): MemoryProje
 			accept((response.data as RpcMemoryUpdateResult).overview, cwd);
 			return true;
 		} catch (cause) {
-			reportFailure(cause instanceof Error ? cause.message : String(cause));
+			reportFailure(describeError(cause));
 			return false;
 		}
 	}, [accept, cwd, reportFailure, rpc]);
@@ -191,7 +192,7 @@ export function useMemoryProject(open: boolean, cwd: string | null): MemoryProje
 				await reload();
 				return true;
 			} catch (cause) {
-				reportFailure(cause instanceof Error ? cause.message : String(cause));
+				reportFailure(describeError(cause));
 				return false;
 			}
 		},

@@ -6,6 +6,7 @@
  */
 
 import { AlertTriangle, RefreshCw, X } from "lucide-react";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
@@ -67,7 +68,7 @@ export function SidecarBanner() {
 					{restarting ? t("sidecar.restartingTitle") : t("sidecar.title")}
 				</div>
 				<div className="truncate text-omp-sm text-[var(--omp-muted)]" title={reason}>
-					{progress ? `${progress} — ${reason}` : reason}
+					{progress ? `${progress} — ${describeError(reason)}` : describeError(reason)}
 				</div>
 				{cwd && <div className="text-omp-xs text-[var(--omp-dim)]">{t("sidecar.project", { cwd })}</div>}
 			</div>

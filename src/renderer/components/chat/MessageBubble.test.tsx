@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentMessage } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
+import { useMessagesStore } from "../../stores/messages";
+import { useSessionStore } from "../../stores/session";
 import { useToolsStore } from "../../stores/tools";
 
 import { MessageBubble } from "./MessageBubble";
@@ -462,5 +464,56 @@ describe("MessageBubble ended replies", () => {
 		const html = ended("error", "429 Too Many Requests");
 		expect(html).toContain("The request failed");
 		expect(html).toContain('role="alert"');
+	});
+
+	it("explains an unusable proxy, keeping Bun's error under Technical details", () => {
+		const html = ended(
+			"error",
+			'UnsupportedProxyProtocol fetching "https://example.com/v1/chat". For more information, pass `verbose: true` in the second argument to fetch()',
+		);
+		expect(html).toContain("The request failed");
+		expect(html).toContain("HTTP and HTTPS proxies");
+		const [sentence, details] = html.split("<details");
+		expect(sentence).not.toContain("UnsupportedProxyProtocol");
+		expect(details).toContain("Technical details");
+		expect(details).toContain("UnsupportedProxyProtocol");
+	});
+
+	it("leaves out Technical details when the sentence is already the whole text", () => {
+		expect(ended("error", "Workspace is read-only")).not.toContain("<details");
+	});
+
+	it("reads as a step along the way while the agent is still trying", async () => {
+		const message: AgentMessage = {
+			role: "assistant",
+			content: [],
+			stopReason: "error",
+			errorMessage: "500 Upstream overloaded",
+			timestamp: "2026-08-06T00:00:00.000Z",
+		};
+		useMessagesStore.setState({ messages: [message], liveMessages: [] });
+		useSessionStore.setState({ isStreaming: true, status: "ready" });
+		const host = document.createElement("div");
+		const root = createRoot(host as never);
+		await act(async () => {
+			root.render(
+				<I18nProvider>
+					<MessageBubble message={message} />
+				</I18nProvider>,
+			);
+		});
+		expect(host.textContent).toContain("Attempt failed, trying again");
+		expect(host.textContent).not.toContain("The request failed");
+		expect(host.querySelector('[role="alert"]')).toBeNull();
+
+		await act(async () => {
+			useSessionStore.setState({ isStreaming: false });
+		});
+		expect(host.textContent).toContain("The request failed");
+		expect(host.querySelector('[role="alert"]')).not.toBeNull();
+		expect(host.textContent).toContain("Retry");
+
+		await act(async () => root.unmount());
+		useMessagesStore.setState({ messages: [], liveMessages: [] });
 	});
 });

@@ -399,7 +399,7 @@ function noticeText(notice: SchedulerNotice): [MainTextKey, string] {
 			),
 		];
 	}
-	const summary = run.report?.summary ?? run.error?.message ?? "";
+	const summary = run.report?.summary ?? (run.error ? mainT("tasks.notify.errorBody") : "");
 	if (run.state === "missed") return ["tasks.notify.missed", mainT("tasks.notify.missedBody")];
 	if (run.state === "blocked_config") return ["tasks.notify.blocked", summary];
 	if (run.verification.state === "failed" || run.verification.state === "error")

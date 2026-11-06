@@ -1,6 +1,7 @@
 import { CheckCircle2, FileKey2, FolderOpen, Plus, RefreshCw, Server, Trash2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSshHostInfo, RpcSshHostInput, RpcSshHostsResult, RpcSshTestResult } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -49,10 +50,6 @@ function platformText(host: RpcSshHostInfo): string {
 	return [host.os, host.shell].filter(value => value && value !== "unknown").join(" · ") || "—";
 }
 
-function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
 export function SshSettingsPage() {
 	const tabRpc = useTabRpc();
 	const t = useT();
@@ -87,8 +84,8 @@ export function SshSettingsPage() {
 			try {
 				const response = await tabRpc.getSshHosts();
 				if (!response.success) {
-					setError(response.error);
-					setLoadError(response.error);
+					setError(describeError(response.error));
+					setLoadError(describeError(response.error));
 					return;
 				}
 				const next = response.data as RpcSshHostsResult;
@@ -104,7 +101,7 @@ export function SshSettingsPage() {
 				setError(undefined);
 				setLoadError(undefined);
 			} catch (cause) {
-				const message = errorMessage(cause);
+				const message = describeError(cause);
 				setError(message);
 				setLoadError(message);
 			} finally {
@@ -169,13 +166,13 @@ export function SshSettingsPage() {
 				...(selected && selected.scope !== "native" ? { previousScope: selected.scope } : {}),
 				host,
 			});
-			if (!response.success) setError(response.error);
+			if (!response.success) setError(describeError(response.error));
 			else {
 				setCreating(false);
 				await load({ name: draft.name.trim(), scope: draft.scope });
 			}
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		} finally {
 			setSaving(false);
 		}
@@ -198,14 +195,14 @@ export function SshSettingsPage() {
 				...(draft.keyPath?.trim() ? { keyPath: draft.keyPath.trim() } : {}),
 				...(draft.compat ? { compat: true } : {}),
 			});
-			if (!response.success) setError(response.error);
+			if (!response.success) setError(describeError(response.error));
 			else {
 				const result = response.data as RpcSshTestResult;
 				setTests(current => ({ ...current, [result.name]: result }));
 				if (!result.ok) setError(result.error ?? t("ssh.test.failed"));
 			}
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		} finally {
 			setTesting(false);
 		}
@@ -221,7 +218,7 @@ export function SshSettingsPage() {
 				scope: selected.scope === "user" ? "user" : "project",
 				name: selected.name,
 			});
-			if (!response.success) setError(response.error);
+			if (!response.success) setError(describeError(response.error));
 			else {
 				selectionRef.current = undefined;
 				setSelected(undefined);
@@ -230,7 +227,7 @@ export function SshSettingsPage() {
 				await load();
 			}
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		} finally {
 			setDeleting(false);
 		}

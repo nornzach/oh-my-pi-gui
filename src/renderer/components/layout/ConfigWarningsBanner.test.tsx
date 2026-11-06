@@ -8,7 +8,7 @@ import { parseHTML } from "linkedom";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { I18nProvider } from "../../lib/i18n";
+import { I18nProvider, translate } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
 import { ConfigWarningsBanner } from "./ConfigWarningsBanner";
 
@@ -75,6 +75,27 @@ describe("ConfigWarningsBanner", () => {
 		expect(container.textContent).not.toContain("second problem");
 		await clickButton("Show all");
 		expect(container.textContent).toContain("second problem");
+	});
+
+	it.each([
+		[{ source: "setting" }, "proxy.dropped.setting"],
+		[{ source: "system" }, "proxy.dropped.system"],
+	] as const)("explains a skipped proxy: %j", async (dropped, key) => {
+		useSessionStore.setState({ proxyWarnings: [dropped] });
+		await mount(<ConfigWarningsBanner />);
+		expect(translate(key)).not.toBe(key);
+		expect(container.textContent).toContain(translate(key));
+	});
+
+	it("names the skipped variables and lists them ahead of the sidecar's warnings", async () => {
+		useSessionStore.setState({
+			proxyWarnings: [{ source: "environment", names: ["HTTPS_PROXY", "https_proxy"] }],
+			configWarnings: ["models.yml: unknown provider 'foo'"],
+		});
+		await mount(<ConfigWarningsBanner />);
+		expect(container.textContent).toContain("2 configuration warnings");
+		expect(container.textContent).toContain("HTTPS_PROXY, https_proxy");
+		expect(container.textContent).not.toContain("models.yml");
 	});
 
 	it("hides the dismissed set and returns when a new warning arrives", async () => {

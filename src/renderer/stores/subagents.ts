@@ -1,5 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { SubagentFrame, SubagentSnapshot, SubagentSubscriptionLevel } from "../../shared/rpc-types";
+import { describeError } from "../lib/errors";
 import { activeTabCommand, createScopedStoreHook, type TabCommand } from "./session-runtime-context";
 
 /**
@@ -157,7 +158,7 @@ export const createSubagentsStore = (command: TabCommand = activeTabCommand) => 
 				// the new session's store.
 				if (version !== refreshVersion || (options?.expect && !options.expect())) return;
 				if (!res.success) {
-					set({ error: res.error });
+					set({ error: describeError(res.error) });
 					return;
 				}
 				const data = res.data as { subagents?: SubagentNode[] } | undefined;
@@ -188,7 +189,7 @@ export const createSubagentsStore = (command: TabCommand = activeTabCommand) => 
 				// Best-effort poll: frames + hydration remain authoritative. The
 				// failure is still recorded so the empty roster can name it.
 				if (version !== refreshVersion || (options?.expect && !options.expect())) return;
-				set({ error: cause instanceof Error ? cause.message : String(cause) });
+				set({ error: describeError(cause) });
 			}
 		},
 		reset: () => {

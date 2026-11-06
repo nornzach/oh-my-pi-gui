@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcSkillDetail, RpcSkillInfo } from "../../../shared/rpc-types";
 import { refreshLearnedSkills } from "../../hooks/use-learned-skills";
 import { DiffView } from "../../lib/diff";
+import { describeError } from "../../lib/errors";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -31,10 +32,6 @@ const STATE_ORDER: Record<SkillReviewState, number> = { new: 0, changed: 1, revi
 
 function iso(ms: number | undefined): string | undefined {
 	return ms === undefined ? undefined : new Date(ms).toISOString();
-}
-
-function errorText(cause: unknown): string {
-	return cause instanceof Error ? cause.message : String(cause);
 }
 
 function Switch({ checked, label, onChange }: { checked: boolean; label: string; onChange: (on: boolean) => void }) {
@@ -106,7 +103,7 @@ function SkillCard({
 				setLoaded(response.data as RpcSkillDetail);
 			})
 			.catch(cause => {
-				if (!cancelled) setLoadError(errorText(cause));
+				if (!cancelled) setLoadError(describeError(cause));
 			});
 		return () => {
 			cancelled = true;
@@ -135,7 +132,7 @@ function SkillCard({
 			if (!response.success) throw new Error(response.error);
 			await onChanged();
 		} catch (cause) {
-			toast({ variant: "error", message: errorText(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 		} finally {
 			setBusy(null);
 		}
@@ -163,7 +160,7 @@ function SkillCard({
 			await onChanged();
 			toast({ variant: "success", message: t("memory.skills.saved") });
 		} catch (cause) {
-			toast({ variant: "error", message: errorText(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 		} finally {
 			setBusy(null);
 		}
@@ -179,7 +176,7 @@ function SkillCard({
 			await onChanged();
 			toast({ variant: "success", message: t("memory.skills.removed", { name: skill.name }) });
 		} catch (cause) {
-			toast({ variant: "error", message: errorText(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 			setBusy(null);
 		}
 	};
@@ -368,7 +365,7 @@ export function SkillsView({ open }: { open: boolean }) {
 			setAutolearn((response.data as { value?: unknown } | undefined)?.value === true);
 		} catch (cause) {
 			setAutolearn(!on);
-			toast({ variant: "error", message: errorText(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 		}
 	};
 

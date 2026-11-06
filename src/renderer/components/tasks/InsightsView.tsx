@@ -7,6 +7,7 @@
 import { BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { InsightsDay, SchedulerInsights } from "../../../shared/scheduler-types";
+import { describeProviderError } from "../../lib/errors";
 import { cx, formatClock, formatCost, formatDuration, formatPercent } from "../../lib/format";
 import { getFormattingLocale, useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
@@ -249,8 +250,13 @@ export function InsightsView() {
 											<span className="min-w-0 flex-1 truncate text-omp-md text-(--omp-text)">
 												{snapshot?.tasks.find(task => task.id === run.taskId)?.title ?? run.taskId}
 											</span>
-											<span className="max-w-[45%] shrink-0 truncate text-omp-sm text-(--omp-error)">
-												{run.error?.message ?? t(`tasks.run.state.${run.state}`)}
+											<span
+												className="max-w-[45%] shrink-0 truncate text-omp-sm text-(--omp-error)"
+												title={run.error?.message}
+											>
+												{run.error
+													? describeProviderError(run.error.message)
+													: t(`tasks.run.state.${run.state}`)}
 											</span>
 										</button>
 									</li>

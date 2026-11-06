@@ -1,8 +1,8 @@
 /**
  * Files panel: workspace file tree sourced via the dedicated `fs:list` /
- * `fs:read` main-process IPC (node:fs — cross-platform, works with no live
- * agent session), in-drawer preview, and @mention insertion via the
- * "omp:insert-mention" window event.
+ * `fs:read` / `fs:read-image` main-process IPC (node:fs — cross-platform, works
+ * with no live agent session), in-drawer preview, and @mention insertion via
+ * the "omp:insert-mention" window event.
  */
 
 import {
@@ -12,6 +12,7 @@ import {
 	Copy,
 	ExternalLink as ExternalLinkIcon,
 	File,
+	FileX,
 	Folder,
 	FolderOpen,
 	FolderX,
@@ -19,13 +20,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FsTreeEntry } from "../../../shared/ipc-types";
-import { copyText } from "../../lib/format";
+import { describeError } from "../../lib/errors";
+import { basename, copyText, formatBytes } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isSelectAll } from "../../lib/keymap";
 import { MarkdownRenderer } from "../../lib/markdown";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { Button, Spinner } from "../common";
+import { ZoomableImage } from "../common/ImageViewer";
 import { showPathMenu } from "../common/LinkMenu";
 import { type TreeNode, TreeView } from "../common/TreeView";
 import { PathLink } from "../tools/PathLink";
@@ -34,13 +37,26 @@ import { FileLabel, PanelEmpty, PanelSearch, PanelToolbar, ToolbarIconButton } f
 const MAX_FILES = 2000;
 const MAX_DEPTH = 8;
 const PREVIEW_MAX_BYTES = 200_000;
+const SVG_NAME = /\.svg$/i;
+const SVG_MIME = "image/svg+xml";
+
+interface PreviewImage {
+	url: string;
+	mime: string | null;
+	bytes: number;
+}
 
 interface PreviewState {
 	path: string;
 	content: string | null;
+	image: PreviewImage | null;
+	/** What to say about the file when there is nothing of it to show. */
+	notice: { title: string; hint?: string } | null;
 	loading: boolean;
 	truncated: boolean;
 }
+
+const NOTHING_LOADED = { content: null, image: null, notice: null, loading: false, truncated: false };
 
 function countFiles(entries: FsTreeEntry[]): number {
 	let count = 0;
@@ -73,6 +89,40 @@ function selectContents(node: Node): void {
 	selection.addRange(range);
 }
 
+/** Fits the panel's width; a click opens the full-window viewer to zoom in. */
+function ImagePreview({
+	image,
+	name,
+	contentRef,
+	onFailed,
+}: {
+	image: PreviewImage;
+	name: string;
+	contentRef: (node: HTMLElement | null) => void;
+	onFailed: () => void;
+}) {
+	const [pixels, setPixels] = useState<string | null>(null);
+	return (
+		<div ref={contentRef} className="flex min-h-full flex-col items-center justify-center gap-2 p-4">
+			<ZoomableImage
+				src={image.url}
+				alt={name}
+				className="omp-image-checker block h-auto max-w-full rounded-md border border-(--omp-border-muted)"
+				onLoad={event => {
+					const { naturalWidth, naturalHeight } = event.currentTarget;
+					// A vector has no pixel size of its own; the browser would report a default.
+					if (image.mime !== SVG_MIME && naturalWidth > 0) setPixels(`${naturalWidth} × ${naturalHeight}`);
+				}}
+				onError={onFailed}
+			/>
+			<span className="text-omp-xs text-(--omp-dim)">
+				{pixels && `${pixels} · `}
+				{formatBytes(image.bytes)}
+			</span>
+		</div>
+	);
+}
+
 export function FilesPanel() {
 	const t = useT();
 	const tabId = useRuntimeTabId();
@@ -100,7 +150,7 @@ export function FilesPanel() {
 				: await window.omp.fs.list(undefined, MAX_DEPTH, MAX_FILES);
 			if (version !== listVersion.current) return;
 			if (!result.ok) {
-				setError(result.error ?? t("filesPanel.unavailable"));
+				setError(result.error ? describeError(result.error) : t("filesPanel.unavailable"));
 				setTree([]);
 				setTruncated(false);
 				return;
@@ -109,7 +159,7 @@ export function FilesPanel() {
 			setTruncated(result.truncated);
 		} catch (err) {
 			if (version !== listVersion.current) return;
-			setError(err instanceof Error ? err.message : String(err));
+			setError(describeError(err));
 			setTree([]);
 			setTruncated(false);
 		} finally {
@@ -129,7 +179,7 @@ export function FilesPanel() {
 	const openPreview = useCallback(
 		async (path: string) => {
 			const version = ++previewVersion.current;
-			setPreview({ path, content: null, loading: true, truncated: false });
+			setPreview({ ...NOTHING_LOADED, path, loading: true });
 			try {
 				const result = tabId
 					? await window.omp.fs.read(path, PREVIEW_MAX_BYTES, tabId)
@@ -137,30 +187,53 @@ export function FilesPanel() {
 				if (version !== previewVersion.current) return;
 				if (!result.ok) {
 					setPreview({
+						...NOTHING_LOADED,
 						path,
-						content: t("filesPanel.readFailed", { error: result.error ?? "unknown" }),
-						loading: false,
-						truncated: false,
+						notice: { title: t("filesPanel.readFailed"), hint: describeError(result.error) },
 					});
 					return;
 				}
-				if (result.binary) {
-					setPreview({ path, content: t("filesPanel.binary"), loading: false, truncated: false });
+				// Binary content is an image or it isn't, whatever its name says. SVG
+				// is text, so only its name says to draw it.
+				const read =
+					result.binary || SVG_NAME.test(path)
+						? await window.omp.fs.readImage(path, tabId ?? undefined).catch(() => null)
+						: null;
+				if (version !== previewVersion.current) return;
+				const image = read?.ok && read.dataUrl ? { url: read.dataUrl, mime: read.mime, bytes: read.size } : null;
+				if (result.binary && !image) {
+					const notice = read?.tooLarge
+						? {
+								title: t("filesPanel.imageTooLarge"),
+								hint: t("filesPanel.imageTooLargeHint", { size: formatBytes(read.size) }),
+							}
+						: { title: t("filesPanel.binary") };
+					setPreview({ ...NOTHING_LOADED, path, notice });
 					return;
 				}
-				setPreview({ path, content: result.content, loading: false, truncated: result.truncated });
+				setPreview({ ...NOTHING_LOADED, path, content: result.content, truncated: result.truncated, image });
 			} catch (error) {
 				if (version !== previewVersion.current) return;
 				setPreview({
+					...NOTHING_LOADED,
 					path,
-					content: t("filesPanel.readFailed", { error: error instanceof Error ? error.message : String(error) }),
-					loading: false,
-					truncated: false,
+					notice: { title: t("filesPanel.readFailed"), hint: describeError(error) },
 				});
 			}
 		},
 		[t, tabId],
 	);
+
+	// The bytes passed the sniff but didn't decode. An SVG still has its source to show.
+	const onImageFailed = useCallback(() => {
+		setPreview(current => {
+			if (!current) return current;
+			const notice = current.content
+				? null
+				: { title: t("filesPanel.imageFailed"), hint: t("filesPanel.imageFailedHint") };
+			return { ...current, image: null, notice };
+		});
+	}, [t]);
 
 	useEffect(() => {
 		if (filePreviewPath) void openPreview(filePreviewPath);
@@ -216,6 +289,8 @@ export function FilesPanel() {
 	// Markdown renders, except when a link named a line: rendered prose has no
 	// line numbers, so the source shows with that line marked (as GitHub does).
 	const previewIsMarkdown = filePreviewPath ? /\.mdx?$/i.test(filePreviewPath) && filePreviewLine === null : false;
+	// An SVG draws on the same terms: a link that named a line wants its source.
+	const previewImage = filePreviewLine === null || !activePreview?.content ? (activePreview?.image ?? null) : null;
 	const previewLines = useMemo(() => {
 		const content = activePreview?.content;
 		if (!content || previewIsMarkdown) return 0;
@@ -306,6 +381,15 @@ export function FilesPanel() {
 							<Spinner size="sm" />
 							<span className="text-omp-sm text-(--omp-dim)">{t("filesPanel.reading")}</span>
 						</div>
+					) : activePreview.notice ? (
+						<PanelEmpty icon={FileX} title={activePreview.notice.title} hint={activePreview.notice.hint} />
+					) : previewImage ? (
+						<ImagePreview
+							image={previewImage}
+							name={basename(filePreviewPath)}
+							contentRef={setPreviewContent}
+							onFailed={onImageFailed}
+						/>
 					) : previewIsMarkdown ? (
 						<div ref={setPreviewContent} className="mx-auto max-w-3xl px-5 py-4 text-omp-md text-(--omp-text)">
 							<MarkdownRenderer content={activePreview.content ?? ""} />

@@ -378,6 +378,46 @@ describe("SidecarManager", () => {
 		}
 	}, 15_000);
 
+	it("keeps proxies the agent can't use out of its process, whichever env layer they came from", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-proxy-"));
+		const envPath = path.join(tempDir, "env.json");
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		await fs.writeFile(
+			binaryPath,
+			`#!/usr/bin/env bun\nawait Bun.write(${JSON.stringify(envPath)}, JSON.stringify(process.env));\nawait Bun.sleep(60_000);\n`,
+		);
+		await fs.chmod(binaryPath, 0o755);
+		vi.stubEnv("HTTP_PROXY", "socks5://127.0.0.1:1085");
+
+		const sidecar = new SidecarManager({
+			binaryPath,
+			cwd: tempDir,
+			proxyEnv: async () => ({ HTTPS_PROXY: "http://127.0.0.1:7890", ALL_PROXY: "socks5h://127.0.0.1:1085" }),
+			shellEnv: async () => ({ PI_PROXY_ANTHROPIC: "socks5://127.0.0.1:1085" }),
+		});
+		const readEnv = async (): Promise<Record<string, string> | null> => {
+			try {
+				return JSON.parse(await fs.readFile(envPath, "utf8"));
+			} catch {
+				return null;
+			}
+		};
+		try {
+			sidecar.start();
+			await expect.poll(readEnv, { timeout: 9_000, interval: 50 }).not.toBeNull();
+			const env = await readEnv();
+			expect(env?.HTTPS_PROXY).toBe("http://127.0.0.1:7890");
+			expect(env?.HTTP_PROXY).toBeUndefined();
+			expect(env?.ALL_PROXY).toBeUndefined();
+			expect(env?.PI_PROXY_ANTHROPIC).toBeUndefined();
+			expect(env?.PI_NOTIFICATIONS).toBe("off");
+		} finally {
+			vi.unstubAllEnvs();
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
 	it("drops a spawn whose env resolution was superseded by a restart", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-superseded-"));
 		const pidPath = path.join(tempDir, "pids.txt");

@@ -11,6 +11,7 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { Handshake } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useForkHandoffStore } from "../../stores/fork-handoff";
 import { useSessionStore } from "../../stores/session";
@@ -92,7 +93,7 @@ export function HandoffDialog() {
 				setStage("summary");
 				const response = await tabRpc.handoff(trimmed.length > 0 ? trimmed : undefined);
 				if (!response.success) {
-					setError(response.error);
+					setError(describeError(response.error));
 					return;
 				}
 				const handoffResult = response.data as HandoffResult | null | undefined;
@@ -135,7 +136,7 @@ export function HandoffDialog() {
 				message: result.savedPath ? t("handoff.successSaved", { path: result.savedPath }) : t("handoff.success"),
 			});
 		} catch (cause) {
-			setError(String(cause));
+			setError(describeError(cause));
 		} finally {
 			setRunning(false);
 			setStopping(false);

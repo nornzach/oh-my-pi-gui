@@ -21,6 +21,7 @@ import { useTabRpc } from "../../../lib/tab-rpc";
 import { ArrowLeft, Check, RefreshCw, RotateCcw, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcPluginDetail, RpcPluginInfo } from "../../../../shared/rpc-types";
+import { describeError } from "../../../lib/errors";
 import { useT } from "../../../lib/i18n";
 import {
 	capturePluginActivationOrigin,
@@ -335,10 +336,10 @@ export function PluginDetailDrawer({
 			if (res.success) {
 				setDetail(res.data as RpcPluginDetail);
 			} else {
-				setLoadError(res.error);
+				setLoadError(describeError(res.error));
 			}
 		} catch (cause) {
-			setLoadError(String(cause));
+			setLoadError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}
@@ -438,7 +439,7 @@ export function PluginDetailDrawer({
 			setFeaturesDraft(null);
 			await load();
 		} catch (cause) {
-			if (isPluginActivationOriginActive(origin)) setFeaturesError(String(cause));
+			if (isPluginActivationOriginActive(origin)) setFeaturesError(describeError(cause));
 		} finally {
 			setFeaturesBusy(false);
 		}
@@ -483,7 +484,7 @@ export function PluginDetailDrawer({
 			.map(field => field.key);
 	}, [detail, fields, drafts, replacingKey]);
 
-	const assembleErrorText = (error: AssembleError, detailMessage?: string): string => {
+	const assembleErrorText = (error: AssembleError): string => {
 		switch (error) {
 			case "number":
 				return t("pluginDetail.errNumber");
@@ -492,7 +493,7 @@ export function PluginDetailDrawer({
 			case "jsonObject":
 				return t("pluginDetail.errJsonObject");
 			case "json":
-				return t("pluginDetail.errJson", { message: detailMessage ?? "" });
+				return t("pluginDetail.errJson");
 		}
 	};
 
@@ -506,7 +507,7 @@ export function PluginDetailDrawer({
 			const assembled = assembleFieldValue(field, drafts[field.key]);
 			if (!assembled.ok) {
 				// Client-side assembly failure — keep the draft, flag the field.
-				failures[field.key] = assembleErrorText(assembled.error, assembled.detail);
+				failures[field.key] = assembleErrorText(assembled.error);
 				continue;
 			}
 			try {
@@ -519,7 +520,7 @@ export function PluginDetailDrawer({
 					succeeded.push(field.key);
 				}
 			} catch (cause) {
-				failures[field.key] = String(cause);
+				failures[field.key] = describeError(cause);
 			}
 		}
 		if (succeeded.length > 0) {
@@ -555,7 +556,7 @@ export function PluginDetailDrawer({
 			if (replacingKey === field.key) setReplacingKey(null);
 			await load();
 		} catch (cause) {
-			setFieldErrors(prev => ({ ...prev, [field.key]: String(cause) }));
+			setFieldErrors(prev => ({ ...prev, [field.key]: describeError(cause) }));
 		} finally {
 			setResetBusy(false);
 			setResetKey(null);

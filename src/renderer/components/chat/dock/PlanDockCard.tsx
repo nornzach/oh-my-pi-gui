@@ -21,6 +21,7 @@ import { CheckCircle2, Circle, ClipboardList, FileWarning, MessageSquare, Refres
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanModeState } from "../../../../shared/rpc-types";
 import { useTabGuard } from "../../../hooks/use-tab-guard";
+import { describeError } from "../../../lib/errors";
 import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
 import { type TabRpc, useTabRpc } from "../../../lib/tab-rpc";
@@ -190,7 +191,7 @@ export function PlanDockCard() {
 				if (!isActive(origin)) return;
 				setLocalRoot(resolved.localRoot);
 				if (!response.ok) {
-					if (!quiet) setError(response.error ?? "Plan read failed");
+					if (!quiet) setError(describeError(response.error));
 					return;
 				}
 				if (response.path == null || response.content == null) {
@@ -201,7 +202,7 @@ export function PlanDockCard() {
 				setPlanFile(response.path);
 				setContent(response.content);
 			} catch (cause) {
-				if (isActive(origin) && !quiet) setError(cause instanceof Error ? cause.message : String(cause));
+				if (isActive(origin) && !quiet) setError(describeError(cause));
 			} finally {
 				if (isActive(origin)) {
 					setLoading(false);

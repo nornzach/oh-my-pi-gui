@@ -10,6 +10,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { Wrench, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RpcActiveTool, RpcActiveToolsResult, RpcForceToolState } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
@@ -45,7 +46,7 @@ export function ForceToolDialog() {
 			setCurrent((forceResponse.data as RpcForceToolState | undefined)?.tool ?? null);
 			setTools((toolsResponse.data as RpcActiveToolsResult | undefined)?.tools ?? []);
 		} catch (cause) {
-			setLoadError(cause instanceof Error ? cause.message : String(cause));
+			setLoadError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}
@@ -90,7 +91,7 @@ export function ForceToolDialog() {
 			toast({
 				variant: "error",
 				title: t("cmd.force"),
-				message: cause instanceof Error ? cause.message : String(cause),
+				message: describeError(cause),
 			});
 		} finally {
 			setBusy(false);
@@ -109,7 +110,7 @@ export function ForceToolDialog() {
 			toast({
 				variant: "error",
 				title: t("cmd.force"),
-				message: cause instanceof Error ? cause.message : String(cause),
+				message: describeError(cause),
 			});
 		} finally {
 			setBusy(false);

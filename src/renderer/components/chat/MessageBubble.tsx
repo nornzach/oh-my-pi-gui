@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
 import type { AgentMessage, ImageContent, MessageContent, ToolCallContent } from "../../../shared/rpc-types";
 import { OutputText } from "../../lib/ansi";
+import { describeProviderError } from "../../lib/errors";
 import { copyText, cx, formatClock, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
@@ -29,6 +30,7 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { toolEntryKey } from "../../stores/tools";
 import { ZoomableImage } from "../common/ImageViewer";
+import { TechnicalDetails } from "../common/TechnicalDetails";
 import { type RunningIndicator, ToolCard } from "../tools/ToolCard";
 import { CustomMessageCard, isCustomMessageCardType } from "./CustomMessageCard";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -82,6 +84,7 @@ function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats
 	const readOnly = useReadOnlyTranscript();
 	const isLatest = useMessagesStore(s => (s.liveMessages.at(-1) ?? s.messages.at(-1)) === message);
 	const idle = useSessionStore(s => !s.isStreaming && s.retryInfo === null && s.status === "ready");
+	const stillTrying = useSessionStore(s => s.isStreaming || s.retryInfo !== null) && isLatest && !readOnly;
 	const retry = async () => {
 		setRetrying(true);
 		try {
@@ -116,33 +119,37 @@ function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats
 				<Square aria-hidden size={10} className="shrink-0 fill-current" />
 				<span className="min-w-0 truncate" title={reason ?? undefined}>
 					{t("chat.stopped")}
-					{reason && <span className="text-[var(--omp-muted)]"> · {reason}</span>}
+					{reason && <span className="text-[var(--omp-muted)]"> · {describeProviderError(reason)}</span>}
 				</span>
 				{retryButton}
 			</div>
 		);
 	}
+	const described = describeProviderError(message.errorMessage);
 	return (
 		<div
-			role="alert"
-			className="omp-message-error mt-2 flex min-w-0 items-start gap-3 rounded-xl border px-3.5 py-2.5"
+			role={stillTrying ? "status" : "alert"}
+			className={cx(
+				"omp-message-error mt-2 flex min-w-0 items-start gap-3 rounded-xl border px-3.5 py-2.5",
+				stillTrying && "omp-message-error-retrying",
+			)}
 		>
-			<CircleAlert aria-hidden size={15} className="mt-0.5 shrink-0 text-[var(--omp-error)]" />
+			<CircleAlert
+				aria-hidden
+				size={15}
+				className={cx("mt-0.5 shrink-0", stillTrying ? "text-[var(--omp-warning)]" : "text-[var(--omp-error)]")}
+			/>
 			<div className="min-w-0 flex-1">
 				<p className="text-omp-md font-medium text-[var(--omp-text)]">
-					{t("chat.error.title")}
+					{stillTrying ? t("chat.error.retryingTitle") : t("chat.error.title")}
 					{repeats > 1 && (
 						<span className="ml-2 text-omp-sm font-normal tabular-nums text-[var(--omp-dim)]">
 							{t("chat.error.repeats", { count: repeats })}
 						</span>
 					)}
 				</p>
-				<p
-					className="mt-0.5 line-clamp-4 break-words text-omp-sm text-[var(--omp-muted)]"
-					title={message.errorMessage}
-				>
-					{message.errorMessage}
-				</p>
+				<p className="mt-0.5 break-words text-omp-sm text-[var(--omp-muted)]">{described}</p>
+				<TechnicalDetails className="mt-1" raw={message.errorMessage} shown={described} />
 			</div>
 			{retryButton}
 		</div>

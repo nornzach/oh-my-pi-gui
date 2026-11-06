@@ -420,6 +420,7 @@ const api: OmpApi = {
 		setProject: (cwd: string) => ipcRenderer.invoke(IPC_COMMANDS.SIDECAR_SET_PROJECT, { cwd }),
 		defaultWorkspace: () => ipcRenderer.invoke(IPC_COMMANDS.SIDECAR_DEFAULT_WORKSPACE) as Promise<string>,
 		getStatus: () => ipcRenderer.invoke(IPC_COMMANDS.SIDECAR_STATUS_GET),
+		getProxyWarnings: () => ipcRenderer.invoke(IPC_COMMANDS.SIDECAR_PROXY_WARNINGS),
 	},
 
 	tray: {

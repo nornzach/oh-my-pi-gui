@@ -9,6 +9,7 @@
 import { FolderGit2, FolderPlus, PackageOpen, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { RpcWorkspaceDirectoriesResult } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import {
@@ -48,10 +49,10 @@ export function WorkspaceDirsDialog() {
 			if (response.success) {
 				setDirectories((response.data as RpcWorkspaceDirectoriesResult | undefined)?.directories ?? []);
 			} else {
-				setError(response.error);
+				setError(describeError(response.error));
 			}
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : String(cause));
+			setError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}

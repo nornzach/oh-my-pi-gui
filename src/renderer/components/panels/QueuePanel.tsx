@@ -30,6 +30,7 @@ import { memo, useCallback, useEffect, useState } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { onEscape } from "../../lib/keymap";
@@ -386,7 +387,7 @@ export function QueuePanel() {
 					const response = await tabRpc.queueEdit(id, text);
 					return response.success
 						? { success: true as const }
-						: { success: false as const, error: response.error };
+						: { success: false as const, error: describeError(response.error) };
 				},
 				"queuePanel.editFailed",
 				t,
@@ -409,7 +410,7 @@ export function QueuePanel() {
 					const response = await tabRpc.queueMove(id, toIndex);
 					return response.success
 						? { success: true as const }
-						: { success: false as const, error: response.error };
+						: { success: false as const, error: describeError(response.error) };
 				},
 				"queuePanel.moveFailed",
 				t,
@@ -437,7 +438,7 @@ export function QueuePanel() {
 					const response = await tabRpc.queueClear(lane);
 					return response.success
 						? { success: true as const }
-						: { success: false as const, error: response.error };
+						: { success: false as const, error: describeError(response.error) };
 				},
 				"queuePanel.clearFailed",
 				t,

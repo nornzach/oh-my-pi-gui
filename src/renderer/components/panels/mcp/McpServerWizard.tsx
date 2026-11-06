@@ -24,6 +24,7 @@ import { useTabRpc } from "../../../lib/tab-rpc";
 import { Globe, Radio, Terminal } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RpcMcpServerInput } from "../../../../shared/rpc-types";
+import { describeError } from "../../../lib/errors";
 import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
 import { useSessionStore } from "../../../stores/session";
@@ -228,9 +229,9 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 		setTestView(null);
 		try {
 			const res = await tabRpc.mcpTest({ config: buildMcpServerInput(values) });
-			setTestView(res.success ? summarizeMcpTestData(res.data) : { kind: "error", error: res.error });
+			setTestView(res.success ? summarizeMcpTestData(res.data) : { kind: "error", error: describeError(res.error) });
 		} catch (cause) {
-			setTestView({ kind: "error", error: cause instanceof Error ? cause.message : String(cause) });
+			setTestView({ kind: "error", error: describeError(cause) });
 		} finally {
 			setTesting(false);
 		}
@@ -249,13 +250,13 @@ export function McpServerWizardForm({ onCancel, onAdded, initialValues }: McpSer
 			const res = await tabRpc.mcpAdd(name, buildMcpServerInput(values), values.scope);
 			if (!res.success) {
 				// Server-side failure: keep every field as typed.
-				setSubmitError(res.error);
+				setSubmitError(describeError(res.error));
 				return;
 			}
 			toast({ variant: "success", message: t("mcp.wizard.added", { name }) });
 			onAdded();
 		} catch (cause) {
-			setSubmitError(cause instanceof Error ? cause.message : String(cause));
+			setSubmitError(describeError(cause));
 		} finally {
 			setSubmitting(false);
 		}

@@ -28,6 +28,7 @@ import type {
 	RpcResponse,
 } from "../../../shared/rpc-types";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
@@ -92,10 +93,10 @@ function useRpcResource<T>(fetcher: () => Promise<RpcResponse>): RpcResource<T> 
 				setData(res.data as T);
 				setLoaded(true);
 			} else {
-				setError(res.error);
+				setError(describeError(res.error));
 			}
 		} catch (cause) {
-			if (request === requestRef.current && requestRoute === routeRef.current) setError(String(cause));
+			if (request === requestRef.current && requestRoute === routeRef.current) setError(describeError(cause));
 		} finally {
 			if (request === requestRef.current && requestRoute === routeRef.current) setLoading(false);
 		}
@@ -776,7 +777,9 @@ function MemoryStatusCard({ report, t }: { report: RpcMemoryReport; t: TFn }) {
 					))}
 				</div>
 			)}
-			{status.error && <div className="text-omp-sm break-words text-[var(--omp-error)]">{status.error}</div>}
+			{status.error && (
+				<div className="text-omp-sm break-words text-[var(--omp-error)]">{describeError(status.error)}</div>
+			)}
 		</div>
 	);
 }

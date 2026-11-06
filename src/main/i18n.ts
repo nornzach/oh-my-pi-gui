@@ -90,6 +90,7 @@ export type MainTextKey =
 	| "tasks.notify.failed"
 	| "tasks.notify.missed"
 	| "tasks.notify.missedBody"
+	| "tasks.notify.errorBody"
 	| "tasks.notify.review"
 	| "tasks.notify.verifyFailed"
 	| "updates.downloadFailed"
@@ -178,6 +179,10 @@ const TEXT: Record<MainTextKey, Record<Exclude<MainLanguage, "ru">, string>> = {
 	"tasks.notify.verifyFailed": { en: "{title}: check failed", zh: "{title}：检查未通过" },
 	"tasks.notify.blocked": { en: "{title} could not start", zh: "{title} 无法启动" },
 	"tasks.notify.missed": { en: "{title} missed a run", zh: "{title} 错过了一次运行" },
+	"tasks.notify.errorBody": {
+		en: "Open the task to see what went wrong.",
+		zh: "打开任务查看出错原因。",
+	},
 	"tasks.notify.missedBody": {
 		en: "omp was closed or the computer was asleep when it was due.",
 		zh: "到点时 omp 未运行或电脑处于睡眠状态。",

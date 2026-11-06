@@ -23,6 +23,7 @@ import type {
 	RpcResponse,
 	RpcVibeModeState,
 } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { loopLimitText, normalizeLoopUpdate, parseLoopLimit } from "../../lib/loop-mode";
@@ -134,10 +135,10 @@ function useModeRpc<T>(
 					setBoth(pick(res.data));
 					if (!silent) setError(null);
 				} else {
-					setError(res.error);
+					setError(describeError(res.error));
 				}
 			} catch (cause) {
-				if (version === generation.current) setError(String(cause));
+				if (version === generation.current) setError(describeError(cause));
 			} finally {
 				if (version === generation.current) setLoading(false);
 			}
@@ -199,7 +200,7 @@ function useModeRpc<T>(
 				setBoth(pick(settled.data));
 			} catch (cause) {
 				if (version !== generation.current) return;
-				setError(String(cause));
+				setError(describeError(cause));
 				toast({ variant: "error", title: t("modesPanel.actionFailed"), message: String(cause) });
 			} finally {
 				if (version === generation.current) setBusy(false);

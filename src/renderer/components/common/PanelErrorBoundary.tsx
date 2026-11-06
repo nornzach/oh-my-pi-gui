@@ -5,6 +5,7 @@
  * error, and offers a retry that remounts the subtree.
  */
 import { Component, type ReactNode } from "react";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 
 interface PanelErrorBoundaryProps {
@@ -20,8 +21,8 @@ function Fallback({ error, onRetry }: { error: Error; onRetry: () => void }) {
 	return (
 		<div className="flex h-full flex-col items-center justify-center gap-2 px-6 py-8 text-center">
 			<span className="text-omp-md font-medium text-[var(--omp-error)]">{t("errorBoundary.title")}</span>
-			<span className="max-w-full break-words font-mono text-omp-xs leading-snug text-[var(--omp-dim)]">
-				{error.message}
+			<span className="max-w-full break-words text-omp-sm leading-snug text-[var(--omp-dim)]" title={error.message}>
+				{describeError(error)}
 			</span>
 			<button
 				type="button"

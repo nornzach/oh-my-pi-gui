@@ -2,6 +2,7 @@ import { Check, ClipboardCopy } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CopyTarget } from "../../../shared/rpc-types";
 import { flattenCopyTargets } from "../../lib/copy-targets";
+import { describeError } from "../../lib/errors";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -42,7 +43,7 @@ export function CopySelectorDialog() {
 			.then(response => {
 				if (cancelled) return;
 				if (!response.success) {
-					setError(response.error);
+					setError(describeError(response.error));
 					return;
 				}
 				const data = response.data as { targets?: CopyTarget[] } | undefined;
@@ -51,7 +52,7 @@ export function CopySelectorDialog() {
 				setSelectedId(flattenCopyTargets(next)[0]?.target.id ?? null);
 			})
 			.catch(cause => {
-				if (!cancelled) setError(String(cause));
+				if (!cancelled) setError(describeError(cause));
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);

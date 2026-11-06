@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { customProviderNeedsApiKey } from "../../../shared/custom-provider";
 import type { CustomProviderView } from "../../../shared/ipc-types";
 import type { LogoutAccount, ProviderDiscoveryState, ProviderInfo, ProvidersResult } from "../../../shared/rpc-types";
-import { ipcErrorMessage } from "../../lib/format";
+import { describeError, describeProviderError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
@@ -75,7 +75,7 @@ export function providerDiscoveryErrors(
 ): string[] {
 	return states
 		.filter(state => state.status === "unavailable" && !state.optional && inUse.has(state.provider))
-		.map(state => `${state.provider}: ${state.error ?? fallbackMessage}`);
+		.map(state => `${state.provider}: ${describeProviderError(state.error ?? fallbackMessage)}`);
 }
 export function ProviderRow({
 	provider,
@@ -238,11 +238,11 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 					setCustomConfigs(configsResult.value);
 					setConfigError(null);
 				} else {
-					setConfigError(t("providers.configFailed", { details: ipcErrorMessage(configsResult.reason) }));
+					setConfigError(t("providers.configFailed", { details: describeError(configsResult.reason) }));
 				}
 				if (providerResult.status === "rejected") {
 					const cause = providerResult.reason;
-					setError(cause instanceof Error ? cause.message : String(cause));
+					setError(describeError(cause));
 				}
 				return providerResult.status === "fulfilled" ? providerResult.value : undefined;
 			} finally {

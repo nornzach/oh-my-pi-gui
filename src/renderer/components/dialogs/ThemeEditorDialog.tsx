@@ -8,6 +8,7 @@
 
 import { AlertTriangle, RotateCcw, Trash2, WandSparkles } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { resolveTheme } from "../../lib/theme";
@@ -387,7 +388,7 @@ export function ThemeEditorDialog() {
 			const file = customThemeFileFor(generated, trimmedName, description);
 			const result = await window.omp.themes.save({ fileName: editing?.fileName, theme: { ...file } });
 			if (!result.ok) {
-				toast({ variant: "error", message: t("themeEditor.saveFailed", { error: result.error }) });
+				toast({ variant: "error", message: t("themeEditor.saveFailed", { error: describeError(result.error) }) });
 				return;
 			}
 			loadCustomThemes(result.themes);
@@ -402,7 +403,7 @@ export function ThemeEditorDialog() {
 			}
 			close();
 		} catch (cause) {
-			toast({ variant: "error", message: t("themeEditor.saveFailed", { error: String(cause) }) });
+			toast({ variant: "error", message: t("themeEditor.saveFailed", { error: describeError(cause) }) });
 		} finally {
 			setSaving(false);
 		}
@@ -415,7 +416,7 @@ export function ThemeEditorDialog() {
 			const onScreen = await getPersistedThemeSelection();
 			const result = await window.omp.themes.delete(editing.fileName);
 			if (!result.ok) {
-				toast({ variant: "error", message: t("themeEditor.deleteFailed", { error: result.error }) });
+				toast({ variant: "error", message: t("themeEditor.deleteFailed", { error: describeError(result.error) }) });
 				return;
 			}
 			loadCustomThemes(result.themes);
@@ -428,7 +429,7 @@ export function ThemeEditorDialog() {
 			setConfirmDelete(false);
 			close(true);
 		} catch (cause) {
-			toast({ variant: "error", message: t("themeEditor.deleteFailed", { error: String(cause) }) });
+			toast({ variant: "error", message: t("themeEditor.deleteFailed", { error: describeError(cause) }) });
 		} finally {
 			setSaving(false);
 		}

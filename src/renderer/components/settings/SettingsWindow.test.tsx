@@ -216,6 +216,22 @@ describe("GUI settings visibility", () => {
 		expect(html).toContain('type="button"');
 	});
 
+	it("says why the agent is down in words, keeping its exit text for the tooltip", () => {
+		const html = renderToStaticMarkup(
+			<I18nProvider>
+				<SettingsConnectionNotice
+					busy={false}
+					error="Exit code 3 — dyld: Library not loaded"
+					hasCachedSchema={false}
+					onRetry={() => {}}
+					status="error"
+				/>
+			</I18nProvider>,
+		);
+		expect(html).toContain("The agent stopped");
+		expect(html.replace(/title="[^"]*"/g, "")).not.toContain("Exit code");
+	});
+
 	it("omits TUI-only rows and groups from a schema tab", () => {
 		const html = renderToStaticMarkup(
 			<I18nProvider>

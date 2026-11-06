@@ -1,6 +1,7 @@
 import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { RpcLiveFrame, RpcLiveMuteResult, RpcLiveStartResult } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { INITIAL_LIVE_STATE, type LiveViewState, reduceLiveFrame } from "../../lib/live-state";
 import { acceptsActiveTabEvents } from "../../lib/tab-routing";
@@ -68,7 +69,7 @@ export function LiveVoiceDialog() {
 			} catch (cause) {
 				// A start superseded by End call (or by closing) reports its cancellation here; stay quiet.
 				if (version !== generation.current) return false;
-				const message = cause instanceof Error ? cause.message : String(cause);
+				const message = describeError(cause);
 				dispatch({
 					kind: "patch",
 					patch: type === "live_start" ? { active: false, phase: "error", error: message } : { error: message },

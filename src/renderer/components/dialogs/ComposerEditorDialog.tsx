@@ -11,6 +11,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { EditorView, keymap } from "@codemirror/view";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { useUiStore } from "../../stores/ui";
@@ -53,7 +54,7 @@ export function ComposerEditorDialog() {
 		try {
 			const response = await window.omp.editor.openExternal(viewRef.current?.state.doc.toString() ?? "");
 			if (!response.ok) {
-				setExternalError(response.error ?? t("editor.externalFailed"));
+				setExternalError(response.error ? describeError(response.error) : t("editor.externalFailed"));
 				return;
 			}
 			// null text = the editor exited non-zero; keep the dialog content.

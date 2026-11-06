@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { describeError } from "../lib/errors";
 
 const POLL_INTERVAL_MS = 30_000;
 /** While the bundled stats server is still booting, retry quickly instead of waiting a full poll tick. */
@@ -82,7 +83,7 @@ function useStatsResource<T>(path: string, params: Record<string, string> | unde
 				unavailableSince = null;
 				if (active) setState({ key, data: result as T, isLoading: false, error: null, updatedAt: Date.now() });
 			} catch (cause) {
-				if (active) setState(previous => ({ ...previous, isLoading: false, error: String(cause) }));
+				if (active) setState(previous => ({ ...previous, isLoading: false, error: describeError(cause) }));
 			} finally {
 				inFlight = false;
 			}

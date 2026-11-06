@@ -34,6 +34,7 @@ import type {
 	RpcResponse,
 } from "../../../shared/rpc-types";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
+import { describeError } from "../../lib/errors";
 import { cx, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
@@ -111,9 +112,9 @@ function useTabRpc<T>(
 			const res = await fetcher(client);
 			if (request !== requestRef.current || requestRoute !== routeRef.current) return;
 			if (res.success) setData(pick(res.data));
-			else setError(res.error);
+			else setError(describeError(res.error));
 		} catch (cause) {
-			if (request === requestRef.current && requestRoute === routeRef.current) setError(String(cause));
+			if (request === requestRef.current && requestRoute === routeRef.current) setError(describeError(cause));
 		} finally {
 			if (request === requestRef.current && requestRoute === routeRef.current) setLoading(false);
 		}
@@ -632,9 +633,9 @@ function McpTab({
 		let view: McpTestView;
 		try {
 			const res = await tabRpc.mcpTest({ name: server.name });
-			view = res.success ? summarizeMcpTestData(res.data) : { kind: "error", error: res.error };
+			view = res.success ? summarizeMcpTestData(res.data) : { kind: "error", error: describeError(res.error) };
 		} catch (cause) {
-			view = { kind: "error", error: cause instanceof Error ? cause.message : String(cause) };
+			view = { kind: "error", error: describeError(cause) };
 		}
 		setTests(prev => ({ ...prev, [server.name]: { testing: false, view } }));
 	};

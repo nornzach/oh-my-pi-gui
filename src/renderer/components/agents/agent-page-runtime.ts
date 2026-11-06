@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StoreApi } from "zustand/vanilla";
 import type { AgentMessage, RpcCommand, RpcResponse, SubagentSnapshot } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useAgentPagesStore } from "../../stores/agent-pages";
 import { createBtwStore } from "../../stores/btw";
 import { createComposerStore } from "../../stores/composer";
@@ -160,7 +161,7 @@ export function useAgentTranscript(
 				});
 				if (version !== generation.current) return;
 				if (!response.success) {
-					setError(response.error);
+					setError(describeError(response.error));
 					return;
 				}
 				const data = (response.data ?? {}) as TranscriptRead;
@@ -180,7 +181,7 @@ export function useAgentTranscript(
 				setError(null);
 				setLoaded(true);
 			} catch (cause) {
-				if (version === generation.current) setError(cause instanceof Error ? cause.message : String(cause));
+				if (version === generation.current) setError(describeError(cause));
 			} finally {
 				if (version === generation.current) inFlight.current = false;
 			}

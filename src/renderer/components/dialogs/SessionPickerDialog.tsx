@@ -23,6 +23,7 @@ import {
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { SessionInfo } from "../../../shared/ipc-types";
 import { requestSessionSwitch, switchSessionNow } from "../../hooks/use-session-switch";
+import { describeError } from "../../lib/errors";
 import { basename, cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -93,7 +94,7 @@ export function SessionPickerDialog() {
 				setSessions(global);
 				setScope("global");
 			} catch (cause) {
-				if (!cancelled) setError(String(cause));
+				if (!cancelled) setError(describeError(cause));
 			} finally {
 				if (!cancelled) setLoading(false);
 			}
@@ -114,7 +115,7 @@ export function SessionPickerDialog() {
 			setSessions(list);
 			setScope(target);
 		} catch (cause) {
-			setError(String(cause));
+			setError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}

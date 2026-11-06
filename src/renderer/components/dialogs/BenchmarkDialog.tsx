@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { IpcBenchmarkModelReport, IpcBenchmarkProfile, IpcBenchmarkRunResult } from "../../../shared/ipc-types";
 import { formatUsd } from "../../lib/chart";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useModelStore } from "../../stores/model";
@@ -60,7 +61,7 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 		try {
 			await window.omp.bench.abort();
 		} catch (cause) {
-			setError(String(cause));
+			setError(describeError(cause));
 		}
 	};
 	const run = async () => {
@@ -75,7 +76,7 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 			if (next.success) setResult(next);
 			else setError(next.error);
 		} catch (cause) {
-			setError(String(cause));
+			setError(describeError(cause));
 		} finally {
 			setRunning(false);
 		}

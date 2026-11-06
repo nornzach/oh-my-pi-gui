@@ -9,6 +9,7 @@
  */
 
 import type { AgentMessage, SubagentSnapshot } from "../../../shared/rpc-types";
+import { describeProviderError } from "../../lib/errors";
 import { messageTimestampMs } from "../../lib/message-identity";
 import type { SubagentListRow } from "../panels/subagent-graph";
 
@@ -236,7 +237,12 @@ export function agentNowLine(agent: SubagentSnapshot): AgentNowLine | null {
 	if (activity === "working" && progress) {
 		const retry = progress.retryState;
 		if (retry) {
-			return { kind: "retry", attempt: retry.attempt, maxAttempts: retry.maxAttempts, error: retry.errorMessage };
+			return {
+				kind: "retry",
+				attempt: retry.attempt,
+				maxAttempts: retry.maxAttempts,
+				error: describeProviderError(retry.errorMessage),
+			};
 		}
 		// A parent running `task` is doing what its children do.
 		if (progress.currentTool === "task") return null;
@@ -246,7 +252,8 @@ export function agentNowLine(agent: SubagentSnapshot): AgentNowLine | null {
 		return null;
 	}
 	if (activity === "failed") {
-		const text = progress?.retryFailure?.errorMessage ?? progress?.recentOutput?.at(-1);
+		const failure = progress?.retryFailure?.errorMessage;
+		const text = failure ? describeProviderError(failure) : progress?.recentOutput?.at(-1);
 		return text?.trim() ? { kind: "error", text: text.trim() } : null;
 	}
 	return null;

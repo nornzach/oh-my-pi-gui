@@ -7,6 +7,7 @@ import type {
 	RpcSecurityScanResult,
 	RpcSecurityTargetInput,
 } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { getFormattingLocale, useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -48,10 +49,6 @@ function severityCounts(findings: RpcSecurityFindingInfo[]): Record<(typeof SEVE
 	const counts = { critical: 0, high: 0, medium: 0, low: 0, informational: 0 };
 	for (const finding of findings) counts[finding.severity]++;
 	return counts;
-}
-
-function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
 }
 
 export function SecuritySettingsPage() {
@@ -103,7 +100,7 @@ export function SecuritySettingsPage() {
 					const response = await tabRpc.getSecurityDashboard();
 					if (version !== generation.current) return;
 					if (!response.success) {
-						setError(response.error);
+						setError(describeError(response.error));
 						return;
 					}
 					const next = response.data as RpcSecurityDashboardResult;
@@ -113,7 +110,7 @@ export function SecuritySettingsPage() {
 					);
 					setError(undefined);
 				} catch (cause) {
-					if (version === generation.current) setError(errorMessage(cause));
+					if (version === generation.current) setError(describeError(cause));
 				} finally {
 					if (version === generation.current) setLoading(false);
 				}
@@ -200,10 +197,10 @@ export function SecuritySettingsPage() {
 			const scanTarget: RpcSecurityTargetInput =
 				target.kind === "ref_diff" ? { kind: "ref_diff", baseRevision, headRevision } : target;
 			const response = await tabRpc.securityStart(scanTarget);
-			if (!response.success) setError(response.error);
+			if (!response.success) setError(describeError(response.error));
 			await refresh();
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		} finally {
 			setRunning(false);
 		}
@@ -227,7 +224,7 @@ export function SecuritySettingsPage() {
 		if (!sidecarReady) return;
 		const response = await tabRpc.getSecurityScan(scanId);
 		if (!response.success) {
-			setError(response.error);
+			setError(describeError(response.error));
 			return;
 		}
 		setSelectedScan(response.data as RpcSecurityScanResult);
@@ -252,9 +249,9 @@ export function SecuritySettingsPage() {
 						: current,
 				);
 				setRationale("");
-			} else setError(response.error);
+			} else setError(describeError(response.error));
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		} finally {
 			setSavingDisposition(false);
 		}
@@ -267,14 +264,14 @@ export function SecuritySettingsPage() {
 		try {
 			const response = await tabRpc.securityValidate(selectedFinding.scanId, selectedFinding.id);
 			if (!response.success) {
-				setError(response.error);
+				setError(describeError(response.error));
 				return;
 			}
 			// The user asked to re-check one finding, not to leave Settings: the
 			// dashboard read back is what reports the new verdict.
 			await refresh();
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		} finally {
 			setValidating(false);
 		}
@@ -284,10 +281,10 @@ export function SecuritySettingsPage() {
 		if (!sidecarReady || !activeOperationId) return;
 		try {
 			const response = await tabRpc.securityCancel(activeOperationId);
-			if (!response.success) setError(response.error);
+			if (!response.success) setError(describeError(response.error));
 			await refresh();
 		} catch (cause) {
-			setError(errorMessage(cause));
+			setError(describeError(cause));
 		}
 	};
 

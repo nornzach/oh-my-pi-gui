@@ -8,6 +8,7 @@ import { type TabRpc, useTabRpc } from "../../lib/tab-rpc";
 import { Check, Eye, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SettingEntry, SettingProvenance } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useLang, useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import {
@@ -190,12 +191,12 @@ function SchemaSettingRow({
 						savedTimer.current = window.setTimeout(() => setSaved(false), 2000);
 					}
 				} else {
-					setError(res.error);
+					setError(describeError(res.error));
 					toast({ variant: "error", title: t("settings.saveFailed"), message: res.error });
 				}
 			} catch (err) {
 				if (generation.current !== requestGeneration) return;
-				setError(String(err));
+				setError(describeError(err));
 				toast({ variant: "error", title: t("settings.saveFailed"), message: String(err) });
 			} finally {
 				if (generation.current === requestGeneration) setSaving(false);
@@ -228,8 +229,8 @@ function SchemaSettingRow({
 		let parsed: unknown;
 		try {
 			parsed = JSON.parse(draft);
-		} catch (err) {
-			setError(t("settings.editors.errInvalidJson", { error: err instanceof Error ? err.message : String(err) }));
+		} catch {
+			setError(t("settings.editors.errInvalidJson"));
 			return;
 		}
 		if (entry.type === "array" && !Array.isArray(parsed)) {

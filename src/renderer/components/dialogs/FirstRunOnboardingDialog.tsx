@@ -2,6 +2,7 @@ import { ArrowRight, Bot, FileCode2, KeyRound, RefreshCw, Sparkles } from "lucid
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CustomProviderView } from "../../../shared/ipc-types";
 import type { ProviderInfo } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -118,7 +119,7 @@ export function FirstRunOnboardingDialog() {
 			} catch (cause) {
 				if (version !== requestVersion.current || !manual) return;
 				setOpen(true);
-				setError(t("onboarding.checkFailed", { error: cause instanceof Error ? cause.message : String(cause) }));
+				setError(t("onboarding.checkFailed", { error: describeError(cause) }));
 			} finally {
 				if (version === requestVersion.current) setChecking(false);
 			}

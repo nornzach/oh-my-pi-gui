@@ -224,14 +224,11 @@ describe("assembleFieldValue (per editor kind)", () => {
 		expect(assembleFieldValue(field("record"), ["a"])).toEqual({ ok: false, error: "jsonObject" });
 	});
 
-	it("json: parses the draft, reporting parse errors with detail", () => {
+	it("json: parses the draft and reports what fails to parse", () => {
 		expect(assembleFieldValue(field("json"), '{"a":1}')).toEqual({ ok: true, value: { a: 1 } });
 		const bad = assembleFieldValue(field("json"), "{nope");
 		expect(bad.ok).toBe(false);
-		if (!bad.ok) {
-			expect(bad.error).toBe("json");
-			expect(typeof bad.detail).toBe("string");
-		}
+		if (!bad.ok) expect(bad.error).toBe("json");
 	});
 });
 

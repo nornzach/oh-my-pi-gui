@@ -4,6 +4,7 @@
  */
 
 import { create } from "zustand";
+import { describeError } from "../lib/errors";
 
 export type ToastVariant = "info" | "success" | "warning" | "error";
 
@@ -45,6 +46,8 @@ export const useToastStore = create<ToastStore>()(set => ({
 		const now = Date.now();
 		const variant = toast.variant ?? "info";
 		const expiresAt = now + (toast.durationMs ?? 5000);
+		// Most failure toasts pass on whatever the call returned, so this is the one place they all cross.
+		const message = variant === "error" || variant === "warning" ? describeError(toast.message) : toast.message;
 		let resultId = 0;
 		set(state => {
 			const duplicateIndex = state.toasts.findIndex(
@@ -53,7 +56,7 @@ export const useToastStore = create<ToastStore>()(set => ({
 					entry.expiresAt > now &&
 					entry.variant === variant &&
 					entry.title === toast.title &&
-					entry.message === toast.message,
+					entry.message === message,
 			);
 			if (duplicateIndex >= 0) {
 				const duplicate = state.toasts[duplicateIndex];
@@ -67,7 +70,7 @@ export const useToastStore = create<ToastStore>()(set => ({
 				id: nextId++,
 				variant,
 				title: toast.title,
-				message: toast.message,
+				message,
 				expiresAt,
 				count: 1,
 			};

@@ -2,6 +2,7 @@ import { GitBranch } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getBtwLatestTurn } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
+import { describeError } from "../../lib/errors";
 import { copyText, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
@@ -67,7 +68,7 @@ export function BtwDialog() {
 			setRecordId(started.id);
 			setDraft("");
 		} catch (cause) {
-			if (generation.current === version) setError(String(cause));
+			if (generation.current === version) setError(describeError(cause));
 		}
 	};
 

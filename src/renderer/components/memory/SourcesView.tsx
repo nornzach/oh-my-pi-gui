@@ -9,6 +9,7 @@ import type { SessionInfo } from "../../../shared/ipc-types";
 import type { RpcMemoryOverview, RpcMemorySource } from "../../../shared/rpc-types";
 import { useSessionList } from "../../hooks/use-session-list";
 import { requestSessionSwitch } from "../../hooks/use-session-switch";
+import { describeError } from "../../lib/errors";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { Spinner } from "../common";
@@ -44,7 +45,10 @@ function StateLine({ source, idleHours }: { source: RpcMemorySource; idleHours: 
 			);
 		case "failed":
 			return (
-				<span className="flex min-w-0 items-center gap-1.5 text-(--omp-warning)" title={source.error}>
+				<span
+					className="flex min-w-0 items-center gap-1.5 text-(--omp-warning)"
+					title={source.error ? describeError(source.error) : undefined}
+				>
 					<AlertTriangle aria-hidden="true" className="shrink-0" size={12} />
 					<span className="truncate">{t("memory.source.failed")}</span>
 				</span>

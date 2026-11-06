@@ -2,6 +2,7 @@ import { CornerDownRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcAsyncJobItem, RpcJobsResult, RpcJobTreeRow } from "../../../shared/rpc-types";
 import { AnsiText } from "../../lib/ansi";
+import { describeError } from "../../lib/errors";
 import { cx, formatClock, formatDuration } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_LG } from "../../lib/preview";
@@ -60,7 +61,7 @@ export function JobsDialog() {
 				setUpdatedAt(Date.now());
 				setError(null);
 			} catch (cause) {
-				if (!cancelled) setError(String(cause));
+				if (!cancelled) setError(describeError(cause));
 			} finally {
 				pending = false;
 				if (!cancelled) setLoading(false);

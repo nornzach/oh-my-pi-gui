@@ -10,6 +10,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcForeignSessionInfo, RpcResponse } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/session";
@@ -64,7 +65,7 @@ export function ImportForeignDialog() {
 				if (!response.success) {
 					setStates(current => ({
 						...current,
-						[target]: { loading: false, error: response.error, sessions: [] },
+						[target]: { loading: false, error: describeError(response.error), sessions: [] },
 					}));
 					return;
 				}
@@ -75,7 +76,10 @@ export function ImportForeignDialog() {
 				}));
 			} catch (cause) {
 				if (generation.current === version)
-					setStates(current => ({ ...current, [target]: { loading: false, error: String(cause), sessions: [] } }));
+					setStates(current => ({
+						...current,
+						[target]: { loading: false, error: describeError(cause), sessions: [] },
+					}));
 			}
 		},
 		[sidecarReady, states, tabRpc.listForeignSessions],
@@ -134,13 +138,13 @@ export function ImportForeignDialog() {
 					response = await tabRpc.importForeignSession(source, session.id);
 				} catch (cause) {
 					failed.add(`${source}:${session.id}`);
-					setImportError(String(cause));
+					setImportError(describeError(cause));
 					continue;
 				}
 				if (generation.current !== version) return;
 				if (!response.success) {
 					failed.add(`${source}:${session.id}`);
-					setImportError(response.error);
+					setImportError(describeError(response.error));
 					continue;
 				}
 				const data = response.data as { sessionPath?: string; sessionId?: string; cwd?: string } | undefined;
@@ -167,7 +171,7 @@ export function ImportForeignDialog() {
 			// completion markers are reconciled instead of leaving a stale snapshot.
 			await load(source, true);
 		} catch (cause) {
-			setImportError(String(cause));
+			setImportError(describeError(cause));
 		} finally {
 			if (generation.current === version) setImporting(false);
 		}

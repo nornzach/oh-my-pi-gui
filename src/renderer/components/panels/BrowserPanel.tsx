@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Bot, Code, ExternalLink, Globe, Plus, RotateCw, X } from "lucide-react";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { IpcBrowserAction, IpcBrowserKeyPayload, IpcBrowserPage } from "../../../shared/ipc-types";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { onEscape } from "../../lib/keymap";
@@ -481,7 +482,7 @@ export function BrowserPanel() {
 			)}
 			{activePage?.error && (
 				<p className="shrink-0 truncate border-b border-(--omp-border-muted) bg-(--omp-error-dim) px-3 py-1.5 text-omp-xs text-(--omp-error)">
-					{t("browser.loadFailed", { error: activePage.error })}
+					{t("browser.loadFailed", { error: describeError(activePage.error) })}
 				</p>
 			)}
 			{searching && (

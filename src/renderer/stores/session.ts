@@ -1,5 +1,6 @@
 import type { VirtualItem } from "@tanstack/react-virtual";
 import { createStore } from "zustand/vanilla";
+import type { DroppedProxy } from "../../shared/proxy";
 import type {
 	ContextUsage,
 	RpcAdvisorStatus,
@@ -83,6 +84,8 @@ export interface SessionStore {
 	vibeModeEnabled: boolean;
 	/** Configuration problems the sidecar collected (get_config_warnings); refreshed on config_warnings_changed. */
 	configWarnings: string[];
+	/** Proxies the GUI kept from this sidecar because the agent can't use them; shown with configWarnings. */
+	proxyWarnings: DroppedProxy[];
 	/** The warning set the user dismissed; a changed set shows the banner again. */
 	configWarningsDismissed: string | null;
 	/** Advisor roster + spend (get_advisor_status); null until fetched. */
@@ -122,6 +125,7 @@ const initialState = {
 	loopMode: null,
 	vibeModeEnabled: false,
 	configWarnings: [] as string[],
+	proxyWarnings: [] as DroppedProxy[],
 	configWarningsDismissed: null as string | null,
 	advisorStatus: null as RpcAdvisorStatus | null,
 };

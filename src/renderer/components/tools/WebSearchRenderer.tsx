@@ -1,4 +1,5 @@
 import { Globe } from "lucide-react";
+import { describeError } from "../../lib/errors";
 import { resultText } from "../../lib/format";
 import { translate, useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
@@ -128,7 +129,7 @@ export function WebSearchRenderer({ args, result, isPartial }: ToolRendererProps
 
 			{parsed.error && (
 				<div className="rounded bg-[var(--omp-tool-error-bg)] px-2 py-1.5 text-omp-sm text-[var(--omp-error)]">
-					{t("tools.websearch.error", { error: parsed.error })}
+					{t("tools.websearch.error", { error: describeError(parsed.error) })}
 				</div>
 			)}
 

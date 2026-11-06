@@ -1,5 +1,6 @@
 /**
- * Toasts sit below the top navigation, clear of composer send/stop controls.
+ * Toasts sit below the top navigation and any banners there (whose buttons they
+ * would otherwise cover), clear of composer send/stop controls.
  * Auto-dismisses via a single pruning interval; slide-in per toast.
  *
  * A built-in browser page is a native view drawn over the whole window, so
@@ -24,6 +25,7 @@ const VARIANT_STYLES: Record<ToastVariant, { border: string; icon: string; Icon:
 const STACK_TOP = 112;
 const STACK_GAP = 16;
 const STACK_WIDTH = 320;
+const BANNERS = "[data-toast-clearance]";
 
 /** `right` offset that keeps the stack clear of the browser viewport, or null for the default column. */
 function stackRightOffset(): number | null {
@@ -33,6 +35,13 @@ function stackRightOffset(): number | null {
 	if (viewport.right <= defaultLeft || viewport.bottom <= STACK_TOP) return null;
 	if (viewport.left < STACK_WIDTH + STACK_GAP * 2) return null;
 	return window.innerWidth - viewport.left + STACK_GAP;
+}
+
+/** The default column's top, or just below the banners once they reach past it. */
+function stackTop(): number {
+	const banners = document.querySelector(BANNERS)?.getBoundingClientRect();
+	if (!banners || banners.height === 0) return STACK_TOP;
+	return Math.max(STACK_TOP, banners.bottom + STACK_GAP / 2);
 }
 
 export function ToastStack() {
@@ -48,13 +57,24 @@ export function ToastStack() {
 	}, [toasts.length, pruneExpired]);
 
 	const [right, setRight] = useState<number | null>(null);
+	const [top, setTop] = useState(STACK_TOP);
 	const visible = toasts.length > 0;
 	useLayoutEffect(() => {
 		if (!visible) return;
-		const place = (): void => setRight(stackRightOffset());
+		const place = (): void => {
+			setRight(stackRightOffset());
+			setTop(stackTop());
+		};
 		place();
 		window.addEventListener("resize", place);
-		return () => window.removeEventListener("resize", place);
+		// A banner can appear, or expand, while a toast is up.
+		const banners = document.querySelector(BANNERS);
+		const observer = banners && typeof ResizeObserver === "function" ? new ResizeObserver(place) : null;
+		if (banners) observer?.observe(banners);
+		return () => {
+			window.removeEventListener("resize", place);
+			observer?.disconnect();
+		};
 	}, [visible]);
 
 	if (!visible) return null;
@@ -62,8 +82,8 @@ export function ToastStack() {
 	return createPortal(
 		<div
 			aria-live="polite"
-			className="pointer-events-none fixed top-28 right-4 z-[70] flex w-80 flex-col gap-2"
-			style={right === null ? undefined : { right }}
+			className="pointer-events-none fixed right-4 z-[70] flex w-80 flex-col gap-2"
+			style={right === null ? { top } : { top, right }}
 		>
 			{toasts.map(entry => {
 				const style = VARIANT_STYLES[entry.variant];

@@ -6,6 +6,7 @@
  */
 
 import type { RpcMarketplacePluginInfo, RpcResponse } from "../../../../shared/rpc-types";
+import { describeError } from "../../../lib/errors";
 
 interface OkResult {
 	ok?: boolean;
@@ -18,9 +19,9 @@ interface OkResult {
  * always sends one).
  */
 export function mutationError(res: RpcResponse, fallback: string): string | null {
-	if (!res.success) return res.error;
+	if (!res.success) return describeError(res.error);
 	const data = res.data as OkResult | undefined;
-	if (data?.ok === false) return data.error ?? fallback;
+	if (data?.ok === false) return describeError(data.error ?? fallback);
 	return null;
 }
 
@@ -29,9 +30,9 @@ export function listAvailablePlugins(
 	res: RpcResponse,
 	fallback: string,
 ): { ok: true; plugins: RpcMarketplacePluginInfo[] } | { ok: false; error: string } {
-	if (!res.success) return { ok: false, error: res.error };
+	if (!res.success) return { ok: false, error: describeError(res.error) };
 	const data = res.data as (OkResult & { plugins?: unknown }) | undefined;
-	if (data?.ok === false) return { ok: false, error: data.error ?? fallback };
+	if (data?.ok === false) return { ok: false, error: describeError(data.error ?? fallback) };
 	const plugins = Array.isArray(data?.plugins) ? (data.plugins as RpcMarketplacePluginInfo[]) : [];
 	return { ok: true, plugins };
 }

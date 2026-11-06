@@ -290,7 +290,12 @@ describe("agentNowLine", () => {
 					retryState: { attempt: 2, maxAttempts: 3, delayMs: 1000, errorMessage: "429", startedAtMs: 0 },
 				}),
 			}),
-			{ kind: "retry", attempt: 2, maxAttempts: 3, error: "429" },
+			{
+				kind: "retry",
+				attempt: 2,
+				maxAttempts: 3,
+				error: "Too many requests, or your quota ran out (429).",
+			},
 		],
 		[
 			"a parent running task stays silent",

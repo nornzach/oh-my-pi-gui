@@ -250,12 +250,37 @@ describe("ProviderConfigDialog", () => {
 		await mountDialog();
 		await fillLocalServer();
 
+		const scrolled: unknown[] = [];
+		const scrollIntoView = vi
+			.spyOn(HTMLElement.prototype as unknown as { scrollIntoView: () => void }, "scrollIntoView")
+			.mockImplementation(function (this: unknown) {
+				scrolled.push(this);
+			});
 		await click(translate("providerCfg.fetch.action"));
-		expect(text()).toContain("401 Unauthorized");
+		expect(text()).toContain("The server rejected your credentials (401)");
+		// The button can sit at the form's bottom edge; the failure must not land out of sight.
+		expect(scrolled.some(node => (node as { textContent: string }).textContent.includes("(401)"))).toBe(true);
+		scrollIntoView.mockRestore();
 		const field = document.body.querySelector(
 			`input[placeholder="${translate("providerCfg.form.modelIdPlaceholder")}"]`,
 		) as unknown as HTMLInputElement;
 		expect(field.value).toBe("m1");
+	});
+
+	it("explains an unusable proxy instead of repeating Bun's error", async () => {
+		discoverProviderModels.mockResolvedValueOnce({
+			type: "response",
+			command: "discover_provider_models",
+			success: false,
+			error: 'UnsupportedProxyProtocol fetching "http://localhost:11434/v1/models". For more information, pass `verbose: true` in the second argument to fetch()',
+		});
+		useUiStore.getState().openProviderConfig("new");
+		await mountDialog();
+		await fillLocalServer();
+
+		await click(translate("providerCfg.fetch.action"));
+		expect(text()).toContain(translate("proxy.unsupportedError"));
+		expect(text()).not.toContain("UnsupportedProxyProtocol");
 	});
 
 	it("asks for a valid base URL instead of calling a fetch with none", async () => {

@@ -9,6 +9,7 @@ import { useRuntimeTabId, withSessionRuntime } from "../../stores/session-runtim
 import { RefreshCw } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { AgentMessage, SubagentSnapshot } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { toast } from "../../stores/toast";
 import { Button, Spinner } from "../common";
@@ -63,7 +64,7 @@ export const SubagentTranscript = memo(function SubagentTranscript({ agent }: { 
 				const response = await rpc.getSubagentMessages(agent.id, agent.sessionFile, fromByte);
 				if (version !== generation.current) return;
 				if (!response.success) {
-					setError(response.error);
+					setError(describeError(response.error));
 					toast({ variant: "error", title: t("subagent.transcriptFailed"), message: response.error });
 					setState(prev => ({ ...prev, loading: false, hasMore: false }));
 					return;
@@ -86,7 +87,7 @@ export const SubagentTranscript = memo(function SubagentTranscript({ agent }: { 
 				}));
 			} catch (cause) {
 				if (version === generation.current) {
-					setError(String(cause));
+					setError(describeError(cause));
 					setState(previous => ({ ...previous, loading: false }));
 				}
 			} finally {

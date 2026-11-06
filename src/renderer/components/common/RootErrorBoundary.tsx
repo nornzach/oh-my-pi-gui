@@ -46,14 +46,19 @@ function RootErrorFallback({ error }: { error: Error }) {
 				<div className="mb-4 h-1 w-12 rounded-full bg-[var(--omp-error)]" />
 				<h1 className="font-display text-lg font-semibold">{translate("appError.title")}</h1>
 				<p className="mt-2 text-sm leading-relaxed text-[var(--omp-muted)]">{translate("appError.description")}</p>
-				<pre className="mt-4 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] p-3 font-mono text-omp-sm leading-relaxed text-[var(--omp-error)]">
-					{error.message}
-				</pre>
-				{logPath ? (
-					<p className="mt-3 break-all font-mono text-omp-xs leading-relaxed text-[var(--omp-dim)]">
-						{translate("appError.logPath", { path: logPath })}
-					</p>
-				) : null}
+				<details className="mt-4">
+					<summary className="cursor-pointer text-omp-sm text-[var(--omp-dim)]">
+						{translate("errors.technicalDetails")}
+					</summary>
+					<pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] p-3 font-mono text-omp-sm leading-relaxed text-[var(--omp-error)]">
+						{error.message}
+					</pre>
+					{logPath ? (
+						<p className="mt-2 break-all font-mono text-omp-xs leading-relaxed text-[var(--omp-dim)]">
+							{translate("appError.logPath", { path: logPath })}
+						</p>
+					) : null}
+				</details>
 				<div className="mt-5 flex items-center gap-2">
 					<button
 						type="button"

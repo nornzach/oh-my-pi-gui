@@ -10,6 +10,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { stripVTControlCharacters } from "node:util";
+import { dropUnsupportedProxies } from "./proxy-env";
 import { MAX_RESTART_ATTEMPTS, RestartBudget, type Revive } from "./stats-restart-policy";
 
 // Bind a private ephemeral port; separate GUI instances must not share an index or listener.
@@ -60,7 +61,7 @@ export class StatsServerManager extends EventEmitter {
 		try {
 			child = spawn(this.#binaryPath, args, {
 				stdio: ["ignore", "pipe", "pipe"],
-				env: { ...process.env, PI_NOTIFICATIONS: "off" },
+				env: dropUnsupportedProxies({ ...process.env, PI_NOTIFICATIONS: "off" }),
 			});
 		} catch (err) {
 			// spawn() throws synchronously (e.g. EBADF/ENOENT) — treat like a

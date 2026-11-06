@@ -45,8 +45,10 @@ import {
 	parseLaunchProfile,
 	profileToFlags,
 } from "../../../shared/launch-profile";
+import { isUnsupportedProxyUrl } from "../../../shared/proxy";
 import type { SettingEntry, SettingsSchemaResult, SidecarStatus } from "../../../shared/rpc-types";
 import { forkSessionFromGui, prefillComposer, retryFailedTurn } from "../../lib/command-registry";
+import { describeError } from "../../lib/errors";
 import { exportSessionHtml } from "../../lib/export-session";
 import { cx } from "../../lib/format";
 import { useLang, useT } from "../../lib/i18n";
@@ -154,7 +156,11 @@ export function SettingsConnectionNotice({
 	const t = useT();
 	const waiting = status === "starting" || status === "restarting";
 	const title = waiting ? t("settings.connection.connecting") : t("settings.connection.unavailable");
-	const detail = error ?? (waiting ? t("settings.connection.waiting") : t("settings.connection.retryHint"));
+	const detail = error
+		? describeError(error)
+		: waiting
+			? t("settings.connection.waiting")
+			: t("settings.connection.retryHint");
 	return (
 		<div
 			className="mb-4 flex items-start gap-3 rounded-lg border border-[var(--omp-warning)]/35 bg-[var(--omp-warning)]/10 px-3 py-2.5"
@@ -164,7 +170,9 @@ export function SettingsConnectionNotice({
 			<AlertTriangle className="mt-0.5 shrink-0 text-[var(--omp-warning)]" size={15} />
 			<div className="min-w-0 flex-1">
 				<div className="text-omp-sm font-medium text-(--omp-text)">{title}</div>
-				<div className="mt-0.5 text-omp-xs text-(--omp-muted)">{detail}</div>
+				<div className="mt-0.5 text-omp-xs text-(--omp-muted)" title={error ?? undefined}>
+					{detail}
+				</div>
 				<div className="mt-1 text-omp-xs text-(--omp-dim)">
 					{hasCachedSchema ? t("settings.connection.cached") : t("settings.connection.noSchema")}
 				</div>
@@ -313,7 +321,7 @@ export function SettingsWindow() {
 			} catch (err) {
 				if (!cancelled) {
 					setSchema(null);
-					setLoadError(String(err));
+					setLoadError(describeError(err));
 					setLoadState("error");
 				}
 			}
@@ -470,6 +478,8 @@ export function SettingsWindow() {
 			setProxyDraft(null);
 			return;
 		}
+		// The field says why; the draft stays so the address can be corrected in place.
+		if (isUnsupportedProxyUrl(next)) return;
 		const origin = focusedSessionRuntime();
 		proxyPending.current = true;
 		setProxySaving(true);
@@ -502,7 +512,7 @@ export function SettingsWindow() {
 				message: t(restarted ? "settings.gui.proxyApplied" : "settings.gui.proxySavedPending"),
 			});
 		} catch (error) {
-			toast({ variant: "error", message: t("pluginActivation.restartFailed", { message: String(error) }) });
+			toast({ variant: "error", message: t("pluginActivation.restartFailed", { message: describeError(error) }) });
 		} finally {
 			proxyPending.current = false;
 			setProxySaving(false);
@@ -571,7 +581,10 @@ export function SettingsWindow() {
 				toast({ variant: "info", message: t("settings.launch.restarting") });
 			})
 			.catch(error =>
-				toast({ variant: "error", message: t("pluginActivation.restartFailed", { message: String(error) }) }),
+				toast({
+					variant: "error",
+					message: t("pluginActivation.restartFailed", { message: describeError(error) }),
+				}),
 			)
 			.finally(() => setLaunchRestarting(false));
 	};
@@ -1320,7 +1333,15 @@ export function SettingsWindow() {
 												spellCheck={false}
 												value={proxyDraft ?? savedProxy}
 											/>
-											<p className="mt-1.5 text-omp-sm text-(--omp-muted)">{t("settings.gui.proxyDesc")}</p>
+											{isUnsupportedProxyUrl(proxyDraft ?? savedProxy) ? (
+												<p className="mt-1.5 text-omp-sm text-(--omp-error)" role="alert">
+													{t("settings.gui.proxyUnsupported")}
+												</p>
+											) : (
+												<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
+													{t("settings.gui.proxyDesc")}
+												</p>
+											)}
 										</Section>
 										<Section id="setting-gui-launch" title={t("settings.launch.title")}>
 											<fieldset className="space-y-3" disabled={launchSaving || launchRestarting}>

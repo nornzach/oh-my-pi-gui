@@ -4,7 +4,7 @@
  * shorthand, slash-command routing, and the prompt/steer/followUp dispatch.
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { AgentMessage, AvailableCommand } from "../../../shared/rpc-types";
 import { hydrateTabSession } from "../../hooks/use-rpc-events";
 import {
@@ -14,6 +14,7 @@ import {
 	settleComposerResponse,
 } from "../../lib/composer-submit";
 import { expandEmoticons } from "../../lib/emoji";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { parseComposerMode } from "../../lib/input-modes";
 import { clearSessionContext } from "../../lib/messages";
@@ -26,7 +27,7 @@ import { type MessagesStore, useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { restoreTabComposer, useTabsStore } from "../../stores/tabs";
-import { toast } from "../../stores/toast";
+import { toast, useToastStore } from "../../stores/toast";
 
 export function useComposerSubmit({
 	text,
@@ -62,6 +63,12 @@ export function useComposerSubmit({
 	const contextTabId = useRuntimeTabId();
 	const activeTabId = useTabsStore(state => state.activeTabId);
 	const runtimeTabId = contextTabId ?? activeTabId;
+	const connectingToast = useRef<number | null>(null);
+	useEffect(() => {
+		if (status !== "ready" || connectingToast.current === null) return;
+		useToastStore.getState().dismiss(connectingToast.current);
+		connectingToast.current = null;
+	}, [status]);
 	const send = useCallback(
 		// `overrideText` sends a freshly computed value (voice dictation submit
 		// trigger) instead of the rendered `text` state, which lags a setText.
@@ -72,7 +79,7 @@ export function useComposerSubmit({
 			if ((!message && images.length === 0) || sending) return;
 			if (!routeReady || !runtimeTabId) return;
 			if (status !== "ready") {
-				toast({ variant: "warning", message: t("input.agentConnecting") });
+				connectingToast.current = toast({ variant: "warning", message: t("input.agentConnecting") });
 				return;
 			}
 			const originTabId = runtimeTabId;
@@ -165,7 +172,7 @@ export function useComposerSubmit({
 						markUncertain();
 						if (originStillActive()) originMessages?.getState().removeMessage(pending);
 						restoreDraft(message, previousImages);
-						showSendError(t("input.bashFailed"), String(error));
+						showSendError(t("input.bashFailed"), describeError(error));
 					})
 					.finally(() => {
 						if (originStillActive()) setSending(false);
@@ -215,7 +222,7 @@ export function useComposerSubmit({
 						markUncertain();
 						if (originStillActive()) originMessages?.getState().removeMessage(pending);
 						restoreDraft(message, previousImages);
-						showSendError(t("input.evalFailed"), String(error));
+						showSendError(t("input.evalFailed"), describeError(error));
 					})
 					.finally(() => {
 						if (originStillActive()) setSending(false);
@@ -275,7 +282,7 @@ export function useComposerSubmit({
 							deliveryPending = false;
 							if (!response.success) {
 								if (response.code === "rpc_delivery_unknown") markUncertain();
-								throw new Error(response.error ?? "queue dispatch failed");
+								throw new Error(response.error ?? t("rpc.failed"));
 							}
 							sent += 1;
 						}
@@ -307,7 +314,9 @@ export function useComposerSubmit({
 							variant: "error",
 							title: uncertain ? t("input.deliveryUnknownTitle") : t("input.sendFailed"),
 							message:
-								sent > 0 ? t("input.queue.partial", { sent, total: dispatchItems.length }) : String(error),
+								sent > 0
+									? t("input.queue.partial", { sent, total: dispatchItems.length })
+									: describeError(error),
 						});
 					} finally {
 						if (originStillActive()) setSending(false);
@@ -383,7 +392,7 @@ export function useComposerSubmit({
 					.catch(error => {
 						markUncertain();
 						restoreDraft(message, previousImages);
-						showSendError(t("input.compactNotRun"), String(error));
+						showSendError(t("input.compactNotRun"), describeError(error));
 					})
 					.finally(() => {
 						if (originStillActive()) setSending(false);
@@ -444,7 +453,7 @@ export function useComposerSubmit({
 						markUncertain();
 						if (optimisticMessage) originMessages.getState().removeLiveMessage(optimisticMessage);
 						restoreDraft(message, previousImages);
-						showSendError(t("input.sendFailed"), String(error));
+						showSendError(t("input.sendFailed"), describeError(error));
 					})
 					.finally(() => {
 						if (originStillActive()) setSending(false);

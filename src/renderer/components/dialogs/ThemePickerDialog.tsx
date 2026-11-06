@@ -10,6 +10,7 @@
 
 import { AlertTriangle, Check, FolderOpen, Monitor, Palette, Pencil, Search } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { describeError } from "../../lib/errors";
 import { cx, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -357,13 +358,13 @@ export function ThemePickerDialog() {
 									if (!result.ok)
 										toast({
 											variant: "error",
-											message: t("themePicker.custom.openFailed", { error: result.error ?? "" }),
+											message: t("themePicker.custom.openFailed", { error: describeError(result.error) }),
 										});
 								})
 								.catch(cause =>
 									toast({
 										variant: "error",
-										message: t("themePicker.custom.openFailed", { error: String(cause) }),
+										message: t("themePicker.custom.openFailed", { error: describeError(cause) }),
 									}),
 								);
 						}}

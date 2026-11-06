@@ -182,16 +182,6 @@ export function formatCost(n: number | null | undefined, decimals = 4): string {
 	return `$${n.toFixed(decimals)}`;
 }
 
-/**
- * The reason a main-process IPC call failed, without the "Error invoking remote
- * method '<channel>': Error: " wrapper Electron puts around it: the user should
- * read why a save failed, not which channel carried it.
- */
-export function ipcErrorMessage(cause: unknown): string {
-	const message = cause instanceof Error ? cause.message : String(cause);
-	return message.replace(/^(?:Error: )?Error invoking remote method '[^']*': (?:\w*Error: )?/, "");
-}
-
 /** Format percentage with safe fallback for NaN/null/undefined. */
 export function formatPercent(n: number | null | undefined, decimals = 1): string {
 	return n != null && Number.isFinite(n) ? `${n.toFixed(decimals)}%` : "—";

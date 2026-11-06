@@ -12,7 +12,6 @@ import {
 	extractImageDataUrls,
 	formatDuration,
 	formatShortClock,
-	ipcErrorMessage,
 	resultDetails,
 	resultText,
 	sanitizeToolText,
@@ -54,19 +53,6 @@ describe("formatDuration", () => {
 
 	it("keeps minutes and seconds under an hour", () => {
 		expect(formatDuration(59 * MINUTE + 15 * SECOND)).toBe("59m 15s");
-	});
-});
-
-describe("ipcErrorMessage", () => {
-	it("shows the main process's reason without Electron's invoke wrapper", () => {
-		const cause = new Error(
-			"Error invoking remote method 'models:provider-upsert': Error: \"anthropic\" is a built-in provider id; choose a distinct custom id.",
-		);
-		expect(ipcErrorMessage(cause)).toBe('"anthropic" is a built-in provider id; choose a distinct custom id.');
-	});
-
-	it("leaves a message that did not come through IPC untouched", () => {
-		expect(ipcErrorMessage(new Error("socket hang up"))).toBe("socket hang up");
 	});
 });
 

@@ -13,6 +13,7 @@ import { useContextReport } from "../../hooks/use-context-report";
 import { useGitStatus } from "../../hooks/use-git-status";
 import { useWorkingTreeChanges } from "../../hooks/use-working-tree-changes";
 import { contextSegments, contextUsageView, formatContextUsage } from "../../lib/context-usage";
+import { describeError } from "../../lib/errors";
 import { basename, cx, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
@@ -377,7 +378,11 @@ function ServersCard() {
 					{servers.map(server => {
 						const state = serverState(server);
 						return (
-							<li className="flex items-center gap-2 text-omp-md" key={server.name} title={server.lastError}>
+							<li
+								className="flex items-center gap-2 text-omp-md"
+								key={server.name}
+								title={server.lastError ? describeError(server.lastError) : undefined}
+							>
 								<span className="min-w-0 flex-1 truncate text-(--omp-text)">{server.name}</span>
 								{server.status === "connected" && server.enabled && (
 									<span className="shrink-0 text-omp-sm tabular-nums text-(--omp-dim)">

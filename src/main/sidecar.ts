@@ -38,6 +38,7 @@ import type {
 } from "../shared/rpc-types";
 import { BTW_FRAME_TYPES, DICTATION_FRAME_TYPES, LIVE_FRAME_TYPES, TERMINAL_FRAME_TYPES } from "../shared/rpc-types";
 import { EventBatcher } from "./event-batcher";
+import { dropUnsupportedProxies } from "./proxy-env";
 import { attachNdjsonParser, supportsRpcProtocolV2 } from "./rpc-bridge";
 import { RpcClient } from "./rpc-client";
 
@@ -379,7 +380,7 @@ export class SidecarManager extends EventEmitter {
 		try {
 			child = spawn(command, spawnArgs, {
 				stdio: ["pipe", "pipe", "pipe"],
-				env: {
+				env: dropUnsupportedProxies({
 					...process.env,
 					// Login-shell PATH first so the GUI proxy pref (and inherited
 					// proxy env) keeps precedence over rc-file proxy exports.
@@ -388,7 +389,7 @@ export class SidecarManager extends EventEmitter {
 					PI_RPC_EMIT_TITLE: "1",
 					PI_NO_PTY: "1",
 					PI_NOTIFICATIONS: "off",
-				},
+				}),
 				cwd,
 				windowsHide: true,
 			});

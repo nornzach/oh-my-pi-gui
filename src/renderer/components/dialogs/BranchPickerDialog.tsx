@@ -7,6 +7,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 
 import { GitBranch, RotateCw, Search } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { branchSessionFromEntry } from "../../lib/messages";
@@ -64,11 +65,11 @@ export function BranchPickerDialog() {
 					const data = response.data as { messages?: BranchEntry[] } | undefined;
 					setEntries(data?.messages ?? []);
 				} else {
-					setError(response.error);
+					setError(describeError(response.error));
 				}
 			})
 			.catch(cause => {
-				if (!cancelled) setError(String(cause));
+				if (!cancelled) setError(describeError(cause));
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);

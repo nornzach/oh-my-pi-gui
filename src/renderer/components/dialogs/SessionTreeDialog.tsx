@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSwitchLeafResult } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
 import { routeToSessionOwner } from "../../hooks/use-session-switch";
+import { describeError } from "../../lib/errors";
 import { cx, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -223,7 +224,7 @@ export function SessionTreeDialog() {
 			.catch(cause => {
 				if (!cancelled) {
 					setModel(null);
-					setError(cause instanceof Error ? cause.message : String(cause));
+					setError(describeError(cause));
 				}
 			})
 			.finally(() => {
@@ -589,7 +590,7 @@ export function SessionTreeDialog() {
 			toast({
 				variant: "error",
 				title: t("sessionTree.labelFailed"),
-				message: cause instanceof Error ? cause.message : String(cause),
+				message: describeError(cause),
 			});
 		} finally {
 			setSavingLabel(false);

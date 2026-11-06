@@ -7,6 +7,7 @@
  * titlebar REC chip and the palette toggle.
  */
 import { toast } from "../stores/toast";
+import { describeError } from "./errors";
 import { translate } from "./i18n";
 
 type RecordingListener = (recording: boolean) => void;
@@ -122,7 +123,7 @@ export async function toggleRecording(): Promise<void> {
 		toast({
 			variant: "error",
 			title: translate("record.title"),
-			message: cause instanceof Error ? cause.message : String(cause),
+			message: describeError(cause),
 		});
 	}
 }

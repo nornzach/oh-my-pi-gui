@@ -9,6 +9,7 @@
  */
 import { createStore } from "zustand/vanilla";
 import { type BtwHistoryRecord, type BtwHistoryTurn, getBtwLatestTurn, type RpcBtwFrame } from "../../shared/rpc-types";
+import { describeError } from "../lib/errors";
 import { activeTabCommand, createScopedStoreHook, type TabCommand } from "./session-runtime-context";
 
 export interface BtwStore {
@@ -119,7 +120,7 @@ export function createBtwStore(command: TabCommand = activeTabCommand) {
 					};
 				});
 			} catch (cause) {
-				if (version === refreshVersion) set({ loading: false, error: String(cause) });
+				if (version === refreshVersion) set({ loading: false, error: describeError(cause) });
 			}
 		},
 		select: id => set({ selectedId: id }),

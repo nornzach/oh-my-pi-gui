@@ -175,9 +175,9 @@ describe("subagents store refresh", () => {
 		await useSubagentsStore.getState().refresh();
 		expect(useSubagentsStore.getState().error).toBe("boom");
 
-		getSubagents.mockRejectedValueOnce(new Error("sidecar went away"));
+		getSubagents.mockRejectedValueOnce(new Error("the list is unavailable"));
 		await useSubagentsStore.getState().refresh();
-		expect(useSubagentsStore.getState().error).toBe("sidecar went away");
+		expect(useSubagentsStore.getState().error).toBe("the list is unavailable");
 
 		getSubagents.mockResolvedValueOnce(ok([snap({ id: "a1", status: "running" })]));
 		await useSubagentsStore.getState().refresh();

@@ -12,6 +12,7 @@
  * newer user action) already superseded is never unwound, and a chain of
  * overlapping optimistic values is unwound transitively to the last real one.
  */
+import { describeError } from "./errors";
 
 /** Maps a failed optimistic value to its predecessor. Server-written values
  *  never enter this map, so walking it terminates at the last authoritative
@@ -81,9 +82,9 @@ export async function optimisticWrite<State extends object>({
 	try {
 		const response = await persist();
 		if (response.success) return;
-		failure = response.error;
+		failure = describeError(response.error);
 	} catch (cause) {
-		failure = cause instanceof Error ? cause.message : String(cause);
+		failure = describeError(cause);
 	}
 
 	const rollback: Record<string, unknown> = {};

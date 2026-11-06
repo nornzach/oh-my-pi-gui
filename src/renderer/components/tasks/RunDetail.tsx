@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { RunReport, TaskRun } from "../../../shared/scheduler-types";
+import { describeProviderError } from "../../lib/errors";
 import { basename, cx, formatClock, formatCost, formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
 import { useTabsStore } from "../../stores/tabs";
 import { Badge, Button, Spinner } from "../common";
+import { TechnicalDetails } from "../common/TechnicalDetails";
 import { runDuration, runOutcome } from "./task-format";
 
 export function RunOutcomeBadge({ run }: { run: TaskRun }) {
@@ -51,7 +53,8 @@ export function RunRow({
 	const duration = runDuration(run);
 	const when = run.startedAt ?? run.scheduledFor ?? run.createdAt;
 	// What the run found or why it failed; without either the trigger is the headline.
-	const headline = title ?? (run.report?.summary || run.error?.message || undefined);
+	const headline =
+		title ?? (run.report?.summary || (run.error ? describeProviderError(run.error.message) : undefined));
 	return (
 		<button
 			className={cx(
@@ -263,8 +266,13 @@ export function RunDetail({ run, taskTitle, actions }: { run: TaskRun; taskTitle
 							{t(`tasks.run.errorKind.${run.error.kind}`)}
 						</p>
 						<p className="mt-0.5 text-omp-md break-words whitespace-pre-wrap text-(--omp-muted)">
-							{run.error.message}
+							{describeProviderError(run.error.message)}
 						</p>
+						<TechnicalDetails
+							className="mt-1.5"
+							raw={run.error.message}
+							shown={describeProviderError(run.error.message)}
+						/>
 					</div>
 				</div>
 			)}

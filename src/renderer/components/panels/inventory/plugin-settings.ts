@@ -165,7 +165,7 @@ export function isFieldDirty(field: SettingField, draft: unknown, value: unknown
 /** Client-side assembly failure kinds, mapped to i18n messages by the form. */
 export type AssembleError = "number" | "json" | "jsonArray" | "jsonObject";
 
-export type AssembleResult = { ok: true; value: unknown } | { ok: false; error: AssembleError; detail?: string };
+export type AssembleResult = { ok: true; value: unknown } | { ok: false; error: AssembleError };
 
 /**
  * Assemble the wire value for one editor kind. Text kinds take their draft
@@ -201,8 +201,8 @@ export function assembleFieldValue(field: SettingField, input: unknown): Assembl
 			if (typeof input !== "string") return { ok: true, value: input };
 			try {
 				return { ok: true, value: JSON.parse(input) };
-			} catch (cause) {
-				return { ok: false, error: "json", detail: cause instanceof Error ? cause.message : String(cause) };
+			} catch {
+				return { ok: false, error: "json" };
 			}
 		}
 	}

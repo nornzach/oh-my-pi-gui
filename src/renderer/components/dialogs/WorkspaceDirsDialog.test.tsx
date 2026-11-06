@@ -177,10 +177,10 @@ describe("WorkspaceDirsDialog", () => {
 	});
 
 	it("shows the server error when the directory listing fails", async () => {
-		installMockOmp({ rpc: { getDirectories: vi.fn(async () => failure("sidecar down")) } });
+		installMockOmp({ rpc: { getDirectories: vi.fn(async () => failure("directories are unavailable")) } });
 		useUiStore.getState().openWorkspaceDirs();
 		await mount(<WorkspaceDirsDialog />);
-		expect(document.body.textContent ?? "").toContain("sidecar down");
+		expect(document.body.textContent ?? "").toContain("directories are unavailable");
 		// A refusal is not an empty workspace: the "no directories" message would
 		// tell the user to add a root when the read is what broke.
 		expect(document.body.textContent ?? "").not.toContain("No workspace directories");
@@ -191,7 +191,7 @@ describe("WorkspaceDirsDialog", () => {
 			rpc: {
 				getDirectories: vi
 					.fn<() => Promise<RpcResponse>>()
-					.mockResolvedValueOnce(failure("sidecar down"))
+					.mockResolvedValueOnce(failure("directories are unavailable"))
 					.mockResolvedValue(success(directories(CWD, EXTRA))),
 			},
 		});
@@ -205,7 +205,7 @@ describe("WorkspaceDirsDialog", () => {
 		expect(omp.rpc.getDirectories).toHaveBeenCalledTimes(2);
 		const text = document.body.textContent ?? "";
 		expect(text).toContain(EXTRA);
-		expect(text).not.toContain("sidecar down");
+		expect(text).not.toContain("directories are unavailable");
 	});
 
 	it("adds a directory picked from the native dialog and refreshes the list", async () => {

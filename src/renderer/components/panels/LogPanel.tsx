@@ -6,6 +6,7 @@
 import { ArrowDown, Copy, Download, RotateCw, ScrollText, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LogBatch } from "../../../shared/ipc-types";
+import { describeError } from "../../lib/errors";
 import { copyText, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { toast } from "../../stores/toast";
@@ -61,7 +62,7 @@ export function LogPanel() {
 		void window.omp.runtime
 			.logSnapshot()
 			.then(applyBatch)
-			.catch(cause => setError(String(cause)));
+			.catch(cause => setError(describeError(cause)));
 	}, [applyBatch]);
 
 	useEffect(() => {

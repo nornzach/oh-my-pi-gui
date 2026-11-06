@@ -7,6 +7,7 @@
  * the persist rejects, so a row never stays pinned across a restart.
  */
 import { create } from "zustand";
+import { describeError } from "../lib/errors";
 import { translate } from "../lib/i18n";
 import { optimisticWrite } from "../lib/optimistic";
 import { toast } from "./toast";
@@ -99,7 +100,7 @@ async function writePrefs(get: () => SidebarPrefsStore): Promise<{ success: bool
 		await window.omp.prefs.set(PREFS_KEY, prefsBlob(get()));
 		return { success: true };
 	} catch (cause) {
-		return { success: false, error: cause instanceof Error ? cause.message : String(cause) };
+		return { success: false, error: describeError(cause) };
 	}
 }
 

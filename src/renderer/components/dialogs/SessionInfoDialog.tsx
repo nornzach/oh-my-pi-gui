@@ -10,6 +10,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { useCallback, useEffect, useState } from "react";
 import type { SessionStats } from "../../../shared/rpc-types";
 import { contextUsageView } from "../../lib/context-usage";
+import { describeError } from "../../lib/errors";
 import { basename, cx, formatCost, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { promptCacheRows } from "../../lib/prompt-cache";
@@ -75,9 +76,9 @@ export function SessionInfoDialog() {
 		try {
 			const response = await tabRpc.getSessionStats();
 			if (response.success) setStats(response.data as SessionStats);
-			else setError(response.error);
+			else setError(describeError(response.error));
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : String(cause));
+			setError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}

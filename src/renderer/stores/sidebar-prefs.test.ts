@@ -119,7 +119,11 @@ describe("sidebar-prefs store", () => {
 		expect(useSidebarPrefs.getState().groupAliases).toEqual({ "/work/a": "Frontend" });
 		expect(useSidebarPrefs.getState().pinnedSessions).toEqual(["/s/kept.jsonl"]);
 		expect(useToastStore.getState().toasts).toContainEqual(
-			expect.objectContaining({ variant: "error", title: translate("sidebar.renameFailed"), message: "EPERM" }),
+			expect.objectContaining({
+				variant: "error",
+				title: translate("sidebar.renameFailed"),
+				message: translate("errors.file.denied"),
+			}),
 		);
 	});
 });

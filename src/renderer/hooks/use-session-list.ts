@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionInfo } from "../../shared/ipc-types";
+import { describeError } from "../lib/errors";
 
 interface SessionListResult {
 	sessions: SessionInfo[];
@@ -53,7 +54,7 @@ export function useSessionList(scope: "local" | "global" = "local"): SessionList
 					if (read !== latestRead.current) return;
 					// A read that never answered is not a read that found nothing — the
 					// sidebar would otherwise claim "no sessions yet" for a failure.
-					setError(cause instanceof Error ? cause.message : String(cause));
+					setError(describeError(cause));
 					setIsLoading(false);
 				});
 		},

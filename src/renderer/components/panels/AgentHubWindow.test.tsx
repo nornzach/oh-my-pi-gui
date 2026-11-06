@@ -218,7 +218,7 @@ describe("AgentHubWindow hub tab", () => {
 				type: "response",
 				command: "get_subagents",
 				success: false,
-				error: "sidecar went away",
+				error: "the list is unavailable",
 			})),
 		});
 		// Hydration's roster pull, which is the only read the hub tab gets until a
@@ -230,7 +230,7 @@ describe("AgentHubWindow hub tab", () => {
 
 		const text = document.body.textContent ?? "";
 		expect(text).toContain("Could not load the subagent roster.");
-		expect(text).toContain("sidecar went away");
+		expect(text).toContain("the list is unavailable");
 		expect(text).not.toContain("No subagents spawned yet.");
 	});
 

@@ -233,7 +233,7 @@ describe("sidecar command fetch failure", () => {
 
 		const alert = container.querySelector('[role="alert"]');
 		expect(alert?.textContent).toBe(translate("palette.commandsFailed"));
-		expect(alert?.getAttribute("title")).toBe("sidecar not ready");
+		expect(alert?.getAttribute("title")).toBe("The agent is still starting. Try again in a moment.");
 
 		const retry = container
 			.querySelectorAll("button")

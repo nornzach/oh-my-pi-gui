@@ -22,6 +22,7 @@ import { useFollowUpModifierHeld } from "../../hooks/use-follow-up-modifier";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useDisplayPreference } from "../../lib/display-preferences";
 import { tryEmojiInlineReplace } from "../../lib/emoji";
+import { describeError } from "../../lib/errors";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -505,7 +506,7 @@ export function InputArea() {
 				toast({
 					variant: "error",
 					title: t("input.paste.saveFailed"),
-					message: cause instanceof Error ? cause.message : String(cause),
+					message: describeError(cause),
 				});
 				insertPasteBlob(pendingPaste.content);
 			}

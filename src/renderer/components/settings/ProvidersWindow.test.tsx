@@ -101,7 +101,9 @@ describe("providerDiscoveryErrors", () => {
 				"Discovery unavailable",
 				new Set(["custom-openai", "ollama"]),
 			),
-		).toEqual(["custom-openai: HTTP 401"]);
+		).toEqual([
+			"custom-openai: The server rejected your credentials (401). Check the API key in the provider's settings, or sign in again.",
+		]);
 	});
 });
 
@@ -425,7 +427,7 @@ describe("ProvidersWindow", () => {
 		useUiStore.getState().openProviders();
 		await mountWindow();
 
-		expect(text()).toContain("socket hang up");
+		expect(text()).toContain("The connection closed before the server answered");
 		expect(text()).toContain(translate("providers.loadFailed"));
 		expect(text()).not.toContain(translate("providers.noAuth"));
 	});

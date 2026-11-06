@@ -2,7 +2,9 @@
  * Configuration warnings the sidecar collected — the GUI counterpart of the
  * TUI header's "Warning: …" rows. A broken models.yml, an extension that failed
  * to load, an invalid WATCHDOG.yml, or a missing default model otherwise fail
- * silently here. Dismissal hides the current set only; a changed set shows again.
+ * silently here. Proxies Main kept from the agent join them, since nothing else
+ * would say why requests stopped using them. Dismissal hides the current set
+ * only; a changed set shows again.
  */
 
 import { AlertTriangle, ChevronDown, ChevronUp, X } from "lucide-react";
@@ -12,9 +14,19 @@ import { useSessionStore } from "../../stores/session";
 
 export function ConfigWarningsBanner() {
 	const t = useT();
-	const warnings = useSessionStore(s => s.configWarnings);
+	const configWarnings = useSessionStore(s => s.configWarnings);
+	const proxyWarnings = useSessionStore(s => s.proxyWarnings);
 	const dismissed = useSessionStore(s => s.configWarningsDismissed);
 	const [expanded, setExpanded] = useState(false);
+	const warnings = [
+		...proxyWarnings.map(dropped =>
+			t(
+				`proxy.dropped.${dropped.source}`,
+				dropped.source === "environment" ? { names: dropped.names.join(", ") } : undefined,
+			),
+		),
+		...configWarnings,
+	];
 	const key = warnings.join("\n");
 	if (warnings.length === 0 || dismissed === key) return null;
 	const multiple = warnings.length > 1;

@@ -39,6 +39,7 @@ import {
 	groupByCategory,
 	prefillComposer,
 } from "../../lib/command-registry";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { retryLastTurn as retryLastTurnShared } from "../../lib/messages";
@@ -239,7 +240,7 @@ export function CommandPalette() {
 			.then(response => {
 				if (seq !== fetchSeq.current) return;
 				if (!response.success) {
-					setCommandsError(response.error ?? "");
+					setCommandsError(describeError(response.error));
 					return;
 				}
 				const data = response.data as { commands?: AvailableCommand[] } | undefined;
@@ -247,7 +248,7 @@ export function CommandPalette() {
 			})
 			.catch((error: unknown) => {
 				if (seq !== fetchSeq.current) return;
-				setCommandsError(String(error));
+				setCommandsError(describeError(error));
 			})
 			.finally(() => {
 				if (seq === fetchSeq.current) setLoading(false);

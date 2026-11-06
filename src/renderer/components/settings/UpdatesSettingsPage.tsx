@@ -2,6 +2,7 @@ import { CheckCircle2, Download, FolderOpen, RefreshCw, RotateCcw, ServerCog } f
 import { useCallback, useEffect, useState } from "react";
 import type { UpdateStatus } from "../../../shared/ipc-types";
 import type { RpcOmpUpdateResult } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
@@ -82,7 +83,10 @@ export function UpdatesSettingsPage() {
 
 	const coreUpdateAvailable = core?.updateAvailable === true;
 	const overview = updateOverviewState(status, core, coreError, checking);
-	const errorMessage = [status.state === "error" ? status.message : undefined, coreError].filter(Boolean).join(" · ");
+	const errorMessage = [status.state === "error" ? status.message : undefined, coreError]
+		.filter(Boolean)
+		.map(describeError)
+		.join(" · ");
 
 	return (
 		<div>

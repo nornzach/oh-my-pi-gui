@@ -31,6 +31,7 @@ import type {
 	UsageReport,
 	UsageSessionStats,
 } from "../../../shared/rpc-types";
+import { describeError } from "../../lib/errors";
 import { formatClock, formatCost, formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useNowTick } from "../../lib/now-tick";
@@ -295,9 +296,9 @@ export function UsageWindow() {
 				const next = (res.data as { reports?: UsageReport[] })?.reports ?? [];
 				setReports(next);
 				publishQuotaReports(next);
-			} else setError(res.error);
+			} else setError(describeError(res.error));
 		} catch (cause) {
-			if (quotaOwnerRef.current === owner) setError(String(cause));
+			if (quotaOwnerRef.current === owner) setError(describeError(cause));
 		} finally {
 			if (quotaOwnerRef.current === owner) setLoading(false);
 		}

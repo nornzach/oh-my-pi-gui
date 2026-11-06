@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RpcSkillDetail, RpcSkillInfo, RpcSkillsResult } from "../../../shared/rpc-types";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
+import { describeError } from "../../lib/errors";
 import { shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
@@ -145,7 +146,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 					return wanted && next.some(skill => skill.name === wanted) ? wanted : (next[0]?.name ?? null);
 				});
 			} catch (cause) {
-				if (request === listRequest.current) setError(cause instanceof Error ? cause.message : String(cause));
+				if (request === listRequest.current) setError(describeError(cause));
 			} finally {
 				if (request === listRequest.current) setLoading(false);
 			}
@@ -194,7 +195,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 			})
 			.catch(cause => {
 				if (request === detailRequest.current && requestRoute === routeRef.current) {
-					setDetailError(cause instanceof Error ? cause.message : String(cause));
+					setDetailError(describeError(cause));
 				}
 			})
 			.finally(() => {
@@ -222,7 +223,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 			setSkills(current =>
 				current.map(item => (item.name === skill.name ? { ...item, enabled: skill.enabled } : item)),
 			);
-			toast({ variant: "error", message: cause instanceof Error ? cause.message : String(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 		} finally {
 			setBusyName(null);
 		}
@@ -249,7 +250,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 			toast({ variant: "success", message: t(`settings.skills.${editor.mode}Success`) });
 		} catch (cause) {
 			if (mutationRoute !== routeRef.current) return;
-			toast({ variant: "error", message: cause instanceof Error ? cause.message : String(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 		} finally {
 			setBusyName(null);
 		}
@@ -270,7 +271,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 			toast({ variant: "success", message: t("settings.skills.deleteSuccess") });
 		} catch (cause) {
 			if (mutationRoute !== routeRef.current) return;
-			toast({ variant: "error", message: cause instanceof Error ? cause.message : String(cause) });
+			toast({ variant: "error", message: describeError(cause) });
 		} finally {
 			setBusyName(null);
 		}

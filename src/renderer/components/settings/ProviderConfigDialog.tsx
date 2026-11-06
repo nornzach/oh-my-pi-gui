@@ -27,7 +27,7 @@ import type {
 } from "../../../shared/ipc-types";
 import { CUSTOM_PROVIDER_APIS } from "../../../shared/ipc-types";
 import type { DiscoveredModel } from "../../../shared/rpc-types";
-import { ipcErrorMessage } from "../../lib/format";
+import { describeError, describeProviderError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useModelStore } from "../../stores/model";
@@ -179,6 +179,11 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 			editing?.extraBody !== undefined,
 	);
 	const formRef = useRef<HTMLDivElement>(null);
+	const fetchOutcomeRef = useRef<HTMLDivElement>(null);
+	// The button can sit at the form's bottom edge, leaving what it produced below the fold.
+	useEffect(() => {
+		if (fetchError || fetched) fetchOutcomeRef.current?.scrollIntoView({ block: "nearest" });
+	}, [fetchError, fetched]);
 	const [errors, setErrors] = useState<Record<string, string>>({});
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
@@ -223,7 +228,7 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 			if (found.length === 0) setFetchError(t("providerCfg.fetch.empty"));
 			else setFetched(found.toSorted((a, b) => a.id.localeCompare(b.id)));
 		} catch (cause) {
-			setFetchError(t("providerCfg.fetch.failed", { error: ipcErrorMessage(cause) }));
+			setFetchError(t("providerCfg.fetch.failed", { error: describeProviderError(cause) }));
 		} finally {
 			setFetching(false);
 		}
@@ -387,13 +392,13 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 				toast({
 					variant: "warning",
 					title: t("providerCfg.toast.refreshFailed"),
-					message: cause instanceof Error ? cause.message : String(cause),
+					message: describeError(cause),
 				});
 			}
 			toast({ variant: "success", message: t("providerCfg.toast.saved", { id: input.id }) });
 			onSaved();
 		} catch (cause) {
-			setSubmitError(ipcErrorMessage(cause));
+			setSubmitError(describeError(cause));
 		} finally {
 			setSubmitting(false);
 		}
@@ -567,19 +572,21 @@ function ProviderForm({ editing, existing, directEdit, onBack, onSaved, onCancel
 					{!readonly && !fetched && !fetchError && !models.some(row => row.id.trim()) && (
 						<span className="mb-1.5 block text-omp-sm text-(--omp-dim)">{t("providerCfg.fetch.hint")}</span>
 					)}
-					{fetchError && (
-						<p className="mb-1.5 text-omp-sm text-(--omp-error)" role="alert">
-							{fetchError}
-						</p>
-					)}
-					{fetched && (
-						<ModelFetchPanel
-							existingIds={new Set(models.map(row => row.id.trim()))}
-							models={fetched}
-							onAdd={addFetchedModels}
-							onClose={() => setFetched(null)}
-						/>
-					)}
+					<div className="scroll-mb-4" ref={fetchOutcomeRef}>
+						{fetchError && (
+							<p className="mb-1.5 text-omp-sm text-(--omp-error)" role="alert">
+								{fetchError}
+							</p>
+						)}
+						{fetched && (
+							<ModelFetchPanel
+								existingIds={new Set(models.map(row => row.id.trim()))}
+								models={fetched}
+								onAdd={addFetchedModels}
+								onClose={() => setFetched(null)}
+							/>
+						)}
+					</div>
 					<div className="flex flex-col gap-2">
 						{models.map(row => (
 							<ModelEditor
@@ -868,7 +875,7 @@ export function ProviderConfigDialog({ open, onClose, editProvider = null }: Pro
 		try {
 			setProviders(await window.omp.models.listProviders());
 		} catch (cause) {
-			setListError(ipcErrorMessage(cause));
+			setListError(describeError(cause));
 		} finally {
 			setLoading(false);
 		}
@@ -894,7 +901,7 @@ export function ProviderConfigDialog({ open, onClose, editProvider = null }: Pro
 				toast({
 					variant: "warning",
 					title: t("providerCfg.toast.refreshFailed"),
-					message: cause instanceof Error ? cause.message : String(cause),
+					message: describeError(cause),
 				});
 			}
 			toast({ variant: "success", message: t("providerCfg.toast.deleted", { id: pendingDelete.id }) });
@@ -909,7 +916,7 @@ export function ProviderConfigDialog({ open, onClose, editProvider = null }: Pro
 			toast({
 				variant: "error",
 				title: t("providerCfg.toast.deleteFailed"),
-				message: ipcErrorMessage(cause),
+				message: describeError(cause),
 			});
 		} finally {
 			setDeleting(false);

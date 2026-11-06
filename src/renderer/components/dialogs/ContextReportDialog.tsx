@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { RpcContextReportResult } from "../../../shared/rpc-types";
 import { useAutoCompactAt } from "../../hooks/use-compaction-config";
 import { contextSegments, contextUsageView } from "../../lib/context-usage";
+import { describeError } from "../../lib/errors";
 import { formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
@@ -44,10 +45,10 @@ function ContextReportBody() {
 			.then(response => {
 				if (cancelled) return;
 				if (response.success) setReport(response.data as RpcContextReportResult);
-				else setError(response.error);
+				else setError(describeError(response.error));
 			})
 			.catch(cause => {
-				if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
+				if (!cancelled) setError(describeError(cause));
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
