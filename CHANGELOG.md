@@ -2,15 +2,21 @@
 
 ## [Unreleased]
 
+## [0.9.39] - 2026-11-09
+
 ### Added
 
 - A Plugins page in the left sidebar: browse plugins as cards with a logo and description, search or filter by category, see what a plugin adds before installing it, and install in one click. The first install from a catalog asks you to trust it once. Logos and previews load from GitHub; plugins from a personal account show a coloured letter rather than that person's photo. Eight plugin catalogs are added the first time the page opens, so there is something to browse right away. Only their addresses ship with the app: nothing is pre-installed, and a plugin downloads when you install it. You can still add your own in Settings, and a catalog you remove stays removed.
 
+### Changed
+
+- Bundled agent rebuilt from monorepo `7915e9b9`, on upstream omp 18.18.2 with its native addon from npm 18.18.2. Overlapping `bash` calls run in a copy of the session shell, the shell ships `sd`, the `sloppy` edit tool applies what matches and lists the rest, Markdown highlights Zig, and on Windows commands get their own console so progress bars and password prompts no longer garble the output.
+
 ### Fixed
 
 - The usage dashboard's background server no longer keeps running after the app crashes or is force-quit.
-- Gemini no longer rejects every request in a session with `enum[0]: cannot be empty` because of the scheduled-task tools ([#47](https://github.com/nornzach/oh-my-pi-gui/pull/47) by [@justlearnwithme314-ops](https://github.com/justlearnwithme314-ops)).
-- On Windows and Linux, the side panel's tabs and close button no longer slide under the window's minimize, maximize and close buttons when the panel is narrow.
+- Gemini no longer rejects every request in a session with `enum[0]: cannot be empty` when a tool offers an empty string as a choice ([#46](https://github.com/nornzach/oh-my-pi-gui/issues/46), [#47](https://github.com/nornzach/oh-my-pi-gui/pull/47) by [@justlearnwithme314-ops](https://github.com/justlearnwithme314-ops)).
+- On Windows and Linux, the side panel's tabs and close button no longer slide under the window's minimize, maximize and close buttons when the panel is narrow ([#44](https://github.com/nornzach/oh-my-pi-gui/issues/44)).
 
 ## [0.9.38] - 2026-11-07
 
