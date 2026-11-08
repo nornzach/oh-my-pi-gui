@@ -8,6 +8,13 @@ import { parseAnsi } from "./ansi";
 import { getCurrentLanguage, translate } from "./i18n";
 import { PREVIEW_TEXT_CHARS } from "./preview";
 
+/** Deterministic avatar hue from a name (Linear-style initial badges). */
+export function avatarHue(name: string): number {
+	let hash = 0;
+	for (let index = 0; index < name.length; index++) hash = (hash * 31 + name.charCodeAt(index)) | 0;
+	return Math.abs(hash) % 360;
+}
+
 /** Join class names, dropping falsy parts. */
 export function cx(...parts: Array<string | false | null | undefined>): string {
 	return parts.filter(Boolean).join(" ");

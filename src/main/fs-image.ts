@@ -8,7 +8,7 @@ import type { IpcFsReadImageResult } from "../shared/ipc-types";
 export const FS_IMAGE_MAX_BYTES = 25_000_000;
 const SNIFF_BYTES = 512;
 
-function sniffImageMime(header: Buffer): string | null {
+export function sniffImageMime(header: Buffer): string | null {
 	if (header.length >= 8 && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47) {
 		return "image/png";
 	}

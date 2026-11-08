@@ -30,6 +30,7 @@ import {
 	Pin,
 	PinOff,
 	Plug,
+	Puzzle,
 	RefreshCw,
 	Rows2,
 	Search,
@@ -1249,6 +1250,12 @@ export function Sidebar() {
 			shortcut: actionChords.get("memory.open")?.[0],
 			badge: pendingSkillReviews,
 			onClick: () => useUiStore.getState().openMemory(pendingSkillReviews > 0 ? "skills" : undefined),
+		},
+		{
+			id: "plugins",
+			icon: Puzzle,
+			label: t("titlebar.plugins"),
+			onClick: () => useUiStore.getState().openPlugins(),
 		},
 		{
 			id: "pull-requests",

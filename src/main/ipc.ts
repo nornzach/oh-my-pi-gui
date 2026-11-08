@@ -4,7 +4,7 @@
 import { type Dirent, existsSync, promises as fsp } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, net, shell } from "electron";
 import Store from "electron-store";
 import type {
 	ConversationSearchResponse,
@@ -30,6 +30,7 @@ import type {
 	IpcHostUriResultPayload,
 	IpcNotifyPayload,
 	IpcOpenPathResult,
+	IpcPluginInspectPayload,
 	IpcPrefsGetPayload,
 	IpcPrefsSetPayload,
 	IpcResolvedPath,
@@ -75,6 +76,7 @@ import type { LogWatcher } from "./log-watcher";
 import type { MemoryWatcher } from "./memory-watcher";
 import { createMenu } from "./menu";
 import { deleteModelsProvider, listModelsProviders, modelsPath, upsertModelsProvider } from "./models-config";
+import { PluginCatalog } from "./plugin-catalog";
 import { runtimeLogPath, writeRuntimeLog } from "./runtime-log";
 import type { SchedulerHost } from "./scheduler/host";
 import type { SessionIndex } from "./session-index";
@@ -1288,6 +1290,15 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			return fail(err instanceof Error ? err.message : String(err));
 		}
 	});
+
+	const pluginCatalog = new PluginCatalog({
+		fetch: (url, init) => net.fetch(url, init),
+		logoCacheDir: path.join(app.getPath("userData"), "plugin-logos"),
+	});
+	ipcMain.handle(IPC_COMMANDS.PLUGIN_LOGO, (_event, owner: unknown) => pluginCatalog.logo(owner));
+	ipcMain.handle(IPC_COMMANDS.PLUGIN_INSPECT, (_event, payload: IpcPluginInspectPayload) =>
+		pluginCatalog.inspect(payload),
+	);
 
 	// Plan-mode document read — deliberately OFF the RPC bus: reading via the
 	// bash RPC injected the plan into the model context and appended

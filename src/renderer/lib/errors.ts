@@ -137,6 +137,14 @@ function withPath(text: string, key: string): string {
 	return path ? translate(`${key}Path`, { path }) : translate(key);
 }
 
+function downloadFailure(url: string | undefined): string {
+	try {
+		return translate("errors.download.failedHost", { host: new URL(url ?? "").host });
+	} catch {
+		return translate("errors.download.failed");
+	}
+}
+
 /** In order: a certificate failure also reads as a failed connection, a missing command also as a missing file. */
 const RULES: ReadonlyArray<readonly [RegExp, (text: string, match: RegExpExecArray) => string]> = [
 	[/UnsupportedProxyProtocol/, () => translate("proxy.unsupportedError")],
@@ -159,12 +167,18 @@ const RULES: ReadonlyArray<readonly [RegExp, (text: string, match: RegExpExecArr
 	[/\bproxy\b.*\b407\b|\b407\b.*\bproxy\b/i, () => translate("errors.http.proxyAuth", { status: "407" })],
 	[/^fetch\(\) URL is invalid|^Invalid URL\b|ERR_INVALID_URL/, () => translate("errors.badUrl")],
 	[
-		/\b(?:CERT_[A-Z_]+|ERR_CERT_\w+|ERR_SSL_\w+|ERR_TLS\w*|SELF_SIGNED\w*|DEPTH_ZERO_SELF_SIGNED_CERT|UNABLE_TO_(?:VERIFY|GET_ISSUER)\w*)\b|certificate verif|self[- ]signed certificate|unable to verify the first certificate|certificate has expired/i,
+		/\b(?:CERT_[A-Z_]+|ERR_CERT_\w+|ERR_SSL_\w+|ERR_TLS\w*|SELF_SIGNED\w*|DEPTH_ZERO_SELF_SIGNED_CERT|UNABLE_TO_(?:VERIFY|GET_ISSUER)\w*)\b|certificate verif|self[- ]signed certificate|unable to verify the first certificate|certificate has expired|SSL certificate problem/i,
 		() => translate("errors.net.tls"),
 	],
 	[
 		/net::ERR_(?:PROXY|TUNNEL)\w*|\bProxyConnect\w*|^proxy\b[^.]*\b(?:refused|failed|unreachable)\b/i,
 		() => translate("errors.net.proxy"),
+	],
+	// Git's report of a failed download, with a temporary folder and curl's wording in it.
+	[/\bfatal: unable to access '([^']*)'/, (_text, match) => downloadFailure(match[1])],
+	[
+		/\bfatal: repository '[^']*' not found|\bRepository not found\b|\bfatal: Could not read from remote repository\b|\bfatal: could not read Username for\b|\bfatal: Authentication failed for\b/,
+		() => translate("errors.download.notFound"),
 	],
 	[
 		/^No internet connection\b|\bENETUNREACH\b|\bEHOSTUNREACH\b|\bEAI_AGAIN\b|ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED/,

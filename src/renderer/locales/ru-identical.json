@@ -8,7 +8,7 @@
   "cmd.plugins",
   "cmd.agents",
   "cmd.hub",
-	"modelRoles.kind.chat",
+  "modelRoles.kind.chat",
   "providers.badge.oauth",
   "providers.badge.apikey",
   "providers.badge.env",
@@ -60,5 +60,11 @@
   "memory.tab.skills",
   "cmd.git",
   "tools.learn.skill",
-  "themePicker.theme.rosePine.label"
+  "themePicker.theme.rosePine.label",
+  "titlebar.plugins",
+  "plugins.title",
+  "plugins.readme",
+  "plugins.effects.skills",
+  "plugins.effects.hooks",
+  "plugins.category.api"
 ]

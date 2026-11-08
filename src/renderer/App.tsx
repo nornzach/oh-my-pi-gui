@@ -126,6 +126,7 @@ const MemoryWindow = lazy(() => import("./components/memory/MemoryWindow").then(
 const PrCenterWindow = lazy(() =>
 	import("./components/panels/PrCenterWindow").then(m => ({ default: m.PrCenterWindow })),
 );
+const PluginsWindow = lazy(() => import("./components/panels/PluginsWindow").then(m => ({ default: m.PluginsWindow })));
 const TasksWindow = lazy(() => import("./components/tasks/TasksWindow").then(m => ({ default: m.TasksWindow })));
 const TaskEditorDialog = lazy(() =>
 	import("./components/tasks/TaskEditorDialog").then(m => ({ default: m.TaskEditorDialog })),
@@ -902,6 +903,7 @@ export function App() {
 				<ModesPanel open={modesOpen} onClose={closeModes} initialTab={modesTab} />
 				<AgentHubWindow open={agentHubOpen} onClose={closeAgentHub} initialTab={agentHubTab} />
 				<PrCenterWindow />
+				<PluginsWindow />
 				<TasksWindow />
 				<TaskEditorDialog />
 				<MemoryWindow />

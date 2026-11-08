@@ -50,6 +50,7 @@ const ctx: CommandRegistryContext = {
 	openAgentHub: () => {},
 	openMemory: () => {},
 	openPrCenter: () => {},
+	openPlugins: () => {},
 	openHotkeys: () => {},
 	openImportDialog: () => {},
 	openProviderConfig: () => {},
@@ -160,6 +161,7 @@ describe("nativized action wiring", () => {
 	const ok = (data?: unknown) => ({ type: "response" as const, command: "x", success: true as const, data });
 	let rpc: Record<string, Mock>;
 	let openSettings: Mock;
+	let openPlugins: Mock;
 	let openExtensions: Mock;
 	let openInventory: Mock;
 	let hydrateSession: Mock;
@@ -188,12 +190,14 @@ describe("nativized action wiring", () => {
 		};
 		(globalThis as Record<string, unknown>).window = { omp: { rpc } };
 		openSettings = vi.fn();
+		openPlugins = vi.fn();
 		openExtensions = vi.fn();
 		openInventory = vi.fn();
 		hydrateSession = vi.fn(async () => {});
 		wiredCtx = {
 			...ctx,
 			openSettings,
+			openPlugins,
 			openExtensions,
 			openInventory,
 			hydrateSession,
@@ -289,7 +293,7 @@ describe("nativized action wiring", () => {
 		if (install.kind !== "window") throw new Error("expected window");
 		install.open();
 		expect(rpc.marketplaceAction).not.toHaveBeenCalledWith(expect.objectContaining({ action: "install" }));
-		expect(openSettings).toHaveBeenCalledWith("resources:marketplaces");
+		expect(openPlugins).toHaveBeenCalled();
 	});
 
 	it("plugins enable without an id opens the installed-plugins Settings route", async () => {

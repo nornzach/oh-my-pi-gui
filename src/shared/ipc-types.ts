@@ -7,6 +7,7 @@ import type { KeyEventLike } from "./chord";
 import type { Language } from "./languages";
 import type { LaunchProfile } from "./launch-profile";
 import type { SessionModelOverride } from "./model-restore";
+import type { PluginEffects } from "./plugin-effects";
 import type { DroppedProxy } from "./proxy";
 import type {
 	AgentSessionEvent,
@@ -31,6 +32,7 @@ import type {
 	RpcDebugParams,
 	RpcDictationFrame,
 	RpcLiveFrame,
+	RpcMarketplacePluginComponents,
 	RpcMcpServerInput,
 	RpcMemoryEdit,
 	RpcResponse,
@@ -263,6 +265,10 @@ export const IPC_COMMANDS = {
 	FS_READ_PLAN: "fs:read-plan",
 	/** Read an image file as a data URL for markdown <img> rendering (sniffed mime, size cap) */
 	FS_READ_IMAGE: "fs:read-image",
+	/** A plugin's logo (its GitHub owner's avatar) as a data URL */
+	PLUGIN_LOGO: "plugin-catalog:logo",
+	/** Preview what installing a plugin would add, from its GitHub repository */
+	PLUGIN_INSPECT: "plugin-catalog:inspect",
 	/** Open a session (or a fresh window) in a new parallel window with its own sidecar */
 	SESSION_OPEN_NEW_WINDOW: "session:open-new-window",
 	/** Fresh window pulls the session it was opened for (one-shot) */
@@ -847,6 +853,27 @@ export interface IpcFsReadImageResult {
 	tooLarge?: boolean;
 	error?: string;
 }
+
+export interface IpcPluginInspectPayload {
+	owner: string;
+	repo: string;
+	ref?: string;
+	/** Plugin folder inside the repository; empty or absent for the repository root. */
+	path?: string;
+	/** What the catalog entry declares itself; wins over the plugin's own manifest. */
+	components?: RpcMarketplacePluginComponents;
+}
+
+export type IpcPluginInspection =
+	| {
+			status: "ok";
+			effects: PluginEffects;
+			/** Start of the plugin's README, as Markdown. */
+			readme?: string;
+			/** Part of the plugin couldn't be read, so this may not be everything it adds. */
+			partial: boolean;
+	  }
+	| { status: "rate-limited" | "not-found" | "unavailable" };
 
 export interface IpcFsReadPlanResult {
 	ok: boolean;
@@ -1670,6 +1697,10 @@ export interface OmpApi {
 		read(path: string, maxBytes?: number, tabId?: string): Promise<IpcFsReadResult>;
 		readPlan(payload: IpcFsReadPlanPayload): Promise<IpcFsReadPlanResult>;
 		readImage(path: string, tabId?: string): Promise<IpcFsReadImageResult>;
+	};
+	pluginCatalog: {
+		logo(owner: string): Promise<string | null>;
+		inspect(payload: IpcPluginInspectPayload): Promise<IpcPluginInspection>;
 	};
 	editor: {
 		openExternal(content: string): Promise<{

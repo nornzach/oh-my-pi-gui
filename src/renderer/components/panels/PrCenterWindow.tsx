@@ -9,20 +9,13 @@
 import { GitPullRequest, GitPullRequestDraft, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcPrListItem } from "../../../shared/rpc-types";
-import { cx, formatTimeAgo } from "../../lib/format";
+import { avatarHue, cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { usePrCenterStore } from "../../stores/pr-center";
 import { useUiStore } from "../../stores/ui";
 import { Button, Modal, Spinner, Tabs } from "../common";
 import { PrCreateDialog } from "./pr/PrCreateDialog";
 import { PrDetailPane } from "./pr/PrDetailPane";
-
-/** Deterministic avatar hue from the login (Linear-style initial badges). */
-function avatarHue(login: string): number {
-	let hash = 0;
-	for (let index = 0; index < login.length; index++) hash = (hash * 31 + login.charCodeAt(index)) | 0;
-	return Math.abs(hash) % 360;
-}
 
 function checksBadge(item: RpcPrListItem): { glyph: string; className: string } {
 	const { success, failure, pending } = item.checks;

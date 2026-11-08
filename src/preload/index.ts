@@ -27,6 +27,8 @@ import type {
 	IpcFsReadResult,
 	IpcMemoryChange,
 	IpcOpenPathResult,
+	IpcPluginInspection,
+	IpcPluginInspectPayload,
 	IpcResolvedPath,
 	IpcSaveCustomThemeResult,
 	IpcSessionOpenNewWindowPayload,
@@ -458,6 +460,12 @@ const api: OmpApi = {
 			ipcRenderer.invoke(IPC_COMMANDS.FS_READ_PLAN, payload) as Promise<IpcFsReadPlanResult>,
 		readImage: (path: string, tabId?: string) =>
 			ipcRenderer.invoke(IPC_COMMANDS.FS_READ_IMAGE, { path, tabId }) as Promise<IpcFsReadImageResult>,
+	},
+
+	pluginCatalog: {
+		logo: (owner: string) => ipcRenderer.invoke(IPC_COMMANDS.PLUGIN_LOGO, owner) as Promise<string | null>,
+		inspect: (payload: IpcPluginInspectPayload) =>
+			ipcRenderer.invoke(IPC_COMMANDS.PLUGIN_INSPECT, payload) as Promise<IpcPluginInspection>,
 	},
 
 	editor: {

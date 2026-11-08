@@ -50,6 +50,7 @@ const baseCtx: CommandRegistryContext = {
 	openAgentHub: () => {},
 	openMemory: () => {},
 	openPrCenter: () => {},
+	openPlugins: () => {},
 	openHotkeys: () => {},
 	openImportDialog: () => {},
 	openProviderConfig: () => {},

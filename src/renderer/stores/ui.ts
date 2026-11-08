@@ -109,6 +109,8 @@ interface UiStore {
 	armedCloseTab: { tabId: string } | null;
 	/** PR Center fullscreen panel (plan/21). */
 	prCenterOpen: boolean;
+	/** Plugins page: browse catalogs and install plugins. */
+	pluginsOpen: boolean;
 	/** Search over what was said in sessions (⇧⌘F). */
 	conversationSearchOpen: boolean;
 	/** Edit → Find (⌘F) and Find Next/Previous (⌘G/⇧⌘G) for the focused tab's transcript. */
@@ -253,6 +255,8 @@ interface UiStore {
 	cancelCloseTab: () => void;
 	openPrCenter: () => void;
 	closePrCenter: () => void;
+	openPlugins: () => void;
+	closePlugins: () => void;
 	openConversationSearch: () => void;
 	closeConversationSearch: () => void;
 	requestTranscriptFind: (command: FindCommand) => void;
@@ -490,6 +494,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	prCenterOpen: false,
 	openPrCenter: () => set({ prCenterOpen: true }),
 	closePrCenter: () => set({ prCenterOpen: false }),
+	pluginsOpen: false,
+	openPlugins: () => set({ pluginsOpen: true }),
+	closePlugins: () => set({ pluginsOpen: false }),
 	conversationSearchOpen: false,
 	openConversationSearch: () => set({ conversationSearchOpen: true }),
 	closeConversationSearch: () => set({ conversationSearchOpen: false }),
@@ -547,6 +554,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 			worktreeClosePrompt: null,
 			armedCloseTab: null,
 			prCenterOpen: false,
+			pluginsOpen: false,
 			conversationSearchOpen: false,
 			filePreviewPath: null,
 			filePreviewLine: null,

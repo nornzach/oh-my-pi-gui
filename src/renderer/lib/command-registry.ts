@@ -141,6 +141,7 @@ export interface CommandRegistryContext {
 	openAgentHub: (tab?: "definitions" | "hub") => void;
 	openMemory: (tab?: MemoryTabId) => void;
 	openPrCenter: () => void;
+	openPlugins: () => void;
 	openHotkeys: () => void;
 	openImportDialog: () => void;
 	openProviderConfig: () => void;
@@ -414,7 +415,7 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 
 	/**
 	 * /marketplace mutations via marketplace_action. Install intentionally opens
-	 * Inventory so the trust confirmation is the only executable-code entry.
+	 * the Plugins page so its trust confirmation is the executable-code entry.
 	 */
 	const runMarketplaceAction = async (
 		verb: "add" | "remove" | "update" | "uninstall" | "upgrade",
@@ -1205,8 +1206,8 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 				subAction("marketplace add", args => runMarketplaceAction("add", args)),
 				subAction("marketplace remove", args => runMarketplaceAction("remove", args)),
 				subAction("marketplace update", args => runMarketplaceAction("update", args)),
-				subWindow("marketplace discover", () => ctx.openSettings("resources:marketplaces")),
-				subWindow("marketplace install", () => ctx.openSettings("resources:marketplaces")),
+				subWindow("marketplace discover", () => ctx.openPlugins()),
+				subWindow("marketplace install", () => ctx.openPlugins()),
 				subAction("marketplace uninstall", args => runMarketplaceAction("uninstall", args)),
 				{
 					name: "marketplace installed",
@@ -1228,6 +1229,13 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		affordance: {
 			kind: "submenu",
 			items: [
+				{
+					name: "plugins browse",
+					label: t("cmd.plugins.browse"),
+					description: t("cmd.plugins.browse.desc"),
+					category: "extensions",
+					affordance: { kind: "window", open: () => ctx.openPlugins() },
+				},
 				{
 					name: "plugins panel",
 					label: t("cmd.plugins.panel"),
@@ -2041,6 +2049,7 @@ export function buildCurrentCommandMenu(availableCommands: AvailableCommand[]): 
 		openAgentHub: ui.openAgentHub,
 		openMemory: ui.openMemory,
 		openPrCenter: ui.openPrCenter,
+		openPlugins: ui.openPlugins,
 		openHotkeys: ui.openHotkeys,
 		openImportDialog: ui.openImportDialog,
 		openProviderConfig: ui.openProviderConfig,

@@ -16,7 +16,30 @@ const NOT_FOUND = "The server couldn't find this (404).";
 const FOUND_NO_HOST = "Couldn't find no-such-host.invalid. Check the address, your network, or your proxy.";
 const INTERNAL = en["errors.internal"];
 
+const CLONE_INTO = "Cloned repository https://github.com/acme/plug.git: Cloning into '/var/tmp/.tmp-clone-1794-8qw'...";
+
 const CASES: Array<[string, string]> = [
+	// Git failing to download a catalog or plugin: no temporary folder, no curl wording.
+	[
+		`${CLONE_INTO}\nfatal: unable to access 'https://github.com/acme/plug.git/': Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server (source: acme/plug)`,
+		"Couldn't download from github.com. Check your network or proxy, then try again.",
+	],
+	[
+		"fatal: unable to access 'https://no-such-host.invalid/a/b.git/': Could not resolve host: no-such-host.invalid",
+		"Couldn't download from no-such-host.invalid. Check your network or proxy, then try again.",
+	],
+	[
+		`${CLONE_INTO}\nremote: Repository not found.\nfatal: repository 'https://github.com/acme/plug.git/' not found (source: acme/plug)`,
+		"Couldn't find that repository, or you don't have access to it. It may have moved or been made private.",
+	],
+	[
+		"Cloning into 'c'...\nERROR: Repository not found.\nfatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.",
+		"Couldn't find that repository, or you don't have access to it. It may have moved or been made private.",
+	],
+	[
+		"fatal: unable to access 'https://github.com/a/b.git/': SSL certificate problem: unable to get local issuer certificate",
+		en["errors.net.tls"],
+	],
 	// HTTP failures keep what the server said, but no markup, status phrase, URL or diagnostic tag.
 	[
 		"401 Incorrect API key provided: sk-fake*** (type=invalid_request_error param=invalid_api_key)",
