@@ -35,6 +35,7 @@ import {
 import { runScheduleTool, SCHEDULE_TASK_TOOL, SCHEDULE_TASK_TOOL_DEFINITION } from "./schedule-tool";
 import { Scheduler, type SchedulerNotice } from "./scheduler";
 import { SchedulerStore } from "./store";
+import { stripEmptyEnumValues } from "./tool-schema";
 
 const SNAPSHOT_DEBOUNCE_MS = 100;
 /** scheduler.db meta key of the notification list. */
@@ -142,7 +143,10 @@ export class SchedulerHost {
 	tabReady(tab: { tabId: string; kind: "agent" | "chat"; sidecar: TabSidecar }): void {
 		if (tab.kind !== "agent") return;
 		tab.sidecar.rpcClient
-			?.command({ type: "set_host_tools", tools: [SCHEDULE_TASK_TOOL_DEFINITION, MANAGE_TASKS_TOOL_DEFINITION] })
+			?.command({
+				type: "set_host_tools",
+				tools: [SCHEDULE_TASK_TOOL_DEFINITION, MANAGE_TASKS_TOOL_DEFINITION].map(stripEmptyEnumValues),
+			})
 			.catch(error => this.#deps.log("set_host_tools failed", { tabId: tab.tabId, error: String(error) }));
 	}
 
