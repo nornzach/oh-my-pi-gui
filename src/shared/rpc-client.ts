@@ -212,7 +212,8 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		setAutoCompaction: (enabled: boolean) => rpcCommand({ type: "set_auto_compaction", enabled }),
 		setAutoRetry: (enabled: boolean) => rpcCommand({ type: "set_auto_retry", enabled }),
 		abortRetry: () => rpcCommand({ type: "abort_retry" }),
-		bash: (command: string, excluded?: boolean) => rpcCommand({ type: "bash", command, excluded }),
+		bash: (command: string, excluded?: boolean) =>
+			rpcCommand({ type: "bash", command, excludeFromContext: excluded }),
 		abortBash: () => rpcCommand({ type: "abort_bash" }),
 		getSessionStats: () => rpcCommand({ type: "get_session_stats" }),
 		setSessionPinned: (sessionId: string, pinned: boolean) =>

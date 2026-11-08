@@ -285,7 +285,7 @@ async function bash(sidecar: RunSidecar, script: string, timeoutMs: number): Pro
 	try {
 		const data = await command<{ output?: string; exitCode?: number; timedOut?: boolean; cancelled?: boolean }>(
 			sidecar,
-			{ type: "bash", command: script, excluded: true },
+			{ type: "bash", command: script, excludeFromContext: true },
 			timeoutMs,
 		);
 		return { output: data.output ?? "", exitCode: data.exitCode, timedOut: data.timedOut === true };

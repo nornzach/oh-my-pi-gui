@@ -57,7 +57,7 @@ export type RpcCommand =
 	| { id?: string; type: "set_auto_compaction"; enabled: boolean }
 	| { id?: string; type: "set_auto_retry"; enabled: boolean }
 	| { id?: string; type: "abort_retry" }
-	| { id?: string; type: "bash"; command: string; excluded?: boolean }
+	| { id?: string; type: "bash"; command: string; excludeFromContext?: boolean }
 	| { id?: string; type: "abort_bash" }
 	| { id?: string; type: "eval"; language?: "python" | "js" | "ruby" | "julia"; code: string; excluded?: boolean }
 	| { id?: string; type: "abort_eval" }
