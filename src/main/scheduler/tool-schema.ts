@@ -13,7 +13,8 @@ export function stripEmptyEnumValues(definition: HostToolDefinition): HostToolDe
 
 type Schema = Record<string, unknown>;
 
-const isSchema = (value: unknown): value is Schema => typeof value === "object" && value !== null && !Array.isArray(value);
+const isSchema = (value: unknown): value is Schema =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
 
 function sanitize(node: unknown): unknown {
 	if (Array.isArray(node)) return node.map(sanitize);

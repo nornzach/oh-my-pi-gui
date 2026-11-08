@@ -9,6 +9,7 @@
 ### Fixed
 
 - The usage dashboard's background server no longer keeps running after the app crashes or is force-quit.
+- Gemini no longer rejects every request in a session with `enum[0]: cannot be empty` because of the scheduled-task tools ([#47](https://github.com/nornzach/oh-my-pi-gui/pull/47) by [@justlearnwithme314-ops](https://github.com/justlearnwithme314-ops)).
 - On Windows and Linux, the side panel's tabs and close button no longer slide under the window's minimize, maximize and close buttons when the panel is narrow.
 
 ## [0.9.38] - 2026-11-07
