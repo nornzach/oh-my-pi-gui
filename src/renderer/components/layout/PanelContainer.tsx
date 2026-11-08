@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { scrollStripOnWheel, useActiveChipInView } from "../../lib/strip-scroll";
 import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { CHAT_PANEL_TABS, type PanelTab, useUiStore } from "../../stores/ui";
 import { AgentRoster, useAgentsTabSignal } from "../agents/AgentRoster";
@@ -40,6 +41,44 @@ const TABS: { id: PanelTab; labelKey: string; icon: typeof Diff }[] = [
 	{ id: "terminal", labelKey: "panel.tabs.terminal", icon: SquareTerminal },
 	{ id: "browser", labelKey: "panel.tabs.browser", icon: Globe },
 ];
+
+interface InspectorTabProps {
+	label: string;
+	/** What a screen reader announces: the label, plus any news the tab carries. */
+	description: string;
+	icon: typeof Diff;
+	active: boolean;
+	signal: "error" | "working" | null;
+	onSelect: () => void;
+}
+
+/** One view in the header's switcher; beside window buttons the row can run out of room, so the selected tab scrolls into view. */
+function InspectorTab({ label, description, icon: Icon, active, signal, onSelect }: InspectorTabProps) {
+	const ref = useActiveChipInView<HTMLButtonElement>(active);
+	return (
+		<button
+			ref={ref}
+			aria-label={description}
+			title={label}
+			aria-pressed={active}
+			type="button"
+			onClick={onSelect}
+			className="relative flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 text-omp-md font-medium"
+		>
+			<Icon size={14} />
+			<span className="omp-inspector-tab-label">{label}</span>
+			{signal && (
+				<span
+					aria-hidden
+					className={cx(
+						"absolute top-1 right-1 h-1.5 w-1.5 rounded-full",
+						signal === "error" ? "bg-[var(--omp-error)]" : "bg-[var(--omp-accent)]",
+					)}
+				/>
+			)}
+		</button>
+	);
+}
 
 /**
  * Review drawer: an overview of the session, what the agent changed and the
@@ -158,17 +197,18 @@ export function PanelContainer() {
 		>
 			{/* One header row: the view switcher and the close control. The panel's
 			    name is announced, not printed — the tabs already say what it holds. */}
-			<div className="omp-inspector-header drag-region flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-[var(--omp-border-muted)] pl-3">
+			<div className="omp-inspector-header drag-region flex h-12 shrink-0 items-center gap-2 border-b border-[var(--omp-border-muted)] pl-3">
 				<h2 className="sr-only">
 					{t("panel.title")} — {t("panel.subtitle")}
 				</h2>
-				<div className="omp-segmented no-drag">
-					{visibleTabs.map(({ id, labelKey, icon: Icon }) => {
+				<div className="omp-segmented omp-tab-scroller no-drag" onWheel={scrollStripOnWheel}>
+					{visibleTabs.map(({ id, labelKey, icon }) => {
 						const active = visiblePanelTab === id;
 						return (
-							<button
+							<InspectorTab
 								key={id}
-								aria-label={
+								label={t(labelKey)}
+								description={
 									id === "agents" && agentsSignal.tone
 										? t("agents.tab.label", {
 												label: t(labelKey),
@@ -179,24 +219,11 @@ export function PanelContainer() {
 											})
 										: t(labelKey)
 								}
-								title={t(labelKey)}
-								aria-pressed={active}
-								type="button"
-								onClick={() => setPanelTab(id)}
-								className="relative flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 text-omp-md font-medium"
-							>
-								<Icon size={14} />
-								<span className="omp-inspector-tab-label">{t(labelKey)}</span>
-								{id === "agents" && !active && agentsSignal.tone && (
-									<span
-										aria-hidden
-										className={cx(
-											"absolute top-1 right-1 h-1.5 w-1.5 rounded-full",
-											agentsSignal.tone === "error" ? "bg-[var(--omp-error)]" : "bg-[var(--omp-accent)]",
-										)}
-									/>
-								)}
-							</button>
+								icon={icon}
+								active={active}
+								signal={id === "agents" && !active ? agentsSignal.tone : null}
+								onSelect={() => setPanelTab(id)}
+							/>
 						);
 					})}
 				</div>

@@ -9,6 +9,7 @@
 ### Fixed
 
 - The usage dashboard's background server no longer keeps running after the app crashes or is force-quit.
+- On Windows and Linux, the side panel's tabs and close button no longer slide under the window's minimize, maximize and close buttons when the panel is narrow.
 
 ## [0.9.38] - 2026-11-07
 

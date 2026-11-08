@@ -779,6 +779,43 @@ kbd,
 	}
 }
 
+/* Windows and Linux: the window buttons take most of a narrow header. The tabs
+   scroll inside their own track, because the header's padding can't hold back
+   anything scrolled within the header itself. */
+:root:is([data-platform="win32"], [data-platform="linux"]):not([data-fullscreen])
+	.omp-inspector-header
+	> .omp-segmented {
+	flex-shrink: 1;
+	min-width: 0;
+	overflow-x: auto;
+}
+
+/* Before that track has to scroll, the tabs give up their label and padding,
+   so every one of them still fits at the panel's narrowest. */
+@container omp-inspector (max-width: 520px) {
+	:root:is([data-platform="win32"], [data-platform="linux"]):not([data-fullscreen])
+		.omp-inspector-header
+		> .omp-segmented {
+		gap: 0;
+	}
+
+	:root:is([data-platform="win32"], [data-platform="linux"]):not([data-fullscreen])
+		.omp-inspector-header
+		> .omp-segmented
+		> button {
+		flex: 0 1 34px;
+		min-width: 22px;
+		padding-inline: 0;
+	}
+
+	:root:is([data-platform="win32"], [data-platform="linux"]):not([data-fullscreen])
+		.omp-inspector-header
+		[aria-pressed="true"]
+		> .omp-inspector-tab-label {
+		display: none;
+	}
+}
+
 @media (max-width: 1000px) {
 	.omp-inspector {
 		position: absolute;

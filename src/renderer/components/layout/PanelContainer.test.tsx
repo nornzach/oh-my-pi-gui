@@ -144,6 +144,29 @@ describe("PanelContainer chat tab filter", () => {
 		}
 	});
 
+	it("brings a tab opened from elsewhere into view in a strip too narrow to show them all", async () => {
+		seedActiveTab("agent");
+		useUiStore.setState({ panelTab: "overview", panelVisible: true });
+		const scrolledTo: string[] = [];
+		const proto = HTMLElement.prototype as unknown as { scrollIntoView?: (this: HTMLElement) => void };
+		const original = proto.scrollIntoView;
+		proto.scrollIntoView = function () {
+			scrolledTo.push(this.getAttribute("title") ?? "");
+		};
+		try {
+			await mount(<PanelContainer />);
+			scrolledTo.length = 0;
+			await act(async () => {
+				useUiStore.getState().setPanelTab("browser");
+			});
+			await flush();
+			expect(scrolledTo).toEqual(["Browser"]);
+		} finally {
+			if (original) proto.scrollIntoView = original;
+			else delete proto.scrollIntoView;
+		}
+	});
+
 	it("uses the available window width instead of a fixed narrow drawer", async () => {
 		Object.defineProperty(window, "innerWidth", { configurable: true, value: 2400 });
 		seedActiveTab("agent");
