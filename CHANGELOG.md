@@ -6,6 +6,10 @@
 
 - A Plugins page in the left sidebar: browse plugins as cards with a logo and description, search or filter by category, see what a plugin adds before installing it, and install in one click. The first install from a catalog asks you to trust it once. Logos and previews load from GitHub; plugins from a personal account show a coloured letter rather than that person's photo. Eight plugin catalogs are added the first time the page opens, so there is something to browse right away. Only their addresses ship with the app: nothing is pre-installed, and a plugin downloads when you install it. You can still add your own in Settings, and a catalog you remove stays removed.
 
+### Fixed
+
+- The usage dashboard's background server no longer keeps running after the app crashes or is force-quit.
+
 ## [0.9.38] - 2026-11-07
 
 ### Added

@@ -34,6 +34,29 @@ await Bun.sleep(5000);
 	}
 });
 
+test("the server is told this process owns it, which is how it exits after a force-kill", async () => {
+	const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-stats-owner-"));
+	const binary = path.join(directory, "stats-owner.ts");
+	// The sidecar reads this variable, so the name and value are a contract with it.
+	await fs.writeFile(
+		binary,
+		`#!/usr/bin/env bun
+const named = Number(process.env.PI_STATS_OWNER_PID) === process.ppid;
+process.stdout.write("Dashboard available at: http://127.0.0.1:" + (named ? 55124 : 55125) + "\\n");
+await Bun.sleep(5000);
+`,
+	);
+	await fs.chmod(binary, 0o755);
+	const server = new StatsServerManager(binary);
+	try {
+		server.start();
+		await expect.poll(() => server.port, { timeout: 5000 }).toBe(55124);
+	} finally {
+		server.kill();
+		await fs.rm(directory, { recursive: true, force: true });
+	}
+});
+
 test("stats does not contact an unrelated default server before its own listener is ready", async () => {
 	const fetch = vi.spyOn(globalThis, "fetch");
 	const client = new StatsClient();

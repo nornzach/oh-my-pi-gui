@@ -12,6 +12,17 @@ import type {
 
 // A local protocol peer. No provider credentials, external network, or user session files.
 if (process.argv.includes("stats")) {
+	// Like the real server: a test that force-kills or times out the app must not leave this behind.
+	const owner = Number(process.env.PI_STATS_OWNER_PID);
+	if (owner > 0) {
+		setInterval(() => {
+			try {
+				process.kill(owner, 0);
+			} catch {
+				process.exit(0);
+			}
+		}, 250);
+	}
 	const binary = process.env.OMP_GUI_TEST_STATS_BINARY;
 	if (binary) {
 		const child = Bun.spawn([binary, ...process.argv.slice(2)], {
@@ -20,6 +31,7 @@ if (process.argv.includes("stats")) {
 			env: process.env,
 		});
 		process.on("SIGTERM", () => child.kill());
+		process.on("exit", () => child.kill());
 		await child.exited;
 	} else {
 		// The routes that contract a bare JSON array must actually receive one, so the

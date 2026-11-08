@@ -2,8 +2,8 @@
  * The GUI's built-in stats dashboard server, spawned from the SAME bundled
  * omp binary as the agent sidecar (`omp stats --no-open`).
  *
- * Internal to the GUI's closed loop: spawned on app start, killed on quit,
- * localhost-only. No external `omp stats` process is required and none is
+ * Internal to the GUI's closed loop: spawned on app start, killed on quit (and
+ * exits by itself if the app dies without quitting), localhost-only. No external `omp stats` process is required and none is
  * consulted — if an external process already owns the port, this reports the
  * conflict rather than silently using it.
  */
@@ -61,7 +61,13 @@ export class StatsServerManager extends EventEmitter {
 		try {
 			child = spawn(this.#binaryPath, args, {
 				stdio: ["ignore", "pipe", "pipe"],
-				env: dropUnsupportedProxies({ ...process.env, PI_NOTIFICATIONS: "off" }),
+				env: dropUnsupportedProxies({
+					...process.env,
+					PI_NOTIFICATIONS: "off",
+					// kill() can't run if this process is force-killed or crashes, so the
+					// server watches this pid and exits with it.
+					PI_STATS_OWNER_PID: String(process.pid),
+				}),
 			});
 		} catch (err) {
 			// spawn() throws synchronously (e.g. EBADF/ENOENT) — treat like a
