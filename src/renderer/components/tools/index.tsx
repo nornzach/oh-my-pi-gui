@@ -4,6 +4,7 @@ import { decodeXdevPayload, xdevDispatch, xdevInnerResult, xdevWriteTarget } fro
 import { AskRenderer } from "./AskRenderer";
 import { AstEditRenderer } from "./AstEditRenderer";
 import { AstGrepRenderer } from "./AstGrepRenderer";
+import { askFormSummary } from "./ask-form";
 import { BashRenderer } from "./BashRenderer";
 import { BrowserRenderer } from "./BrowserRenderer";
 import { ComputerRenderer } from "./ComputerRenderer";
@@ -227,7 +228,7 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>) => string> = {
 	github: args => argLine(args, ["action", "repo", "url"]),
 	hub: args => argLine(args, ["op", "agent"]),
 	wait: () => "background activity",
-	ask: args => argLine(args, ["question", "i"]),
+	ask: args => argLine(args, ["question", "i"]) || sanitizeToolText(askFormSummary(args.html)),
 	goal: args => argLine(args, ["objective", "op"]),
 	checkpoint: args => argLine(args, ["goal"]),
 	rewind: args => argLine(args, ["report"]),

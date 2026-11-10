@@ -151,6 +151,8 @@ describe("SidecarManager", () => {
 				"terminal_configure",
 			]);
 			expect(commands[1]?.events).toContain("message_update");
+			// Without `form`, the agent's questions fall back to one dialog per field.
+			expect(commands[2]).toMatchObject({ enabled: true, form: true });
 			// Full snapshots per token stall the main process (gui#19).
 			expect(commands[1]?.messageUpdates).toBe("delta");
 		} finally {

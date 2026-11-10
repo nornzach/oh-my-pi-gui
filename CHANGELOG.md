@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- When the agent asks several questions, they appear together in one form again instead of one dialog per question.
+- Questions the agent asks now show in the chat with their options and your answers, instead of a generic "Question" and raw JSON; password answers are masked.
 - Signing in to DeepSeek, Exa and other API-key providers no longer sticks at "Waiting for your browser…": the sign-in dialog now has a masked field to paste the key ([#48](https://github.com/nornzach/oh-my-pi-gui/issues/48)).
 
 ## [0.9.39] - 2026-11-09

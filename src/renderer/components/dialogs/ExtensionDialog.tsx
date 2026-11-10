@@ -13,18 +13,18 @@
 
 import { json } from "@codemirror/lang-json";
 import { EditorView } from "@codemirror/view";
-import { Check, ExternalLink, Eye, EyeOff } from "lucide-react";
+import { ExternalLink, Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isApprovalRequest } from "../../../shared/approval-prompt";
 import type { ExtensionAskDialogResult, ExtensionUIRequest } from "../../../shared/rpc-types";
 import { AnsiText } from "../../lib/ansi";
-import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
 import { removeExtensionRequest, useAllPendingRequests, useExtensionUiStore } from "../../stores/extension-ui";
 import { toast } from "../../stores/toast";
 import { Button, Input, Modal, Spinner } from "../common";
 import { ApprovalDialog } from "./ApprovalDialog";
+import { ChoiceRow, FormDialog } from "./FormDialog";
 
 /** The `open_url` request a sign-in prompt says it belongs to. */
 function signInOwner(request: ExtensionUIRequest): string | undefined {
@@ -80,7 +80,11 @@ function useCountdown(request: ExtensionUIRequest | null): number | null {
 			? request.timeout
 			: request && request.method === "confirm"
 				? request.timeout
-				: request && (request.method === "input" || request.method === "askDialog" || request.method === "ask")
+				: request &&
+						(request.method === "input" ||
+							request.method === "askDialog" ||
+							request.method === "ask" ||
+							request.method === "form")
 					? request.timeout
 					: undefined;
 	// Remaining time is derived PER REQUEST at render: a state-only countdown
@@ -346,48 +350,26 @@ function AskDialog({
 								{question.options.map((option, optionIndex) => {
 									const checked = answer?.selected.has(option.label) ?? false;
 									return (
-										<button
-											className={cx(
-												"flex w-full items-start gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-(--omp-border-accent)",
-												checked
-													? "border-(--omp-border-accent) bg-(--omp-selected-bg)"
-													: "border-(--omp-border-muted) hover:border-(--omp-border-accent) hover:bg-(--omp-selected-bg)",
-											)}
+										<ChoiceRow
+											checked={checked}
 											key={option.label}
+											multi={question.multi ?? false}
 											onClick={() => toggleOption(questionIndex, option.label)}
-											type="button"
 										>
-											<span
-												className={cx(
-													"mt-px flex h-3.5 w-3.5 shrink-0 items-center justify-center border transition-colors",
-													question.multi ? "rounded-[3px]" : "rounded-full",
-													checked
-														? "border-(--omp-accent) text-(--omp-accent)"
-														: "border-(--omp-border-strong) text-transparent",
-												)}
-											>
-												{question.multi ? (
-													<Check size={10} strokeWidth={3} />
-												) : (
-													<span className="h-1.5 w-1.5 rounded-full bg-current" />
-												)}
-											</span>
-											<span className="min-w-0 flex-1">
-												<span className="flex items-center gap-1.5 text-xs text-(--omp-text)">
-													<span className="min-w-0 break-words">{option.label}</span>
-													{question.recommended === optionIndex && (
-														<span className="shrink-0 rounded border border-(--omp-border-accent) px-1 py-px text-omp-xxs font-medium text-(--omp-accent)">
-															{t("extDialog.ask.recommended")}
-														</span>
-													)}
-												</span>
-												{option.description && (
-													<span className="mt-0.5 block text-omp-xs leading-snug break-words text-(--omp-dim)">
-														{option.description}
+											<span className="flex items-center gap-1.5 text-xs text-(--omp-text)">
+												<span className="min-w-0 break-words">{option.label}</span>
+												{question.recommended === optionIndex && (
+													<span className="shrink-0 rounded border border-(--omp-border-accent) px-1 py-px text-omp-xxs font-medium text-(--omp-accent)">
+														{t("extDialog.ask.recommended")}
 													</span>
 												)}
 											</span>
-										</button>
+											{option.description && (
+												<span className="mt-0.5 block text-omp-xs leading-snug break-words text-(--omp-dim)">
+													{option.description}
+												</span>
+											)}
+										</ChoiceRow>
 									);
 								})}
 							</div>
@@ -521,6 +503,7 @@ type ExtensionResponse =
 	| { confirmed: boolean }
 	| { askDialog: ExtensionAskDialogResult }
 	| { answers: Array<{ id: string; selectedOptions: string[]; customInput?: string }> }
+	| { formData: Record<string, string | string[]> }
 	| { cancelled: true };
 
 function answerExtensionRequest(id: string, response: ExtensionResponse): void {
@@ -754,6 +737,16 @@ function ActiveDialog({
 					}
 					remaining={remaining}
 					request={request}
+				/>
+			);
+		case "form":
+			return (
+				<FormDialog
+					footer={<TimeoutFooter remaining={remaining} />}
+					key={request.id}
+					onCancel={cancel}
+					onSubmit={formData => respond({ formData })}
+					sections={request.sections}
 				/>
 			);
 		case "editor":

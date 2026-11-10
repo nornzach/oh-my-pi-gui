@@ -620,7 +620,7 @@ export class SidecarManager extends EventEmitter {
 					.command({ type: "set_event_filter", events: Object.keys(AGENT_EVENT_TYPES), messageUpdates: "delta" })
 					.catch(() => {});
 				// Opt into upstream's `ask` protocol — the GUI renders ask dialogs.
-				void this.#rpcClient.command({ type: "set_ask_dialog", enabled: true }).catch(() => {});
+				void this.#rpcClient.command({ type: "set_ask_dialog", enabled: true, form: true }).catch(() => {});
 				// `pty: true` bash runs in the terminal panel, where the user can answer it,
 				// and the agent's `terminal` tool reads the panel's terminals and starts
 				// long-lived commands (dev servers) there.

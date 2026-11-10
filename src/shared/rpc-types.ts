@@ -41,7 +41,7 @@ export type RpcCommand =
 	 */
 	| { id?: string; type: "set_event_filter"; events: string[] | null; messageUpdates?: "full" | "delta" }
 	/** Opts the host into upstream's `ask` extension-dialog protocol (`answers` responses). */
-	| { id?: string; type: "set_ask_dialog"; enabled: boolean }
+	| { id?: string; type: "set_ask_dialog"; enabled: boolean; form?: boolean }
 	| { id?: string; type: "get_subagents" }
 	| { id?: string; type: "get_subagent_messages"; subagentId?: string; sessionFile?: string; fromByte?: number }
 	| { id?: string; type: "set_model"; provider: string; modelId: string }
@@ -1708,6 +1708,49 @@ export interface ExtensionAskDialogChatResult {
 }
 export type ExtensionAskDialogResult = ExtensionAskDialogSubmitResult | ExtensionAskDialogChatResult;
 
+export interface ExtensionFormSpan {
+	text: string;
+	style?: "code" | "strong" | "em";
+}
+export interface ExtensionFormChoiceField {
+	kind: "choice";
+	name: string;
+	multi: boolean;
+	select: boolean;
+	/** Offer a free-text answer beside the options. */
+	other: boolean;
+	label: ExtensionFormSpan[];
+	options: Array<{ value: string; label: ExtensionFormSpan[]; checked: boolean; disabled: boolean }>;
+	required: boolean;
+}
+export interface ExtensionFormTextField {
+	kind: "text";
+	name: string;
+	type: string;
+	multiline: boolean;
+	label: ExtensionFormSpan[];
+	value: string;
+	placeholder: string;
+	required: boolean;
+	min?: number;
+	max?: number;
+	pattern?: string;
+	minLength?: number;
+	maxLength?: number;
+	rows: number;
+}
+export type ExtensionFormField = ExtensionFormChoiceField | ExtensionFormTextField;
+export type ExtensionFormBlock =
+	| { kind: "text"; spans: ExtensionFormSpan[]; heading: boolean }
+	| { kind: "list"; items: ExtensionFormSpan[][]; ordered: boolean }
+	| { kind: "pre"; text: string }
+	| { kind: "table"; rows: ExtensionFormSpan[][][]; headerRows: number }
+	| { kind: "field"; field: ExtensionFormField };
+export interface ExtensionFormSection {
+	title: ExtensionFormSpan[];
+	blocks: ExtensionFormBlock[];
+}
+
 export interface ExtensionUISelectOptionDetail {
 	description?: string;
 }
@@ -1735,6 +1778,14 @@ export type ExtensionUIRequest =
 			id: string;
 			method: "ask";
 			questions: ExtensionAskDialogQuestion[];
+			timeout?: number;
+	  }
+	/** The whole form of one `ask` tool call; sent after `set_ask_dialog` with `form: true`. */
+	| {
+			type: "extension_ui_request";
+			id: string;
+			method: "form";
+			sections: ExtensionFormSection[];
 			timeout?: number;
 	  }
 	| {
@@ -1812,6 +1863,8 @@ export type ExtensionUIResponse =
 			id: string;
 			answers: Array<{ id: string; selectedOptions: string[]; customInput?: string }>;
 	  }
+	/** Answers a `form` request by control name; a multi-choice field gives an array. */
+	| { type: "extension_ui_response"; id: string; formData: Record<string, string | string[]> }
 	| { type: "extension_ui_response"; id: string; cancelled: true; timedOut?: boolean };
 
 // ============================================================================
@@ -2047,6 +2100,7 @@ export const BLOCKING_UI_METHODS: Record<string, true> = {
 	confirm: true,
 	askDialog: true,
 	ask: true,
+	form: true,
 	input: true,
 	editor: true,
 	open_url: true,
@@ -2516,7 +2570,7 @@ export interface AvailableCommandsUpdateFrame {
 export interface RpcSwitchLeafResult {
 	cancelled: boolean;
 	aborted?: boolean;
-	reopenAsk?: { toolCallId: string; questions: unknown };
+	reopenAsk?: { toolCallId: string; html: string };
 	editorText?: string;
 	editorImages?: ImageContent[];
 	activeLeafId?: string;

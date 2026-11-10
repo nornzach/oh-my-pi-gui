@@ -219,6 +219,89 @@ describe("ExtensionDialog select", () => {
 	});
 });
 
+describe("ExtensionDialog form", () => {
+	const spans = (text: string) => [{ text }];
+	const showForm = async () => {
+		await act(async () => {
+			useExtensionUiStore.getState().pushRequest({
+				type: "extension_ui_request",
+				id: "form-1",
+				method: "form",
+				sections: [
+					{
+						title: spans("Deploy"),
+						blocks: [
+							{ kind: "text", spans: spans("Where to?"), heading: false },
+							{
+								kind: "field",
+								field: {
+									kind: "choice",
+									name: "target",
+									multi: false,
+									select: false,
+									other: false,
+									label: [],
+									required: true,
+									options: [
+										{ value: "prod", label: spans("Production"), checked: false, disabled: false },
+										{ value: "stage", label: spans("Staging"), checked: false, disabled: false },
+									],
+								},
+							},
+							{
+								kind: "field",
+								field: {
+									kind: "text",
+									name: "api_key",
+									type: "password",
+									multiline: false,
+									label: spans("API key"),
+									value: "prefilled",
+									placeholder: "",
+									required: false,
+									rows: 1,
+								},
+							},
+						],
+					},
+				],
+			});
+		});
+	};
+	const submitForm = async () => {
+		const form = document.querySelector("form") as unknown as TestElement | null;
+		if (!form) throw new Error("missing form");
+		await act(async () => {
+			form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+		});
+	};
+
+	it("shows every question in one dialog and answers by control name", async () => {
+		await mount();
+		await showForm();
+		const body = () => document.body.textContent ?? "";
+		expect(body()).toContain("Where to?");
+		expect(body()).toContain("API key");
+		const staging = buttonWithText("Staging");
+		if (!staging) throw new Error("missing option");
+		await click(staging);
+		await submitForm();
+		expect(respondExtensionUi).toHaveBeenCalledWith({
+			type: "extension_ui_response",
+			id: "form-1",
+			formData: { target: "stage", api_key: "prefilled" },
+		});
+	});
+
+	it("keeps the form open until a required choice is made", async () => {
+		await mount();
+		await showForm();
+		await submitForm();
+		expect(respondExtensionUi).not.toHaveBeenCalled();
+		expect(document.body.textContent).toContain("Required");
+	});
+});
+
 describe("ExtensionDialog askDialog", () => {
 	it("returns the wire submit discriminator and renders the selected option preview", async () => {
 		await mount();
