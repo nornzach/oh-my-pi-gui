@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.9.40] - 2026-11-11
+
+### Changed
+
+- Bundled agent rebuilt from monorepo `04c428a4`, on upstream omp 18.18.6 with its native addon from npm 18.18.6. The agent asks through forms, with a free-text answer on every choice (a picture in a form shows as its description for now). Auto-compaction warns once instead of repeating every turn when the system prompt and tools alone exceed the budget, and a late usage-limit error from a previous provider no longer blocks the one you selected.
+
 ### Fixed
 
 - When the agent asks several questions, they appear together in one form again instead of one dialog per question.
