@@ -2051,6 +2051,8 @@ export const zh: Record<string, string> = {
 	"extDialog.openUrl.pasteSubmit": "使用授权码",
 	"extDialog.openUrl.pasteChecking": "正在验证…",
 	"extDialog.openUrl.pasteRetry": "授权码无效。请从浏览器重新复制并粘贴到这里。",
+	"extDialog.openUrl.signInTitle": "登录",
+	"extDialog.openUrl.promptSubmit": "继续",
 
 	// Session picker dialog
 	"sessionPicker.searchLabel": "搜索会话",

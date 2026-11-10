@@ -83,11 +83,13 @@ export const en: Record<string, string> = {
 	"plugins.refresh": "Check catalogs for updates",
 	"plugins.connecting": "Waiting for the agent to start…",
 	"plugins.seeding": "Adding plugin catalogs… {done} of {total}",
-	"plugins.seedingHint": "Catalogs are lists of plugins, downloaded from GitHub once. A plugin itself downloads only when you install it.",
+	"plugins.seedingHint":
+		"Catalogs are lists of plugins, downloaded from GitHub once. A plugin itself downloads only when you install it.",
 	"plugins.noCatalogs": "No plugin catalogs",
 	"plugins.noCatalogsHint": "Add the default catalogs, or add your own in Settings.",
 	"plugins.seedingWait": "You can install plugins once the catalogs have been added",
-	"plugins.seedFailed": "Some plugin catalogs couldn't be added. They'll be tried again next time you open this page: {message}",
+	"plugins.seedFailed":
+		"Some plugin catalogs couldn't be added. They'll be tried again next time you open this page: {message}",
 	"plugins.addDefaults": "Add the default catalogs",
 	"plugins.catalogFilter": "Catalog",
 	"plugins.catalogFilter.all": "All catalogs",
@@ -116,7 +118,8 @@ export const en: Record<string, string> = {
 	"plugins.preview.rateLimited":
 		"GitHub limits how often this can be checked. Try again in a while, or install anyway.",
 	"plugins.preview.notFound": "This plugin's files weren't found on GitHub, so installing it may fail.",
-	"plugins.preview.unavailable": "GitHub isn't responding, so what this plugin adds can't be checked. You can still install it.",
+	"plugins.preview.unavailable":
+		"GitHub isn't responding, so what this plugin adds can't be checked. You can still install it.",
 	"plugins.preview.noRepository":
 		"This plugin isn't hosted on GitHub, so what it adds can't be checked before installing.",
 	"plugins.effects.skills": "Skills",
@@ -2109,6 +2112,8 @@ export const en: Record<string, string> = {
 	"extDialog.openUrl.pasteSubmit": "Use Code",
 	"extDialog.openUrl.pasteChecking": "Checking…",
 	"extDialog.openUrl.pasteRetry": "That code didn't work. Copy it from the browser again and paste it here.",
+	"extDialog.openUrl.signInTitle": "Sign In",
+	"extDialog.openUrl.promptSubmit": "Continue",
 
 	// Session picker dialog
 	"sessionPicker.searchLabel": "Search sessions",
@@ -4090,7 +4095,8 @@ export const en: Record<string, string> = {
 	"errors.http.server": "The server had a problem ({status}).",
 	"errors.download.failed": "Couldn't download that. Check your network or proxy, then try again.",
 	"errors.download.failedHost": "Couldn't download from {host}. Check your network or proxy, then try again.",
-	"errors.download.notFound": "Couldn't find that repository, or you don't have access to it. It may have moved or been made private.",
+	"errors.download.notFound":
+		"Couldn't find that repository, or you don't have access to it. It may have moved or been made private.",
 	"errors.net.tls":
 		"Couldn't verify the server's security certificate. If you're on a company network or using your own server, its certificate may need to be trusted.",
 	"errors.net.proxy": "Couldn't connect through the proxy. Check that it's running and that its address is right.",

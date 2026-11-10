@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Signing in to DeepSeek, Exa and other API-key providers no longer sticks at "Waiting for your browser…": the sign-in dialog now has a masked field to paste the key ([#48](https://github.com/nornzach/oh-my-pi-gui/issues/48)).
+
 ## [0.9.39] - 2026-11-09
 
 ### Added

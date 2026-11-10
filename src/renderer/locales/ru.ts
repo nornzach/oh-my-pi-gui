@@ -78,11 +78,13 @@ export const ru: Record<string, string> = {
 	"plugins.refresh": "Проверить обновления каталогов",
 	"plugins.connecting": "Ожидание запуска агента…",
 	"plugins.seeding": "Подключение каталогов Plugins… {done} из {total}",
-	"plugins.seedingHint": "Каталоги — это списки Plugins, они загружаются с GitHub один раз. Сам plugin загружается только при установке.",
+	"plugins.seedingHint":
+		"Каталоги — это списки Plugins, они загружаются с GitHub один раз. Сам plugin загружается только при установке.",
 	"plugins.noCatalogs": "Нет каталогов Plugins",
 	"plugins.noCatalogsHint": "Подключите каталоги по умолчанию или добавьте свой в настройках.",
 	"plugins.seedingWait": "Установка Plugins станет доступна после подключения каталогов",
-	"plugins.seedFailed": "Не удалось подключить некоторые каталоги Plugins. Новая попытка будет при следующем открытии этой страницы: {message}",
+	"plugins.seedFailed":
+		"Не удалось подключить некоторые каталоги Plugins. Новая попытка будет при следующем открытии этой страницы: {message}",
 	"plugins.addDefaults": "Подключить каталоги по умолчанию",
 	"plugins.catalogFilter": "Каталог",
 	"plugins.catalogFilter.all": "Все каталоги",
@@ -2054,6 +2056,8 @@ export const ru: Record<string, string> = {
 	"extDialog.openUrl.pasteSubmit": "Использовать код",
 	"extDialog.openUrl.pasteChecking": "Проверка…",
 	"extDialog.openUrl.pasteRetry": "Код не подошёл. Скопируй его из браузера ещё раз и вставь сюда.",
+	"extDialog.openUrl.signInTitle": "Вход",
+	"extDialog.openUrl.promptSubmit": "Продолжить",
 	"sessionPicker.searchLabel": "Поиск сессий",
 	"sessionPicker.placeholder": "Поиск сессий…",
 	"sessionPicker.loading": "Загрузка сессий…",
@@ -3922,7 +3926,8 @@ export const ru: Record<string, string> = {
 	"errors.http.server": "На сервере произошла ошибка ({status}).",
 	"errors.download.failed": "Не удалось скачать. Проверьте сеть или прокси и повторите попытку.",
 	"errors.download.failedHost": "Не удалось скачать с {host}. Проверьте сеть или прокси и повторите попытку.",
-	"errors.download.notFound": "Репозиторий не найден или у вас нет к нему доступа. Возможно, его перенесли или сделали приватным.",
+	"errors.download.notFound":
+		"Репозиторий не найден или у вас нет к нему доступа. Возможно, его перенесли или сделали приватным.",
 	"errors.net.tls":
 		"Не удалось проверить сертификат безопасности сервера. Если вы в корпоративной сети или используете свой сервер, возможно, его сертификату нужно доверять.",
 	"errors.net.proxy": "Не удалось подключиться через прокси. Убедитесь, что он запущен и его адрес указан верно.",

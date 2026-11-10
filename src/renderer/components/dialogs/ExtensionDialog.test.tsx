@@ -134,6 +134,30 @@ async function showSignIn(): Promise<void> {
 	);
 }
 
+const KEY_TITLE = "Paste your DeepSeek API key";
+
+/** What `login` sends for an API-key provider: the page with the key, then the prompt the sign-in waits on. */
+async function showKeySignIn(fields: { allowEmpty?: boolean } = {}): Promise<void> {
+	await push(
+		{
+			type: "extension_ui_request",
+			id: "url-1",
+			method: "open_url",
+			url: "https://platform.deepseek.com/api_keys",
+			instructions: "Create or copy your API key from the DeepSeek dashboard",
+		},
+		{
+			type: "extension_ui_request",
+			id: "key-1",
+			method: "input",
+			title: KEY_TITLE,
+			placeholder: "sk-...",
+			loginPromptFor: "url-1",
+			...fields,
+		},
+	);
+}
+
 function showAskDialog(): void {
 	useExtensionUiStore.getState().pushRequest({
 		type: "extension_ui_request",
@@ -443,5 +467,59 @@ describe("ExtensionDialog sign-in browser step", () => {
 		});
 
 		expect(document.body.textContent).toContain(PASTE_TITLE);
+	});
+
+	it("asks for an API key inside the sign-in dialog instead of queueing it behind that dialog", async () => {
+		await mount();
+		await showKeySignIn();
+
+		// Open from the start and masked: nothing in the browser can finish this sign-in.
+		expect(document.body.textContent).toContain(KEY_TITLE);
+		expect(document.querySelector("input")?.getAttribute("type")).toBe("password");
+		await click(document.querySelector('button[aria-label="Reveal value"]') as unknown as TestElement);
+		expect(document.querySelector("input")?.getAttribute("type")).toBe("text");
+
+		await typeInto(document.querySelector("input") as unknown as TestElement, " sk-test ");
+		await submit(document.querySelector("form") as unknown as TestElement);
+
+		expect(respondExtensionUi.mock.calls).toEqual([
+			[{ type: "extension_ui_response", id: "key-1", value: "sk-test" }],
+		]);
+		expect(buttonWithText("Checking")).toBeDefined();
+
+		// Signed in: the agent closes the browser step and the dialog goes away.
+		await push({ type: "extension_ui_request", id: "close-1", method: "cancel", targetId: "url-1" });
+		expect(document.querySelector("form")).toBeNull();
+	});
+
+	it("moves on to the sign-in's next question without calling the last answer wrong", async () => {
+		await mount();
+		await showKeySignIn();
+		await typeInto(document.querySelector("input") as unknown as TestElement, "token");
+		await submit(document.querySelector("form") as unknown as TestElement);
+
+		await push({
+			type: "extension_ui_request",
+			id: "account-1",
+			method: "input",
+			title: "Enter your Cloudflare account ID",
+			loginPromptFor: "url-1",
+		});
+
+		expect(document.body.textContent).toContain("Enter your Cloudflare account ID");
+		expect(document.body.textContent).not.toContain("didn't work");
+		expect(buttonWithText("Continue")).toBeDefined();
+	});
+
+	it.each([
+		["refuses a blank key", false, []],
+		["sends a blank answer the sign-in allows", true, [[{ type: "extension_ui_response", id: "key-1", value: "" }]]],
+	])("%s", async (_name, allowEmpty, expected) => {
+		await mount();
+		await showKeySignIn({ allowEmpty });
+
+		await submit(document.querySelector("form") as unknown as TestElement);
+
+		expect(respondExtensionUi.mock.calls).toEqual(expected);
 	});
 });

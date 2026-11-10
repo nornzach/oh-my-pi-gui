@@ -13,7 +13,7 @@
 
 import { json } from "@codemirror/lang-json";
 import { EditorView } from "@codemirror/view";
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isApprovalRequest } from "../../../shared/approval-prompt";
 import type { ExtensionAskDialogResult, ExtensionUIRequest } from "../../../shared/rpc-types";
@@ -26,11 +26,15 @@ import { toast } from "../../stores/toast";
 import { Button, Input, Modal, Spinner } from "../common";
 import { ApprovalDialog } from "./ApprovalDialog";
 
-/** A paste prompt shown inside its sign-in dialog rather than on its own. */
+/** The `open_url` request a sign-in prompt says it belongs to. */
+function signInOwner(request: ExtensionUIRequest): string | undefined {
+	return request.method === "input" ? (request.authCodeFor ?? request.loginPromptFor) : undefined;
+}
+
+/** A sign-in prompt shown inside its browser dialog rather than on its own. */
 function belongsToOpenUrl(request: ExtensionUIRequest, pending: ExtensionUIRequest[]): boolean {
-	if (request.method !== "input" || !request.authCodeFor) return false;
-	const owner = request.authCodeFor;
-	return pending.some(other => other.id === owner && other.method === "open_url");
+	const owner = signInOwner(request);
+	return owner !== undefined && pending.some(other => other.id === owner && other.method === "open_url");
 }
 
 /** Requests handled elsewhere (store/router) — never rendered as dialogs. */
@@ -529,7 +533,9 @@ function answerExtensionRequest(id: string, response: ExtensionResponse): void {
  * browser and closes when the sign-in ends; the agent sends the close. When
  * the sign-in also accepts a pasted code, the agent's paste prompt
  * (`authCodeFor`) shows here as an optional field instead of as a second
- * dialog, for a browser that cannot reach this machine.
+ * dialog, for a browser that cannot reach this machine. A prompt the sign-in
+ * is waiting on (`loginPromptFor`, such as an API key) shows here too, open
+ * and masked: the page only helps the user find the answer.
  */
 function OpenUrlDialog({
 	request,
@@ -546,14 +552,25 @@ function OpenUrlDialog({
 	const [opened, setOpened] = useState(false);
 	const [pasting, setPasting] = useState(false);
 	const [code, setCode] = useState("");
-	// The prompt last answered; a new prompt after it means the agent could not use that value.
-	const [answered, setAnswered] = useState<string | null>(null);
+	const [revealed, setRevealed] = useState(false);
+	// The prompt last answered; a new paste prompt after it means the agent could not use that value.
+	const [answered, setAnswered] = useState<CodePrompt | null>(null);
 	const target = request.launchUrl ?? request.url;
-	const checking = answered !== null && (!codePrompt || codePrompt.id === answered);
-	const retry = answered !== null && codePrompt !== undefined && codePrompt.id !== answered;
+	const checking = answered !== null && (!codePrompt || codePrompt.id === answered.id);
+	// Falls back to the answered prompt so the dialog keeps its shape while that answer is checked.
+	const prompt = codePrompt ?? answered;
+	const loginPrompt = prompt?.loginPromptFor ? prompt : undefined;
+	const retry = !loginPrompt && answered !== null && codePrompt !== undefined && codePrompt.id !== answered.id;
+	const fieldLabel = loginPrompt ? loginPrompt.title : t("extDialog.openUrl.pastePlaceholder");
+	const submitLabel = loginPrompt ? t("extDialog.openUrl.promptSubmit") : t("extDialog.openUrl.pasteSubmit");
 
 	return (
-		<Modal onClose={onCancel} open size="sm" title={t("extDialog.openUrl.title")}>
+		<Modal
+			onClose={onCancel}
+			open
+			size="sm"
+			title={loginPrompt ? t("extDialog.openUrl.signInTitle") : t("extDialog.openUrl.title")}
+		>
 			<div className="space-y-3">
 				{request.instructions && (
 					<p className="text-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-muted)">
@@ -563,38 +580,63 @@ function OpenUrlDialog({
 				<div className="rounded-md border border-(--omp-border-muted) bg-(--omp-code-bg) px-2.5 py-2 font-mono text-omp-xs break-all text-(--omp-md-link)">
 					{target}
 				</div>
-				{opened && (
+				{opened && !loginPrompt && (
 					<div className="flex items-center gap-2 text-xs text-(--omp-muted)" role="status">
 						<Spinner size="sm" />
 						<span>{t("extDialog.openUrl.waiting")}</span>
 					</div>
 				)}
-				{(codePrompt || checking) &&
-					(pasting ? (
+				{prompt &&
+					(loginPrompt || pasting ? (
 						<form
 							className="space-y-1.5"
 							onSubmit={event => {
 								event.preventDefault();
 								const value = code.trim();
-								if (!codePrompt || checking || !value) return;
+								if (!codePrompt || checking || (!value && !codePrompt.allowEmpty)) return;
 								onCode(codePrompt, value);
-								setAnswered(codePrompt.id);
+								setAnswered(codePrompt);
 								setCode("");
+								setRevealed(false);
 							}}
 						>
+							{loginPrompt && (
+								<p className="text-omp-md font-medium text-(--omp-text-secondary)">{loginPrompt.title}</p>
+							)}
 							<div className="flex items-center gap-2">
-								<div className="min-w-0 flex-1">
+								<div className="relative min-w-0 flex-1">
 									<Input
-										aria-label={t("extDialog.openUrl.pastePlaceholder")}
+										// Keyed: the next question in a sign-in takes the focus back.
+										key={prompt.id}
+										aria-label={fieldLabel}
+										autoComplete="off"
 										autoFocus
+										className={loginPrompt ? "pr-8" : undefined}
 										disabled={checking}
 										onChange={event => setCode(event.target.value)}
-										placeholder={t("extDialog.openUrl.pastePlaceholder")}
+										placeholder={loginPrompt ? loginPrompt.placeholder : fieldLabel}
+										spellCheck={false}
+										type={loginPrompt && !revealed ? "password" : "text"}
 										value={code}
 									/>
+									{loginPrompt && (
+										<button
+											aria-label={revealed ? t("common.hideValue") : t("common.revealValue")}
+											className="absolute right-2 top-1/2 -translate-y-1/2 text-(--omp-dim) transition-colors hover:text-(--omp-text)"
+											onClick={() => setRevealed(prev => !prev)}
+											type="button"
+										>
+											{revealed ? <EyeOff size={13} /> : <Eye size={13} />}
+										</button>
+									)}
 								</div>
-								<Button disabled={checking || !code.trim()} size="sm" type="submit" variant="secondary">
-									{t(checking ? "extDialog.openUrl.pasteChecking" : "extDialog.openUrl.pasteSubmit")}
+								<Button
+									disabled={checking || (!code.trim() && !prompt.allowEmpty)}
+									size="sm"
+									type="submit"
+									variant={loginPrompt ? "primary" : "secondary"}
+								>
+									{checking ? t("extDialog.openUrl.pasteChecking") : submitLabel}
 								</Button>
 							</div>
 							{retry && <p className="text-omp-xs text-(--omp-error)">{t("extDialog.openUrl.pasteRetry")}</p>}
@@ -613,19 +655,21 @@ function OpenUrlDialog({
 						{t("common.cancel")}
 					</Button>
 					<Button
-						autoFocus
+						autoFocus={!loginPrompt}
 						icon={<ExternalLink size={12} />}
 						onClick={() => {
 							void window.omp.system.openExternal(target);
 							setOpened(true);
 						}}
 						size="sm"
-						variant={opened ? "secondary" : "primary"}
+						variant={opened || loginPrompt ? "secondary" : "primary"}
 					>
 						{opened ? t("extDialog.openUrl.openAgain") : t("extDialog.openUrl.open")}
 					</Button>
 				</div>
-				{!opened && <p className="text-right text-omp-xs text-(--omp-dim)">{t("extDialog.openUrl.hint")}</p>}
+				{!opened && !loginPrompt && (
+					<p className="text-right text-omp-xs text-(--omp-dim)">{t("extDialog.openUrl.hint")}</p>
+				)}
 			</div>
 		</Modal>
 	);
@@ -752,7 +796,7 @@ export function ExtensionDialog() {
 	const codePrompt = useMemo(
 		() =>
 			request?.method === "open_url"
-				? pending.find((req): req is CodePrompt => req.method === "input" && req.authCodeFor === request.id)
+				? pending.find((req): req is CodePrompt => req.method === "input" && signInOwner(req) === request.id)
 				: undefined,
 		[pending, request],
 	);
