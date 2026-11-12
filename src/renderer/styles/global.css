@@ -544,6 +544,10 @@ kbd,
    Closing is the quicker half (it must finish inside OVERLAY_EXIT_MS). */
 .omp-collapse {
 	display: grid;
+	/* The one column is the parent's width, never the content's: once settled the
+	   inner box is overflow-visible, and an auto column then grows to its widest
+	   unbreakable line (a one-line command) and pushes the body out of the column. */
+	grid-template-columns: minmax(0, 1fr);
 	grid-template-rows: 0fr;
 	transition: grid-template-rows var(--omp-motion-fast) var(--omp-ease-exit);
 }
@@ -556,6 +560,7 @@ kbd,
 }
 
 .omp-collapse-inner {
+	min-width: 0;
 	min-height: 0;
 	overflow: hidden;
 	opacity: 0;
