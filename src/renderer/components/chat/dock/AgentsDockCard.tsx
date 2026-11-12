@@ -6,7 +6,8 @@
  * the card header switches the compact spawn tree for the graphical DAG.
  *
  * The card shows only while an agent is working; `display.pinnedAgents`
- * picks hidden, a summary, or the full list. Finished and parked agents stay
+ * picks hidden, a summary, or the full list. It lists only the batches still
+ * at work (`liveAgentRows`): earlier finished, failed and stale agents stay
  * reachable from the drawer's Agents tab, the sidebar, and agent pages. The
  * stream-time get_subagents poll lives in the workspace dock, so a hidden
  * card cannot stall it.
@@ -40,7 +41,7 @@ import {
 	useSubagentGraphStore,
 } from "../../panels/subagent-graph";
 import { DockCard } from "./DockCard";
-import { buildAgentDockSummary } from "./dock-summary";
+import { buildAgentDockSummary, liveAgentRows } from "./dock-summary";
 import { useWorkspaceDockFocus } from "./WorkspaceDockFocus";
 
 type PanelView = "list" | "graph";
@@ -206,9 +207,10 @@ export function AgentsDockCard() {
 
 	const rootToolCallIds = useMemo(() => new Set(extractTaskToolCallIds(messages)), [messages]);
 	const rows = useMemo(
-		() => buildSubagentList(agents, rootToolCallIds, toolCallOwners),
+		() => liveAgentRows(buildSubagentList(agents, rootToolCallIds, toolCallOwners)),
 		[agents, rootToolCallIds, toolCallOwners],
 	);
+	const liveIds = useMemo(() => new Set(rows.map(row => row.agent.id)), [rows]);
 	const summary = useMemo(() => buildAgentDockSummary(rows), [rows]);
 	const displayedRows = showFull ? rows : summary.rows;
 
@@ -254,7 +256,7 @@ export function AgentsDockCard() {
 			actions={<ViewToggle onChange={changeView} view={view} />}
 			badge={
 				<span className="shrink-0 text-omp-xs tabular-nums text-[var(--omp-dim)]">
-					{runningCount}/{agents.length}
+					{runningCount}/{rows.length}
 				</span>
 			}
 			icon={Bot}
@@ -263,7 +265,7 @@ export function AgentsDockCard() {
 		>
 			{view === "graph" ? (
 				<div className="h-72">
-					<SubagentDag />
+					<SubagentDag include={liveIds} />
 				</div>
 			) : (
 				<div className="space-y-1.5 px-2 py-1.5" role="tree">

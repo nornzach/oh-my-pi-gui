@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SubagentSnapshot } from "../../../../shared/rpc-types";
 import type { UiTodoPhase, UiTodoTask } from "../../../stores/todo";
 import type { SubagentListRow } from "../../panels/subagent-graph";
-import { buildAgentDockSummary, buildTodoDockSummary } from "./dock-summary";
+import { buildAgentDockSummary, buildTodoDockSummary, liveAgentRows } from "./dock-summary";
 
 function task(id: string, status: UiTodoTask["status"]): UiTodoTask {
 	return { id, content: id, status };
@@ -62,5 +62,37 @@ describe("dock summaries", () => {
 		const summary = buildAgentDockSummary(rows);
 		expect(summary.rows.map(row => row.agent.id)).toEqual(["a1", "a2", "a3", "a4", "a8"]);
 		expect(summary).toMatchObject({ totalCount: 8, hiddenCount: 3 });
+	});
+});
+
+describe("liveAgentRows", () => {
+	const spawnedBy = (snapshot: SubagentSnapshot, parentToolCallId: string): SubagentSnapshot => ({
+		...snapshot,
+		parentToolCallId,
+	});
+
+	it("drops batches that have finished, whatever they ended in, and keeps the one at work whole", () => {
+		const rows: SubagentListRow[] = [
+			// An earlier task call: completed, failed, cancelled and gone stale.
+			{ agent: spawnedBy(agent("a1", "completed", 1), "call_1"), depth: 0 },
+			{ agent: spawnedBy(agent("a2", "failed", 2), "call_1"), depth: 0 },
+			{ agent: spawnedBy(agent("a3", "cancelled", 3), "call_1"), depth: 0 },
+			{ agent: { ...spawnedBy(agent("a4", "running", 4), "call_1"), live: false }, depth: 0 },
+			// The current call: one done, one still working.
+			{ agent: spawnedBy(agent("a5", "completed", 5), "call_2"), depth: 0 },
+			{ agent: spawnedBy(agent("a6", "running", 6), "call_2"), depth: 0 },
+		];
+		expect(liveAgentRows(rows).map(row => row.agent.id)).toEqual(["a5", "a6"]);
+	});
+
+	it("keeps the agents above a working child so it is never an orphan, but not their finished batches", () => {
+		const rows: SubagentListRow[] = [
+			{ agent: spawnedBy(agent("a1", "running", 1), "call_1"), depth: 0 },
+			{ agent: spawnedBy(agent("a2", "completed", 2, "a1"), "call_a1_1"), depth: 1 },
+			{ agent: spawnedBy(agent("a3", "running", 3, "a1"), "call_a1_2"), depth: 1 },
+			{ agent: spawnedBy(agent("a4", "parked", 4), "call_3"), depth: 0 },
+		];
+		// a2's own batch is over; a3 works under a1; a parked agent still waits.
+		expect(liveAgentRows(rows).map(row => row.agent.id)).toEqual(["a1", "a3", "a4"]);
 	});
 });

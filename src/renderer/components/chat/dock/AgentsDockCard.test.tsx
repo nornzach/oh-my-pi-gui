@@ -129,7 +129,7 @@ function containerText(): string {
 	return container.textContent ?? "";
 }
 
-/** Seven agents, one working: two more than the summary keeps. */
+/** Seven agents of one task call, one working: two more than the summary keeps. */
 function largeRoster(): SubagentSnapshot[] {
 	return [
 		snap({ id: "a1", index: 1, status: "running" }),
@@ -139,7 +139,7 @@ function largeRoster(): SubagentSnapshot[] {
 		snap({ id: "a5", index: 5, status: "completed", lastUpdate: 5 }),
 		snap({ id: "a6", index: 6, status: "completed", lastUpdate: 6 }),
 		snap({ id: "a7", index: 7, status: "completed", lastUpdate: 7 }),
-	];
+	].map(agent => ({ ...agent, parentToolCallId: "call_1" }));
 }
 
 function button(label: string): { click: () => void } | undefined {
@@ -173,8 +173,9 @@ describe("AgentsDockCard", () => {
 					snap({ id: "a3", index: 3, status: "failed" }),
 				]);
 		});
-		expect(containerText()).toContain("1/3");
-		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(3);
+		// Back with the agent that resumed; the finished ones of other calls stay away.
+		expect(containerText()).toContain("1/1");
+		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(1);
 	});
 
 	it("stays hidden while agents work when display.pinnedAgents is off", async () => {
@@ -184,22 +185,26 @@ describe("AgentsDockCard", () => {
 		expect(containerText()).toBe("");
 	});
 
-	it("lists every known agent with the working/total count badge", async () => {
-		useSubagentsStore
-			.getState()
-			.setSnapshots([
-				snap({ id: "a1", status: "running" }),
-				snap({ id: "a2", index: 2, status: "parked" }),
-				snap({ id: "a3", index: 3, status: "parked" }),
-				snap({ id: "a4", index: 4, status: "completed" }),
-			]);
+	it("lists the task call at work, not the finished agents of earlier ones", async () => {
+		useSubagentsStore.getState().setSnapshots([
+			// An earlier task call, over: completed, failed and gone stale.
+			snap({ id: "old1", index: 1, status: "completed", agent: "earlier", parentToolCallId: "call_1" }),
+			snap({ id: "old2", index: 2, status: "failed", agent: "earlier", parentToolCallId: "call_1" }),
+			snap({ id: "old3", index: 3, status: "running", live: false, agent: "earlier", parentToolCallId: "call_1" }),
+			// The current one: working, parked and done.
+			snap({ id: "a1", index: 4, status: "running", parentToolCallId: "call_2" }),
+			snap({ id: "a2", index: 5, status: "parked", parentToolCallId: "call_2" }),
+			snap({ id: "a3", index: 6, status: "parked", parentToolCallId: "call_2" }),
+			snap({ id: "a4", index: 7, status: "completed", parentToolCallId: "call_2" }),
+		]);
 		await mount(<AgentsDockCard />);
 
-		// Only working agents count: parked ones wait (plan/24 §4.1). The
-		// terminal completed row stays listed.
+		// Only working agents count: parked ones wait (plan/24 §4.1). The current
+		// call's finished row stays while its batch works.
 		expect(containerText()).toContain("1/4");
 		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(4);
 		expect(containerText()).toContain("scout");
+		expect(containerText()).not.toContain("earlier");
 	});
 
 	it("shows each agent's resolved model, tokens, and cost", async () => {
