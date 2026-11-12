@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.41] - 2026-11-11
+
 ### Added
 - Task cards list a spawn's ordered steps when the agent's **Sequential Task Steps** setting is on, and the context breakdown shows instruction files (AGENTS.md and the like) as their own category.
 - The composer's `/` menu lists every command grouped by source (built-in, skills, extensions, custom, MCP prompts, files) with prefix matches first, instead of cutting off at eight; a new **Commands** entry in the composer's `+` menu opens it.
@@ -13,7 +15,7 @@
 
 ### Changed
 
-- Bundled agent updated to upstream omp 18.19.0: multi-step tasks, omp's own WebKit browser, auto-parallel task splitting, per-model system prompt templates and the rest of 18.18.7–18.19.0; the new settings are translated into Chinese and Russian.
+- Bundled agent rebuilt from monorepo `4b67dcb3`, on upstream omp 18.19.0 with its native addon from npm 18.19.0: multi-step tasks, omp's own WebKit browser, auto-parallel task splitting, per-model system prompt templates and the rest of 18.18.7–18.19.0; the new settings are translated into Chinese and Russian.
 - Todos no longer offer **Mark as blocked**: omp 18.19 removed the status, and a blocked task from an older session reads as pending.
 - New logo: a π that reads as a π (the old mark read as "TJ"), on a navy tile, in the app icon, favicon and sidebar badge.
 - The accent now leads the interface: your messages, the focused composer, primary buttons, the active tab and the active settings page carry it; signed-in providers get a green edge.
