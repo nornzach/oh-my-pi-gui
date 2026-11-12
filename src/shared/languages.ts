@@ -3,6 +3,7 @@ export const LANGUAGES = [
 	{ id: "en", name: "English", short: "EN", locale: "en-US" },
 	{ id: "ru", name: "Русский", short: "RU", locale: "ru-RU" },
 	{ id: "zh", name: "中文", short: "中文", locale: "zh-CN" },
+	{ id: "th", name: "ไทย", short: "TH", locale: "th-TH" },
 ] as const;
 
 export type Language = (typeof LANGUAGES)[number]["id"];

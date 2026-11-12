@@ -2,12 +2,13 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { isLanguage, type Language, languageDetails, languageFromLocale } from "../../shared/languages";
 import { en } from "../locales/en";
 import { ru } from "../locales/ru";
+import { th } from "../locales/th";
 import { zh } from "../locales/zh";
 
 export type Locale = Record<string, string>;
 export type Lang = Language;
 
-const LOCALES: Record<Lang, Locale> = { en, ru, zh };
+const LOCALES: Record<Lang, Locale> = { en, ru, th, zh };
 const LANG_KEY = "omp.lang";
 
 function readStoredLanguage(): Lang | undefined {

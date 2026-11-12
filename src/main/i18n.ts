@@ -2,6 +2,7 @@ import { app } from "electron";
 import Store from "electron-store";
 import { isLanguage, type Language, languageFromLocale } from "../shared/languages";
 import { RU_MAIN_TEXT } from "./native-ru";
+import { TH_MAIN_TEXT } from "./native-th";
 
 export type MainLanguage = Language;
 
@@ -100,7 +101,7 @@ export type MainTextKey =
 	| "updates.openInstallerFailed"
 	| "updates.unsupportedArchitecture";
 
-const TEXT: Record<MainTextKey, Record<Exclude<MainLanguage, "ru">, string>> = {
+const TEXT: Record<MainTextKey, Record<Exclude<MainLanguage, "ru" | "th">, string>> = {
 	"browser.back": { en: "Back", zh: "后退" },
 	"browser.copyImage": { en: "Copy Image", zh: "复制图片" },
 	"browser.copyImageAddress": { en: "Copy Image Address", zh: "复制图片地址" },
@@ -249,12 +250,24 @@ export function getMainLanguage(): MainLanguage {
 	return languageFromLocale(app.getLocale());
 }
 
+/** ru/th live in native-*.ts tables; en/zh are columns of TEXT. */
+function textFor(language: MainLanguage, key: MainTextKey): string {
+	switch (language) {
+		case "ru":
+			return RU_MAIN_TEXT[key];
+		case "th":
+			return TH_MAIN_TEXT[key];
+		default:
+			return TEXT[key][language];
+	}
+}
+
 export function mainT(
 	key: MainTextKey,
 	language = getMainLanguage(),
 	params?: Record<string, string | number>,
 ): string {
-	const text = language === "ru" ? RU_MAIN_TEXT[key] : TEXT[key][language];
+	const text = textFor(language, key);
 	if (!params) return text;
 	return text.replace(/\{(\w+)\}/g, (match, name: string) => (name in params ? String(params[name]) : match));
 }

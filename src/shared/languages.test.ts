@@ -11,12 +11,14 @@ describe("interface languages", () => {
 		expect(languageFromLocale("ru-RU")).toBe("ru");
 		expect(languageFromLocale("RU")).toBe("ru");
 		expect(languageFromLocale("zh-CN")).toBe("zh");
+		expect(languageFromLocale("th-TH")).toBe("th");
 		expect(languageFromLocale("de-DE")).toBe("en");
 	});
 	it("cycles through every language for tray shortcuts", () => {
 		expect(nextLanguage("en")).toBe("ru");
 		expect(nextLanguage("ru")).toBe("zh");
-		expect(nextLanguage("zh")).toBe("en");
-		expect(LANGUAGES.map(language => language.name)).toEqual(["English", "Русский", "中文"]);
+		expect(nextLanguage("zh")).toBe("th");
+		expect(nextLanguage("th")).toBe("en");
+		expect(LANGUAGES.map(language => language.name)).toEqual(["English", "Русский", "中文", "ไทย"]);
 	});
 });
