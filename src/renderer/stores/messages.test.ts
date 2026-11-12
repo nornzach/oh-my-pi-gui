@@ -271,6 +271,70 @@ describe("transcript hydration", () => {
 		expect(state.streamingMessage).toBeNull();
 	});
 
+	describe("a transcript read while the reply's tools run", () => {
+		const signedThinking = {
+			type: "thinking" as const,
+			thinking: "Check the hosts.",
+			thinkingSignature: "reasoning_content",
+		};
+		const reply: AgentMessage = {
+			role: "assistant",
+			content: [
+				signedThinking,
+				{ type: "text", text: "Testing access:" },
+				{ type: "toolCall", id: "call_one", name: "bash", arguments: { command: "ssh a true" } },
+			],
+			timestamp: 3,
+		};
+		const user: AgentMessage = { role: "user", content: "survey", timestamp: 2, entryId: "user-entry" };
+		// The agent's transcript drops the running call and the thinking signature.
+		const stripped: AgentMessage = {
+			...reply,
+			content: [
+				{ type: "thinking", thinking: "Check the hosts." },
+				{ type: "text", text: "Testing access:" },
+			],
+			strippedToolCalls: 1,
+			entryId: "reply-entry",
+		};
+		const shown = () => {
+			const state = useMessagesStore.getState();
+			return [...state.messages, ...state.liveMessages];
+		};
+
+		it("shows the reply once, with its tool call, when the read lands after message_end", () => {
+			useMessagesStore.setState({ messages: [user], totalMessages: 1 });
+			useMessagesStore.getState().applyEvents([
+				{ type: "message_start", message: reply },
+				{ type: "message_end", message: reply },
+			]);
+
+			useMessagesStore.getState().reconcileFetched([user, stripped]);
+
+			expect(shown()).toEqual([user, { ...reply, entryId: "reply-entry" }]);
+		});
+
+		it("shows the reply once, with its tool call, when the read overtakes message_end", () => {
+			useMessagesStore.getState().reconcileFetched([user, stripped]);
+			useMessagesStore.getState().applyEvents([
+				{ type: "message_start", message: reply },
+				{ type: "message_end", message: reply },
+			]);
+
+			expect(shown()).toEqual([user, { ...reply, entryId: "reply-entry" }]);
+		});
+
+		it("keeps a different reply that shares the timestamp as its own row", () => {
+			const other: AgentMessage = { ...reply, content: [{ type: "text", text: "Another answer" }] };
+			useMessagesStore.setState({ messages: [user], totalMessages: 1 });
+			useMessagesStore.getState().applyEvents([{ type: "message_end", message: other }]);
+
+			useMessagesStore.getState().reconcileFetched([user, stripped]);
+
+			expect(shown()).toEqual([user, stripped, other]);
+		});
+	});
+
 	it("retires the local echo when the transcript already committed its expanded prompt", () => {
 		const delivered: AgentMessage = { role: "user", content: "expanded question", timestamp: 2 };
 		const committed = { ...delivered, entryId: "user-entry" };

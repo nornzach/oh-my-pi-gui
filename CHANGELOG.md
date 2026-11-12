@@ -5,6 +5,7 @@
 ### Fixed
 - Finished sub-agents no longer pile up in the Agents card above the composer. The card lists only the task calls still at work, so completed, failed, cancelled and stale agents from earlier tasks drop out of it. The drawer's Agents tab still lists every one.
 - An expanded step group no longer runs off the right edge of the transcript: with a long one-line command inside, the group and the text around it overflowed the column and the transcript scrolled sideways. Thinking blocks and tool details opened the same way are fixed too.
+- A running turn no longer shows a reply twice, once without its tool rows and once with them. Each reply now appears once, with its tool rows, while its tools run.
 - Letter shortcuts follow your keyboard layout: under Colemak, Dvorak or AZERTY, ⇧⌘O is the key that types O rather than the key in O's place on a US keyboard. This applies to the system-wide show/hide shortcut, keys recorded in Settings → Keyboard shortcuts, the app's own shortcuts and the built-in browser's keys; layouts without Latin letters keep US positions ([#49](https://github.com/nornzach/oh-my-pi-gui/issues/49)).
 
 ## [0.9.42] - 2026-11-12

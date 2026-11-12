@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { AgentMessage, AgentSessionEvent, MessagesPage } from "../../shared/rpc-types";
-import { messageIdentity, sameMessageContent } from "../lib/message-identity";
+import { isStrippedCopyOf, messageIdentity, sameMessageContent } from "../lib/message-identity";
 import { createScopedStoreHook } from "./session-runtime-context";
 
 /**
@@ -93,6 +93,23 @@ function alreadyCommitted(message: AgentMessage, committed: AgentMessage[]): boo
 	return committed.some(
 		entry => entry.entryId !== undefined && messageIdentity(entry) === identity && sameMessageContent(message, entry),
 	);
+}
+
+/**
+ * A transcript read while a reply's tools run returns that reply without its
+ * tool calls. Put the delivered reply back in its place under the committed
+ * entry id, so the row keeps its tool rows and matches the live delivery.
+ */
+function restoreStrippedReplies(committed: AgentMessage[], delivered: readonly AgentMessage[]): AgentMessage[] {
+	let next = committed;
+	for (const message of delivered) {
+		const index = next.findIndex(entry => entry.entryId !== undefined && isStrippedCopyOf(entry, message));
+		const entry = next[index];
+		if (!entry) continue;
+		if (next === committed) next = [...committed];
+		next[index] = { ...message, entryId: entry.entryId };
+	}
+	return next;
 }
 
 function appendLiveMessages(
@@ -235,6 +252,8 @@ export const createMessagesStore = () =>
 						break;
 					}
 					case "message_end":
+						// A transcript read that overtook this delivery may hold the reply without its tool calls.
+						if (event.message.role === "assistant") messages = restoreStrippedReplies(messages, [event.message]);
 						liveMessages = appendLiveMessages(liveMessages, [event.message], messages);
 						if (event.message.role === "assistant") {
 							streamingMessage = null;
@@ -323,8 +342,9 @@ export const createMessagesStore = () =>
 			set(s => ({
 				liveMessages: s.liveMessages.filter(message => isOptimisticUser(message) && !message.optimisticDelivered),
 			})),
-		reconcileFetched: fetched => {
+		reconcileFetched: transcript => {
 			const state = get();
+			const fetched = restoreStrippedReplies(transcript, state.liveMessages);
 			const committedByIdentity = new Map<string, AgentMessage[]>();
 			for (const message of fetched) {
 				const identity = messageIdentity(message);
