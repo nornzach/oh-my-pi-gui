@@ -27,7 +27,7 @@ import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { parseComposerMode } from "../../lib/input-modes";
-import { FOLLOW_UP_CHORD, isFollowUpSend, onEscape } from "../../lib/keymap";
+import { effectiveOverrides, FOLLOW_UP_CHORD, isComposerShortcut, isFollowUpSend, onEscape } from "../../lib/keymap";
 import { abortActiveTurn } from "../../lib/messages";
 import {
 	dropReferencedPastes,
@@ -604,14 +604,15 @@ export function InputArea() {
 				return;
 			}
 		}
-		// Ctrl+R: history search overlay (TUI `app.history.search`).
-		if (e.key === "r" && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+		// ⌃R unless remapped or turned off: history search overlay (TUI `app.history.search`).
+		const shortcuts = effectiveOverrides(useUiStore.getState().keymapOverrides, useUiStore.getState().keymapDisabled);
+		if (isComposerShortcut("composer.history", e, shortcuts)) {
 			e.preventDefault();
 			setHistorySearchOpen(open => !open);
 			return;
 		}
-		// ⌃G: fullscreen editor dialog.
-		if (e.key === "g" && e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+		// ⌃G unless remapped or turned off: fullscreen editor dialog.
+		if (isComposerShortcut("composer.editor", e, shortcuts)) {
 			e.preventDefault();
 			openDraftEditor();
 			return;

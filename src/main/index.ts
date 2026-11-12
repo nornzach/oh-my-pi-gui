@@ -6,9 +6,8 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { app, BrowserWindow, desktopCapturer, globalShortcut, nativeImage, session, webContents } from "electron";
+import { app, BrowserWindow, desktopCapturer, nativeImage, session, webContents } from "electron";
 import Store from "electron-store";
-import { nativeAccelerator } from "../shared/hotkeys";
 import type { SessionKind } from "../shared/ipc-types";
 import { installQuitGuard, requestQuit } from "./app-quit";
 import { BrowserHost } from "./browser-host";
@@ -28,6 +27,7 @@ import { writeRuntimeLog } from "./runtime-log";
 import { SchedulerHost } from "./scheduler/host";
 import { SessionIndex } from "./session-index";
 import { shellSpawnEnv } from "./shell-env";
+import { bindWindowToggle } from "./shortcuts";
 import { SidecarManager, type SidecarOptions } from "./sidecar";
 import { SidecarPool } from "./sidecar-pool";
 import { StatsClient } from "./stats-client";
@@ -432,9 +432,10 @@ app.whenReady().then(() => {
 	});
 	schedulerHost?.start();
 
-	// Global shortcut: Cmd+Shift+O — toggle focused window, else show the most
-	// recent, else spawn one (multi-window decision tree).
-	globalShortcut.register(nativeAccelerator("window.toggle"), () => {
+	// System-wide show/hide (⇧⌘O unless the user changed or turned it off in
+	// Settings → Keyboard shortcuts): toggle the focused window, else show the
+	// most recent, else spawn one (multi-window decision tree).
+	bindWindowToggle(() => {
 		const focused = BrowserWindow.getFocusedWindow();
 		if (focused && !focused.isDestroyed() && windowManager.recordFor(focused)) {
 			if (focused.isVisible()) focused.hide();

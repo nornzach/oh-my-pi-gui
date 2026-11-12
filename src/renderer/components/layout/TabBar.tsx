@@ -69,7 +69,7 @@ import {
 	useTabsStore,
 	visibleTabIds,
 } from "../../stores/tabs";
-import { type TabWidth, useUiStore } from "../../stores/ui";
+import { type TabWidth, useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
 import { AgentPageChips } from "../agents/AgentPageChips";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor, type ContextMenuItem } from "../common/ContextMenu";
 import { type TabSearchEntry, TabSearchMenu } from "./TabSearchMenu";
@@ -869,7 +869,7 @@ function NewTabMenu({ buttonClass }: { buttonClass: string }) {
 	const t = useT();
 	const openTab = useTabsStore(s => s.openTab);
 	const openWorktreeDialog = useUiStore(s => s.openWorktreeDialog);
-	const keymapOverrides = useUiStore(s => s.keymapOverrides);
+	const keymapOverrides = useEffectiveKeymapOverrides();
 	const [agentChord = ""] = actionChords(KEYMAP_ACTION_BY_ID["tab.new"], keymapOverrides);
 	const [chatChord = ""] = actionChords(KEYMAP_ACTION_BY_ID["tab.newChat"], keymapOverrides);
 	return (

@@ -41,6 +41,7 @@ export const SSH_TAB_ID = "ssh";
 export const UPDATES_TAB_ID = "updates";
 export const ADVANCED_TAB_ID = "advanced";
 export const GUI_TAB_ID = "gui";
+export const SHORTCUTS_TAB_ID = "shortcuts";
 
 export const MANAGEMENT_TAB_IDS = new Set([
 	SKILLS_TAB_ID,
@@ -55,7 +56,13 @@ export const MANAGEMENT_TAB_IDS = new Set([
 
 export function isAgentSchemaTab(tab: string, schema: { tabs: { id: string }[] } | null): boolean {
 	if (schema?.tabs.some(schemaTab => schemaTab.id === tab)) return true;
-	return !MANAGEMENT_TAB_IDS.has(tab) && tab !== GUI_TAB_ID && tab !== CAPABILITIES_TAB_ID && tab !== ADVANCED_TAB_ID;
+	return (
+		!MANAGEMENT_TAB_IDS.has(tab) &&
+		tab !== GUI_TAB_ID &&
+		tab !== SHORTCUTS_TAB_ID &&
+		tab !== CAPABILITIES_TAB_ID &&
+		tab !== ADVANCED_TAB_ID
+	);
 }
 
 export const SEARCHABLE_MANAGEMENT_TAB_IDS = new Set([
@@ -79,7 +86,13 @@ export function buildSettingsNavGroups(
 	} | null,
 ): SettingsNavGroup[] {
 	const groups: SettingsNavGroup[] = [
-		{ id: "experience", items: [{ id: GUI_TAB_ID, label: "Interface" }] },
+		{
+			id: "experience",
+			items: [
+				{ id: GUI_TAB_ID, label: "Interface" },
+				{ id: SHORTCUTS_TAB_ID, label: "Keyboard shortcuts" },
+			],
+		},
 		{ id: "models", items: [] },
 		{ id: "tasks", items: [] },
 		{ id: "tools", items: [] },
@@ -176,6 +189,13 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		labelKey: "settings.gui.proxy",
 		aliases: "proxyUrl proxy socks network 代理 网络",
 		tabId: ADVANCED_TAB_ID,
+	},
+	{
+		id: "shortcuts",
+		tabId: SHORTCUTS_TAB_ID,
+		labelKey: "settings.tabs.shortcuts",
+		aliases:
+			"keymapOverrides keymapDisabled keyboard shortcuts hotkeys keybindings keys 快捷键 键盘 按键 горячие клавиши сочетания",
 	},
 	{
 		id: "launch",

@@ -2,10 +2,10 @@
  * Native application menu for the omp GUI.
  */
 import { app, Menu, type MenuItemConstructorOptions, shell } from "electron";
-import { nativeAccelerator } from "../shared/hotkeys";
 import { IPC_EVENTS, type MenuAction } from "../shared/ipc-types";
 import type { BrowserHost } from "./browser-host";
 import { getMainLanguage, mainT } from "./i18n";
+import { nativeShortcut } from "./shortcuts";
 import type { SpawnWindow, WindowManager } from "./window";
 
 function sendMenuAction(windowManager: WindowManager, spawnWindow: SpawnWindow, action: MenuAction): void {
@@ -61,7 +61,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 			submenu: [
 				{
 					label: mainT("menu.openProject", language),
-					// No accelerator: ⌘⇧O is owned by the globalShortcut window
+					// No accelerator: ⇧⌘O is the default of the system-wide window
 					// toggle (index.ts). Registering it here too makes macOS fire
 					// both (dialog + hide) and Windows swallow the menu shortcut
 					// entirely. The menu item stays clickable.
@@ -70,7 +70,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				{ type: "separator" },
 				{
 					label: mainT("menu.newSession", language),
-					accelerator: nativeAccelerator("session.new"),
+					accelerator: nativeShortcut("session.new"),
 					click: () => sendMenuAction(windowManager, spawnWindow, "new-session"),
 				},
 				{
@@ -86,7 +86,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				},
 				{
 					label: mainT("menu.newWindow", language),
-					accelerator: nativeAccelerator("window.new"),
+					accelerator: nativeShortcut("window.new"),
 					click: () => {
 						// Open a parallel window in the target window's project (its
 						// sidecar keeps running untouched in the current window). With no
@@ -122,7 +122,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				{ type: "separator" },
 				{
 					label: mainT("menu.find", language),
-					accelerator: nativeAccelerator("browser.find"),
+					accelerator: nativeShortcut("browser.find"),
 					click: () => {
 						if (!browserHost.find("find")) sendMenuAction(windowManager, spawnWindow, "find");
 					},
@@ -203,7 +203,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				},
 				{
 					label: mainT("menu.closeWindow", language),
-					accelerator: nativeAccelerator("window.close"),
+					accelerator: nativeShortcut("window.close"),
 					click: () => windowManager.getTargetWindow()?.close(),
 				},
 				{ type: "separator" },
@@ -239,7 +239,7 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				},
 				{
 					label: mainT("menu.exportHtml", language),
-					accelerator: nativeAccelerator("session.exportHtml"),
+					accelerator: nativeShortcut("session.exportHtml"),
 					click: () => sendMenuAction(windowManager, spawnWindow, "export-html"),
 				},
 				{

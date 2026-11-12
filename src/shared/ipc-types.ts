@@ -69,6 +69,8 @@ import type {
 export const IPC_EVENTS = {
 	/** Global interface language changed in any app window. */
 	LANGUAGE_CHANGED: "prefs:language-changed",
+	/** The user's saved shortcuts changed in some app window. */
+	KEYMAP_CHANGED: "prefs:keymap-changed",
 	/** Batched agent session events (16ms cadence) */
 	EVENTS_BATCH: "rpc:events",
 	/** Sidecar connection status change */
@@ -238,6 +240,8 @@ export const IPC_COMMANDS = {
 	/** Set GUI preferences */
 	PREFS_SET: "prefs:set",
 	PREFS_UPDATE_LAUNCH_PROFILE: "prefs:update-launch-profile",
+	/** Whether the system-wide show/hide shortcut is registered (→ IpcWindowToggleStatus) */
+	PREFS_WINDOW_TOGGLE_STATUS: "prefs:window-toggle-status",
 	/** Restart sidecar */
 	SIDECAR_RESTART: "sidecar:restart",
 	/** Get sidecar status */
@@ -745,6 +749,14 @@ export interface IpcPrefsGetPayload {
 export interface IpcPrefsSetPayload {
 	key: string;
 	value: unknown;
+}
+
+/** The system-wide show/hide shortcut as the main process applied it. */
+export interface IpcWindowToggleStatus {
+	/** Electron accelerator in use; absent when the user turned the shortcut off. */
+	accelerator?: string;
+	/** False when another app already holds the accelerator. */
+	registered: boolean;
 }
 
 export interface IpcUpdateLaunchProfilePayload {
@@ -1672,6 +1684,9 @@ export interface OmpApi {
 		get(key?: string): Promise<unknown>;
 		set(key: string, value: unknown): Promise<void>;
 		onLanguageChanged(callback: (language: Language) => void): () => void;
+		/** Fires in every window after any window saves shortcut changes. */
+		onKeymapChanged(callback: () => void): () => void;
+		windowToggleStatus(): Promise<IpcWindowToggleStatus>;
 		updateLaunchProfile(cwd: string, patch: Partial<LaunchProfile>): Promise<LaunchProfile>;
 	};
 	sidecar: {

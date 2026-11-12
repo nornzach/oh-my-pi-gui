@@ -4,8 +4,10 @@
  * The TUI's `~/.omp/agent/keybindings.yml` is inert for the GUI: the agent
  * process's KeybindingsManager feeds only the TUI key dispatch, and
  * `omp --mode rpc-ui` never parses keys. GUI remapping is therefore GUI-local
- * by design — overrides live in the `keymapOverrides` prefs key (ui store
- * hydrates/persists) and are NEVER written to keybindings.yml.
+ * by design — overrides live in the `keymapOverrides` prefs key and turned-off
+ * shortcuts in `keymapDisabled` (ui store hydrates/persists; the main process
+ * reads both for the menu and the system-wide show/hide shortcut). They are
+ * NEVER written to keybindings.yml.
  *
  * Model: an action table (TUI app.* naming for familiarity) of GUI-remappable
  * chords. At boot and on every change the defaults + overrides compile into a
@@ -28,21 +30,33 @@
  * CmdOrCtrl); user bindings are taken literally on every platform.
  */
 
-import { type Chord, serializeChord } from "../../shared/chord";
+import { chordFromEvent, type KeyEventLike, parseChord, serializeChord } from "../../shared/chord";
 import { NATIVE_CHORDS } from "../../shared/hotkeys";
 import { isImeKeyEvent } from "./ime";
 
 export * from "../../shared/chord";
 
-/** Sections of the hotkeys reference the remappable rows are filed under. */
+/** Sections of the shortcut list the app's own actions are filed under. */
 export type HotkeyGroupId = "generation" | "view" | "session";
 
-/** Owner class of a non-remappable chord: a focused control, or the native layer. */
-export type ReservedChordGroup = "input" | "native";
+/** Every section of the shortcut list: the app's groups, the composer's keys, and app-level shortcuts. */
+export type ShortcutGroupId = "input" | HotkeyGroupId | "native";
+
+/** Sections in list order; "sidebar" holds only built-in keys. Titles are `hotkeys.group.<id>`. */
+export const SHORTCUT_SECTIONS = ["input", "generation", "view", "sidebar", "session", "native"] as const;
+export type ShortcutSectionId = (typeof SHORTCUT_SECTIONS)[number];
+
+/**
+ * Who handles a shortcut. "app" = the renderer keymap below (App.tsx);
+ * "composer" = InputArea's own keydown while the composer has focus;
+ * "native" = the menu or the system-wide show/hide shortcut in the main
+ * process, which takes the key before any page sees it.
+ */
+export type ShortcutKind = "app" | "composer" | "native";
 
 export interface KeymapAction {
 	readonly id: string;
-	/** i18n key for the row label in HotkeysDialog. */
+	/** i18n key for the row label. */
 	readonly labelKey: string;
 	/** Canonical default chords (first is the primary display chord), as macOS spells them. */
 	readonly defaults: readonly string[];
@@ -58,119 +72,31 @@ export interface KeymapAction {
 	 * False = suppressed by overlayOpen / defaultPrevented / [role=dialog].
 	 */
 	readonly overlaySafe: boolean;
-	/** Required so no action can exist without a row in the reference dialog. */
+	/** Required so no action can exist without a row in the shortcut list. */
 	readonly hotkeyGroup: HotkeyGroupId;
 }
 
-/** A chord something other than the keymap claims: the composer's own keydown
- *  (InputArea.handleKeyDown) or the native menu / global shortcut. Neither can
- *  be dispatched through the registry, so neither is remappable — but both
- *  occupy the chord, and the recorder must say so. */
-export interface ReservedChord {
+/** One row of the shortcut list, whoever handles it. */
+export interface ShortcutEntry {
 	readonly id: string;
 	readonly labelKey: string;
-	readonly chord: string;
-	readonly hotkeyGroup: ReservedChordGroup;
+	readonly kind: ShortcutKind;
+	readonly group: ShortcutGroupId;
+	/** As macOS spells them; off macOS a ⌘ default becomes ⌃ (see defaultChords). */
+	readonly defaults: readonly string[];
+	readonly offMacDefaults?: readonly string[];
+	/** Shown for reference only: it cannot be changed or turned off. */
+	readonly fixed?: boolean;
 }
 
-/** actionId → replacement chord list (canonical or aliased; sanitized on hydration). */
+/**
+ * shortcut id → the user's chords (canonical or aliased; sanitized on hydration).
+ * Effective tables (see effectiveOverrides) also hold `[]` for a shortcut the user turned off.
+ */
 export type KeymapOverrides = Record<string, string[]>;
 
 /** Whether this renderer runs on macOS, where ⌘ is the command key. */
 export const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-
-const MOD_SYMBOLS: Record<string, "ctrl" | "alt" | "shift" | "meta"> = {
-	"⌃": "ctrl",
-	"⌥": "alt",
-	"⇧": "shift",
-	"⌘": "meta",
-};
-
-const TEXT_MOD_ALIASES: Record<string, "ctrl" | "alt" | "shift" | "meta"> = {
-	ctrl: "ctrl",
-	control: "ctrl",
-	alt: "alt",
-	option: "alt",
-	shift: "shift",
-	cmd: "meta",
-	command: "meta",
-	meta: "meta",
-	super: "meta",
-};
-
-/** Textual aliases for multi-char base keys (single-char glyphs pass through as-is). */
-const NAMED_KEY_ALIASES: Record<string, string> = {
-	up: "↑",
-	arrowup: "↑",
-	down: "↓",
-	arrowdown: "↓",
-	left: "←",
-	arrowleft: "←",
-	right: "→",
-	arrowright: "→",
-	enter: "↵",
-	return: "↵",
-	tab: "⇥",
-	space: "␣",
-	spacebar: "␣",
-	esc: "⎋",
-	escape: "⎋",
-	backspace: "⌫",
-	delete: "⌦",
-	del: "⌦",
-};
-
-function normalizeBaseKey(raw: string): string | null {
-	if (!raw) return null;
-	if (raw.length === 1) {
-		// Letters canonicalize uppercase; digits/punctuation/glyphs stay literal.
-		return /^[a-z]$/i.test(raw) ? raw.toUpperCase() : raw;
-	}
-	const alias = NAMED_KEY_ALIASES[raw.toLowerCase()];
-	if (alias) return alias;
-	const fkey = /^f(\d{1,2})$/i.exec(raw);
-	if (fkey) {
-		const n = Number(fkey[1]);
-		if (n >= 1 && n <= 12) return `F${n}`;
-	}
-	return null;
-}
-
-/**
- * Parse a chord string (canonical unicode form or textual alias form) into a
- * Chord. Returns null for anything without a base key or without at least one
- * of ⌃/⌥/⌘ — unmodified and shift-only "chords" are unbindable by design.
- */
-export function parseChord(input: string): Chord | null {
-	const trimmed = input.trim();
-	if (!trimmed) return null;
-	const flags = { ctrl: false, alt: false, shift: false, meta: false };
-	let base = "";
-	if (/[⌃⌥⇧⌘]/u.test(trimmed)) {
-		// Canonical form: modifier glyphs may appear in any order; the rest is the base key.
-		for (const ch of trimmed) {
-			const mod = MOD_SYMBOLS[ch];
-			if (mod) flags[mod] = true;
-			else base += ch;
-		}
-	} else {
-		// Textual form: consume leading "modifier<sep>" tokens; whatever remains is
-		// the base key, so "ctrl+-" binds "-" and "ctrl++" binds "+".
-		let rest = trimmed;
-		for (;;) {
-			const match = /^([a-z]+)\s*[+-]\s*/i.exec(rest);
-			const mod = match?.[1] ? TEXT_MOD_ALIASES[match[1].toLowerCase()] : undefined;
-			if (!match || !mod) break;
-			flags[mod] = true;
-			rest = rest.slice(match[0].length);
-		}
-		base = rest;
-	}
-	const key = normalizeBaseKey(base.trim());
-	if (!key) return null;
-	if (!flags.ctrl && !flags.alt && !flags.meta) return null;
-	return { ...flags, key };
-}
 
 /** Anything an Escape handler can claim: React synthetic events and native events alike. */
 interface EscapeCapable {
@@ -196,7 +122,7 @@ export function onEscape(event: EscapeCapable, dismiss: () => void): boolean {
 
 /**
  * GUI-remappable actions (TUI app.* naming, plan/17 §6.2). Single source for
- * App.tsx's dispatch and HotkeysDialog's rows; the native menu keeps its own
+ * App.tsx's dispatch and the shortcut list; the native menu keeps its own
  * chords in shared/hotkeys.ts because Electron resolves those before the
  * renderer sees a keydown.
  * `defaults` for the ⌘ actions include their ⌃ twin: the pre-B3 handler
@@ -352,13 +278,112 @@ export const KEYMAP_ACTIONS = [
 	{ id: "hotkeys", labelKey: "hotkeys.row.hotkeys", defaults: ["⌘/", "⌃/"], overlaySafe: true, hotkeyGroup: "view" },
 ] as const satisfies readonly KeymapAction[];
 
-/** Chords the composer's own keydown handler owns (InputArea.handleKeyDown).
- *  They still work outside the composer, so a collision is a warning. */
-const COMPOSER_CHORDS: readonly ReservedChord[] = [
-	{ id: "composer.followUp", labelKey: "hotkeys.row.followUpSend", chord: "⌘↵", hotkeyGroup: "input" },
-	{ id: "composer.history", labelKey: "hotkeys.row.history", chord: "⌃R", hotkeyGroup: "input" },
-	{ id: "composer.editor", labelKey: "hotkeys.row.composerEditor", chord: "⌃G", hotkeyGroup: "input" },
+/** The composer's own keys (InputArea.handleKeyDown), active while it has focus. */
+const COMPOSER_SHORTCUTS: readonly ShortcutEntry[] = [
+	// ⌘↵ is Enter with a modifier, not a chord of its own: it follows the send key.
+	{
+		id: "composer.followUp",
+		labelKey: "hotkeys.row.followUpSend",
+		kind: "composer",
+		group: "input",
+		defaults: ["⌘↵"],
+		fixed: true,
+	},
+	{ id: "composer.history", labelKey: "hotkeys.row.history", kind: "composer", group: "input", defaults: ["⌃R"] },
+	{
+		id: "composer.editor",
+		labelKey: "hotkeys.row.composerEditor",
+		kind: "composer",
+		group: "input",
+		defaults: ["⌃G"],
+	},
 ];
+
+/** Ids of the composer shortcuts InputArea looks up. */
+export type ComposerShortcutId = "composer.history" | "composer.editor";
+
+/** Every shortcut in list order: composer keys, the app's actions by group, then app-level shortcuts. */
+export const SHORTCUT_ENTRIES: readonly ShortcutEntry[] = [
+	...COMPOSER_SHORTCUTS,
+	...(["generation", "view", "session"] as const).flatMap(group =>
+		KEYMAP_ACTIONS.filter(action => action.hotkeyGroup === group).map(
+			(action: KeymapAction): ShortcutEntry => ({
+				id: action.id,
+				labelKey: action.labelKey,
+				kind: "app",
+				group,
+				defaults: action.defaults,
+				offMacDefaults: action.offMacDefaults,
+			}),
+		),
+	),
+	...NATIVE_CHORDS.map(
+		(entry): ShortcutEntry => ({
+			id: entry.id,
+			labelKey: entry.labelKey,
+			kind: "native",
+			group: "native",
+			defaults: [entry.chord],
+		}),
+	),
+];
+
+/** A built-in key the list shows for reference: typing keys, modifier clicks, and find steps. */
+export interface BuiltInShortcut {
+	readonly section: ShortcutSectionId;
+	readonly keys: string;
+	readonly labelKey: string;
+	/** Listed before the section's shortcuts rather than after. */
+	readonly first?: boolean;
+}
+
+/**
+ * The keys no keymap owns. Unmodified keys (Enter, @, /) and the shift-only
+ * ⇧Tab / Escape belong to focused controls and stay as they are; terminal-only
+ * TUI rows (suspend, display reset, $EDITOR) are deliberately absent.
+ */
+export const BUILT_IN_SHORTCUTS: readonly BuiltInShortcut[] = [
+	{ section: "input", keys: "Enter", labelKey: "hotkeys.row.send", first: true },
+	{ section: "input", keys: "⇧Enter", labelKey: "hotkeys.row.newline", first: true },
+	{ section: "input", keys: "-> / =>", labelKey: "hotkeys.row.queueShorthand", first: true },
+	{ section: "input", keys: "!", labelKey: "hotkeys.row.bashMode", first: true },
+	{ section: "input", keys: "$", labelKey: "hotkeys.row.pythonMode", first: true },
+	{ section: "input", keys: "@", labelKey: "hotkeys.row.mention", first: true },
+	{ section: "input", keys: "/", labelKey: "hotkeys.row.commands", first: true },
+	{ section: "input", keys: "↑ / ↓", labelKey: "hotkeys.row.historyNav", first: true },
+	{ section: "generation", keys: "Esc", labelKey: "hotkeys.row.abort", first: true },
+	{ section: "generation", keys: "⇧Tab", labelKey: "hotkeys.row.thinkingCycle", first: true },
+	{ section: "view", keys: "Enter / ⇧Enter", labelKey: "hotkeys.row.findStep" },
+	// The menu's accelerators: ⌘G on macOS, F3 elsewhere (main/menu.ts).
+	{ section: "view", keys: IS_MAC ? "⌘G / ⇧⌘G" : "F3 / ⇧F3", labelKey: "hotkeys.row.findStepMenu" },
+	// The sidebar takes either modifier; each platform is shown its own.
+	{ section: "sidebar", keys: IS_MAC ? "⌘-click" : "⌃-click", labelKey: "hotkeys.row.sidebarToggleSelect" },
+	{ section: "sidebar", keys: "⇧-click", labelKey: "hotkeys.row.sidebarRangeSelect" },
+	{ section: "sidebar", keys: platformChord("⌘A"), labelKey: "hotkeys.row.sidebarSelectAll" },
+	{ section: "sidebar", keys: "⌫", labelKey: "hotkeys.row.sidebarDeleteSelected" },
+	{ section: "sidebar", keys: "Esc", labelKey: "hotkeys.row.sidebarEndSelect" },
+];
+
+/** A section's rows in display order: leading built-in keys, its shortcuts, then the rest. */
+export function shortcutSectionRows(
+	section: ShortcutSectionId,
+): ({ kind: "entry"; entry: ShortcutEntry } | { kind: "builtIn"; row: BuiltInShortcut })[] {
+	const builtIn = BUILT_IN_SHORTCUTS.filter(row => row.section === section);
+	return [
+		...builtIn.filter(row => row.first).map(row => ({ kind: "builtIn" as const, row })),
+		...SHORTCUT_ENTRIES.filter(entry => entry.group === section).map(entry => ({ kind: "entry" as const, entry })),
+		...builtIn.filter(row => !row.first).map(row => ({ kind: "builtIn" as const, row })),
+	];
+}
+
+/** The shortcuts a user can change or turn off. */
+export const EDITABLE_SHORTCUTS: readonly ShortcutEntry[] = SHORTCUT_ENTRIES.filter(entry => !entry.fixed);
+
+const shortcutById = new Map(SHORTCUT_ENTRIES.map(entry => [entry.id, entry]));
+
+export function shortcutEntry(id: string): ShortcutEntry | undefined {
+	return shortcutById.get(id);
+}
 
 /** The composer's follow-up send chord as the platform's keyboard has it. */
 export const FOLLOW_UP_CHORD = platformChord("⌘↵");
@@ -389,62 +414,51 @@ export function platformChord(chord: string, mac = IS_MAC): string {
 	return serializeChord({ ...parsed, ctrl: true, meta: false });
 }
 
-/** An action's default chords on this platform. */
-export function defaultChords(action: KeymapAction, mac = IS_MAC): readonly string[] {
-	if (mac) return action.defaults;
-	return [...new Set((action.offMacDefaults ?? action.defaults).map(chord => platformChord(chord, false)))];
+/** A shortcut's default chords on this platform. */
+export function defaultChords(
+	shortcut: Pick<ShortcutEntry, "defaults" | "offMacDefaults">,
+	mac = IS_MAC,
+): readonly string[] {
+	if (mac) return shortcut.defaults;
+	return [...new Set((shortcut.offMacDefaults ?? shortcut.defaults).map(chord => platformChord(chord, false)))];
 }
 
-/** The chords that fire an action: the user's binding, else its platform defaults. */
-export function actionChords(action: KeymapAction, overrides: KeymapOverrides, mac = IS_MAC): readonly string[] {
-	const userChords = overrides[action.id];
-	return userChords?.length ? userChords : defaultChords(action, mac);
+/**
+ * The chords that fire a shortcut: the user's binding, else its platform defaults.
+ * An effective table's `[]` (turned off) yields none.
+ */
+export function actionChords(
+	shortcut: Pick<ShortcutEntry, "id" | "defaults" | "offMacDefaults">,
+	overrides: KeymapOverrides,
+	mac = IS_MAC,
+): readonly string[] {
+	return overrides[shortcut.id] ?? defaultChords(shortcut, mac);
 }
 
-/** Every chord the GUI already owns that the registry cannot dispatch. The
- *  native accelerators are CmdOrCtrl, so their ⌘ follows the platform too. */
-export function reservedChords(mac = IS_MAC): readonly ReservedChord[] {
-	return [
-		...COMPOSER_CHORDS.map(entry => ({ ...entry, chord: platformChord(entry.chord, mac) })),
-		...NATIVE_CHORDS.map(entry => ({
-			id: entry.id,
-			labelKey: entry.labelKey,
-			chord: platformChord(entry.chord, mac),
-			hotkeyGroup: "native" as const,
-		})),
-	];
+/** The saved overrides with `[]` for every shortcut the user turned off. */
+export function effectiveOverrides(overrides: KeymapOverrides, disabled: readonly string[]): KeymapOverrides {
+	if (disabled.length === 0) return overrides;
+	const result: KeymapOverrides = { ...overrides };
+	for (const id of disabled) result[id] = [];
+	return result;
 }
 
-export const RESERVED_CHORDS: readonly ReservedChord[] = reservedChords();
-
-/** Rows the reference dialog files under a group, in registry order. */
-export function keymapActionsForGroup<const Group extends HotkeyGroupId>(
-	group: Group,
-): Extract<(typeof KEYMAP_ACTIONS)[number], { hotkeyGroup: Group }>[] {
-	return KEYMAP_ACTIONS.filter(
-		(action): action is Extract<(typeof KEYMAP_ACTIONS)[number], { hotkeyGroup: Group }> =>
-			action.hotkeyGroup === group,
-	);
+/** Whether a keydown in the composer is this composer shortcut under the effective table. */
+export function isComposerShortcut(
+	id: ComposerShortcutId,
+	event: KeyEventLike,
+	overrides: KeymapOverrides,
+	mac = IS_MAC,
+): boolean {
+	const chord = chordFromEvent(event);
+	const entry = shortcutById.get(id);
+	if (!chord || !entry) return false;
+	return actionChords(entry, overrides, mac).some(candidate => canonicalChord(candidate) === chord);
 }
 
-/** Non-remappable rows the reference dialog files under a group. */
-export function reservedChordsForGroup(group: ReservedChordGroup): ReservedChord[] {
-	return RESERVED_CHORDS.filter(entry => entry.hotkeyGroup === group);
-}
-
-export interface ChordOwner {
-	readonly labelKey: string;
-	/** "action" = a remappable registry row; the others name who holds the chord. */
-	readonly holds: "action" | ReservedChordGroup;
-}
-
-/** Who owns a chord id — a remappable action or a reserved chord. */
-export function chordOwner(id: string): ChordOwner | undefined {
-	const action: KeymapAction | undefined = KEYMAP_ACTIONS.find(candidate => candidate.id === id);
-	if (action) return { labelKey: action.labelKey, holds: "action" };
-	const reserved: ReservedChord | undefined = RESERVED_CHORDS.find(candidate => candidate.id === id);
-	if (!reserved) return undefined;
-	return { labelKey: reserved.labelKey, holds: reserved.hotkeyGroup };
+function canonicalChord(chord: string): string | null {
+	const parsed = parseChord(chord);
+	return parsed ? serializeChord(parsed) : null;
 }
 
 export type KeymapActionId = (typeof KEYMAP_ACTIONS)[number]["id"];
@@ -457,10 +471,10 @@ export const KEYMAP_ACTION_BY_ID: Readonly<Record<KeymapActionId, KeymapAction>>
 /**
  * Compile defaults + overrides into the dispatch lookup. A user's binding
  * REPLACES its action's defaults (no union — TUI parity), so a remapped
- * action's old chords go dead. Defaults are applied first and user bindings
- * second, so on a shadow the explicit user chord deterministically wins the
- * slot; user-user collisions resolve in table order (and are surfaced as
- * errors by detectConflicts before they can be saved).
+ * action's old chords go dead, and an effective `[]` leaves it unbound.
+ * Defaults are applied first and user bindings second, so on a shadow the
+ * explicit user chord deterministically wins the slot; user-user collisions
+ * resolve in table order (findShortcutConflict refuses them before they save).
  */
 export function compileKeymap<A extends KeymapAction>(
 	actions: readonly A[],
@@ -469,121 +483,94 @@ export function compileKeymap<A extends KeymapAction>(
 ): Map<string, A["id"]> {
 	const map = new Map<string, A["id"]>();
 	for (const action of actions) {
-		if (overrides[action.id]?.length) continue; // replaced, not merged
+		if (overrides[action.id] !== undefined) continue; // replaced or turned off, not merged
 		for (const raw of defaultChords(action, mac)) {
-			const parsed = parseChord(raw);
-			if (parsed) map.set(serializeChord(parsed), action.id);
+			const chord = canonicalChord(raw);
+			if (chord) map.set(chord, action.id);
 		}
 	}
 	for (const action of actions) {
-		const userChords = overrides[action.id];
-		if (!userChords?.length) continue;
-		for (const raw of userChords) {
-			const parsed = parseChord(raw);
-			if (parsed) map.set(serializeChord(parsed), action.id);
+		for (const raw of overrides[action.id] ?? []) {
+			const chord = canonicalChord(raw);
+			if (chord) map.set(chord, action.id);
 		}
 	}
 	return map;
 }
 
-export interface KeymapConflict {
-	/** "error" blocks saving (ambiguous dispatch, or a chord native code owns);
-	 *  "warning" allows it (the user binding wins the slot). */
+export interface ShortcutConflict {
+	/** "error" blocks saving: the key could not reach this shortcut. "warning" saves anyway. */
 	kind: "error" | "warning";
-	/** Canonical chord string in dispute. */
-	chord: string;
-	/** Claimants: the colliding user actions (error) or [user action, shadowed owner]. */
-	actionIds: string[];
+	/**
+	 * "taken" = another shortcut keeps the key (a menu or system shortcut, a
+	 * user binding, or another composer key). "shadow" = this replaces another
+	 * action's default. "composer" = the focused composer takes the key, and
+	 * the app action gets it everywhere else.
+	 */
+	reason: "taken" | "shadow" | "composer";
+	/** The shortcut that also claims the chord. */
+	otherId: string;
 }
 
 /**
- * (a) user-user: one chord claimed by 2+ user bindings → error (TUI
- * getConflicts parity). (b) shadow: a user chord equals another action's LIVE
- * default chord → warning — the TUI never detects this; the GUI does (plan/17
- * §6.3). Defaults of an action that is itself remapped are dead and cast no
- * shadow. (c) reserved: a user chord taken by a focused control → warning (it
- * still fires elsewhere), or by the native menu / global shortcut → error
- * (Electron resolves it before the renderer ever sees the keydown).
+ * What binding `chord` to shortcut `id` would collide with, given the
+ * effective table (turned-off shortcuts hold `[]` and claim nothing). Errors
+ * win over warnings. Menu and system shortcuts take keys before any page sees
+ * them, so any overlap with one is an error, in either direction.
  */
-export function detectConflicts(
-	actions: readonly KeymapAction[],
+export function findShortcutConflict(
+	id: string,
+	chord: string,
 	overrides: KeymapOverrides,
 	mac = IS_MAC,
-	reserved: readonly ReservedChord[] = reservedChords(mac),
-): KeymapConflict[] {
-	const liveDefaults = new Map<string, Set<string>>();
-	for (const action of actions) {
-		const chords = new Set<string>();
-		for (const raw of defaultChords(action, mac)) {
-			const parsed = parseChord(raw);
-			if (parsed) chords.add(serializeChord(parsed));
+): ShortcutConflict | null {
+	const self = shortcutById.get(id);
+	const target = canonicalChord(chord);
+	if (!self || !target) return null;
+	let warning: ShortcutConflict | null = null;
+	for (const other of SHORTCUT_ENTRIES) {
+		if (other.id === id) continue;
+		const claims = actionChords(other, overrides, mac).some(candidate => canonicalChord(candidate) === target);
+		if (!claims) continue;
+		if (self.kind === "native" || other.kind === "native")
+			return { kind: "error", reason: "taken", otherId: other.id };
+		if (self.kind === other.kind) {
+			if (self.kind === "composer") return { kind: "error", reason: "taken", otherId: other.id };
+			if (overrides[other.id]?.length) return { kind: "error", reason: "taken", otherId: other.id };
+			warning ??= { kind: "warning", reason: "shadow", otherId: other.id };
+			continue;
 		}
-		liveDefaults.set(action.id, chords);
+		warning ??= { kind: "warning", reason: "composer", otherId: other.id };
 	}
-	const userClaims = new Map<string, string[]>();
-	for (const action of actions) {
-		const userChords = overrides[action.id];
-		if (!userChords) continue;
-		for (const raw of userChords) {
-			const parsed = parseChord(raw);
-			if (!parsed) continue;
-			const chord = serializeChord(parsed);
-			const claimants = userClaims.get(chord) ?? [];
-			// The same action listing a chord twice is redundant, not a conflict.
-			if (!claimants.includes(action.id)) claimants.push(action.id);
-			userClaims.set(chord, claimants);
-		}
-	}
-	const conflicts: KeymapConflict[] = [];
-	for (const [chord, claimants] of userClaims) {
-		if (claimants.length > 1) conflicts.push({ kind: "error", chord, actionIds: claimants });
-	}
-	for (const [chord, claimants] of userClaims) {
-		if (claimants.length > 1) continue; // already reported as an error
-		const [userAction] = claimants;
-		if (!userAction) continue;
-		for (const action of actions) {
-			if (action.id === userAction) continue;
-			if (overrides[action.id]?.length) continue; // that action's defaults were replaced — dead
-			if (liveDefaults.get(action.id)?.has(chord)) {
-				conflicts.push({ kind: "warning", chord, actionIds: [userAction, action.id] });
-			}
-		}
-		for (const entry of reserved) {
-			const parsed = parseChord(entry.chord);
-			if (!parsed || serializeChord(parsed) !== chord) continue;
-			conflicts.push({
-				kind: entry.hotkeyGroup === "native" ? "error" : "warning",
-				chord,
-				actionIds: [userAction, entry.id],
-			});
-		}
-	}
-	return conflicts;
+	return warning;
 }
 
 /**
- * Validate a raw prefs payload into overrides: unknown actions are ignored
- * (prefs drift across builds), values must be string arrays, each chord must
- * parse, chords canonicalize and dedupe, and empty lists drop out (an action
- * with no chords falls back to its defaults).
+ * Validate a raw prefs payload into overrides: unknown or fixed shortcuts are
+ * ignored (prefs drift across builds), values must be string arrays, each
+ * chord must parse, chords canonicalize and dedupe, and empty lists drop out
+ * (a shortcut with no chords falls back to its defaults).
  */
-export function sanitizeOverrides(actions: readonly KeymapAction[], raw: unknown): KeymapOverrides {
+export function sanitizeOverrides(raw: unknown): KeymapOverrides {
 	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-	const known = new Set(actions.map(action => action.id));
 	const result: KeymapOverrides = {};
-	for (const [actionId, value] of Object.entries(raw as Record<string, unknown>)) {
-		if (!known.has(actionId)) continue;
-		if (!Array.isArray(value)) continue;
+	for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+		if (!editableIds.has(id) || !Array.isArray(value)) continue;
 		const chords: string[] = [];
 		for (const item of value) {
 			if (typeof item !== "string") continue;
-			const parsed = parseChord(item);
-			if (!parsed) continue;
-			const chord = serializeChord(parsed);
-			if (!chords.includes(chord)) chords.push(chord);
+			const chord = canonicalChord(item);
+			if (chord && !chords.includes(chord)) chords.push(chord);
 		}
-		if (chords.length > 0) result[actionId] = chords;
+		if (chords.length > 0) result[id] = chords;
 	}
 	return result;
 }
+
+/** Validate a raw prefs payload into the ids of turned-off shortcuts. */
+export function sanitizeDisabled(raw: unknown): string[] {
+	if (!Array.isArray(raw)) return [];
+	return [...new Set(raw.filter((id): id is string => typeof id === "string" && editableIds.has(id)))];
+}
+
+const editableIds = new Set(EDITABLE_SHORTCUTS.map(entry => entry.id));

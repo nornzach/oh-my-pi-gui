@@ -81,7 +81,7 @@ import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { usePendingSkillReviews } from "../../stores/skill-review";
 import { type SplitAxis, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
-import { useUiStore } from "../../stores/ui";
+import { useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
 import {
 	SessionAgentsScope,
 	type SidebarAgentsInfo,
@@ -185,8 +185,8 @@ function SidebarRowTitle({ className, title }: { className?: string; title: stri
 export function Sidebar() {
 	const tabRpc = useTabRpc();
 	const t = useT();
-	const keymapOverrides = useUiStore(state => state.keymapOverrides);
-	// The chords bound to each action, as the user configured them.
+	const keymapOverrides = useEffectiveKeymapOverrides();
+	// The chords bound to each action, as the user configured them (none when turned off).
 	const actionChords = useMemo(() => {
 		const chords = new Map<string, string[]>();
 		for (const [chord, action] of compileKeymap(KEYMAP_ACTIONS, keymapOverrides)) {

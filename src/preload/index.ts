@@ -44,6 +44,7 @@ import type {
 	IpcTabInfo,
 	IpcTabStatusPayload,
 	IpcTerminalFramePayload,
+	IpcWindowToggleStatus,
 	LogBatch,
 	MenuAction,
 	MenuActionPayload,
@@ -411,6 +412,9 @@ const api: OmpApi = {
 
 	prefs: {
 		onLanguageChanged: callback => subscribe<Language>(IPC_EVENTS.LANGUAGE_CHANGED, callback),
+		onKeymapChanged: callback => subscribe<void>(IPC_EVENTS.KEYMAP_CHANGED, () => callback()),
+		windowToggleStatus: () =>
+			ipcRenderer.invoke(IPC_COMMANDS.PREFS_WINDOW_TOGGLE_STATUS) as Promise<IpcWindowToggleStatus>,
 		get: (key?: string) => ipcRenderer.invoke(IPC_COMMANDS.PREFS_GET, { key }),
 		set: (key: string, value: unknown) => ipcRenderer.invoke(IPC_COMMANDS.PREFS_SET, { key, value }),
 		updateLaunchProfile: (cwd, patch) => ipcRenderer.invoke(IPC_COMMANDS.PREFS_UPDATE_LAUNCH_PROFILE, { cwd, patch }),

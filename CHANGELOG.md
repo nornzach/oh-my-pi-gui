@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- **Settings → Keyboard shortcuts** lists every shortcut. Click one to record new keys, or turn it off with its switch. This covers the system-wide ⇧⌘O show/hide shortcut, the menu shortcuts (⌘N, ⌘E, ⇧⌘N, ⇧⌘W, ⌘F) and the composer's ⌃R and ⌃G, none of which could be changed before, and it warns when another app already holds the show/hide keys ([#49](https://github.com/nornzach/oh-my-pi-gui/issues/49)).
+
+### Changed
+- The Keyboard Shortcuts panel (⌘/) is now a reference that shows the keys in effect; its **Customize** button opens the settings page.
+
 ## [0.9.41] - 2026-11-11
 
 ### Added

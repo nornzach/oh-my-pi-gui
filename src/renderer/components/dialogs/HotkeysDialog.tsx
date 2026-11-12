@@ -1,228 +1,56 @@
-import { Check, Pencil, RotateCcw, X } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
-import {
-	actionChords,
-	chordFromEvent,
-	chordOwner,
-	detectConflicts,
-	type HotkeyGroupId,
-	IS_MAC,
-	KEYMAP_ACTION_BY_ID,
-	KEYMAP_ACTIONS,
-	type KeymapActionId,
-	type KeymapConflict,
-	keymapActionsForGroup,
-	platformChord,
-	type ReservedChordGroup,
-	reservedChordsForGroup,
-} from "../../lib/keymap";
-import { toast } from "../../stores/toast";
-import { useUiStore } from "../../stores/ui";
+import { actionChords, SHORTCUT_SECTIONS, shortcutSectionRows } from "../../lib/keymap";
+import { useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
 import { Button, Input, Modal } from "../common";
 
-interface StaticHotkeyRow {
-	keys: string;
-	labelKey: string;
-}
-
-/** Remappable row: label + current chords resolve from the keymap action table. */
-interface RemapHotkeyRow {
-	actionId: KeymapActionId;
-}
-
-type HotkeyRow = StaticHotkeyRow | RemapHotkeyRow;
-
-function isRemapRow(row: HotkeyRow): row is RemapHotkeyRow {
-	return "actionId" in row;
-}
-
-interface HotkeyGroup {
-	titleKey: string;
-	rows: HotkeyRow[];
-}
-
-/** Remappable rows for a group, straight from the registry. */
-function remapRows(group: HotkeyGroupId): HotkeyRow[] {
-	return keymapActionsForGroup(group).map(action => ({ actionId: action.id }));
-}
-
-/** Non-remappable rows for an owner class (composer keys, native chords). */
-function reservedRows(group: ReservedChordGroup): HotkeyRow[] {
-	return reservedChordsForGroup(group).map(entry => ({ keys: entry.chord, labelKey: entry.labelKey }));
-}
-
-// GUI shortcut reference (plan/17 §6.2): the data-driven replacement for the
-// TUI's static /hotkeys markdown. Remappable rows come from lib/keymap.ts's
-// action table and non-remappable rows from its reserved-chord table — so an
-// action can exist only with a row here, and the same chords the recorder
-// conflict-checks against are the ones on display. Unmodified keys (Enter, @,
-// /) and the shift-only ⇧Tab / Escape globals stay static; terminal-only TUI
-// rows (suspend, display reset, $EDITOR) are deliberately absent.
-const HOTKEY_GROUPS: HotkeyGroup[] = [
-	{
-		titleKey: "hotkeys.group.input",
-		rows: [
-			{ keys: "Enter", labelKey: "hotkeys.row.send" },
-			{ keys: "⇧Enter", labelKey: "hotkeys.row.newline" },
-			{ keys: "-> / =>", labelKey: "hotkeys.row.queueShorthand" },
-			{ keys: "!", labelKey: "hotkeys.row.bashMode" },
-			{ keys: "$", labelKey: "hotkeys.row.pythonMode" },
-			{ keys: "@", labelKey: "hotkeys.row.mention" },
-			{ keys: "/", labelKey: "hotkeys.row.commands" },
-			{ keys: "↑ / ↓", labelKey: "hotkeys.row.historyNav" },
-			...reservedRows("input"),
-		],
-	},
-	{
-		titleKey: "hotkeys.group.generation",
-		rows: [
-			{ keys: "Esc", labelKey: "hotkeys.row.abort" },
-			{ keys: "⇧Tab", labelKey: "hotkeys.row.thinkingCycle" },
-			...remapRows("generation"),
-		],
-	},
-	{
-		titleKey: "hotkeys.group.view",
-		rows: [
-			...remapRows("view"),
-			{ keys: "Enter / ⇧Enter", labelKey: "hotkeys.row.findStep" },
-			// The menu's accelerators: ⌘G on macOS, F3 elsewhere (main/menu.ts).
-			{ keys: IS_MAC ? "⌘G / ⇧⌘G" : "F3 / ⇧F3", labelKey: "hotkeys.row.findStepMenu" },
-		],
-	},
-	{
-		titleKey: "hotkeys.group.sidebar",
-		rows: [
-			// The sidebar takes either modifier; each platform is shown its own.
-			{ keys: IS_MAC ? "⌘-click" : "⌃-click", labelKey: "hotkeys.row.sidebarToggleSelect" },
-			{ keys: "⇧-click", labelKey: "hotkeys.row.sidebarRangeSelect" },
-			{ keys: platformChord("⌘A"), labelKey: "hotkeys.row.sidebarSelectAll" },
-			{ keys: "⌫", labelKey: "hotkeys.row.sidebarDeleteSelected" },
-			{ keys: "Esc", labelKey: "hotkeys.row.sidebarEndSelect" },
-		],
-	},
-	{ titleKey: "hotkeys.group.session", rows: remapRows("session") },
-	{ titleKey: "hotkeys.group.native", rows: reservedRows("native") },
-];
-
 interface ResolvedRow {
+	id: string;
 	label: string;
+	/** Empty when the user turned the shortcut off. */
 	keys: string;
-	actionId: KeymapActionId | null;
 }
 
-interface CaptureState {
-	actionId: KeymapActionId;
-	chord: string | null;
-}
-
-/** Searchable shortcut reference panel with per-row keybinding remap (B3). */
+/**
+ * Searchable shortcut reference (plan/17 §6.2): every row of the shortcut list
+ * with the chords in effect. Changing or turning shortcuts off happens on the
+ * Keyboard shortcuts settings page, which the header button opens.
+ */
 export function HotkeysDialog({ open }: { open: boolean }) {
 	const t = useT();
 	const close = useUiStore(s => s.closeHotkeys);
-	const overrides = useUiStore(s => s.keymapOverrides);
-	const setKeymapOverride = useUiStore(s => s.setKeymapOverride);
-	const resetKeymapOverrides = useUiStore(s => s.resetKeymapOverrides);
+	const overrides = useEffectiveKeymapOverrides();
 	const [query, setQuery] = useState("");
-	const [capture, setCapture] = useState<CaptureState | null>(null);
-	const [confirmingResetAll, setConfirmingResetAll] = useState(false);
 
-	// Stays mounted through its exit animation, so every open starts from a clean
-	// filter rather than the previous visit's search, capture or confirm state.
+	// Stays mounted through its exit animation, so every open starts from a clean filter.
 	useEffect(() => {
-		if (!open) return;
-		setQuery("");
-		setCapture(null);
-		setConfirmingResetAll(false);
+		if (open) setQuery("");
 	}, [open]);
 
-	// Capture mode: swallow every key at window-capture phase so nothing leaks
-	// to App's global handler (window bubble) or the modal's own Escape-close
-	// (document capture — later phase than window capture). Esc cancels.
-	useEffect(() => {
-		if (!capture) return;
-		const onCaptureKey = (event: KeyboardEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-			if (event.key === "Escape") {
-				setCapture(null);
-				return;
-			}
-			const chord = chordFromEvent(event);
-			if (chord) setCapture(current => (current ? { ...current, chord } : current));
-		};
-		window.addEventListener("keydown", onCaptureKey, true);
-		return () => window.removeEventListener("keydown", onCaptureKey, true);
-	}, [capture]);
-
-	const captureAction = capture ? KEYMAP_ACTION_BY_ID[capture.actionId] : null;
-
-	// Live conflict display for the captured chord: a native owner or a second
-	// user binding blocks the save, a shadowed default or the composer's own key
-	// only warns (the user binding wins the slot outside those contexts).
-	const captureConflict: KeymapConflict | null = useMemo(() => {
-		if (!capture?.chord) return null;
-		const candidate = { ...overrides, [capture.actionId]: [capture.chord] };
-		return detectConflicts(KEYMAP_ACTIONS, candidate).find(conflict => conflict.chord === capture.chord) ?? null;
-	}, [capture, overrides]);
-
-	const captureConflictLabel = useMemo(() => {
-		if (!capture || !captureConflict) return null;
-		const otherId = captureConflict.actionIds.find(id => id !== capture.actionId);
-		const other = otherId ? chordOwner(otherId) : undefined;
-		const params = { action: other ? t(other.labelKey) : (otherId ?? "") };
-		if (other && other.holds !== "action")
-			return t(other.holds === "native" ? "hotkeys.remap.conflictNative" : "hotkeys.remap.conflictInput", params);
-		return captureConflict.kind === "error"
-			? t("hotkeys.remap.conflictUser", params)
-			: t("hotkeys.remap.conflictShadow", params);
-	}, [capture, captureConflict, t]);
-
 	const groups = useMemo(() => {
-		const resolve = (row: HotkeyRow): ResolvedRow => {
-			if (isRemapRow(row)) {
-				const action = KEYMAP_ACTION_BY_ID[row.actionId];
-				return {
-					label: t(action.labelKey),
-					keys: actionChords(action, overrides).join(" / "),
-					actionId: row.actionId,
-				};
-			}
-			return { label: t(row.labelKey), keys: row.keys, actionId: null };
-		};
 		const q = query.trim().toLowerCase();
-		return HOTKEY_GROUPS.map(group => ({
-			...group,
-			rows: group.rows
-				.map(resolve)
-				.filter(row => !q || row.label.toLowerCase().includes(q) || row.keys.toLowerCase().includes(q)),
+		const off = t("hotkeys.off").toLowerCase();
+		return SHORTCUT_SECTIONS.map(section => ({
+			section,
+			rows: shortcutSectionRows(section)
+				.map(
+					(row): ResolvedRow =>
+						row.kind === "entry"
+							? {
+									id: row.entry.id,
+									label: t(row.entry.labelKey),
+									keys: actionChords(row.entry, overrides).join(" / "),
+								}
+							: { id: row.row.labelKey, label: t(row.row.labelKey), keys: row.row.keys },
+				)
+				.filter(row => !q || row.label.toLowerCase().includes(q) || (row.keys || off).toLowerCase().includes(q)),
 		})).filter(group => group.rows.length > 0);
 	}, [query, t, overrides]);
 
-	const saveCapture = () => {
-		if (!capture?.chord || !captureAction || captureConflict?.kind === "error") return;
-		setKeymapOverride(capture.actionId, [capture.chord]);
-		toast({
-			variant: "success",
-			message: t("hotkeys.remap.saved", { action: t(captureAction.labelKey), chord: capture.chord }),
-		});
-		setCapture(null);
-	};
-
-	const resetRow = (actionId: KeymapActionId) => {
-		setKeymapOverride(actionId, []);
-		toast({
-			variant: "success",
-			message: t("hotkeys.remap.resetDone", { action: t(KEYMAP_ACTION_BY_ID[actionId].labelKey) }),
-		});
-	};
-
-	const confirmResetAll = () => {
-		resetKeymapOverrides();
-		setConfirmingResetAll(false);
-		setCapture(null);
-		toast({ variant: "success", message: t("hotkeys.remap.resetAllDone") });
+	const customize = () => {
+		close();
+		useUiStore.getState().openSettings("shortcuts");
 	};
 
 	return (
@@ -235,118 +63,32 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 						placeholder={t("hotkeys.search")}
 					/>
 				</div>
-				{confirmingResetAll ? (
-					// Inline ✓/✕ confirm (0.3.0 convention): the confirm sits exactly
-					// where "reset all" was; ✕ or clicking elsewhere cancels.
-					<span className="flex shrink-0 items-center gap-0.5">
-						<button
-							type="button"
-							title={t("common.confirm")}
-							aria-label={t("common.confirm")}
-							onClick={confirmResetAll}
-							className="flex h-6 w-6 items-center justify-center rounded bg-[var(--omp-tool-error-bg)] text-[var(--omp-error)] hover:brightness-110"
-						>
-							<Check size={12} strokeWidth={3} />
-						</button>
-						<button
-							type="button"
-							title={t("common.cancel")}
-							aria-label={t("common.cancel")}
-							onClick={() => setConfirmingResetAll(false)}
-							className="flex h-6 w-6 items-center justify-center rounded text-[var(--omp-dim)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-text)]"
-						>
-							<X size={12} strokeWidth={3} />
-						</button>
-					</span>
-				) : (
-					<Button size="sm" variant="ghost" onClick={() => setConfirmingResetAll(true)}>
-						{t("hotkeys.remap.resetAll")}
-					</Button>
-				)}
+				<Button icon={<Settings2 size={13} />} onClick={customize} size="sm" variant="ghost">
+					{t("hotkeys.customize")}
+				</Button>
 			</div>
-
-			{capture && captureAction && (
-				<div className="mb-3 rounded-lg border border-[var(--omp-border)] px-3 py-2">
-					<div className="flex items-center gap-2">
-						<span className="min-w-0 flex-1 truncate text-omp-md text-[var(--omp-text)]">
-							{t("hotkeys.remap.rebinding", { action: t(captureAction.labelKey) })}
-						</span>
-						<kbd className="shrink-0 rounded-md border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] px-2 py-0.5 font-mono text-omp-sm text-[var(--omp-muted)]">
-							{capture.chord ?? t("hotkeys.remap.pressChord")}
-						</kbd>
-						<Button
-							size="sm"
-							variant="primary"
-							disabled={!capture.chord || captureConflict?.kind === "error"}
-							onClick={saveCapture}
-						>
-							{t("common.save")}
-						</Button>
-						<Button size="sm" variant="ghost" onClick={() => setCapture(null)}>
-							{t("common.cancel")}
-						</Button>
-					</div>
-					<div className="mt-1 text-omp-sm text-[var(--omp-dim)]">{t("hotkeys.remap.captureHint")}</div>
-					{captureConflictLabel && (
-						<div
-							className={`mt-1 text-omp-sm ${
-								captureConflict?.kind === "error" ? "text-[var(--omp-error)]" : "text-[var(--omp-warning)]"
-							}`}
-						>
-							{captureConflictLabel}
-						</div>
-					)}
-				</div>
-			)}
 
 			{groups.length === 0 && (
 				<div className="py-6 text-center text-omp-md text-[var(--omp-dim)]">{t("hotkeys.empty")}</div>
 			)}
 			{groups.map(group => (
-				<div key={group.titleKey} className="mb-4 last:mb-0">
-					<div className="mb-1.5 text-omp-sm font-semibold text-[var(--omp-dim)]">{t(group.titleKey)}</div>
+				<div key={group.section} className="mb-4 last:mb-0">
+					<div className="mb-1.5 text-omp-sm font-semibold text-[var(--omp-dim)]">
+						{t(`hotkeys.group.${group.section}`)}
+					</div>
 					<div className="overflow-hidden rounded-lg border border-[var(--omp-border-muted)]">
-						{group.rows.map(row => {
-							const actionId = row.actionId;
-							const hasOverride = actionId ? overrides[actionId] !== undefined : false;
-							return (
-								<div
-									key={actionId ?? row.label}
-									className="group flex items-center justify-between gap-4 px-3 py-2 text-omp-md"
-								>
-									<span className="text-[var(--omp-text)]">{row.label}</span>
-									<span className="flex shrink-0 items-center gap-1">
-										{actionId && (
-											<>
-												<button
-													type="button"
-													title={t("hotkeys.remap.rebind")}
-													aria-label={t("hotkeys.remap.rebind")}
-													onClick={() => setCapture({ actionId, chord: null })}
-													className="hidden h-5 w-5 items-center justify-center rounded text-[var(--omp-dim)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-text)] group-hover:flex"
-												>
-													<Pencil size={11} />
-												</button>
-												{hasOverride && (
-													<button
-														type="button"
-														title={t("hotkeys.remap.reset")}
-														aria-label={t("hotkeys.remap.reset")}
-														onClick={() => resetRow(actionId)}
-														className="hidden h-5 w-5 items-center justify-center rounded text-[var(--omp-dim)] hover:bg-[var(--omp-bg-tertiary)] hover:text-[var(--omp-text)] group-hover:flex"
-													>
-														<RotateCcw size={11} />
-													</button>
-												)}
-											</>
-										)}
-										<kbd className="rounded-md border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] px-2 py-0.5 font-mono text-omp-sm text-[var(--omp-muted)]">
-											{row.keys}
-										</kbd>
-									</span>
-								</div>
-							);
-						})}
+						{group.rows.map(row => (
+							<div key={row.id} className="flex items-center justify-between gap-4 px-3 py-2 text-omp-md">
+								<span className="text-[var(--omp-text)]">{row.label}</span>
+								{row.keys ? (
+									<kbd className="shrink-0 rounded-md border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] px-2 py-0.5 font-mono text-omp-sm text-[var(--omp-muted)]">
+										{row.keys}
+									</kbd>
+								) : (
+									<span className="shrink-0 text-omp-sm text-[var(--omp-dim)]">{t("hotkeys.off")}</span>
+								)}
+							</div>
+						))}
 					</div>
 				</div>
 			))}

@@ -3,11 +3,12 @@
  * plan/17 §6.3): chord parse/serialize round-trips and alias acceptance,
  * replace-not-union compilation, both conflict classes (user-user error,
  * default-shadow warning), and override sanitization that ignores unknown
- * actions on hydration. B5 adds the single-chord-table invariants: every action
- * has exactly one reference group, every chord the app owns (registry default,
- * composer key, or native menu accelerator) has one claimant, and the reserved
- * chords actually block or warn in the recorder. GUI-local only — nothing here
- * touches the TUI's keybindings.yml.
+ * actions on hydration. B5 adds the single-chord-table invariants: every
+ * shortcut has exactly one row, every chord the app owns (registry default,
+ * composer key, or native menu accelerator) has one claimant, and the recorder
+ * blocks or warns on chords another shortcut holds — including composer and
+ * native shortcuts the user changed or turned off. GUI-local only — nothing
+ * here touches the TUI's keybindings.yml.
  */
 
 import { describe, expect, it } from "vitest";
@@ -16,14 +17,16 @@ import {
 	chordFromEvent,
 	compileKeymap,
 	defaultChords,
-	detectConflicts,
+	EDITABLE_SHORTCUTS,
+	effectiveOverrides,
+	findShortcutConflict,
+	isComposerShortcut,
 	isFollowUpSend,
 	isSelectAll,
 	KEYMAP_ACTIONS,
-	keymapActionsForGroup,
 	parseChord,
-	reservedChords,
-	reservedChordsForGroup,
+	SHORTCUT_ENTRIES,
+	sanitizeDisabled,
 	sanitizeOverrides,
 	serializeChord,
 } from "./keymap";
@@ -176,6 +179,13 @@ describe("compileKeymap", () => {
 		expect(map.get("⌃T")).toBe("thinking.toggle");
 	});
 
+	it("leaves a turned-off action unbound, defaults included", () => {
+		const map = compileKeymap(KEYMAP_ACTIONS, effectiveOverrides({}, ["palette"]), true);
+		expect(map.has("⌘K")).toBe(false);
+		expect(map.has("⌃K")).toBe(false);
+		expect(map.get("⌃O")).toBe("tools.expand");
+	});
+
 	it("lets an explicit user chord win a shadowed default slot", () => {
 		const map = compileKeymap(KEYMAP_ACTIONS, { retry: ["ctrl+o"] });
 		expect(map.get("⌃O")).toBe("retry");
@@ -197,61 +207,98 @@ describe("compileKeymap", () => {
 	});
 });
 
-describe("detectConflicts", () => {
-	it("flags one chord claimed by two user bindings as an error", () => {
-		const conflicts = detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃⇧R"], dequeue: ["ctrl+shift+r"] });
-		expect(conflicts).toEqual([{ kind: "error", chord: "⇧⌃R", actionIds: ["retry", "dequeue"] }]);
+describe("findShortcutConflict", () => {
+	it("refuses a chord another user binding already holds", () => {
+		expect(findShortcutConflict("dequeue", "ctrl+shift+r", { retry: ["⌃⇧R"] }, true)).toEqual({
+			kind: "error",
+			reason: "taken",
+			otherId: "retry",
+		});
 	});
 
-	it("warns when a user chord shadows another action's live default", () => {
-		const conflicts = detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃O"] });
-		expect(conflicts).toEqual([{ kind: "warning", chord: "⌃O", actionIds: ["retry", "tools.expand"] }]);
+	it("warns when the chord replaces another action's live default", () => {
+		expect(findShortcutConflict("retry", "⌃O", {}, true)).toEqual({
+			kind: "warning",
+			reason: "shadow",
+			otherId: "tools.expand",
+		});
 	});
 
-	it("drops the shadow warning once the shadowed action is itself remapped", () => {
-		// Not ⌃⇧O: off macOS that is the native window toggle.
-		const conflicts = detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃O"], "tools.expand": ["alt+shift+o"] });
-		expect(conflicts).toEqual([]);
+	it("drops the shadow once that action is remapped or turned off", () => {
+		expect(findShortcutConflict("retry", "⌃O", { "tools.expand": ["⌥⇧O"] }, true)).toBeNull();
+		expect(findShortcutConflict("retry", "⌃O", effectiveOverrides({}, ["tools.expand"]), true)).toBeNull();
 	});
 
-	it("ignores a user chord equal to its own action's default or listed twice", () => {
-		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌥R"] })).toEqual([]);
-		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃⇧R", "ctrl+shift+r"] })).toEqual([]);
+	it("ignores the shortcut's own chords", () => {
+		expect(findShortcutConflict("retry", "⌥R", {}, true)).toBeNull();
 	});
 
-	it("blocks a binding on a chord the native layer already registers", () => {
-		// Electron resolves the menu/global accelerator before the renderer sees
-		// the keydown, so such a binding could never fire.
-		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌘N"] }, true)).toEqual([
-			{ kind: "error", chord: "⌘N", actionIds: ["retry", "session.new"] },
-		]);
-		// The accelerator is CmdOrCtrl: off macOS the menu takes ⌃N instead.
-		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃N"] }, false)).toEqual([
-			{ kind: "error", chord: "⌃N", actionIds: ["retry", "session.new"] },
-		]);
+	it("blocks any overlap with a menu or system-wide shortcut, in either direction", () => {
+		// Electron takes a menu or global accelerator before the page sees the key,
+		// so neither side of the overlap could ever fire.
+		expect(findShortcutConflict("retry", "⌘N", {}, true)).toEqual({
+			kind: "error",
+			reason: "taken",
+			otherId: "session.new",
+		});
+		// Off macOS the accelerators are CmdOrCtrl: ⌃N there.
+		expect(findShortcutConflict("retry", "⌃N", {}, false)?.otherId).toBe("session.new");
+		expect(findShortcutConflict("window.toggle", "⌘K", {}, true)).toEqual({
+			kind: "error",
+			reason: "taken",
+			otherId: "palette",
+		});
 	});
 
-	it("warns for a composer chord instead: it still fires anywhere else", () => {
-		expect(detectConflicts(KEYMAP_ACTIONS, { retry: ["⌃R"] })).toEqual([
-			{ kind: "warning", chord: "⌃R", actionIds: ["retry", "composer.history"] },
-		]);
+	it("frees a menu shortcut's keys once the user turns it off", () => {
+		expect(findShortcutConflict("retry", "⌘N", effectiveOverrides({}, ["session.new"]), true)).toBeNull();
+	});
+
+	it("warns between composer and app keys, and follows the composer's own remap", () => {
+		expect(findShortcutConflict("retry", "⌃R", {}, true)).toEqual({
+			kind: "warning",
+			reason: "composer",
+			otherId: "composer.history",
+		});
+		expect(findShortcutConflict("retry", "⌃R", { "composer.history": ["⌥H"] }, true)).toBeNull();
+		expect(findShortcutConflict("composer.editor", "⌥H", { "composer.history": ["⌥H"] }, true)).toEqual({
+			kind: "error",
+			reason: "taken",
+			otherId: "composer.history",
+		});
+	});
+});
+
+describe("isComposerShortcut", () => {
+	const ctrlR = { ...NO_MODS, key: "r", code: "KeyR", ctrlKey: true };
+	const altH = { ...NO_MODS, key: "˙", code: "KeyH", altKey: true };
+
+	it("follows the user's chord and drops the default it replaced", () => {
+		expect(isComposerShortcut("composer.history", ctrlR, {}, true)).toBe(true);
+		const remapped = { "composer.history": ["⌥H"] };
+		expect(isComposerShortcut("composer.history", altH, remapped, true)).toBe(true);
+		expect(isComposerShortcut("composer.history", ctrlR, remapped, true)).toBe(false);
+	});
+
+	it("matches nothing once turned off", () => {
+		expect(isComposerShortcut("composer.history", ctrlR, effectiveOverrides({}, ["composer.history"]), true)).toBe(
+			false,
+		);
 	});
 });
 
 describe("hotkey reference table", () => {
-	it("files every remappable action in exactly one group", () => {
-		// A second group would render the action twice (two rows, one binding); a
-		// dropped one could never be remapped at all — the dialog is the only
-		// entry point. The required `hotkeyGroup` field makes "none" a type error,
-		// and HotkeysDialog's render test covers "no section for this group".
-		const seen = new Set<string>();
-		for (const group of new Set(KEYMAP_ACTIONS.map(action => action.hotkeyGroup))) {
-			for (const action of keymapActionsForGroup(group)) {
-				expect(seen.has(action.id), `${action.id} claimed by two groups`).toBe(false);
-				seen.add(action.id);
-			}
+	it("lists every shortcut once", () => {
+		// A second row would offer two editors for one binding; a missing one could
+		// never be changed or turned off.
+		const ids = SHORTCUT_ENTRIES.map(entry => entry.id);
+		expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+		for (const id of [...KEYMAP_ACTIONS.map(action => action.id), ...NATIVE_CHORDS.map(entry => entry.id)]) {
+			expect(
+				EDITABLE_SHORTCUTS.some(entry => entry.id === id),
+				id,
+			).toBe(true);
 		}
-		expect([...seen].sort()).toEqual(KEYMAP_ACTIONS.map(action => action.id).sort());
 	});
 
 	it.each([
@@ -262,18 +309,12 @@ describe("hotkey reference table", () => {
 		// later action win, and a default landing on the composer's ⌃R or a menu
 		// accelerator never reaches the renderer at all. Off macOS a ⌘ default
 		// turns into ⌃ and can land on another action's ⌃ default.
-		const claims = [
-			...KEYMAP_ACTIONS.flatMap(action => defaultChords(action, mac).map(chord => ({ id: action.id, chord }))),
-			...reservedChords(mac).map(entry => ({ id: entry.id, chord: entry.chord })),
-		];
+		const claims = SHORTCUT_ENTRIES.flatMap(entry =>
+			defaultChords(entry, mac).map(chord => ({ id: entry.id, chord })),
+		);
 		for (const claim of claims) expect(canonical(claim.chord), `"${claim.chord}"`).toBe(claim.chord);
 		const chords = claims.map(claim => claim.chord);
 		expect(chords.filter((chord, index) => chords.indexOf(chord) !== index)).toEqual([]);
-	});
-
-	it("lists each native menu chord once, in both owners' tables", () => {
-		const native = reservedChordsForGroup("native").map(entry => entry.id);
-		expect(native.sort()).toEqual(NATIVE_CHORDS.map(entry => entry.id).sort());
 	});
 
 	it("spells every Electron accelerator with the keys the dialog displays", () => {
@@ -286,19 +327,31 @@ describe("hotkey reference table", () => {
 });
 
 describe("sanitizeOverrides", () => {
-	it("drops unknown actions, non-arrays, unparsable and duplicate chords", () => {
+	it("drops unknown and built-in shortcuts, non-arrays, unparsable and duplicate chords", () => {
 		const raw = {
 			"bogus.action": ["ctrl+q"],
+			"composer.followUp": ["ctrl+enter"],
 			retry: ["alt+shift+r", "⌥⇧R", "not a chord", 42],
 			"tools.expand": "ctrl+o",
 			dequeue: [],
+			"window.toggle": ["ctrl+alt+space"],
 		};
-		expect(sanitizeOverrides(KEYMAP_ACTIONS, raw)).toEqual({ retry: ["⌥⇧R"] });
+		expect(sanitizeOverrides(raw)).toEqual({ retry: ["⌥⇧R"], "window.toggle": ["⌥⌃␣"] });
 	});
 
 	it("returns an empty table for non-object payloads", () => {
-		expect(sanitizeOverrides(KEYMAP_ACTIONS, null)).toEqual({});
-		expect(sanitizeOverrides(KEYMAP_ACTIONS, ["ctrl+o"])).toEqual({});
-		expect(sanitizeOverrides(KEYMAP_ACTIONS, "ctrl+o")).toEqual({});
+		expect(sanitizeOverrides(null)).toEqual({});
+		expect(sanitizeOverrides(["ctrl+o"])).toEqual({});
+		expect(sanitizeOverrides("ctrl+o")).toEqual({});
+	});
+});
+
+describe("sanitizeDisabled", () => {
+	it("keeps known shortcut ids once and drops the rest", () => {
+		expect(sanitizeDisabled(["window.toggle", "window.toggle", "bogus", 3, "composer.followUp", "retry"])).toEqual([
+			"window.toggle",
+			"retry",
+		]);
+		expect(sanitizeDisabled({ retry: true })).toEqual([]);
 	});
 });

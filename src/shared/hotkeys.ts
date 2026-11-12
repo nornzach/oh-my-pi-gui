@@ -9,6 +9,9 @@
  * `main/index.ts` ask for the Electron accelerator by id, and the renderer
  * derives its display + conflict table from the same list.
  */
+
+import { chordToAccelerator } from "./chord";
+
 export interface NativeChord {
 	readonly id: string;
 	/** Renderer i18n key for the reference row. */
@@ -41,7 +44,33 @@ export type NativeChordId = (typeof NATIVE_CHORDS)[number]["id"];
 const nativeChordById = {} as Record<NativeChordId, (typeof NATIVE_CHORDS)[number]>;
 for (const entry of NATIVE_CHORDS) nativeChordById[entry.id] = entry;
 
-/** Electron accelerator for a native chord id. */
-export function nativeAccelerator(id: NativeChordId): string {
+/** Prefs key for the user's chord per shortcut id (a list; the first chord is the native one). */
+export const KEYMAP_OVERRIDES_PREF = "keymapOverrides";
+/** Prefs key for the ids of shortcuts the user turned off. */
+export const KEYMAP_DISABLED_PREF = "keymapDisabled";
+
+/** Whether a stored disabled list turns this shortcut off. */
+export function isShortcutDisabled(id: string, disabled: unknown): boolean {
+	return Array.isArray(disabled) && disabled.includes(id);
+}
+
+/**
+ * Electron accelerator for a native chord id under the user's saved shortcuts,
+ * or undefined when the user turned it off. A stored chord that no longer
+ * parses falls back to the default rather than leaving the action unbound.
+ */
+export function nativeAccelerator(
+	id: NativeChordId,
+	overrides: unknown,
+	disabled: unknown,
+	mac: boolean,
+): string | undefined {
+	if (isShortcutDisabled(id, disabled)) return undefined;
+	if (overrides && typeof overrides === "object" && !Array.isArray(overrides)) {
+		const chords = (overrides as Record<string, unknown>)[id];
+		const first = Array.isArray(chords) ? chords[0] : undefined;
+		const accelerator = typeof first === "string" ? chordToAccelerator(first, mac) : null;
+		if (accelerator) return accelerator;
+	}
 	return nativeChordById[id].accelerator;
 }

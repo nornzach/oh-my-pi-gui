@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, net, shell } from "electron";
 import Store from "electron-store";
+import { KEYMAP_DISABLED_PREF, KEYMAP_OVERRIDES_PREF } from "../shared/hotkeys";
 import type {
 	ConversationSearchResponse,
 	CustomProviderInput,
@@ -81,6 +82,7 @@ import { runtimeLogPath, writeRuntimeLog } from "./runtime-log";
 import type { SchedulerHost } from "./scheduler/host";
 import type { SessionIndex } from "./session-index";
 import { resolveEditorCommand } from "./shell-env";
+import { applyWindowToggle, windowToggleStatus } from "./shortcuts";
 import type { SidecarManager } from "./sidecar";
 import type { SidecarPool } from "./sidecar-pool";
 import type { StatsClient } from "./stats-client";
@@ -1080,7 +1082,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		return prefsStore.store;
 	});
 
-	ipcMain.handle(IPC_COMMANDS.PREFS_SET, (_event, payload: IpcPrefsSetPayload) => {
+	ipcMain.handle(IPC_COMMANDS.PREFS_SET, (event, payload: IpcPrefsSetPayload) => {
 		if (typeof payload.key !== "string") {
 			throw new Error("Invalid preference key");
 		}
@@ -1093,7 +1095,20 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 				window.webContents.send(IPC_EVENTS.LANGUAGE_CHANGED, payload.value);
 			}
 		}
+		// Saved shortcuts: menu accelerators and the system-wide show/hide shortcut
+		// follow at once, and every other window re-reads its keymap.
+		if (payload.key === KEYMAP_OVERRIDES_PREF || payload.key === KEYMAP_DISABLED_PREF) {
+			applyWindowToggle();
+			createMenu(windowManager, deps.spawnWindow, deps.browserHost);
+			// Not the saving window: it already holds the newer state, and a reload
+			// racing its next save would flash the older one back.
+			for (const window of BrowserWindow.getAllWindows()) {
+				if (window.webContents !== event.sender) window.webContents.send(IPC_EVENTS.KEYMAP_CHANGED);
+			}
+		}
 	});
+
+	ipcMain.handle(IPC_COMMANDS.PREFS_WINDOW_TOGGLE_STATUS, () => windowToggleStatus());
 
 	ipcMain.handle(IPC_COMMANDS.PREFS_UPDATE_LAUNCH_PROFILE, (_event, payload: IpcUpdateLaunchProfilePayload) => {
 		if (

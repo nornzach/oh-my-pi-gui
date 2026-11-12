@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { I18nProvider } from "../../lib/i18n";
-import { defaultChords, KEYMAP_ACTIONS, RESERVED_CHORDS } from "../../lib/keymap";
+import { defaultChords, SHORTCUT_ENTRIES } from "../../lib/keymap";
 import { useUiStore } from "../../stores/ui";
 import { HotkeysDialog } from "./HotkeysDialog";
 
@@ -51,29 +51,29 @@ afterEach(async () => {
 	await act(async () => root?.unmount());
 	container?.remove();
 	document.body.innerHTML = "";
-	useUiStore.setState({ keymapOverrides: {} });
+	useUiStore.setState({ keymapOverrides: {}, keymapDisabled: [] });
 });
 
 describe("HotkeysDialog", () => {
-	it("renders one row for every remappable action and every chord the app owns", async () => {
-		// The dialog is derived from the keymap tables. A row missing here is an
-		// action nobody can discover or remap, and a duplicated one offers two
-		// editors for the same binding.
+	it("renders one row for every shortcut the app owns", async () => {
+		// The dialog is derived from the keymap tables. A row missing here is a
+		// shortcut nobody can discover, and a duplicated one lists one key twice.
 		await mount();
 		const chords = displayedChords();
-		for (const action of KEYMAP_ACTIONS) {
-			const displayed = defaultChords(action).join(" / ");
+		for (const entry of SHORTCUT_ENTRIES) {
+			const displayed = defaultChords(entry).join(" / ");
 			expect(
 				chords.filter(chord => chord === displayed),
-				action.id,
-			).toHaveLength(1);
-		}
-		for (const entry of RESERVED_CHORDS) {
-			expect(
-				chords.filter(chord => chord === entry.chord),
 				entry.id,
 			).toHaveLength(1);
 		}
+	});
+
+	it("shows a turned-off shortcut as off instead of keys that do nothing", async () => {
+		useUiStore.setState({ keymapDisabled: ["window.toggle"] });
+		await mount();
+		expect(displayedChords()).not.toContain("⇧⌘O");
+		expect(document.body.textContent).toContain("Off");
 	});
 
 	it("labels every row and group in words, never as a raw translation key", async () => {

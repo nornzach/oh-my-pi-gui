@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { create } from "zustand";
+import { KEYMAP_DISABLED_PREF, KEYMAP_OVERRIDES_PREF } from "../../shared/hotkeys";
 import type { CustomProviderView, SessionInfo } from "../../shared/ipc-types";
 import type { SidecarRestartProgress } from "../../shared/rpc-types";
-import { KEYMAP_ACTIONS, type KeymapOverrides, sanitizeOverrides } from "../lib/keymap";
+import { effectiveOverrides, type KeymapOverrides, sanitizeDisabled, sanitizeOverrides } from "../lib/keymap";
 import { readPrepaintThemeMode, type ThemeMode } from "../lib/theme";
 import type { CustomThemeSelection } from "../lib/themes";
 import { useTabsStore } from "./tabs";
@@ -294,11 +296,16 @@ interface UiStore {
 	 * dispatch map. GUI-local only — never synced to the TUI's keybindings.yml.
 	 */
 	keymapOverrides: KeymapOverrides;
-	/** One-shot boot hydration guard for keymapOverrides (input-history pattern). */
+	/** Ids of the shortcuts the user turned off (prefs key "keymapDisabled"). */
+	keymapDisabled: readonly string[];
+	/** One-shot boot hydration guard for the saved shortcuts (input-history pattern). */
 	keymapHydrated: boolean;
-	hydrateKeymap: () => Promise<void>;
-	/** Replace one action's chords; an empty list removes the override (reset to default). */
+	/** `reload` re-reads after another window saved shortcut changes. */
+	hydrateKeymap: (reload?: boolean) => Promise<void>;
+	/** Replace one shortcut's chords; an empty list removes the override (reset to default). */
 	setKeymapOverride: (actionId: string, chords: string[]) => void;
+	setShortcutEnabled: (id: string, enabled: boolean) => void;
+	/** Every shortcut back to its default chord, and on. */
 	resetKeymapOverrides: () => void;
 }
 
@@ -582,12 +589,20 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	setTabWidth: width => set({ tabWidth: width }),
 	setTabRows: rows => set({ tabRows: rows }),
 	keymapOverrides: {} as KeymapOverrides,
+	keymapDisabled: [],
 	keymapHydrated: false,
-	hydrateKeymap: async () => {
-		if (get().keymapHydrated) return;
+	hydrateKeymap: async reload => {
+		if (get().keymapHydrated && !reload) return;
 		try {
-			const raw = await window.omp.prefs.get("keymapOverrides");
-			set({ keymapOverrides: sanitizeOverrides(KEYMAP_ACTIONS, raw), keymapHydrated: true });
+			const [overrides, disabled] = await Promise.all([
+				window.omp.prefs.get(KEYMAP_OVERRIDES_PREF),
+				window.omp.prefs.get(KEYMAP_DISABLED_PREF),
+			]);
+			set({
+				keymapOverrides: sanitizeOverrides(overrides),
+				keymapDisabled: sanitizeDisabled(disabled),
+				keymapHydrated: true,
+			});
 		} catch {
 			// prefs IPC unavailable (tests, storybook) — defaults stay in effect.
 			set({ keymapHydrated: true });
@@ -600,10 +615,25 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 		if (chords.length === 0) delete next[actionId];
 		else next[actionId] = chords;
 		set({ keymapOverrides: next });
-		void window.omp.prefs.set("keymapOverrides", next).catch(() => {});
+		void window.omp.prefs.set(KEYMAP_OVERRIDES_PREF, next).catch(() => {});
+	},
+	setShortcutEnabled: (id, enabled) => {
+		const current = get().keymapDisabled;
+		if (current.includes(id) !== enabled) return;
+		const next = enabled ? current.filter(other => other !== id) : [...current, id];
+		set({ keymapDisabled: next });
+		void window.omp.prefs.set(KEYMAP_DISABLED_PREF, next).catch(() => {});
 	},
 	resetKeymapOverrides: () => {
-		set({ keymapOverrides: {} });
-		void window.omp.prefs.set("keymapOverrides", {}).catch(() => {});
+		set({ keymapOverrides: {}, keymapDisabled: [] });
+		void window.omp.prefs.set(KEYMAP_OVERRIDES_PREF, {}).catch(() => {});
+		void window.omp.prefs.set(KEYMAP_DISABLED_PREF, []).catch(() => {});
 	},
 }));
+
+/** The chords in effect: saved overrides, with `[]` for every shortcut the user turned off. */
+export function useEffectiveKeymapOverrides(): KeymapOverrides {
+	const overrides = useUiStore(s => s.keymapOverrides);
+	const disabled = useUiStore(s => s.keymapDisabled);
+	return useMemo(() => effectiveOverrides(overrides, disabled), [overrides, disabled]);
+}

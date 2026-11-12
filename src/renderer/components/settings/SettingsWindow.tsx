@@ -27,6 +27,7 @@ import {
 	ChevronDown,
 	ChevronRight,
 	HardDriveDownload,
+	Keyboard,
 	Network,
 	RefreshCw,
 	RotateCw,
@@ -85,6 +86,7 @@ import { AdvancedTab } from "./pages/AdvancedTab";
 import { CapabilitiesHome, type CapabilityTarget } from "./pages/CapabilitiesHome";
 import { SchemaTabContent } from "./pages/SchemaTabContent";
 import { SecuritySettingsPage } from "./SecuritySettingsPage";
+import { ShortcutsSettingsPage } from "./ShortcutsSettingsPage";
 import { SkillsSettingsPage } from "./SkillsSettingsPage";
 import { SshSettingsPage } from "./SshSettingsPage";
 import { settingTranslation } from "./schema-localization";
@@ -108,6 +110,7 @@ import {
 	SECURITY_TAB_ID,
 	type SettingsNavGroup,
 	type SettingsResponseData,
+	SHORTCUTS_TAB_ID,
 	SKILLS_TAB_ID,
 	SSH_TAB_ID,
 	UPDATES_TAB_ID,
@@ -1067,8 +1070,10 @@ export function SettingsWindow() {
 													{tb.id === SECURITY_TAB_ID && <ShieldCheck aria-hidden="true" size={13} />}
 													{tb.id === SSH_TAB_ID && <Server aria-hidden="true" size={13} />}
 													{tb.id === UPDATES_TAB_ID && <HardDriveDownload aria-hidden="true" size={13} />}
+													{tb.id === SHORTCUTS_TAB_ID && <Keyboard aria-hidden="true" size={13} />}
 													{!MANAGEMENT_TAB_IDS.has(tb.id) &&
 														tb.id !== CAPABILITIES_TAB_ID &&
+														tb.id !== SHORTCUTS_TAB_ID &&
 														tb.id !== UPDATES_TAB_ID && (
 															<SlidersHorizontal aria-hidden="true" size={13} />
 														)}
@@ -1148,6 +1153,7 @@ export function SettingsWindow() {
 								{tab === SECURITY_TAB_ID && <SecuritySettingsPage />}
 								{tab === SSH_TAB_ID && <SshSettingsPage />}
 								{tab === UPDATES_TAB_ID && <UpdatesSettingsPage />}
+								{tab === SHORTCUTS_TAB_ID && <ShortcutsSettingsPage />}
 								{tab === CAPABILITIES_TAB_ID && (
 									<CapabilitiesHome
 										advisorActive={advisorActive}
@@ -1664,7 +1670,7 @@ export function SettingsWindow() {
 									>
 										<span className="text-omp-md">{t(item.labelKey)}</span>
 										<span className="mt-1 block text-omp-xs text-(--omp-dim)">
-											{t("tabId" in item ? "settings.tabs.advanced" : "settings.tabs.gui")} · {item.id}
+											{t("tabId" in item ? `settings.tabs.${item.tabId}` : "settings.tabs.gui")} · {item.id}
 										</span>
 									</button>
 								))}

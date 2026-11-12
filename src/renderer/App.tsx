@@ -91,7 +91,7 @@ import { useSettingsStore } from "./stores/settings";
 import { useTabRuntime } from "./stores/tab-runtime";
 import { cycleTab, moveActiveTab, selectTabAt, useSessionTabs, useTabsStore } from "./stores/tabs";
 import { toast } from "./stores/toast";
-import { type PanelTab, useUiStore } from "./stores/ui";
+import { type PanelTab, useEffectiveKeymapOverrides, useUiStore } from "./stores/ui";
 import { subscribeUpdaterStatus } from "./stores/updater";
 
 // Heavy overlays code-split: they render null while closed, so they download
@@ -413,10 +413,14 @@ export function App() {
 	// User keybinding overrides → precompiled chord → actionId lookup (B3,
 	// plan/15 §3.5): keydown dispatch is an O(1) map hit, never a config walk.
 	// The memo recomputes only when the overrides object identity changes.
-	const keymapOverrides = useUiStore(s => s.keymapOverrides);
+	// Turned-off shortcuts hold [] and compile to no chord.
+	const keymapOverrides = useEffectiveKeymapOverrides();
 	const keymap = useMemo(() => compileKeymap(KEYMAP_ACTIONS, keymapOverrides), [keymapOverrides]);
 
-	// Boot hydration of user keybinding overrides (prefs key "keymapOverrides").
+	// Another window saved shortcut changes: re-read them so every window agrees.
+	useEffect(() => window.omp?.prefs?.onKeymapChanged?.(() => void useUiStore.getState().hydrateKeymap(true)), []);
+
+	// Boot hydration of the saved shortcuts (prefs keys "keymapOverrides" / "keymapDisabled").
 	useEffect(() => {
 		void useUiStore.getState().hydrateKeymap();
 
