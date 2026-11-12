@@ -415,6 +415,7 @@ const api: OmpApi = {
 		onKeymapChanged: callback => subscribe<void>(IPC_EVENTS.KEYMAP_CHANGED, () => callback()),
 		windowToggleStatus: () =>
 			ipcRenderer.invoke(IPC_COMMANDS.PREFS_WINDOW_TOGGLE_STATUS) as Promise<IpcWindowToggleStatus>,
+		setKeyboardLayout: layout => ipcRenderer.invoke(IPC_COMMANDS.PREFS_KEYBOARD_LAYOUT, layout),
 		get: (key?: string) => ipcRenderer.invoke(IPC_COMMANDS.PREFS_GET, { key }),
 		set: (key: string, value: unknown) => ipcRenderer.invoke(IPC_COMMANDS.PREFS_SET, { key, value }),
 		updateLaunchProfile: (cwd, patch) => ipcRenderer.invoke(IPC_COMMANDS.PREFS_UPDATE_LAUNCH_PROFILE, { cwd, patch }),

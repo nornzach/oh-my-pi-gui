@@ -7,12 +7,23 @@
 
 import { globalShortcut } from "electron";
 import Store from "electron-store";
+import {
+	type KeyboardLayout,
+	keyboardLayout,
+	keyboardLayoutFrom,
+	positionalAccelerator,
+	setKeyboardLayout,
+} from "../shared/chord";
 import { KEYMAP_DISABLED_PREF, KEYMAP_OVERRIDES_PREF, type NativeChordId, nativeAccelerator } from "../shared/hotkeys";
 import type { IpcWindowToggleStatus } from "../shared/ipc-types";
 
 // electron-store re-reads the file on every get, so this sees the IPC handler's writes.
 const prefs = new Store<Record<string, unknown>>({ name: "prefs" });
 const mac = process.platform === "darwin";
+// The layout the renderer last reported, kept so the first registration at
+// startup already lands on the right key.
+const layoutStore = new Store<{ layout?: Record<string, string> }>({ name: "keyboard-layout" });
+setKeyboardLayout(storedLayout());
 
 let toggleHandler: (() => void) | null = null;
 let registeredAccelerator: string | undefined;
@@ -38,13 +49,15 @@ export function applyWindowToggle(): IpcWindowToggleStatus {
 		status = { accelerator, registered: false };
 		return status;
 	}
+	// macOS registers by US key position; Windows and Linux already go by the layout's character.
+	const target = mac ? positionalAccelerator(accelerator, keyboardLayout()) : accelerator;
 	let registered = false;
 	try {
-		registered = globalShortcut.register(accelerator, toggleHandler);
+		registered = globalShortcut.register(target, toggleHandler);
 	} catch (error) {
-		console.warn(`[shortcuts] could not register ${accelerator}:`, error);
+		console.warn(`[shortcuts] could not register ${target}:`, error);
 	}
-	if (registered) registeredAccelerator = accelerator;
+	if (registered) registeredAccelerator = target;
 	else console.warn(`[shortcuts] ${accelerator} is held by another app; the window shortcut is inactive`);
 	status = { accelerator, registered };
 	return status;
@@ -52,4 +65,28 @@ export function applyWindowToggle(): IpcWindowToggleStatus {
 
 export function windowToggleStatus(): IpcWindowToggleStatus {
 	return status;
+}
+
+/**
+ * The keyboard layout a window read (`navigator.keyboard.getLayoutMap()`): the
+ * main process reads built-in browser keystrokes and places the system-wide
+ * shortcut by it. Re-registers only when the layout changed.
+ */
+export function updateKeyboardLayout(raw: unknown): void {
+	if (!raw || typeof raw !== "object") return;
+	const layout = keyboardLayoutFrom(Object.entries(raw));
+	if (sameLayout(layout, keyboardLayout())) return;
+	setKeyboardLayout(layout);
+	layoutStore.set("layout", layout);
+	if (toggleHandler) applyWindowToggle();
+}
+
+function storedLayout(): KeyboardLayout {
+	const raw = layoutStore.get("layout");
+	return raw && typeof raw === "object" ? keyboardLayoutFrom(Object.entries(raw)) : {};
+}
+
+function sameLayout(a: KeyboardLayout, b: KeyboardLayout): boolean {
+	const codes = Object.keys(a);
+	return codes.length === Object.keys(b).length && codes.every(code => a[code] === b[code]);
 }

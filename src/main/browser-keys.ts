@@ -5,7 +5,7 @@
  * to the window that owns them.
  */
 import type { Input } from "electron";
-import { chordFromEvent, type KeyEventLike } from "../shared/chord";
+import { baseKeyFromEvent, chordFromEvent, type KeyEventLike } from "../shared/chord";
 
 /** What a keystroke in a focused page means to the host; null leaves it to the page. */
 export type PageKeyCommand =
@@ -30,18 +30,20 @@ export function pageKeyCommand(
 	if (input.type !== "keyDown") return null;
 	const mac = platform === "darwin";
 	const command = mac ? input.meta && !input.control : input.control && !input.meta;
-	if ((command && !input.alt && input.code === "KeyR") || input.key === "F5") {
+	// By the character typed, like the app keymap, so ⌘R is the R on the keycap under any layout.
+	const base = baseKeyFromEvent(input);
+	if ((command && !input.alt && base === "R") || input.key === "F5") {
 		return { kind: "reload", ignoreCache: input.shift };
 	}
 	const devtools = mac
-		? input.meta && input.alt && !input.control && input.code === "KeyI"
-		: input.control && input.shift && !input.alt && input.code === "KeyI";
+		? input.meta && input.alt && !input.control && base === "I"
+		: input.control && input.shift && !input.alt && base === "I";
 	if (devtools || input.key === "F12") return { kind: "devtools" };
 	if (mac ? command && !input.shift && !input.alt : input.alt && !input.control && !input.meta && !input.shift) {
-		if (mac ? input.code === "BracketLeft" : input.key === "ArrowLeft") return { kind: "back" };
-		if (mac ? input.code === "BracketRight" : input.key === "ArrowRight") return { kind: "forward" };
+		if (mac ? base === "[" : input.key === "ArrowLeft") return { kind: "back" };
+		if (mac ? base === "]" : input.key === "ArrowRight") return { kind: "forward" };
 	}
-	if (command && !input.shift && !input.alt && input.code === "KeyL") return { kind: "focusAddress" };
+	if (command && !input.shift && !input.alt && base === "L") return { kind: "focusAddress" };
 	if (!command) return null;
 	const key: KeyEventLike = {
 		key: input.key,

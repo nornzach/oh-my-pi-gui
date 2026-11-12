@@ -242,6 +242,8 @@ export const IPC_COMMANDS = {
 	PREFS_UPDATE_LAUNCH_PROFILE: "prefs:update-launch-profile",
 	/** Whether the system-wide show/hide shortcut is registered (→ IpcWindowToggleStatus) */
 	PREFS_WINDOW_TOGGLE_STATUS: "prefs:window-toggle-status",
+	/** The keyboard layout a window read, by physical key code (renderer → main) */
+	PREFS_KEYBOARD_LAYOUT: "prefs:keyboard-layout",
 	/** Restart sidecar */
 	SIDECAR_RESTART: "sidecar:restart",
 	/** Get sidecar status */
@@ -1687,6 +1689,8 @@ export interface OmpApi {
 		/** Fires in every window after any window saves shortcut changes. */
 		onKeymapChanged(callback: () => void): () => void;
 		windowToggleStatus(): Promise<IpcWindowToggleStatus>;
+		/** Report the keyboard layout in use: code → the character its key types unshifted. */
+		setKeyboardLayout(layout: Record<string, string>): Promise<void>;
 		updateLaunchProfile(cwd: string, patch: Partial<LaunchProfile>): Promise<LaunchProfile>;
 	};
 	sidecar: {

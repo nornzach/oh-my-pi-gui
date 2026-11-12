@@ -82,7 +82,7 @@ import { runtimeLogPath, writeRuntimeLog } from "./runtime-log";
 import type { SchedulerHost } from "./scheduler/host";
 import type { SessionIndex } from "./session-index";
 import { resolveEditorCommand } from "./shell-env";
-import { applyWindowToggle, windowToggleStatus } from "./shortcuts";
+import { applyWindowToggle, updateKeyboardLayout, windowToggleStatus } from "./shortcuts";
 import type { SidecarManager } from "./sidecar";
 import type { SidecarPool } from "./sidecar-pool";
 import type { StatsClient } from "./stats-client";
@@ -1109,6 +1109,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	});
 
 	ipcMain.handle(IPC_COMMANDS.PREFS_WINDOW_TOGGLE_STATUS, () => windowToggleStatus());
+	ipcMain.handle(IPC_COMMANDS.PREFS_KEYBOARD_LAYOUT, (_event, layout: unknown) => updateKeyboardLayout(layout));
 
 	ipcMain.handle(IPC_COMMANDS.PREFS_UPDATE_LAUNCH_PROFILE, (_event, payload: IpcUpdateLaunchProfilePayload) => {
 		if (

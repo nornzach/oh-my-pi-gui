@@ -54,7 +54,7 @@ const EVENT_KEY_GLYPHS: Record<string, string> = {
 	Delete: "⌦",
 };
 
-/** Physical-code → base key for punctuation (layout-independent, immune to ⌥ composition). */
+/** Physical-code → base key for punctuation at its US-layout position (immune to ⌥ composition). */
 const CODE_BASE_KEYS: Record<string, string> = {
 	Minus: "-",
 	Equal: "=",
@@ -69,25 +69,72 @@ const CODE_BASE_KEYS: Record<string, string> = {
 	Slash: "/",
 };
 
-function keyFromEvent(event: KeyEventLike): string | null {
+const PUNCTUATION_KEYS = new Set(Object.values(CODE_BASE_KEYS));
+
+/**
+ * The character each letter, digit and punctuation key types unshifted in the
+ * keyboard layout in use, by physical key code: Colemak's `Semicolon` key types
+ * "o". Only keys whose character a chord can name are kept.
+ */
+export type KeyboardLayout = Readonly<Record<string, string>>;
+
+let activeLayout: KeyboardLayout = {};
+
+/**
+ * A KeyboardLayout from a layout map's entries (`navigator.keyboard.getLayoutMap()`
+ * or a copy sent over IPC). Keys that type no Latin letter, digit or chord
+ * punctuation — a Cyrillic layout's letters, AZERTY's digit row — are
+ * left out, so they keep their US-layout position.
+ */
+export function keyboardLayoutFrom(entries: Iterable<readonly [unknown, unknown]>): Record<string, string> {
+	const layout: Record<string, string> = {};
+	for (const [code, typed] of entries) {
+		if (typeof code !== "string" || typeof typed !== "string" || !positionKey(code)) continue;
+		const key = typed.toLowerCase();
+		if (/^[a-z0-9]$/.test(key) || PUNCTUATION_KEYS.has(key)) layout[code] = key;
+	}
+	return layout;
+}
+
+/** Use this layout to read keystrokes from now on (each process keeps its own). */
+export function setKeyboardLayout(layout: KeyboardLayout): void {
+	activeLayout = layout;
+}
+
+export function keyboardLayout(): KeyboardLayout {
+	return activeLayout;
+}
+
+/** Base key at a physical code's US-layout position: KeyO → "O", Semicolon → ";". */
+function positionKey(code: string): string | null {
+	if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+	if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+	return CODE_BASE_KEYS[code] ?? null;
+}
+
+/**
+ * Canonical base key of a keystroke. Letters, digits and punctuation are the
+ * character the key types in the current layout, so a shortcut follows the
+ * letter on the keycap under Colemak or Dvorak; a key whose layout character a
+ * chord cannot name keeps its US position. Never event.key for these: with ⌥
+ * held macOS composes it (⌥R → "®"), and ⇧ shifts it.
+ */
+export function baseKeyFromEvent(event: Pick<KeyEventLike, "key" | "code">): string | null {
 	if (IGNORED_EVENT_KEYS[event.key]) return null;
 	const glyph = EVENT_KEY_GLYPHS[event.key];
 	if (glyph) return glyph;
 	if (/^F(?:[1-9]|1[0-2])$/.test(event.key)) return event.key;
-	// Prefer the physical code for letters/digits/punctuation: with ⌥ held,
-	// macOS turns event.key into a composition character (⌥R → "®"), and the
-	// pre-B3 hardcoded chains were already code-based for exactly this reason.
-	if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3);
-	if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5);
-	const punct = CODE_BASE_KEYS[event.code];
-	if (punct) return punct;
+	const typed = activeLayout[event.code];
+	if (typed) return /^[a-z]$/.test(typed) ? typed.toUpperCase() : typed;
+	const position = positionKey(event.code);
+	if (position) return position;
 	if (event.key.length === 1) return /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : event.key;
 	return null;
 }
 
 /** Chord for a keydown event, or null for pure modifiers / unmodified / shift-only keys. */
 export function eventToChord(event: KeyEventLike): Chord | null {
-	const key = keyFromEvent(event);
+	const key = baseKeyFromEvent(event);
 	if (!key) return null;
 	if (!event.ctrlKey && !event.altKey && !event.metaKey) return null;
 	return { ctrl: event.ctrlKey, alt: event.altKey, shift: event.shiftKey, meta: event.metaKey, key };
@@ -221,4 +268,26 @@ export function chordToAccelerator(input: string, mac: boolean): string | null {
 	if (chord.meta) parts.push(mac ? "Command" : "Super");
 	parts.push(ACCELERATOR_KEYS[chord.key] ?? chord.key);
 	return parts.join("+");
+}
+
+/**
+ * A macOS system-wide accelerator moved to the key that types its letter in
+ * the current layout. Electron registers system-wide shortcuts on macOS by key
+ * position on a US keyboard, so under Colemak "Shift+Command+O" would fire on
+ * the key that types Y; this returns "Shift+Command+;", where Colemak types O.
+ * Unchanged when the layout types the letter nowhere or at its US position.
+ */
+export function positionalAccelerator(accelerator: string, layout: KeyboardLayout): string {
+	const parts = accelerator.split("+");
+	const last = parts[parts.length - 1] ?? "";
+	if (last.length !== 1) return accelerator;
+	const wanted = last.toLowerCase();
+	for (const [code, typed] of Object.entries(layout)) {
+		if (typed !== wanted) continue;
+		const position = positionKey(code);
+		if (!position) continue;
+		parts[parts.length - 1] = position;
+		return parts.join("+");
+	}
+	return accelerator;
 }

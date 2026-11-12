@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Letter shortcuts follow your keyboard layout: under Colemak, Dvorak or AZERTY, ⇧⌘O is the key that types O rather than the key in O's place on a US keyboard. This applies to the system-wide show/hide shortcut, keys recorded in Settings → Keyboard shortcuts, the app's own shortcuts and the built-in browser's keys; layouts without Latin letters keep US positions ([#49](https://github.com/nornzach/oh-my-pi-gui/issues/49)).
+
 ## [0.9.42] - 2026-11-12
 
 ### Added

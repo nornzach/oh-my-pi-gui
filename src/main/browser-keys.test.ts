@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { keyboardLayoutFrom, setKeyboardLayout } from "../shared/chord";
 import { pageKeyCommand } from "./browser-keys";
 
 type KeyInput = Parameters<typeof pageKeyCommand>[0];
@@ -21,6 +22,26 @@ function key(code: string, keyName: string, mods: Partial<KeyInput> = {}): KeyIn
 const APP_CHORDS = new Set(["⌘J", "⌃J", "⌘B", "⌃P"]);
 
 describe("pageKeyCommand", () => {
+	afterEach(() => setKeyboardLayout({}));
+
+	it("reads browser keys by the letter the keyboard layout types", () => {
+		// Colemak: R is typed at US S, L at US U.
+		setKeyboardLayout(
+			keyboardLayoutFrom([
+				["KeyS", "r"],
+				["KeyR", "p"],
+				["KeyU", "l"],
+				["KeyL", "i"],
+			]),
+		);
+		expect(pageKeyCommand(key("KeyS", "r", { meta: true }), APP_CHORDS, "darwin")).toEqual({
+			kind: "reload",
+			ignoreCache: false,
+		});
+		expect(pageKeyCommand(key("KeyR", "p", { meta: true }), APP_CHORDS, "darwin")).toBeNull();
+		expect(pageKeyCommand(key("KeyU", "l", { meta: true }), APP_CHORDS, "darwin")).toEqual({ kind: "focusAddress" });
+	});
+
 	it("reloads the page, not the app window the menu's ⌘R would reload", () => {
 		expect(pageKeyCommand(key("KeyR", "r", { meta: true }), APP_CHORDS, "darwin")).toEqual({
 			kind: "reload",
