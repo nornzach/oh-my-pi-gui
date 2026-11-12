@@ -26,7 +26,7 @@ function approximateTokens(tokens: number): string {
 }
 
 /**
- * Compact context control beside Send. The idle surface is one icon; hover,
+ * Compact context control in the context row under the composer. The idle surface is one icon; hover,
  * focus or click reveals the native provider-anchored token breakdown without
  * opening the full context-report modal. `autoCompactAt` is where the strategy
  * bar says compaction fires (null when it is off), so the buffer drawn here

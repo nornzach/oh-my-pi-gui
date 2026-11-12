@@ -342,8 +342,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	toggleToolsExpandAll: () =>
 		set({ toolsExpandAll: { expanded: !get().toolsExpandAll.expanded, seq: get().toolsExpandAll.seq + 1 } }),
 	setPanelTab: tab => {
-		// Chat tabs are tool-free: only files can exist there, so a force-open
-		// of any other drawer tab is a no-op.
+		// Chat tabs are tool-free: only Overview, btw and Files exist there, so a
+		// force-open of any other drawer tab is a no-op.
 		if (!CHAT_PANEL_TABS.has(tab)) {
 			const activeKind = useTabsStore
 				.getState()

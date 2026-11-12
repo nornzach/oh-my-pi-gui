@@ -5,8 +5,7 @@
  * mount it anywhere under the provider. Rendered label shows the CURRENT
  * language autonym ("EN" / "中文"), matching OS-language-picker convention.
  *
- * Mount points (wired by the shell owner): TitleBar trailing icon row and the
- * Settings window GUI tab.
+ * Mount point: the sidebar footer.
  */
 
 import { Globe } from "lucide-react";

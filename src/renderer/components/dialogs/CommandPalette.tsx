@@ -29,6 +29,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMe
 import type { AvailableCommand } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
 import { newSessionNow } from "../../hooks/use-session-switch";
+import { scoreCommand } from "../../lib/command-ranking";
 import {
 	buildCommandMenu,
 	type CommandAffordance,
@@ -50,7 +51,7 @@ import { useSettingsStore } from "../../stores/settings";
 import { useActiveTabKind } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { Spinner } from "../common";
+import { Kbd, Spinner } from "../common";
 import { DIALOG_OVERLAY_Z, isTopmostDialog, registerDialogLayer } from "../common/dialog-layer";
 
 const RECENT_KEY = "omp.palette.recent";
@@ -79,24 +80,6 @@ function saveRecent(names: string[]) {
 	} catch {
 		// Storage unavailable — recents are best-effort.
 	}
-}
-
-/** Subsequence fuzzy score; null = no match. Earlier + denser wins. */
-function fuzzyScore(query: string, target: string): number | null {
-	const q = query.toLowerCase();
-	const t = target.toLowerCase();
-	if (q.length === 0) return 0;
-	let qi = 0;
-	let score = 0;
-	let last = -2;
-	for (let ti = 0; ti < t.length && qi < q.length; ti++) {
-		if (t[ti] === q[qi]) {
-			score += ti === last + 1 ? 2 : 1;
-			last = ti;
-			qi++;
-		}
-	}
-	return qi === q.length ? score : null;
 }
 
 interface ScoredItem {
@@ -461,13 +444,8 @@ export function CommandPalette() {
 		const q = query.trim();
 		const scored: ScoredItem[] = [];
 		for (const item of workingItems) {
-			const targets = [item.name, item.label, item.description ?? "", ...(item.aliases ?? [])];
-			let best: number | null = null;
-			for (const target of targets) {
-				const score = fuzzyScore(q, target);
-				if (score !== null && (best === null || score > best)) best = score;
-			}
-			if (best !== null) scored.push({ item, score: best });
+			const score = scoreCommand(q, item);
+			if (score !== null) scored.push({ item, score });
 		}
 		return scored.sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
 	}, [workingItems, query]);
@@ -653,11 +631,7 @@ export function CommandPalette() {
 								{toggleOn ? t("palette.on") : t("palette.off")}
 							</span>
 						)}
-						{item.shortcut && (
-							<kbd className="rounded border border-(--omp-border-muted) px-1 text-omp-xxs text-(--omp-dim)">
-								{item.shortcut}
-							</kbd>
-						)}
+						{item.shortcut && <Kbd>{item.shortcut}</Kbd>}
 					</span>
 					<span className="block truncate text-omp-xs text-(--omp-muted)">
 						{disabled
@@ -721,9 +695,7 @@ export function CommandPalette() {
 						value={query}
 					/>
 					{loading && <Spinner size="sm" />}
-					<kbd className="shrink-0 rounded border border-(--omp-border-muted) px-1.5 py-0.5 text-omp-xxs text-(--omp-dim)">
-						esc
-					</kbd>
+					<Kbd>esc</Kbd>
 				</div>
 				{commandsError !== null && (
 					<div className="flex items-center gap-2 border-b border-(--omp-border-muted) px-3 py-1.5">

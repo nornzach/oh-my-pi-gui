@@ -31,7 +31,7 @@ import { mergeContentMatches, rankSessions, type SessionSortMode } from "../../l
 import { browsableSessions } from "../../lib/session-tree";
 import { useSessionStore } from "../../stores/session";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Button, Modal, Spinner } from "../common";
+import { Badge, Button, Kbd, Modal, Spinner } from "../common";
 
 type SessionScope = "local" | "global";
 
@@ -267,9 +267,7 @@ export function SessionPickerDialog() {
 					>
 						<FolderTree size={11} />
 					</button>
-					<kbd className="shrink-0 rounded border border-(--omp-border-muted) px-1.5 py-0.5 text-omp-xxs text-(--omp-dim)">
-						esc
-					</kbd>
+					<Kbd>esc</Kbd>
 				</div>
 				<div
 					className="min-h-0 flex-1 overflow-y-auto p-1.5"

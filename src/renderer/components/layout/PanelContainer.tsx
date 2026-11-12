@@ -108,7 +108,7 @@ export function PanelContainer() {
 		media.addEventListener("change", onChange);
 		return () => media.removeEventListener("change", onChange);
 	}, []);
-	/** Chat tabs only expose files — diffs, shells, and agent browsing need tools. */
+	/** Chat tabs expose only Overview, btw and Files — diffs, shells and agent browsing need tools. */
 	const isChat = useActiveTabKind() === "chat";
 	const visibleTabs = isChat ? TABS.filter(tab => CHAT_PANEL_TABS.has(tab.id)) : TABS;
 	const visiblePanelTab = isChat && !CHAT_PANEL_TABS.has(panelTab) ? "files" : panelTab;

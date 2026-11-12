@@ -9,11 +9,12 @@ import { useTabRpc } from "../../lib/tab-rpc";
  * Settings window (Cmd+,): schema-driven editor for the agent settings
  * schema. Tabs, groups, labels, and control types all come from the
  * sidecar (get_settings_schema / get_settings RPC); writes go through
- * set_setting and apply immediately. Three product-level tabs sit beside the
- * schema tabs: "OMP Capabilities" surfaces differentiating workflows first,
- * "Runtime" holds ordinary live toggles, and "GUI" contains renderer-local
- * preferences persisted via prefs IPC. Entries without UI metadata land in
- * "Advanced".
+ * set_setting and apply immediately. Product pages sit beside the schema
+ * tabs: "OMP Capabilities" surfaces differentiating workflows first, the
+ * management pages (Skills, MCP, Resources, Hooks, Commands, Security, SSH,
+ * Updates) own their own data, and "Interface" and "Shortcuts" hold
+ * renderer-local preferences persisted via prefs IPC. Entries without UI
+ * metadata land in "Advanced".
  * String-typed settings that reference a model or a provider (last path
  * segment ends in Model/Provider) render as searchable dropdowns fed by
  * get_available_models / get_providers instead of free-text inputs.
@@ -55,6 +56,7 @@ import { exportSessionHtml } from "../../lib/export-session";
 import { cx } from "../../lib/format";
 import { useLang, useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
+import { platformChord } from "../../lib/keymap";
 import { setCodeLineNumbersPref } from "../../lib/markdown";
 import { clearSessionContext, retryLastTurn as retryLastTurnShared } from "../../lib/messages";
 import { dumpTranscriptToClipboard } from "../../lib/transcript-copy";
@@ -96,6 +98,7 @@ import {
 	buildSettingsNavGroups,
 	CAPABILITIES_TAB_ID,
 	COMMANDS_TAB_ID,
+	FILL_HEIGHT_TAB_IDS,
 	GUI_SETTING_SEARCH_ITEMS,
 	GUI_TAB_ID,
 	HOOKS_TAB_ID,
@@ -117,7 +120,7 @@ import {
 } from "./settings-window-model";
 import { UpdatesSettingsPage } from "./UpdatesSettingsPage";
 
-/** Settings without UI metadata (advanced): searchable flat list. */
+/** One GUI display switch; a row that overrides the Agent setting offers to inherit it again. */
 function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELDS)[number] }) {
 	const t = useT();
 	const value = useDisplayPreference(field);
@@ -133,6 +136,7 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 		<div id={`setting-gui-${field}`} className="flex items-center gap-3">
 			<div className="flex-1">
 				<Toggle
+					className="omp-settings-row"
 					label={t(`settings.display.${field}`)}
 					// The section intro already explains that unset rows read the Agent
 					// setting; only a row that diverges from it needs a marker.
@@ -454,6 +458,10 @@ export function SettingsWindow() {
 	}, [open, tabRpc.getSettings]);
 
 	const navGroups = useMemo<SettingsNavGroup[]>(() => buildSettingsNavGroups(schema), [schema]);
+	const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
+	/** The active page's group is always open; others stay open once opened. */
+	const isGroupOpen = (group: SettingsNavGroup) =>
+		openGroups.has(group.id) || group.items.some(item => item.id === tab);
 	// Load the persisted proxy pref each time the window opens.
 	useEffect(() => {
 		if (!open) return;
@@ -682,6 +690,7 @@ export function SettingsWindow() {
 	const isSchemaTab = schema?.tabs.some(schemaTab => schemaTab.id === tab) === true;
 	const isAgentSettingsTab = isAgentSchemaTab(tab, schema);
 	const managementTab = MANAGEMENT_TAB_IDS.has(tab);
+	const wideTab = managementTab || tab === CAPABILITIES_TAB_ID;
 	const showGlobalSearch = true;
 
 	// The search field advertises Cmd/Ctrl+K. Capture it while Settings is open
@@ -717,6 +726,8 @@ export function SettingsWindow() {
 		}
 		return byTab;
 	}, [query, schema, sidecarReady, values]);
+	// Master-detail pages size their panes to the window instead of scrolling the page.
+	const fillsHeight = searchGroups === null && FILL_HEIGHT_TAB_IDS.has(tab);
 
 	const guiSearchResults = useMemo(() => {
 		const q = query.trim().normalize("NFKC").toLowerCase();
@@ -1025,22 +1036,40 @@ export function SettingsWindow() {
 							<section className={groupIndex === 0 ? "" : "settings-nav-group mt-4"} key={group.id}>
 								<button
 									type="button"
-									aria-expanded={group.items.some(item => item.id === tab)}
+									aria-expanded={isGroupOpen(group)}
 									className="settings-nav-group-label mb-1 flex w-full items-center gap-1 rounded-lg px-3 py-2 text-left text-omp-md font-medium text-(--omp-text) hover:bg-(--omp-selected-bg)"
 									onClick={() => {
+										// Opening a group shows its first page; a group stays open until its
+										// own header closes it, so several groups can be read side by side.
+										if (isGroupOpen(group) && !group.items.some(item => item.id === tab)) {
+											setOpenGroups(prev => {
+												const next = new Set(prev);
+												next.delete(group.id);
+												return next;
+											});
+											return;
+										}
+										const current = navGroups.find(candidate =>
+											candidate.items.some(item => item.id === tab),
+										);
+										setOpenGroups(prev => {
+											const next = new Set(prev).add(group.id);
+											if (current) next.add(current.id);
+											return next;
+										});
 										setTab(group.items[0].id);
 										setQuery("");
 										setFocusedSetting(null);
 									}}
 								>
-									{group.items.some(item => item.id === tab) ? (
+									{isGroupOpen(group) ? (
 										<ChevronDown aria-hidden="true" className="shrink-0 text-(--omp-dim)" size={13} />
 									) : (
 										<ChevronRight aria-hidden="true" className="shrink-0 text-(--omp-dim)" size={13} />
 									)}
 									<span className="min-w-0 truncate">{t(`settings.nav.${group.id}`)}</span>
 								</button>
-								{group.items.some(item => item.id === tab) &&
+								{isGroupOpen(group) &&
 									group.items.map(tb => {
 										const active = tb.id === tab;
 										return (
@@ -1089,11 +1118,9 @@ export function SettingsWindow() {
 				<main className="settings-main-canvas flex min-w-0 flex-1 flex-col overflow-hidden">
 					<header className="omp-column omp-column-workspace drag-region flex h-14 shrink-0 items-center gap-3 border-b border-(--omp-border-muted)">
 						<div className="min-w-0 flex-1">
-							{!managementTab && (
-								<h1 className="truncate text-omp-xl font-semibold tracking-[-0.015em] text-(--omp-text)">
-									{tabTitle({ id: tab, label: tab })}
-								</h1>
-							)}
+							<h1 className="truncate text-omp-xl font-semibold tracking-[-0.015em] text-(--omp-text)">
+								{tabTitle({ id: tab, label: tab })}
+							</h1>
 						</div>
 						{showGlobalSearch && (
 							<div className="no-drag relative w-[clamp(13rem,32vw,20rem)] max-w-full min-w-0 shrink">
@@ -1108,7 +1135,7 @@ export function SettingsWindow() {
 									value={query}
 								/>
 								<span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-(--omp-border-muted) px-1.5 py-0.5 text-omp-xxs text-(--omp-dim)">
-									⌘K
+									{platformChord("⌘K")}
 								</span>
 							</div>
 						)}
@@ -1121,586 +1148,641 @@ export function SettingsWindow() {
 							<X size={16} />
 						</button>
 					</header>
-					<div
-						className={cx(
-							"settings-content omp-column min-h-0 flex-1 overflow-y-auto py-4 min-[1080px]:py-5",
-							// Forms read on the narrow column so a switch stays beside its label;
-							// management pages (lists with detail panes) keep the wide one.
-							managementTab || tab === CAPABILITIES_TAB_ID ? "omp-column-workspace" : "omp-column-settings",
-						)}
-					>
-						{!sidecarReady && isAgentSettingsTab && (
-							<SettingsConnectionNotice
-								busy={sidecarBusy}
-								error={sidecarError}
-								hasCachedSchema={schema !== null}
-								onRetry={retrySettingsConnection}
-								status={sidecarStatus}
-							/>
-						)}
-						<PendingRestartBanner
-							busy={sidecarBusy}
-							onRestart={restartForPendingSettings}
-							pending={pendingRestarts}
-						/>
-						{searchGroups === null ? (
-							<>
-								{tab === SKILLS_TAB_ID && <SkillsSettingsPage query={query} />}
-								{tab === MCP_TAB_ID && <ExtensionSettingsPage query={query} tabId="mcp" />}
-								{tab === RESOURCES_TAB_ID && <InventorySettingsPage initialTab={resourceTab} query={query} />}
-								{tab === HOOKS_TAB_ID && <ExtensionSettingsPage query={query} tabId="hooks" />}
-								{tab === COMMANDS_TAB_ID && <ExtensionSettingsPage query={query} tabId="commands" />}
-								{tab === SECURITY_TAB_ID && <SecuritySettingsPage />}
-								{tab === SSH_TAB_ID && <SshSettingsPage />}
-								{tab === UPDATES_TAB_ID && <UpdatesSettingsPage />}
-								{tab === SHORTCUTS_TAB_ID && <ShortcutsSettingsPage />}
-								{tab === CAPABILITIES_TAB_ID && (
-									<CapabilitiesHome
-										advisorActive={advisorActive}
-										advisorEnabled={values["advisor.enabled"] === true}
-										memoryBackend={
-											typeof values["memory.backend"] === "string" ? values["memory.backend"] : ""
-										}
-										onConfigureAdvisor={() => {
-											setTab("model");
-											setQuery("advisor");
-										}}
-										onConfigureTtsr={() => {
-											setTab("context");
-											setQuery("ttsr");
-										}}
-										onOpenAgents={() => {
-											close();
-											useUiStore.getState().openAgentHub("definitions");
-										}}
-										onOpenGoal={() => {
-											close();
-											useUiStore.getState().openModes("goal");
-										}}
-										onOpenLoop={() => {
-											close();
-											useUiStore.getState().openModes("loop");
-										}}
-										onOpenMemory={() => {
-											setTab("memory");
-											setQuery("");
-										}}
-										onOpenTools={() => {
-											setTab("tools");
-											setQuery("");
-										}}
-										onOpenCommandCenter={() => {
-											close();
-											useUiStore.getState().openCommandPalette();
-										}}
-										onOpenTarget={openCapabilityTarget}
-										onOpenModelRoles={() => {
-											close();
-											useUiStore.getState().openModelRoles();
-										}}
-										ready={loadState === "ready" && sidecarReady}
-										ttsrEnabled={values["ttsr.enabled"] === true}
+					{/* The scroller spans the whole canvas so its bar sits at the window edge;
+					    the page inside shares the header's column, so every page title and
+					    every page body start on the same left edge. */}
+					<div className="settings-scroll min-h-0 flex-1 overflow-y-auto" ref={contentRef}>
+						<div
+							className={cx(
+								"omp-column omp-column-workspace py-4 min-[1080px]:py-5",
+								fillsHeight && "flex h-full flex-col",
+							)}
+						>
+							<div
+								className={cx(
+									"settings-content",
+									// Forms keep a reading measure so a switch stays beside its label;
+									// management pages (lists with detail panes) use the full column.
+									!wideTab && "settings-form-measure",
+									fillsHeight && "flex min-h-0 flex-1 flex-col",
+								)}
+							>
+								{!sidecarReady && isAgentSettingsTab && (
+									<SettingsConnectionNotice
+										busy={sidecarBusy}
+										error={sidecarError}
+										hasCachedSchema={schema !== null}
+										onRetry={retrySettingsConnection}
+										status={sidecarStatus}
 									/>
 								)}
-
-								{tab === GUI_TAB_ID && (
+								<PendingRestartBanner
+									busy={sidecarBusy}
+									onRestart={restartForPendingSettings}
+									pending={pendingRestarts}
+								/>
+								{searchGroups === null ? (
 									<>
-										<Section id="setting-gui-theme" title={t("settings.gui.themeSection")}>
-											<Button
-												onClick={() => {
+										{tab === SKILLS_TAB_ID && <SkillsSettingsPage query={query} />}
+										{tab === MCP_TAB_ID && <ExtensionSettingsPage query={query} tabId="mcp" />}
+										{tab === RESOURCES_TAB_ID && (
+											<InventorySettingsPage initialTab={resourceTab} query={query} />
+										)}
+										{tab === HOOKS_TAB_ID && <ExtensionSettingsPage query={query} tabId="hooks" />}
+										{tab === COMMANDS_TAB_ID && <ExtensionSettingsPage query={query} tabId="commands" />}
+										{tab === SECURITY_TAB_ID && <SecuritySettingsPage />}
+										{tab === SSH_TAB_ID && <SshSettingsPage />}
+										{tab === UPDATES_TAB_ID && <UpdatesSettingsPage />}
+										{tab === SHORTCUTS_TAB_ID && <ShortcutsSettingsPage />}
+										{tab === CAPABILITIES_TAB_ID && (
+											<CapabilitiesHome
+												advisorActive={advisorActive}
+												advisorEnabled={values["advisor.enabled"] === true}
+												memoryBackend={
+													typeof values["memory.backend"] === "string" ? values["memory.backend"] : ""
+												}
+												onConfigureAdvisor={() => {
+													setTab("model");
+													setQuery("advisor");
+												}}
+												onConfigureTtsr={() => {
+													setTab("context");
+													setQuery("ttsr");
+												}}
+												onOpenAgents={() => {
 													close();
-													useUiStore.getState().openThemePicker();
+													useUiStore.getState().openAgentHub("definitions");
 												}}
-												variant="secondary"
-											>
-												{t("settings.gui.theme")}
-											</Button>
-											<Toggle
-												checked={followAgentTheme}
-												label={t("settings.gui.followAgentTheme")}
-												description={t("settings.gui.followAgentThemeDesc")}
-												onChange={value => applyDisplayPreference("followAgentTheme", value)}
-											/>
-										</Section>
-										<Section id="setting-gui-display" title={t("settings.display.title")}>
-											<p className="mb-3 text-omp-sm text-(--omp-muted)">{t("settings.display.scope")}</p>
-											<div className="space-y-4">
-												{GUI_DISPLAY_BOOL_FIELDS.map(field => (
-													<DisplayPreferenceRow key={field} field={field} />
-												))}
-											</div>
-											{/* Same row geometry as the switches above: label left, a
-											    number-sized field right — not a full-width text box. */}
-											<div
-												id="setting-gui-pasteMenuThreshold"
-												className="flex items-center justify-between gap-4 px-2 py-2"
-											>
-												<span className="text-omp-md font-medium text-(--omp-text)">
-													{t("settings.display.pasteMenuThreshold")}
-												</span>
-												<div className="w-24 shrink-0">
-													<Input
-														compact
-														aria-label={t("settings.display.pasteMenuThreshold")}
-														type="number"
-														min={0}
-														step={1}
-														value={pasteThresholdDraft ?? String(pasteMenuThreshold)}
-														onChange={event => setPasteThresholdDraft(event.target.value)}
-														onBlur={() => {
-															if (pasteThresholdDraft === null) return;
-															const value = Number(pasteThresholdDraft);
-															if (
-																pasteThresholdDraft.trim() === "" ||
-																!Number.isInteger(value) ||
-																value < 0
-															) {
-																toast({ variant: "error", message: t("settings.editors.errNumber") });
-																return;
-															}
-															void setDisplayPreference("pasteMenuThreshold", value).then(ok => {
-																if (ok) setPasteThresholdDraft(null);
-															});
-														}}
-													/>
-												</div>
-											</div>
-										</Section>
-										<Section id="setting-gui-readability" title={t("settings.gui.readability")}>
-											<Toggle
-												checked={compactDensity}
-												label={t("settings.gui.compactDensity")}
-												description={t("settings.gui.compactDensityDesc")}
-												onChange={value => applyDisplayPreference("compactDensity", value)}
-											/>
-											<Toggle
-												checked={colorBlindMode}
-												label={t("settings.gui.colorBlindMode")}
-												onChange={value => applyDisplayPreference("colorBlindMode", value)}
-											/>
-										</Section>
-										<Section id="setting-gui-fontSize" title={t("settings.gui.fontSize")}>
-											<div className="w-40">
-												<Input
-													compact
-													max={20}
-													min={10}
-													onBlur={commitFontSize}
-													onChange={event => setFontSizeDraft(event.target.value)}
-													onKeyDown={event => {
-														if (isImeKeyEvent(event)) return;
-														if (event.key === "Enter") event.currentTarget.blur();
-													}}
-													type="number"
-													value={fontSizeDraft ?? String(fontSize)}
-												/>
-											</div>
-											<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
-												{t("settings.gui.fontSizeDesc")}
-											</p>
-										</Section>
-										<Section id="setting-gui-panelDefault" title={t("settings.gui.panelDefault")}>
-											<RadioGroup
-												name="defaultPanelTab"
-												onChange={applyPanelTab}
-												options={[
-													{ value: "diff", label: t("settings.gui.panel.diff") },
-													{ value: "files", label: t("settings.gui.panel.files") },
-												]}
-												value={panelTab}
-											/>
-										</Section>
-										<Section id="setting-gui-tabStrip" title={t("settings.gui.tabStrip")}>
-											<RadioGroup
-												name="tabWidth"
-												onChange={applyTabWidth}
-												options={[
-													{
-														value: "compact",
-														label: t("settings.gui.tabWidth.compact"),
-														description: t("settings.gui.tabWidth.compactDesc"),
-													},
-													{
-														value: "default",
-														label: t("settings.gui.tabWidth.default"),
-														description: t("settings.gui.tabWidth.defaultDesc"),
-													},
-													{
-														value: "wide",
-														label: t("settings.gui.tabWidth.wide"),
-														description: t("settings.gui.tabWidth.wideDesc"),
-													},
-												]}
-												value={tabWidth}
-											/>
-											<Toggle
-												checked={tabRows === "multi"}
-												description={t("settings.gui.tabRowsDesc")}
-												label={t("settings.gui.tabRows")}
-												onChange={applyTabRows}
-											/>
-										</Section>
-										<Section id="setting-gui-sidebarQuotas" title={t("settings.gui.sidebarQuotas")}>
-											<Toggle
-												checked={sidebarQuotas}
-												description={t("settings.gui.sidebarQuotasDesc")}
-												label={t("settings.gui.sidebarQuotas")}
-												onChange={applySidebarQuotas}
-											/>
-										</Section>
-										<Section id="setting-gui-notifications" title={t("settings.gui.notifications")}>
-											<Toggle
-												checked={notifications}
-												description={t("settings.gui.notificationsDesc")}
-												label={t("settings.gui.notifications")}
-												onChange={applyNotifications}
-											/>
-											<Toggle
-												checked={notificationsWhenFocused}
-												description={t("settings.gui.notificationsWhenFocusedDesc")}
-												disabled={!notifications}
-												label={t("settings.gui.notificationsWhenFocused")}
-												onChange={applyNotificationsWhenFocused}
-											/>
-										</Section>
-										<Section id="setting-gui-thinkingExpanded" title={t("settings.gui.thinkingExpanded")}>
-											<Toggle
-												checked={thinkingExpanded}
-												description={t("settings.gui.thinkingExpandedDesc")}
-												label={t("settings.gui.thinkingExpanded")}
-												onChange={applyThinkingExpanded}
-											/>
-										</Section>
-										<Section id="setting-gui-transcriptDetail" title={t("settings.gui.transcriptDetail")}>
-											<RadioGroup
-												name="transcriptDetail"
-												onChange={applyTranscriptDetail}
-												options={[
-													{
-														value: "compact",
-														label: t("settings.gui.transcript.compact"),
-														description: t("settings.gui.transcript.compactDesc"),
-													},
-													{
-														value: "full",
-														label: t("settings.gui.transcript.full"),
-														description: t("settings.gui.transcript.fullDesc"),
-													},
-												]}
-												value={transcriptDetail}
-											/>
-										</Section>
-										<Section id="setting-gui-lineNumbers" title={t("codeblock.title")}>
-											<Toggle
-												checked={codeLineNumbers}
-												description={t("codeblock.lineNumbersDesc")}
-												label={t("codeblock.lineNumbers")}
-												onChange={applyCodeLineNumbers}
-											/>
-										</Section>
-									</>
-								)}
-								{tab === ADVANCED_TAB_ID && (
-									<>
-										<Section id="setting-gui-proxy" title={t("settings.gui.proxy")}>
-											<Input
-												compact
-												disabled={proxySaving}
-												onBlur={commitProxy}
-												onChange={event => setProxyDraft(event.target.value)}
-												onKeyDown={event => {
-													if (isImeKeyEvent(event)) return;
-													if (event.key === "Enter") event.currentTarget.blur();
+												onOpenGoal={() => {
+													close();
+													useUiStore.getState().openModes("goal");
 												}}
-												placeholder="http://127.0.0.1:7890"
-												spellCheck={false}
-												value={proxyDraft ?? savedProxy}
+												onOpenLoop={() => {
+													close();
+													useUiStore.getState().openModes("loop");
+												}}
+												onOpenMemory={() => {
+													setTab("memory");
+													setQuery("");
+												}}
+												onOpenTools={() => {
+													setTab("tools");
+													setQuery("");
+												}}
+												onOpenCommandCenter={() => {
+													close();
+													useUiStore.getState().openCommandPalette();
+												}}
+												onOpenTarget={openCapabilityTarget}
+												onOpenModelRoles={() => {
+													close();
+													useUiStore.getState().openModelRoles();
+												}}
+												ready={loadState === "ready" && sidecarReady}
+												ttsrEnabled={values["ttsr.enabled"] === true}
 											/>
-											{isUnsupportedProxyUrl(proxyDraft ?? savedProxy) ? (
-												<p className="mt-1.5 text-omp-sm text-(--omp-error)" role="alert">
-													{t("settings.gui.proxyUnsupported")}
-												</p>
-											) : (
-												<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
-													{t("settings.gui.proxyDesc")}
-												</p>
-											)}
-										</Section>
-										<Section id="setting-gui-launch" title={t("settings.launch.title")}>
-											<fieldset className="space-y-3" disabled={launchSaving || launchRestarting}>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.systemPrompt")}
-													</span>
-													<TextArea
-														compact
-														mono
-														onBlur={() => commitLaunchField("systemPrompt")}
-														onChange={event =>
-															setLaunchDrafts(prev => ({ ...prev, systemPrompt: event.target.value }))
-														}
-														placeholder={t("settings.launch.systemPromptPlaceholder")}
-														rows={4}
-														spellCheck={false}
-														value={launchDrafts.systemPrompt ?? launchProfile.systemPrompt ?? ""}
-													/>
-												</div>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.appendSystemPrompt")}
-													</span>
-													<TextArea
-														compact
-														mono
-														onBlur={() => commitLaunchField("appendSystemPrompt")}
-														onChange={event =>
-															setLaunchDrafts(prev => ({
-																...prev,
-																appendSystemPrompt: event.target.value,
-															}))
-														}
-														placeholder={t("settings.launch.appendSystemPromptPlaceholder")}
-														rows={4}
-														spellCheck={false}
-														value={
-															launchDrafts.appendSystemPrompt ?? launchProfile.appendSystemPrompt ?? ""
-														}
-													/>
-												</div>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.addDirs")}
-													</span>
-													<ArrayChipEditor
-														onCommit={dirs => updateLaunchProfile({ addDirs: dirs })}
-														placeholder={t("settings.launch.addDirsPlaceholder")}
-														values={launchProfile.addDirs ?? []}
-													/>
-													<div className="mt-1.5">
-														<Button
-															onClick={() => void pickLaunchAddDirs()}
-															size="sm"
-															type="button"
-															variant="secondary"
-														>
-															{t("settings.launch.addDirPick")}
-														</Button>
-													</div>
-													<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
-														{t("settings.launch.addDirsDesc")}
-													</p>
-												</div>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.tools")}
-													</span>
-													<ArrayChipEditor
-														onCommit={tools => updateLaunchProfile({ tools })}
-														values={launchProfile.tools ?? []}
-													/>
-													<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
-														{t("settings.launch.toolsDesc")}
-													</p>
-												</div>
-												<Toggle
-													checked={launchProfile.noRules === true}
-													description={t("settings.launch.noRulesDesc")}
-													label={t("settings.launch.noRules")}
-													onChange={value => updateLaunchProfile({ noRules: value })}
-												/>
-												<Toggle
-													checked={launchProfile.noLsp === true}
-													description={t("settings.launch.noLspDesc")}
-													label={t("settings.launch.noLsp")}
-													onChange={value => updateLaunchProfile({ noLsp: value })}
-												/>
-												<Toggle
-													checked={launchProfile.planYolo === true}
-													description={t("settings.launch.planYoloDesc")}
-													label={t("settings.launch.planYolo")}
-													onChange={value => updateLaunchProfile({ planYolo: value })}
-												/>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.profile")}
-													</span>
-													<Input
-														compact
-														onBlur={() => commitLaunchField("profile")}
-														onChange={event =>
-															setLaunchDrafts(prev => ({ ...prev, profile: event.target.value }))
-														}
-														onKeyDown={event => {
-															if (isImeKeyEvent(event)) return;
-															if (event.key === "Enter") event.currentTarget.blur();
-														}}
-														placeholder={t("settings.launch.profilePlaceholder")}
-														spellCheck={false}
-														value={launchDrafts.profile ?? launchProfile.profile ?? ""}
-													/>
-												</div>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.sessionDir")}
-													</span>
-													<Input
-														compact
-														onBlur={() => commitLaunchField("sessionDir")}
-														onChange={event =>
-															setLaunchDrafts(prev => ({ ...prev, sessionDir: event.target.value }))
-														}
-														onKeyDown={event => {
-															if (isImeKeyEvent(event)) return;
-															if (event.key === "Enter") event.currentTarget.blur();
-														}}
-														placeholder={t("settings.launch.sessionDirPlaceholder")}
-														spellCheck={false}
-														value={launchDrafts.sessionDir ?? launchProfile.sessionDir ?? ""}
-													/>
-												</div>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.config")}
-													</span>
-													<Input
-														compact
-														onBlur={() => commitLaunchField("config")}
-														onChange={event =>
-															setLaunchDrafts(prev => ({ ...prev, config: event.target.value }))
-														}
-														onKeyDown={event => {
-															if (isImeKeyEvent(event)) return;
-															if (event.key === "Enter") event.currentTarget.blur();
-														}}
-														placeholder={t("settings.launch.configPlaceholder")}
-														spellCheck={false}
-														value={launchDrafts.config ?? launchProfile.config ?? ""}
-													/>
-												</div>
-												<div>
-													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
-														{t("settings.launch.preview")}
-													</span>
-													<CodeBlock
-														code={launchPreview}
-														language="bash"
-														showCopy={false}
-														showLineNumbers={false}
-													/>
-												</div>
-												<div className="flex items-center gap-3 rounded-md border border-[var(--omp-warning)]/40 px-3 py-2">
-													<span className="min-w-0 flex-1 text-omp-sm text-[var(--omp-warning)]">
-														{t("settings.launch.restartNote")}
-													</span>
+										)}
+
+										{tab === GUI_TAB_ID && (
+											<>
+												<Section id="setting-gui-theme" title={t("settings.gui.themeSection")}>
 													<Button
-														disabled={
-															sidecarBusy ||
-															launchRestarting ||
-															launchSaving ||
-															Object.keys(launchDrafts).length > 0
-														}
-														onClick={restartForLaunchProfile}
-														size="sm"
-														type="button"
+														onClick={() => {
+															close();
+															useUiStore.getState().openThemePicker();
+														}}
 														variant="secondary"
 													>
-														{launchRestarting
-															? t("settings.launch.restarting")
-															: t("settings.launch.restartNow")}
+														{t("settings.gui.theme")}
 													</Button>
-												</div>
-												{sidecarBusy && (
-													<p className="text-omp-sm text-(--omp-muted)">{t("settings.launch.busyHint")}</p>
-												)}
-											</fieldset>
-										</Section>
+													<Toggle
+														className="omp-settings-row"
+														checked={followAgentTheme}
+														label={t("settings.gui.followAgentTheme")}
+														description={t("settings.gui.followAgentThemeDesc")}
+														onChange={value => applyDisplayPreference("followAgentTheme", value)}
+													/>
+												</Section>
+												<Section id="setting-gui-display" title={t("settings.display.title")}>
+													<p className="mb-3 text-omp-sm text-(--omp-muted)">
+														{t("settings.display.scope")}
+													</p>
+													<div className="space-y-4">
+														{GUI_DISPLAY_BOOL_FIELDS.map(field => (
+															<DisplayPreferenceRow key={field} field={field} />
+														))}
+													</div>
+													{/* Same row geometry as the switches above: label left, a
+											    number-sized field right — not a full-width text box. */}
+													<div
+														id="setting-gui-pasteMenuThreshold"
+														className="omp-settings-row flex items-center justify-between gap-4"
+													>
+														<span className="text-omp-md font-medium text-(--omp-text)">
+															{t("settings.display.pasteMenuThreshold")}
+														</span>
+														<div className="w-24 shrink-0">
+															<Input
+																compact
+																aria-label={t("settings.display.pasteMenuThreshold")}
+																type="number"
+																min={0}
+																step={1}
+																value={pasteThresholdDraft ?? String(pasteMenuThreshold)}
+																onChange={event => setPasteThresholdDraft(event.target.value)}
+																onBlur={() => {
+																	if (pasteThresholdDraft === null) return;
+																	const value = Number(pasteThresholdDraft);
+																	if (
+																		pasteThresholdDraft.trim() === "" ||
+																		!Number.isInteger(value) ||
+																		value < 0
+																	) {
+																		toast({
+																			variant: "error",
+																			message: t("settings.editors.errNumber"),
+																		});
+																		return;
+																	}
+																	void setDisplayPreference("pasteMenuThreshold", value).then(ok => {
+																		if (ok) setPasteThresholdDraft(null);
+																	});
+																}}
+															/>
+														</div>
+													</div>
+												</Section>
+												<Section id="setting-gui-readability" title={t("settings.gui.readability")}>
+													<Toggle
+														className="omp-settings-row"
+														checked={compactDensity}
+														label={t("settings.gui.compactDensity")}
+														description={t("settings.gui.compactDensityDesc")}
+														onChange={value => applyDisplayPreference("compactDensity", value)}
+													/>
+													<Toggle
+														className="omp-settings-row"
+														checked={colorBlindMode}
+														label={t("settings.gui.colorBlindMode")}
+														onChange={value => applyDisplayPreference("colorBlindMode", value)}
+													/>
+												</Section>
+												<Section id="setting-gui-fontSize" title={t("settings.gui.fontSize")}>
+													<div className="w-40">
+														<Input
+															compact
+															max={20}
+															min={10}
+															onBlur={commitFontSize}
+															onChange={event => setFontSizeDraft(event.target.value)}
+															onKeyDown={event => {
+																if (isImeKeyEvent(event)) return;
+																if (event.key === "Enter") event.currentTarget.blur();
+															}}
+															type="number"
+															value={fontSizeDraft ?? String(fontSize)}
+														/>
+													</div>
+													<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
+														{t("settings.gui.fontSizeDesc")}
+													</p>
+												</Section>
+												<Section id="setting-gui-panelDefault" title={t("settings.gui.panelDefault")}>
+													<RadioGroup
+														name="defaultPanelTab"
+														onChange={applyPanelTab}
+														options={[
+															{ value: "diff", label: t("settings.gui.panel.diff") },
+															{ value: "files", label: t("settings.gui.panel.files") },
+														]}
+														value={panelTab}
+													/>
+												</Section>
+												<Section id="setting-gui-tabStrip" title={t("settings.gui.tabStrip")}>
+													<RadioGroup
+														name="tabWidth"
+														onChange={applyTabWidth}
+														options={[
+															{
+																value: "compact",
+																label: t("settings.gui.tabWidth.compact"),
+																description: t("settings.gui.tabWidth.compactDesc"),
+															},
+															{
+																value: "default",
+																label: t("settings.gui.tabWidth.default"),
+																description: t("settings.gui.tabWidth.defaultDesc"),
+															},
+															{
+																value: "wide",
+																label: t("settings.gui.tabWidth.wide"),
+																description: t("settings.gui.tabWidth.wideDesc"),
+															},
+														]}
+														value={tabWidth}
+													/>
+													<Toggle
+														className="omp-settings-row"
+														checked={tabRows === "multi"}
+														description={t("settings.gui.tabRowsDesc")}
+														label={t("settings.gui.tabRows")}
+														onChange={applyTabRows}
+													/>
+												</Section>
+												<Section id="setting-gui-sidebarQuotas" title={t("settings.gui.sidebarQuotas")}>
+													<Toggle
+														className="omp-settings-row"
+														checked={sidebarQuotas}
+														description={t("settings.gui.sidebarQuotasDesc")}
+														label={t("settings.gui.sidebarQuotas")}
+														onChange={applySidebarQuotas}
+													/>
+												</Section>
+												<Section id="setting-gui-notifications" title={t("settings.gui.notifications")}>
+													<Toggle
+														className="omp-settings-row"
+														checked={notifications}
+														description={t("settings.gui.notificationsDesc")}
+														label={t("settings.gui.notifications")}
+														onChange={applyNotifications}
+													/>
+													<Toggle
+														className="omp-settings-row"
+														checked={notificationsWhenFocused}
+														description={t("settings.gui.notificationsWhenFocusedDesc")}
+														disabled={!notifications}
+														label={t("settings.gui.notificationsWhenFocused")}
+														onChange={applyNotificationsWhenFocused}
+													/>
+												</Section>
+												<Section
+													id="setting-gui-thinkingExpanded"
+													title={t("settings.gui.thinkingExpanded")}
+												>
+													<Toggle
+														className="omp-settings-row"
+														checked={thinkingExpanded}
+														description={t("settings.gui.thinkingExpandedDesc")}
+														label={t("settings.gui.thinkingExpanded")}
+														onChange={applyThinkingExpanded}
+													/>
+												</Section>
+												<Section
+													id="setting-gui-transcriptDetail"
+													title={t("settings.gui.transcriptDetail")}
+												>
+													<RadioGroup
+														name="transcriptDetail"
+														onChange={applyTranscriptDetail}
+														options={[
+															{
+																value: "compact",
+																label: t("settings.gui.transcript.compact"),
+																description: t("settings.gui.transcript.compactDesc"),
+															},
+															{
+																value: "full",
+																label: t("settings.gui.transcript.full"),
+																description: t("settings.gui.transcript.fullDesc"),
+															},
+														]}
+														value={transcriptDetail}
+													/>
+												</Section>
+												<Section id="setting-gui-lineNumbers" title={t("codeblock.title")}>
+													<Toggle
+														className="omp-settings-row"
+														checked={codeLineNumbers}
+														description={t("codeblock.lineNumbersDesc")}
+														label={t("codeblock.lineNumbers")}
+														onChange={applyCodeLineNumbers}
+													/>
+												</Section>
+											</>
+										)}
+										{tab === ADVANCED_TAB_ID && (
+											<>
+												<Section id="setting-gui-proxy" title={t("settings.gui.proxy")}>
+													<Input
+														compact
+														disabled={proxySaving}
+														onBlur={commitProxy}
+														onChange={event => setProxyDraft(event.target.value)}
+														onKeyDown={event => {
+															if (isImeKeyEvent(event)) return;
+															if (event.key === "Enter") event.currentTarget.blur();
+														}}
+														placeholder="http://127.0.0.1:7890"
+														spellCheck={false}
+														value={proxyDraft ?? savedProxy}
+													/>
+													{isUnsupportedProxyUrl(proxyDraft ?? savedProxy) ? (
+														<p className="mt-1.5 text-omp-sm text-(--omp-error)" role="alert">
+															{t("settings.gui.proxyUnsupported")}
+														</p>
+													) : (
+														<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
+															{t("settings.gui.proxyDesc")}
+														</p>
+													)}
+												</Section>
+												<Section id="setting-gui-launch" title={t("settings.launch.title")}>
+													<fieldset className="space-y-3" disabled={launchSaving || launchRestarting}>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.systemPrompt")}
+															</span>
+															<TextArea
+																compact
+																mono
+																onBlur={() => commitLaunchField("systemPrompt")}
+																onChange={event =>
+																	setLaunchDrafts(prev => ({
+																		...prev,
+																		systemPrompt: event.target.value,
+																	}))
+																}
+																placeholder={t("settings.launch.systemPromptPlaceholder")}
+																rows={4}
+																spellCheck={false}
+																value={launchDrafts.systemPrompt ?? launchProfile.systemPrompt ?? ""}
+															/>
+														</div>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.appendSystemPrompt")}
+															</span>
+															<TextArea
+																compact
+																mono
+																onBlur={() => commitLaunchField("appendSystemPrompt")}
+																onChange={event =>
+																	setLaunchDrafts(prev => ({
+																		...prev,
+																		appendSystemPrompt: event.target.value,
+																	}))
+																}
+																placeholder={t("settings.launch.appendSystemPromptPlaceholder")}
+																rows={4}
+																spellCheck={false}
+																value={
+																	launchDrafts.appendSystemPrompt ??
+																	launchProfile.appendSystemPrompt ??
+																	""
+																}
+															/>
+														</div>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.addDirs")}
+															</span>
+															<ArrayChipEditor
+																onCommit={dirs => updateLaunchProfile({ addDirs: dirs })}
+																placeholder={t("settings.launch.addDirsPlaceholder")}
+																values={launchProfile.addDirs ?? []}
+															/>
+															<div className="mt-1.5">
+																<Button
+																	onClick={() => void pickLaunchAddDirs()}
+																	size="sm"
+																	type="button"
+																	variant="secondary"
+																>
+																	{t("settings.launch.addDirPick")}
+																</Button>
+															</div>
+															<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
+																{t("settings.launch.addDirsDesc")}
+															</p>
+														</div>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.tools")}
+															</span>
+															<ArrayChipEditor
+																onCommit={tools => updateLaunchProfile({ tools })}
+																values={launchProfile.tools ?? []}
+															/>
+															<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
+																{t("settings.launch.toolsDesc")}
+															</p>
+														</div>
+														<Toggle
+															className="omp-settings-row"
+															checked={launchProfile.noRules === true}
+															description={t("settings.launch.noRulesDesc")}
+															label={t("settings.launch.noRules")}
+															onChange={value => updateLaunchProfile({ noRules: value })}
+														/>
+														<Toggle
+															className="omp-settings-row"
+															checked={launchProfile.noLsp === true}
+															description={t("settings.launch.noLspDesc")}
+															label={t("settings.launch.noLsp")}
+															onChange={value => updateLaunchProfile({ noLsp: value })}
+														/>
+														<Toggle
+															className="omp-settings-row"
+															checked={launchProfile.planYolo === true}
+															description={t("settings.launch.planYoloDesc")}
+															label={t("settings.launch.planYolo")}
+															onChange={value => updateLaunchProfile({ planYolo: value })}
+														/>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.profile")}
+															</span>
+															<Input
+																compact
+																onBlur={() => commitLaunchField("profile")}
+																onChange={event =>
+																	setLaunchDrafts(prev => ({ ...prev, profile: event.target.value }))
+																}
+																onKeyDown={event => {
+																	if (isImeKeyEvent(event)) return;
+																	if (event.key === "Enter") event.currentTarget.blur();
+																}}
+																placeholder={t("settings.launch.profilePlaceholder")}
+																spellCheck={false}
+																value={launchDrafts.profile ?? launchProfile.profile ?? ""}
+															/>
+														</div>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.sessionDir")}
+															</span>
+															<Input
+																compact
+																onBlur={() => commitLaunchField("sessionDir")}
+																onChange={event =>
+																	setLaunchDrafts(prev => ({
+																		...prev,
+																		sessionDir: event.target.value,
+																	}))
+																}
+																onKeyDown={event => {
+																	if (isImeKeyEvent(event)) return;
+																	if (event.key === "Enter") event.currentTarget.blur();
+																}}
+																placeholder={t("settings.launch.sessionDirPlaceholder")}
+																spellCheck={false}
+																value={launchDrafts.sessionDir ?? launchProfile.sessionDir ?? ""}
+															/>
+														</div>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.config")}
+															</span>
+															<Input
+																compact
+																onBlur={() => commitLaunchField("config")}
+																onChange={event =>
+																	setLaunchDrafts(prev => ({ ...prev, config: event.target.value }))
+																}
+																onKeyDown={event => {
+																	if (isImeKeyEvent(event)) return;
+																	if (event.key === "Enter") event.currentTarget.blur();
+																}}
+																placeholder={t("settings.launch.configPlaceholder")}
+																spellCheck={false}
+																value={launchDrafts.config ?? launchProfile.config ?? ""}
+															/>
+														</div>
+														<div>
+															<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
+																{t("settings.launch.preview")}
+															</span>
+															<CodeBlock
+																code={launchPreview}
+																language="bash"
+																showCopy={false}
+																showLineNumbers={false}
+															/>
+														</div>
+														<div className="flex items-center gap-3 rounded-md border border-[var(--omp-warning)]/40 px-3 py-2">
+															<span className="min-w-0 flex-1 text-omp-sm text-[var(--omp-warning)]">
+																{t("settings.launch.restartNote")}
+															</span>
+															<Button
+																disabled={
+																	sidecarBusy ||
+																	launchRestarting ||
+																	launchSaving ||
+																	Object.keys(launchDrafts).length > 0
+																}
+																onClick={restartForLaunchProfile}
+																size="sm"
+																type="button"
+																variant="secondary"
+															>
+																{launchRestarting
+																	? t("settings.launch.restarting")
+																	: t("settings.launch.restartNow")}
+															</Button>
+														</div>
+														{sidecarBusy && (
+															<p className="text-omp-sm text-(--omp-muted)">
+																{t("settings.launch.busyHint")}
+															</p>
+														)}
+													</fieldset>
+												</Section>
+											</>
+										)}
+
+										{isAgentSettingsTab && sidecarReady && loadState === "loading" && (
+											<div className="flex items-center justify-center gap-2 py-10">
+												<Spinner size="sm" />
+												<span className="text-omp-xs text-(--omp-muted)">
+													{t("settings.schemaLoading")}
+												</span>
+											</div>
+										)}
+										{isAgentSettingsTab && sidecarReady && loadState === "error" && (
+											<div className="flex flex-col items-center gap-3 py-10">
+												<span className="text-omp-xs text-(--omp-error)">
+													{loadError ?? t("settings.schemaLoadFailed")}
+												</span>
+												<span className="text-omp-xs text-(--omp-dim)">
+													{t("settings.schemaUnavailable")}
+												</span>
+												<Button
+													onClick={() => setReloadToken(token => token + 1)}
+													size="sm"
+													type="button"
+													variant="secondary"
+												>
+													{t("common.retry")}
+												</Button>
+											</div>
+										)}
+										{loadState === "ready" && sidecarReady && schema && isSchemaTab && (
+											<SchemaTabContent
+												entries={schema.entries}
+												groups={schema.tabs.find(schemaTab => schemaTab.id === tab)?.groups ?? []}
+												onCommitted={handleCommitted}
+												tabId={tab}
+												values={values}
+											/>
+										)}
+										{loadState === "ready" && sidecarReady && schema && tab === ADVANCED_TAB_ID && (
+											<AdvancedTab entries={schema.entries} onCommitted={handleCommitted} values={values} />
+										)}
+									</>
+								) : searchGroups.size === 0 && guiSearchResults.length === 0 ? (
+									<div className="py-10 text-center text-omp-xs text-(--omp-dim)">
+										{t("settings.noMatches")}
+									</div>
+								) : (
+									<>
+										{guiSearchResults.map(item => (
+											<button
+												key={item.id}
+												type="button"
+												className="mb-2 block w-full rounded-lg border border-(--omp-border-muted) p-3 text-left hover:bg-(--omp-selected-bg)"
+												onClick={() =>
+													locateSetting(
+														"tabId" in item ? item.tabId : GUI_TAB_ID,
+														`setting-gui-${item.id === "followAgentTheme" ? "theme" : item.id}`,
+													)
+												}
+											>
+												<span className="text-omp-md">{t(item.labelKey)}</span>
+												<span className="mt-1 block text-omp-xs text-(--omp-dim)">
+													{t("tabId" in item ? `settings.tabs.${item.tabId}` : "settings.tabs.gui")} ·{" "}
+													{item.id}
+												</span>
+											</button>
+										))}
+										{[...searchGroups.entries()].map(([tabId, entries]) => (
+											<Section key={tabId} title={tabTitle({ id: tabId, label: tabId })}>
+												{entries.map(entry => (
+													<button
+														key={entry.path}
+														type="button"
+														className="mb-2 block w-full rounded-lg border border-(--omp-border-muted) p-3 text-left hover:bg-(--omp-selected-bg)"
+														onClick={() => locateSetting(tabId, `setting-${entry.path}`)}
+													>
+														<span className="text-omp-md">
+															{settingTranslation(lang, entry.path)?.label ?? entry.label ?? entry.path}
+														</span>
+														<span className="mt-1 block text-omp-xs text-(--omp-dim)">{entry.path}</span>
+													</button>
+												))}
+											</Section>
+										))}
 									</>
 								)}
-
-								{isAgentSettingsTab && sidecarReady && loadState === "loading" && (
-									<div className="flex items-center justify-center gap-2 py-10">
-										<Spinner size="sm" />
-										<span className="text-omp-xs text-(--omp-muted)">{t("settings.schemaLoading")}</span>
-									</div>
-								)}
-								{isAgentSettingsTab && sidecarReady && loadState === "error" && (
-									<div className="flex flex-col items-center gap-3 py-10">
-										<span className="text-omp-xs text-(--omp-error)">
-											{loadError ?? t("settings.schemaLoadFailed")}
-										</span>
-										<span className="text-omp-xs text-(--omp-dim)">{t("settings.schemaUnavailable")}</span>
-										<Button
-											onClick={() => setReloadToken(token => token + 1)}
-											size="sm"
-											type="button"
-											variant="secondary"
-										>
-											{t("common.retry")}
+								{!managementTab && (
+									<div className="mt-8 flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-4">
+										<span className="text-omp-sm text-(--omp-dim)">{t("settings.applyImmediately")}</span>
+										<Button onClick={close} type="button" variant="primary">
+											{t("settings.close")}
 										</Button>
 									</div>
 								)}
-								{loadState === "ready" && sidecarReady && schema && isSchemaTab && (
-									<SchemaTabContent
-										entries={schema.entries}
-										groups={schema.tabs.find(schemaTab => schemaTab.id === tab)?.groups ?? []}
-										onCommitted={handleCommitted}
-										tabId={tab}
-										values={values}
-									/>
-								)}
-								{loadState === "ready" && sidecarReady && schema && tab === ADVANCED_TAB_ID && (
-									<AdvancedTab entries={schema.entries} onCommitted={handleCommitted} values={values} />
-								)}
-							</>
-						) : searchGroups.size === 0 && guiSearchResults.length === 0 ? (
-							<div className="py-10 text-center text-omp-xs text-(--omp-dim)">{t("settings.noMatches")}</div>
-						) : (
-							<>
-								{guiSearchResults.map(item => (
-									<button
-										key={item.id}
-										type="button"
-										className="mb-2 block w-full rounded-lg border border-(--omp-border-muted) p-3 text-left hover:bg-(--omp-selected-bg)"
-										onClick={() =>
-											locateSetting(
-												"tabId" in item ? item.tabId : GUI_TAB_ID,
-												`setting-gui-${item.id === "followAgentTheme" ? "theme" : item.id}`,
-											)
-										}
-									>
-										<span className="text-omp-md">{t(item.labelKey)}</span>
-										<span className="mt-1 block text-omp-xs text-(--omp-dim)">
-											{t("tabId" in item ? `settings.tabs.${item.tabId}` : "settings.tabs.gui")} · {item.id}
-										</span>
-									</button>
-								))}
-								{[...searchGroups.entries()].map(([tabId, entries]) => (
-									<Section key={tabId} title={tabTitle({ id: tabId, label: tabId })}>
-										{entries.map(entry => (
-											<button
-												key={entry.path}
-												type="button"
-												className="mb-2 block w-full rounded-lg border border-(--omp-border-muted) p-3 text-left hover:bg-(--omp-selected-bg)"
-												onClick={() => locateSetting(tabId, `setting-${entry.path}`)}
-											>
-												<span className="text-omp-md">
-													{settingTranslation(lang, entry.path)?.label ?? entry.label ?? entry.path}
-												</span>
-												<span className="mt-1 block text-omp-xs text-(--omp-dim)">{entry.path}</span>
-											</button>
-										))}
-									</Section>
-								))}
-							</>
-						)}
-						{!managementTab && (
-							<div className="mt-8 flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-4">
-								<span className="text-omp-sm text-(--omp-dim)">{t("settings.applyImmediately")}</span>
-								<Button onClick={close} type="button" variant="primary">
-									{t("settings.close")}
-								</Button>
 							</div>
-						)}
+						</div>
 					</div>
 				</main>
 			</div>

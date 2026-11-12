@@ -125,16 +125,10 @@ describe("OverviewPanel", () => {
 	it("lists changed files by porcelain code and MCP servers by connection state", async () => {
 		await mount("agent");
 
-		expect(card("Changes")?.textContent).toContain("8 files changed");
+		expect(card("Changes")?.textContent).toContain("8 uncommitted files");
 		// Untracked "??" reads as U; the first non-blank side of XY is the code.
-		expect(rows("Changes")).toEqual([
-			"Unew.tssrc/new.ts",
-			"Mapp.tssrc/app.ts",
-			"Dold.mdold.md",
-			"Mb.tssrc/b.ts",
-			"Mc.tssrc/c.ts",
-			"Md.tssrc/d.ts",
-		]);
+		// Each row is name then folder; a root file has no folder, so its name is not repeated.
+		expect(rows("Changes")).toEqual(["Unew.tssrc", "Mapp.tssrc", "Dold.md", "Mb.tssrc", "Mc.tssrc", "Md.tssrc"]);
 		expect(card("Changes")?.textContent).toContain("+2 more");
 
 		// A server with a last error is an error even while it reports "disconnected";

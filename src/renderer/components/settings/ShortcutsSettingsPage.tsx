@@ -27,8 +27,10 @@ import {
 } from "../../lib/keymap";
 import { toast } from "../../stores/toast";
 import { useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
-import { Button, Input } from "../common";
+import { Button, Input, Kbd, kbdClass } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
 import { Section } from "./editors/Section";
+import { SettingsPageIntro } from "./SettingsPageIntro";
 
 interface Recording {
 	id: string;
@@ -36,9 +38,6 @@ interface Recording {
 	chord: string | null;
 	conflict: ShortcutConflict | null;
 }
-
-const KBD =
-	"rounded-md border border-(--omp-border) bg-(--omp-bg-elevated) px-2 py-0.5 font-mono text-omp-sm text-(--omp-muted)";
 
 function sameChords(a: readonly string[], b: readonly string[]): boolean {
 	const canonical = (list: readonly string[]) =>
@@ -61,20 +60,7 @@ function Switch({ checked, label, onChange }: { checked: boolean; label: string;
 			role="switch"
 			type="button"
 		>
-			<span
-				aria-hidden
-				className={cx(
-					"omp-switch-track relative h-5 w-9 rounded-full",
-					checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)", // surface-ok: toggle switch track fill
-				)}
-			>
-				<span
-					className={cx(
-						"omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow",
-						checked ? "translate-x-4" : "translate-x-0",
-					)}
-				/>
-			</span>
+			<SwitchTrack on={checked} />
 		</button>
 	);
 }
@@ -164,7 +150,7 @@ export function ShortcutsSettingsPage() {
 	const renderBuiltIn = (row: BuiltInShortcut) => (
 		<div className="flex items-center gap-3 px-3 py-2" key={row.labelKey}>
 			<span className="min-w-0 flex-1 text-omp-md text-(--omp-text)">{t(row.labelKey)}</span>
-			<kbd className={KBD}>{row.keys}</kbd>
+			<Kbd variant="keycap">{row.keys}</Kbd>
 			<span className="w-[4.75rem] shrink-0 text-right text-omp-xs text-(--omp-dim)">{t("shortcuts.builtIn")}</span>
 		</div>
 	);
@@ -201,9 +187,9 @@ export function ShortcutsSettingsPage() {
 					</div>
 					{active ? (
 						<span className="flex shrink-0 items-center gap-1">
-							<kbd className={cx(KBD, "border-(--omp-border-accent) text-(--omp-text)")}>
+							<Kbd className="border-(--omp-border-accent) text-(--omp-text)" variant="keycap">
 								{active.chord ?? t("hotkeys.remap.pressChord")}
-							</kbd>
+							</Kbd>
 							<button
 								aria-label={t("common.cancel")}
 								className="flex size-6 items-center justify-center rounded text-(--omp-dim) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)"
@@ -218,8 +204,8 @@ export function ShortcutsSettingsPage() {
 						<button
 							aria-label={t("shortcuts.change", { action: t(entry.labelKey) })}
 							className={cx(
-								KBD,
-								"shrink-0 transition-colors enabled:hover:border-(--omp-border-accent) enabled:hover:text-(--omp-text) disabled:cursor-not-allowed disabled:line-through disabled:opacity-60",
+								kbdClass("keycap"),
+								"transition-colors enabled:hover:border-(--omp-border-accent) enabled:hover:text-(--omp-text) disabled:cursor-not-allowed disabled:line-through disabled:opacity-60",
 							)}
 							disabled={!on}
 							onClick={() => setRecording({ id: entry.id, chord: null, conflict: null })}
@@ -293,7 +279,7 @@ export function ShortcutsSettingsPage() {
 
 	return (
 		<>
-			<p className="mb-3 px-1 text-omp-sm text-(--omp-muted)">{t("shortcuts.intro")}</p>
+			<SettingsPageIntro className="mb-5" description={t("shortcuts.intro")} />
 			{/* Settings search lands here: the filter takes focus. */}
 			<div className="mb-5 flex items-center gap-2" id="setting-gui-shortcuts">
 				<div className="min-w-0 flex-1">

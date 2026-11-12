@@ -44,6 +44,7 @@ import {
 	Tabs,
 	TextArea,
 } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
 
 export interface ModesPanelProps {
 	open: boolean;
@@ -353,20 +354,14 @@ function Toggle({
 			</span>
 			<button
 				aria-checked={checked}
-				className={`relative mt-0.5 h-5 w-9 shrink-0 omp-switch-track rounded-full disabled:cursor-not-allowed disabled:opacity-50 ${
-					checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)"
-				}`}
+				className="mt-0.5 shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--omp-accent) disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={disabled}
 				onClick={() => onChange(!checked)}
 				role="switch"
 				title={title}
 				type="button"
 			>
-				<span
-					className={`omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow ${
-						checked ? "translate-x-4" : "translate-x-0"
-					}`}
-				/>
+				<SwitchTrack on={checked} />
 			</button>
 		</label>
 	);

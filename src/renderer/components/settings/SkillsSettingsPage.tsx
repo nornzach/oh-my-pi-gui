@@ -23,6 +23,8 @@ import { useSkillReviewStore } from "../../stores/skill-review";
 import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { Button, Input, Spinner, TextArea } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
+import { SettingsPageIntro } from "./SettingsPageIntro";
 
 type SkillFilter = "all" | "enabled" | "disabled" | "managed" | "project" | "user";
 type EditorState = {
@@ -63,9 +65,7 @@ function Toggle({
 		<button
 			aria-checked={checked}
 			aria-label={label}
-			className={`omp-switch-track relative h-5 w-9 shrink-0 rounded-full ${
-				checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)" // surface-ok: toggle switch track fill
-			}`}
+			className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--omp-accent) disabled:cursor-not-allowed disabled:opacity-50"
 			disabled={disabled}
 			onClick={event => {
 				event.stopPropagation();
@@ -74,12 +74,7 @@ function Toggle({
 			role="switch"
 			type="button"
 		>
-			<span
-				aria-hidden="true"
-				className={`omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm ${
-					checked ? "translate-x-4" : "translate-x-0"
-				}`}
-			/>
+			<SwitchTrack on={checked} />
 		</button>
 	);
 }
@@ -290,29 +285,21 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 	};
 
 	return (
-		<div className="space-y-5">
-			<header className="flex flex-wrap items-start justify-between gap-4">
-				<div>
-					<div className="flex items-center gap-2">
-						<BookOpen className="text-(--omp-accent)" size={17} />
-						<h2 className="text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)">
-							{t("settings.skills.title")}
-						</h2>
-					</div>
-					<p className="mt-1.5 max-w-2xl text-omp-sm leading-relaxed text-(--omp-muted)">
-						{t("settings.skills.description")}
-					</p>
-				</div>
-				<Button
-					disabled={!sidecarReady || !routeReady}
-					icon={<Plus size={13} />}
-					onClick={startCreate}
-					size="sm"
-					variant="primary"
-				>
-					{t("settings.skills.new")}
-				</Button>
-			</header>
+		<div className="flex min-h-0 flex-1 flex-col gap-5">
+			<SettingsPageIntro
+				actions={
+					<Button
+						disabled={!sidecarReady || !routeReady}
+						icon={<Plus size={13} />}
+						onClick={startCreate}
+						size="sm"
+						variant="primary"
+					>
+						{t("settings.skills.new")}
+					</Button>
+				}
+				description={t("settings.skills.description")}
+			/>
 
 			<div className="flex flex-wrap items-center gap-1.5">
 				{filterOptions.map(option => (

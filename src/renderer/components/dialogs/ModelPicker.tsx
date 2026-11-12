@@ -26,7 +26,7 @@ import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Modal, Spinner } from "../common";
+import { Badge, Kbd, Modal, Spinner } from "../common";
 
 export function ModelPicker() {
 	const tabRpc = useTabRpc();
@@ -288,9 +288,7 @@ export function ModelPicker() {
 						ref={inputRef}
 						value={query}
 					/>
-					<kbd className="shrink-0 rounded border border-(--omp-border-muted) px-1.5 py-0.5 text-omp-xxs text-(--omp-dim)">
-						esc
-					</kbd>
+					<Kbd>esc</Kbd>
 				</div>
 				<div
 					className="min-h-0 flex-1 overflow-y-auto p-1.5"

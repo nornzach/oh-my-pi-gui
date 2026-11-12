@@ -28,7 +28,7 @@ import { isImeKeyEvent } from "../../lib/ime";
 import { useSessionStore } from "../../stores/session";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { useUiStore } from "../../stores/ui";
-import { Spinner } from "../common";
+import { Kbd, Spinner } from "../common";
 import { DIALOG_OVERLAY_Z, isTopmostDialog, registerDialogLayer } from "../common/dialog-layer";
 
 type Scope = "project" | "all";
@@ -442,14 +442,6 @@ function SearchPanel() {
 				</div>
 			</div>
 		</div>
-	);
-}
-
-function Kbd({ children }: { children: string }) {
-	return (
-		<kbd className="rounded border border-(--omp-border-muted) px-1 font-sans text-omp-xxs text-(--omp-muted)">
-			{children}
-		</kbd>
 	);
 }
 

@@ -263,12 +263,15 @@ kbd,
 /* ============================================================================
    Motion system
 
-   One curve, a long gentle deceleration with no overshoot, carries every
-   entrance: overlays (dialogs, menus, popovers, toasts, drawers) settle in
-   from a few pixels and a hair of scale; a turn that genuinely arrives at the
-   transcript tail rises a few pixels as it fades in. Exits are shorter than
-   entrances and never travel. Content already on screen never moves — hover,
-   press and selection change color only, and streamed text grows in place.
+   Two entrance curves. Overlays that should feel physical (dialogs, popovers,
+   toasts, drawers, the starter grid, a chevron turning) ride the damped
+   spring (--omp-ease-spring at --omp-motion-spring): they settle in from a
+   few pixels and a hair of scale with a small overshoot. Everything else that
+   enters, such as a turn arriving at the transcript tail rising a few pixels
+   as it fades in, uses the long, gentle --omp-ease-enter deceleration with no
+   overshoot. Exits are shorter than entrances and never travel. Content
+   already on screen never moves — hover, press and selection change color
+   only, and streamed text grows in place.
    ============================================================================ */
 
 :root {
@@ -279,7 +282,7 @@ kbd,
 	--omp-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 	--omp-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
 	--omp-ease-exit: cubic-bezier(0.4, 0, 1, 1);
-	/* Damped spring with a ~15% overshoot, sampled into linear(). Entrances that
+	/* Damped spring with a ~16% overshoot, sampled into linear(). Entrances that
 	   should feel physical (dialogs, popovers, toasts, chevrons) ride this curve
 	   at --omp-motion-spring; it needs a longer duration than the CSS beziers
 	   because the settle is part of the curve. */
@@ -770,7 +773,7 @@ kbd,
 	background-color: var(--omp-bg-tertiary);
 }
 
-/* Empty state: the canvas fades in once as a whole — no per-element cascade. */
+/* Empty state: the canvas rises in once as a whole; only the starter cards inside it stagger (.omp-starter-grid). */
 .omp-empty-canvas {
 	animation: omp-fade-up var(--omp-motion-slow) var(--omp-ease-enter) both;
 }
@@ -781,8 +784,6 @@ kbd,
 	}
 }
 
-/* Tab strip + title bar + composer leave ~480px of canvas at 820px tall, so
-   the compact layout starts there or the welcome card clips under the strip. */
 /* Too short for the placeholder transcript: the mark and its label say enough. */
 @media (max-height: 600px) {
 	.omp-loading-skeleton {
@@ -790,6 +791,8 @@ kbd,
 	}
 }
 
+/* Tab strip + title bar + composer leave ~480px of canvas at 820px tall, so
+   the compact layout starts there or the welcome card clips under the strip. */
 @media (max-height: 820px) {
 	.omp-empty-canvas {
 		justify-content: flex-start;
@@ -904,6 +907,18 @@ kbd,
 	container: settings-content / inline-size;
 }
 
+/* The scroller always reserves its bar's gutter, so a page that overflows and
+   one that does not lay out at the same width. */
+.settings-scroll {
+	scrollbar-gutter: stable;
+}
+
+/* Form pages keep a reading measure on the column's left edge rather than
+   centering inside it, so switching pages never moves where content starts. */
+.settings-form-measure {
+	max-width: var(--omp-column-settings);
+}
+
 .settings-capability-grid {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -940,10 +955,11 @@ kbd,
 .skills-master-detail {
 	display: grid;
 	grid-template-columns: minmax(13.75rem, 17.5rem) minmax(0, 1fr);
-	/* Consume the available settings viewport. The previous 52rem ceiling
-	   left most of high-resolution windows blank, especially below 100% GUI
-	   scale, and made the skill document look like a cropped preview. */
-	height: max(28rem, calc(100dvh - 11.5rem));
+	/* Fill whatever height the page leaves below its toolbar (the page is a
+	   flex column sized to the window), so the panes scroll and the page never
+	   does; short windows fall back to the minimum and scroll the page. */
+	flex: 1 1 0;
+	min-height: 28rem;
 	background: transparent;
 }
 
@@ -969,7 +985,9 @@ kbd,
 .ssh-master-detail {
 	display: grid;
 	grid-template-columns: minmax(0, 1fr) minmax(20rem, 22.5rem);
-	height: clamp(26rem, calc(100dvh - 13rem), 47.5rem);
+	flex: 1 1 0;
+	min-height: 26rem;
+	max-height: 47.5rem;
 }
 
 .security-revision-grid {
@@ -986,9 +1004,16 @@ kbd,
 	grid-template-columns: minmax(0, 1.4fr) minmax(13.75rem, 1fr);
 }
 
+/* Each row is its own grid, so the action column is a fixed track: with
+   `auto` a longer status ("Check failed") shifted that row's version
+   columns away from the row above it. */
 .updates-row {
 	display: grid;
-	grid-template-columns: 2rem minmax(0, 1fr) 6.875rem 6.875rem auto;
+	grid-template-columns: 2rem minmax(0, 1fr) 6.875rem 6.875rem 8.5rem;
+}
+
+.updates-action {
+	text-align: right;
 }
 
 @container settings-content (max-width: 1600px) {
@@ -1024,7 +1049,8 @@ kbd,
 @container settings-content (max-width: 1040px) {
 	.ssh-master-detail {
 		grid-template-columns: minmax(0, 1fr);
-		height: auto;
+		flex: none;
+		max-height: none;
 	}
 
 	.ssh-list-pane {
@@ -1042,7 +1068,7 @@ kbd,
 	.skills-master-detail,
 	.security-master-detail {
 		grid-template-columns: minmax(0, 1fr);
-		height: auto;
+		flex: none;
 	}
 
 	.skills-list-pane {
@@ -1095,6 +1121,7 @@ kbd,
 
 	.updates-action {
 		justify-self: start;
+		text-align: left;
 	}
 
 	.settings-management-toolbar {

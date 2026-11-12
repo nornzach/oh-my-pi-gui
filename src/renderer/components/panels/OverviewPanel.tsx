@@ -14,7 +14,7 @@ import { useGitStatus } from "../../hooks/use-git-status";
 import { useWorkingTreeChanges } from "../../hooks/use-working-tree-changes";
 import { contextSegments, contextUsageView, formatContextUsage } from "../../lib/context-usage";
 import { describeError } from "../../lib/errors";
-import { basename, cx, shortenPath } from "../../lib/format";
+import { basename, cx, dirname, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useBtwStore } from "../../stores/btw";
@@ -213,7 +213,12 @@ function ChangesCard() {
 										{code}
 									</span>
 									<span className="shrink-0 text-(--omp-text)">{basename(file.path)}</span>
-									<span className="min-w-0 truncate text-omp-sm text-(--omp-dim)">{file.path}</span>
+									{/* Name, then its folder — the shape tool rows use; a root file has no folder to show. */}
+									{dirname(file.path) && (
+										<span className="min-w-0 truncate text-omp-sm text-(--omp-dim)">
+											{dirname(file.path)}
+										</span>
+									)}
 								</li>
 							);
 						})}

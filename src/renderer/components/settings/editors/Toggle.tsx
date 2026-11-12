@@ -10,7 +10,9 @@
 
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
+import { SwitchTrack } from "../../common/SwitchTrack";
 
 /** How long the confirmation stays beside the label. */
 const CONFIRM_MS = 1800;
@@ -22,6 +24,7 @@ export function Toggle({
 	description,
 	disabled,
 	badge,
+	className,
 }: {
 	checked: boolean;
 	/** May return a promise: the confirmation then waits for it and is skipped when it rejects or resolves `false`. */
@@ -30,6 +33,8 @@ export function Toggle({
 	description?: string;
 	disabled?: boolean;
 	badge?: React.ReactNode;
+	/** Row geometry from the host; Settings passes `omp-settings-row` so its switches align with its other rows. */
+	className?: string;
 }) {
 	const t = useT();
 	const [confirmed, setConfirmed] = useState(false);
@@ -57,7 +62,10 @@ export function Toggle({
 		<button
 			aria-checked={checked}
 			aria-label={label}
-			className="flex w-full cursor-pointer items-start justify-between gap-4 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-(--omp-sidebar-item-hover) disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+			className={cx(
+				"flex w-full cursor-pointer items-start justify-between gap-4 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-(--omp-sidebar-item-hover) disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
+				className,
+			)}
 			disabled={disabled}
 			onClick={toggle}
 			role="switch"
@@ -81,18 +89,7 @@ export function Toggle({
 					<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-muted)">{description}</span>
 				)}
 			</span>
-			<span
-				aria-hidden
-				className={`omp-switch-track relative mt-0.5 h-5 w-9 shrink-0 rounded-full ${
-					checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)" // surface-ok: toggle switch track fill
-				}`}
-			>
-				<span
-					className={`omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow ${
-						checked ? "translate-x-4" : "translate-x-0"
-					}`}
-				/>
-			</span>
+			<SwitchTrack className="mt-0.5" on={checked} />
 		</button>
 	);
 }

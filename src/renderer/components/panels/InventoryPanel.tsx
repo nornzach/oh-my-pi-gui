@@ -41,6 +41,8 @@ import { useSessionStore } from "../../stores/session";
 import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { Badge, Button, Modal, Spinner, type TabItem, Tabs } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
+import { SettingsPageIntro } from "../settings/SettingsPageIntro";
 import { AddMarketplaceForm, MarketplaceCard } from "./inventory/MarketplacesSection";
 import { PluginDetailDrawer } from "./inventory/PluginDetailDrawer";
 import { filterMarketplaces, filterPlugins, filterTemplates } from "./inventory-utils";
@@ -364,22 +366,14 @@ function PluginToggle({
 		<button
 			aria-checked={enabled}
 			aria-label={label}
-			className={cx(
-				"relative h-5 w-9 shrink-0 omp-switch-track rounded-full disabled:cursor-not-allowed disabled:opacity-50",
-				enabled ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)",
-			)}
+			className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--omp-accent) disabled:cursor-not-allowed disabled:opacity-50"
 			disabled={disabled}
 			onClick={onToggle}
 			role="switch"
 			title={label}
 			type="button"
 		>
-			<span
-				className={cx(
-					"omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow",
-					enabled ? "translate-x-4" : "translate-x-0",
-				)}
-			/>
+			<SwitchTrack on={enabled} />
 		</button>
 	);
 }
@@ -950,17 +944,7 @@ export function InventorySettingsPage({ initialTab = "plugins", query }: { initi
 	const t = useT();
 	return (
 		<div className="space-y-5">
-			<header>
-				<div className="flex items-center gap-2 text-(--omp-accent)">
-					<PackageOpen aria-hidden="true" size={17} />
-					<h2 className="text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)">
-						{t("settings.resources.title")}
-					</h2>
-				</div>
-				<p className="mt-1.5 max-w-2xl text-omp-sm leading-relaxed text-(--omp-muted)">
-					{t("settings.resources.description")}
-				</p>
-			</header>
+			<SettingsPageIntro description={t("settings.resources.description")} />
 			<InventoryContent active embedded initialTab={initialTab} query={query} />
 		</div>
 	);

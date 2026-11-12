@@ -6,7 +6,7 @@
 export function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
 	return (
 		<section id={id} className="mb-7 scroll-mt-4">
-			<h3 className="mb-2 px-1 text-omp-md font-semibold text-(--omp-text)">{title}</h3>
+			<h3 className="mb-2 text-omp-md font-semibold text-(--omp-text)">{title}</h3>
 			{children}
 		</section>
 	);

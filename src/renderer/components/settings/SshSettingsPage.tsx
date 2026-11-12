@@ -6,6 +6,8 @@ import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
 import { Button, ConfirmDialog, Input, Spinner, TextArea } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
+import { SettingsPageIntro } from "./SettingsPageIntro";
 
 interface HostDraft extends RpcSshHostInput {
 	name: string;
@@ -244,13 +246,8 @@ export function SshSettingsPage() {
 	const tested = tests[draft.name]?.ok === true;
 
 	return (
-		<div>
-			<header className="mb-4 flex items-start justify-between gap-4">
-				<div>
-					<h2 className="text-omp-2xl font-semibold tracking-[-0.015em] text-(--omp-text)">{t("ssh.title")}</h2>
-					<p className="mt-1 text-omp-md text-(--omp-muted)">{t("ssh.subtitle")}</p>
-				</div>
-			</header>
+		<div className="flex min-h-0 flex-1 flex-col">
+			<SettingsPageIntro className="mb-5" description={t("ssh.subtitle")} />
 
 			<div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-(--omp-border-muted) px-3 py-2.5 text-omp-xs text-(--omp-muted)">
 				<span className="flex items-center gap-1.5">
@@ -472,13 +469,7 @@ export function SshSettingsPage() {
 									{t("ssh.form.compatDesc")}
 								</span>
 							</span>
-							<span
-								className={`relative mt-0.5 h-5 w-9 shrink-0 rounded-full ${draft.compat ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)" /* surface-ok: toggle switch track fill */}`}
-							>
-								<span
-									className={`omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow ${draft.compat ? "translate-x-4" : "translate-x-0"}`}
-								/>
-							</span>
+							<SwitchTrack className="mt-0.5" on={draft.compat === true} />
 						</button>
 					</div>
 

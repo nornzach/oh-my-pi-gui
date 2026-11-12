@@ -8,7 +8,7 @@
 
 import type { SessionInfo } from "../../shared/ipc-types";
 
-/** Subsequence fuzzy score; null = no match. Earlier + denser wins. */
+/** Subsequence fuzzy score; null = no match. Consecutive letters score double, so denser matches win. */
 export function fuzzyScore(query: string, target: string): number | null {
 	const q = query.toLowerCase();
 	const t = target.toLowerCase();

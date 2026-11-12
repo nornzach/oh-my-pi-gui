@@ -8,6 +8,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
 import { useUpdaterStore } from "../../stores/updater";
 import { Button, Spinner } from "../common";
+import { SettingsPageIntro } from "./SettingsPageIntro";
 
 function appLatest(status: UpdateStatus): string {
 	if ("version" in status) return status.version;
@@ -90,10 +91,7 @@ export function UpdatesSettingsPage() {
 
 	return (
 		<div>
-			<header className="mb-5">
-				<h2 className="text-omp-2xl font-semibold tracking-[-0.015em] text-(--omp-text)">{t("updates.title")}</h2>
-				<p className="mt-1 text-omp-md text-(--omp-muted)">{t("updates.subtitle")}</p>
-			</header>
+			<SettingsPageIntro className="mb-5" description={t("updates.subtitle")} />
 
 			<div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-(--omp-border-muted) px-3 py-2.5">
 				{overview === "checking" ? (

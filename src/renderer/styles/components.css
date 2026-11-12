@@ -128,8 +128,8 @@
 	color: var(--omp-syntax-operator);
 }
 /* Live thinking tail inherits the thinking body's typography — the reply
-   tail's 14.5px would visibly outweigh promoted paragraphs inside the
-   12px thinking block. */
+   tail's body size (text-omp-lg) would visibly outweigh promoted paragraphs
+   inside the smaller (text-omp-sm) thinking block. */
 .omp-thinking-body .omp-streaming-tail {
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
@@ -668,11 +668,11 @@
 }
 
 .omp-transcript-editorial .omp-user-bubble {
-	border: 0;
+	border: 1px solid var(--omp-transcript-user-border);
 	border-radius: 20px;
 	background: var(--omp-transcript-user-bg);
 	box-shadow: none !important;
-	padding: 10px 16px;
+	padding: 9px 15px;
 }
 
 .omp-transcript-editorial .omp-user-bubble-layout {
@@ -1338,7 +1338,7 @@
 }
 
 /* The composer: one soft rounded surface, no inner dividers. Focus deepens
-   the hairline instead of drawing a colored ring. */
+   the hairline here; the Hierarchy pass below adds the soft accent ring. */
 .omp-composer-box {
 	border: 1px solid var(--omp-input-border);
 	border-radius: 24px;
@@ -1719,10 +1719,6 @@
 	--omp-column-settings: 46rem;
 }
 
-.omp-column-settings {
-	max-width: calc(var(--omp-column-settings) + 2 * var(--omp-column-pad));
-}
-
 /* Switches glide rather than snap. */
 .omp-switch-track {
 	transition: background-color var(--omp-motion-med) var(--omp-ease);
@@ -1977,16 +1973,11 @@
 /* ============================================================================
    Hierarchy pass
    Everything below leans on theme tokens only, so all named themes inherit it.
-   The accent leads: your message, the focused composer, the primary action and
-   the active tab carry it; everything else stays quiet.
+   The accent leads: your message (tinted by each theme's --omp-user-msg-*
+   tokens, so the theme editor and agent palettes reach it), the focused
+   composer, the primary action and the active tab carry it; everything else
+   stays quiet.
    ============================================================================ */
-
-/* Your message is the anchor of each turn: tinted with the accent, hairlined. */
-.omp-transcript-editorial .omp-user-bubble {
-	border: 1px solid color-mix(in srgb, var(--omp-accent) 16%, transparent);
-	background: color-mix(in srgb, var(--omp-accent) 8%, var(--omp-bg-primary));
-	padding: 9px 15px;
-}
 
 /* A finished or running step group reads as a quiet chip, not loose text. */
 .omp-transcript-editorial .omp-execution-group-header {
@@ -2084,11 +2075,11 @@
 }
 
 /* A page is a stack of sections; each opens with a real heading, an accent
-   tick and a hairline, instead of a bold label the same size as its rows. */
+   tick and a hairline, instead of a bold label the same size as its rows. The
+   tick hangs in the column gutter so the heading text starts on the same edge
+   as the rows and field labels below it. */
 .settings-content > section > h3 {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+	position: relative;
 	margin-bottom: 8px;
 	color: var(--omp-text);
 	font-size: var(--text-omp-lg);
@@ -2098,11 +2089,14 @@
 
 .settings-content > section > h3::before {
 	content: "";
+	position: absolute;
+	top: 50%;
+	left: -11px;
 	width: 3px;
 	height: 14px;
-	flex-shrink: 0;
 	border-radius: 2px;
 	background: var(--omp-accent);
+	transform: translateY(-50%);
 }
 
 .settings-content > section + section {
@@ -2111,10 +2105,20 @@
 	border-top: 1px solid var(--omp-border-muted);
 }
 
-/* Toggle rows breathe and read as targets. */
-.settings-content section > button:has(> .omp-switch-track) {
-	padding-block: 10px;
+/* Every interactive settings row (switches, schema fields, display rows)
+   shares one geometry: the same inset, height rhythm, corner and hover wash.
+   The wash hangs into the gutter, so row text starts on the content edge
+   like the headings and bare field labels around it. */
+.settings-content .omp-settings-row {
+	/* Explicit width: a full-width control would otherwise only shift left. */
+	width: calc(100% + 24px);
+	margin-inline: -12px;
+	padding: 10px 12px;
 	border-radius: 10px;
+}
+
+.settings-content .omp-settings-row:hover:not(:disabled) {
+	background: var(--omp-sidebar-item-hover);
 }
 
 /* Dialogs: a blurred, dimmed backdrop pushes the page back, and an accent

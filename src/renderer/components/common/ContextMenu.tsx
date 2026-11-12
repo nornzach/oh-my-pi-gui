@@ -1,8 +1,8 @@
 /**
  * Shared context menu: portal-rendered at cursor/trigger coordinates, with
  * full keyboard support (arrows navigate, Enter selects, Escape closes) and
- * outside-press dismissal. Used by the sidebar mode selector, workspace
- * group menus, and session row menus — one implementation, three surfaces.
+ * outside-press dismissal. The one context menu for the whole app — sidebar,
+ * tab strip, title bar, composer, panels and agent views all use it.
  */
 
 import type { LucideIcon } from "lucide-react";

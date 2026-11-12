@@ -23,7 +23,7 @@ import { type TabRpc as SessionRpc, useTabRpc as useSessionRpc } from "../../lib
  *   <ExtensionsPanel open={extensionsOpen} onClose={closeExtensions} />
  */
 
-import { Braces, Network, Plus, RefreshCw, Search, Webhook } from "lucide-react";
+import { Plus, RefreshCw, Search } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	AvailableCommand,
@@ -41,6 +41,8 @@ import { useSessionStore } from "../../stores/session";
 import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { Badge, type BadgeVariant, Button, Modal, Spinner, type TabItem, Tabs } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
+import { SettingsPageIntro } from "../settings/SettingsPageIntro";
 import { type McpTestView, summarizeMcpTestData } from "./mcp/McpFeedback";
 import { type McpCardAction, type McpReauthPhase, McpServerCard } from "./mcp/McpServerCard";
 import { McpServerWizard } from "./mcp/McpServerWizard";
@@ -232,22 +234,14 @@ function EnableToggle({
 		<button
 			aria-checked={enabled}
 			aria-label={label}
-			className={cx(
-				"relative h-4 w-7 shrink-0 rounded-full transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
-				enabled ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)",
-			)}
+			className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--omp-accent) disabled:cursor-not-allowed disabled:opacity-50"
 			disabled={disabled}
 			onClick={onToggle}
 			role="switch"
 			title={label}
 			type="button"
 		>
-			<span
-				className={cx(
-					"absolute top-1/2 size-3 -translate-y-1/2 rounded-full bg-white shadow transition-[left] duration-150",
-					enabled ? "left-3.5" : "left-0.5",
-				)}
-			/>
+			<SwitchTrack on={enabled} />
 		</button>
 	);
 }
@@ -905,28 +899,9 @@ export function ExtensionSettingsPage({ tabId, query }: { tabId: TabId; query: s
 	const mcp = useTabRpc(true, tabId === "mcp", fetchMcpServers, pickMcpServers);
 	const commands = useTabRpc(true, tabId === "commands", fetchCommands, pickCommands);
 	const onQueryChange = useCallback(() => {}, []);
-	const icon =
-		tabId === "mcp" ? (
-			<Network aria-hidden="true" size={17} />
-		) : tabId === "hooks" ? (
-			<Webhook aria-hidden="true" size={17} />
-		) : (
-			<Braces aria-hidden="true" size={17} />
-		);
-
 	return (
 		<div className="space-y-5">
-			<header>
-				<div className="flex items-center gap-2 text-(--omp-accent)">
-					{icon}
-					<h2 className="text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)">
-						{t(`settings.extensions.${tabId}.title`)}
-					</h2>
-				</div>
-				<p className="mt-1.5 max-w-2xl text-omp-sm leading-relaxed text-(--omp-muted)">
-					{t(`settings.extensions.${tabId}.description`)}
-				</p>
-			</header>
+			<SettingsPageIntro description={t(`settings.extensions.${tabId}.description`)} />
 			<div className="settings-embedded-panel flex flex-col">
 				{tabId === "hooks" && (
 					<HooksTab embedded onQueryChange={onQueryChange} query={query} rpc={hooks} showSearch={false} />

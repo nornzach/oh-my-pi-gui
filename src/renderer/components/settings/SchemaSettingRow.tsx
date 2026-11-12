@@ -319,6 +319,7 @@ function SchemaSettingRow({
 			return (
 				<Toggle
 					badge={restartBadge}
+					className="omp-settings-row"
 					checked={value === true}
 					description={description}
 					disabled={saving}
@@ -369,7 +370,7 @@ function SchemaSettingRow({
 				typeof value === "object" &&
 				!Array.isArray(value);
 			return (
-				<div className="rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
+				<div className="omp-settings-row transition-colors">
 					<div className="flex items-center gap-2">
 						<span className="text-omp-md font-medium text-(--omp-text)" title={entry.path}>
 							{label}
@@ -477,7 +478,7 @@ function SchemaSettingRow({
 		// Prompts get a full-width multi-line editor below the label, applied explicitly.
 		if (entry.type === "string" && PROMPT_SETTINGS.has(entry.path)) {
 			return (
-				<div className="rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
+				<div className="omp-settings-row transition-colors">
 					<div className="flex items-center gap-2">
 						<span className="text-omp-md font-medium text-(--omp-text)" title={entry.path}>
 							{label}
@@ -654,7 +655,7 @@ function SchemaSettingRow({
 		}
 
 		return (
-			<div className="settings-field-row rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
+			<div className="settings-field-row omp-settings-row transition-colors">
 				<div className="min-w-0 flex-1">
 					<div className="flex items-center gap-2">
 						<span className="text-omp-md font-medium text-(--omp-text)" title={entry.path}>
@@ -691,14 +692,14 @@ function SchemaSettingRow({
 		<div>
 			{renderControl()}
 			{entry.default === undefined && value !== undefined && (
-				<div className="px-2 pb-2">
+				<div className="pb-2">
 					<Button disabled={saving} onClick={() => void commit(undefined)} size="sm" variant="ghost">
 						{t("settings.restoreUnset")}
 					</Button>
 				</div>
 			)}
 			{error && (
-				<p role="alert" className="px-2 pb-2 text-omp-xs text-(--omp-error)">
+				<p role="alert" className="pb-2 text-omp-xs text-(--omp-error)">
 					{error}
 				</p>
 			)}
@@ -716,7 +717,7 @@ function SchemaSettingRow({
 				{overrideLayer && provenance && (
 					<details
 						className={cx(
-							"mx-2 mb-2 rounded-md px-2 py-1.5 text-omp-xs",
+							"mb-2 rounded-md px-2 py-1.5 text-omp-xs",
 							overriddenSave
 								? "border border-[var(--omp-warning)]/40 bg-[var(--omp-warning)]/8 text-(--omp-text)"
 								: "text-(--omp-muted)",

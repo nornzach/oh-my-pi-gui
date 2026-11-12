@@ -82,7 +82,7 @@ export function Modal({
 
 	// Focus + keyboard + layer scope all live with `open`: the layer releases
 	// the moment close begins, handing Escape to the dialog beneath even while
-	// this one plays its 240ms exit animation.
+	// this one plays its exit animation (unmounted after OVERLAY_EXIT_MS).
 	useEffect(() => {
 		if (!open) return;
 		const unregisterLayer = registerDialogLayer(panelRef.current);

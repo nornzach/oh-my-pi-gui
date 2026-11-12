@@ -1,8 +1,8 @@
 /**
  * Session tab strip, mounted between TitleBar and SidecarBanner. One chip per
  * pooled sidecar tab: session title (or cwd basename; identical untitled
- * labels disambiguate with an index suffix), a slow status signal, a muted
- * workspace subtitle, a close × (hidden at the single-tab floor,
+ * labels disambiguate with an index suffix), a slow status signal, the
+ * workspace in its tooltip and accessible name, a close × (hidden at the single-tab floor,
  * inline-confirmed while a run is live), and a trailing "+" that opens a
  * fresh session tab in the current cwd.
  *

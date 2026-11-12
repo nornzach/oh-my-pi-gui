@@ -29,7 +29,6 @@ export interface SettingsResponseData {
 	advisorActive?: boolean;
 }
 
-/** Settings without UI metadata (advanced): searchable flat list. */
 export const CAPABILITIES_TAB_ID = "capabilities";
 export const SKILLS_TAB_ID = "skills";
 export const MCP_TAB_ID = "mcp";
@@ -39,6 +38,7 @@ export const COMMANDS_TAB_ID = "commands";
 export const SECURITY_TAB_ID = "security";
 export const SSH_TAB_ID = "ssh";
 export const UPDATES_TAB_ID = "updates";
+/** Settings without UI metadata (advanced): searchable flat list. */
 export const ADVANCED_TAB_ID = "advanced";
 export const GUI_TAB_ID = "gui";
 export const SHORTCUTS_TAB_ID = "shortcuts";
@@ -53,6 +53,9 @@ export const MANAGEMENT_TAB_IDS = new Set([
 	SSH_TAB_ID,
 	UPDATES_TAB_ID,
 ]);
+
+/** Master-detail pages whose panes scroll on their own, sized to the window. */
+export const FILL_HEIGHT_TAB_IDS = new Set([SKILLS_TAB_ID, SSH_TAB_ID]);
 
 export function isAgentSchemaTab(tab: string, schema: { tabs: { id: string }[] } | null): boolean {
 	if (schema?.tabs.some(schemaTab => schemaTab.id === tab)) return true;

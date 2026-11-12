@@ -12,6 +12,7 @@ import { getFormattingLocale, useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
 import { Button, ConfirmDialog, Input, Spinner } from "../common";
+import { SettingsPageIntro } from "./SettingsPageIntro";
 
 const ACTIVE_PHASES = new Set(["queued", "preparing", "reviewing", "publishing"]);
 const SEVERITIES = ["critical", "high", "medium", "low", "informational"] as const;
@@ -313,14 +314,7 @@ export function SecuritySettingsPage() {
 
 	return (
 		<div>
-			<header className="mb-4 flex items-start justify-between gap-4">
-				<div>
-					<h2 className="text-omp-2xl font-semibold tracking-[-0.015em] text-(--omp-text)">
-						{t("security.title")}
-					</h2>
-					<p className="mt-1 text-omp-md text-(--omp-muted)">{t("security.subtitle")}</p>
-				</div>
-			</header>
+			<SettingsPageIntro className="mb-5" description={t("security.subtitle")} />
 
 			<div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-(--omp-border-muted) px-3 py-2.5 text-omp-xs">
 				<span className="flex items-center gap-1.5 text-(--omp-muted)">

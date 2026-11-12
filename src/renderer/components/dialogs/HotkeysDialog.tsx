@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
 import { actionChords, SHORTCUT_SECTIONS, shortcutSectionRows } from "../../lib/keymap";
 import { useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
-import { Button, Input, Modal } from "../common";
+import { Button, Input, Kbd, Modal } from "../common";
 
 interface ResolvedRow {
 	id: string;
@@ -57,7 +57,10 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 		<Modal onClose={close} open={open} title={t("hotkeys.title")}>
 			<div className="mb-3 flex items-center gap-2">
 				<div className="min-w-0 flex-1">
+					{/* Typing filters straight away: the list is what this dialog is opened to search. */}
 					<Input
+						aria-label={t("hotkeys.search")}
+						autoFocus
 						value={query}
 						onChange={event => setQuery(event.target.value)}
 						placeholder={t("hotkeys.search")}
@@ -81,9 +84,7 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 							<div key={row.id} className="flex items-center justify-between gap-4 px-3 py-2 text-omp-md">
 								<span className="text-[var(--omp-text)]">{row.label}</span>
 								{row.keys ? (
-									<kbd className="shrink-0 rounded-md border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] px-2 py-0.5 font-mono text-omp-sm text-[var(--omp-muted)]">
-										{row.keys}
-									</kbd>
+									<Kbd variant="keycap">{row.keys}</Kbd>
 								) : (
 									<span className="shrink-0 text-omp-sm text-[var(--omp-dim)]">{t("hotkeys.off")}</span>
 								)}

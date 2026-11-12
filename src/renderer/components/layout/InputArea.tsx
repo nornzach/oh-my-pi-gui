@@ -143,9 +143,9 @@ export function InputArea() {
 	useLayoutEffect(() => {
 		const toolbar = composerToolbarRef.current;
 		if (!toolbar) return;
-		// Below 780px the control labels collapse to icons (components.css), so
-		// the full row fits in ~540px. Folding earlier hid the run state (model,
-		// thinking, approval) whenever the workspace panel was open.
+		// Below a 680px toolbar the control labels collapse to icons (components.css),
+		// so the full row fits in ~560px (420 for chat). Folding earlier hid the run
+		// state (model, thinking, approval) whenever the workspace panel was open.
 		const inlineMinWidth = isChat ? 420 : 560;
 		const measure = () => {
 			const measured = toolbar.getBoundingClientRect().width;
@@ -301,7 +301,7 @@ export function InputArea() {
 		};
 	}, [status, sessionId, runtimeTabId, rpc]);
 
-	// Auto-grow the textarea to fit its content (up to ~40% of the viewport).
+	// Auto-grow the textarea to fit its content (up to ~40% of the session pane; one line while empty).
 	useEffect(() => {
 		const el = textareaRef.current;
 		if (!el) return;
@@ -970,7 +970,7 @@ export function InputArea() {
 												? t("input.placeholder.chat")
 												: t("input.placeholder.idle")
 								}
-								className="max-h-[40vh] min-h-[44px] w-full resize-none bg-transparent text-omp-xl leading-[1.5] text-[var(--omp-text)] outline-none placeholder:text-[var(--omp-dim)]"
+								className="max-h-[40vh] min-h-[44px] w-full resize-none bg-transparent text-omp-xl leading-[1.5] text-[var(--omp-text)] outline-none placeholder:truncate placeholder:text-[var(--omp-dim)]"
 							/>
 						</div>
 

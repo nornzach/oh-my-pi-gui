@@ -41,6 +41,7 @@ import { useSubagentsStore } from "../../stores/subagents";
 import { toast } from "../../stores/toast";
 import { subagentActivity } from "../agents/agent-activity";
 import { Badge, Button, Input, Modal, Spinner, type TabItem, Tabs } from "../common";
+import { SwitchTrack } from "../common/SwitchTrack";
 import { type AgentSettingsRpc, type AgentSettingsState, useAgentSettings } from "./agent-hub-settings";
 import { SubagentTranscript } from "./SubagentTranscript";
 import {
@@ -79,19 +80,13 @@ function Toggle({
 			<button
 				aria-checked={checked}
 				aria-label={label}
-				className={`relative h-5 w-9 shrink-0 omp-switch-track rounded-full disabled:cursor-not-allowed disabled:opacity-50 ${
-					checked ? "bg-(--omp-switch-on)" : "bg-(--omp-switch-off)"
-				}`}
+				className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--omp-accent) disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={disabled}
 				onClick={() => onChange(!checked)}
 				role="switch"
 				type="button"
 			>
-				<span
-					className={`omp-switch-thumb absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow ${
-						checked ? "translate-x-4" : "translate-x-0"
-					}`}
-				/>
+				<SwitchTrack on={checked} />
 			</button>
 			<span className="text-omp-sm text-(--omp-muted)">{label}</span>
 		</label>
