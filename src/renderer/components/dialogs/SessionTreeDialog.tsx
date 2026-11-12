@@ -773,7 +773,7 @@ export function SessionTreeDialog() {
 				</div>
 				{error ? (
 					<div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-						<p role="alert" className="text-xs text-[var(--omp-error)]">
+						<p role="alert" className="text-omp-xs text-[var(--omp-error)]">
 							{error}
 						</p>
 						<Button
@@ -790,10 +790,10 @@ export function SessionTreeDialog() {
 				) : loading || !layout ? (
 					<div className="flex flex-1 items-center justify-center gap-2">
 						<Spinner size="sm" />
-						<span className="text-xs text-(--omp-dim)">{t("sessionTree.loading")}</span>
+						<span className="text-omp-xs text-(--omp-dim)">{t("sessionTree.loading")}</span>
 					</div>
 				) : layout.nodeCount === 0 ? (
-					<div className="flex flex-1 items-center justify-center text-xs text-(--omp-dim)">
+					<div className="flex flex-1 items-center justify-center text-omp-xs text-(--omp-dim)">
 						{model && model.entries.length > 0 ? t("sessionTree.noFilterMatch") : t("sessionTree.empty")}
 					</div>
 				) : (
@@ -926,7 +926,7 @@ export function SessionTreeDialog() {
 							<input
 								aria-label={t("sessionTree.editLabel")}
 								autoFocus
-								className="min-w-0 flex-1 rounded border border-(--omp-input-focus-border) bg-(--omp-input-bg) px-2 py-1 text-xs text-(--omp-text) outline-none"
+								className="min-w-0 flex-1 rounded border border-(--omp-input-focus-border) bg-(--omp-input-bg) px-2 py-1 text-omp-xs text-(--omp-text) outline-none"
 								onChange={event => setLabelDraft(event.target.value)}
 								onKeyDown={event => {
 									if (isImeKeyEvent(event)) return;
@@ -974,7 +974,7 @@ export function SessionTreeDialog() {
 										<Badge variant="muted">{t("sessionTree.inactiveBranch")}</Badge>
 									)}
 								</div>
-								<p className="text-xs leading-relaxed whitespace-pre-wrap text-(--omp-text)">
+								<p className="text-omp-xs leading-relaxed whitespace-pre-wrap text-(--omp-text)">
 									{selectedEntry.textPreview}
 								</p>
 							</div>

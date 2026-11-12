@@ -1401,6 +1401,8 @@ export interface OmpApi {
 		getMessagesPage(cursor?: string, limit?: number): Promise<RpcResponse>;
 		getLoginProviders(): Promise<RpcResponse>;
 		login(providerId: string): Promise<RpcResponse>;
+		/** Sign a provider in with an API key the GUI collected itself; works where `login` cannot ask for a secret. */
+		setApiKey(providerId: string, apiKey: string): Promise<RpcResponse>;
 		getLogoutAccounts(providerId: string): Promise<RpcResponse>;
 		logout(providerId: string, credentialId: number): Promise<RpcResponse>;
 		getUsage(): Promise<RpcResponse>;

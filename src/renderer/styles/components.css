@@ -770,7 +770,7 @@
 }
 
 .omp-transcript-editorial .omp-execution-group-summary {
-	font-size: calc(var(--gui-font-size, 15px) * 13.5 / 15);
+	font-size: var(--text-omp-md);
 }
 
 .omp-goal-dock {
@@ -818,7 +818,7 @@
 	min-height: 28px;
 	padding: 3px 8px 3px 0;
 	border-radius: 8px;
-	font-size: calc(var(--gui-font-size, 15px) * 12.5 / 15);
+	font-size: var(--text-omp-sm);
 }
 
 .omp-transcript-editorial .omp-tool-header:hover {
@@ -827,7 +827,7 @@
 
 .omp-transcript-editorial .omp-tool-name {
 	min-width: 40px;
-	font-size: calc(var(--gui-font-size, 15px) * 12.5 / 15);
+	font-size: var(--text-omp-sm);
 	font-weight: 600;
 	letter-spacing: 0;
 }
@@ -886,15 +886,102 @@
 	padding: 6px var(--omp-editorial-edge) 14px var(--omp-editorial-inset) !important;
 }
 
-/* The agent is alive but has nothing to show yet: one small breathing dot
-   beside a shimmering label — no spinner, no countdown until it matters. */
+/* The one "agent is working" mark: a breathing core inside a small orbiting
+   arc — the loading mark's language at inline size. Used wherever a single
+   live status stands for work (waiting on the model, a running step group,
+   a long task); the composer carries the same arc around its border. */
 .omp-working-dot {
-	width: 8px;
-	height: 8px;
+	--omp-beacon: 12px;
+	position: relative;
+	width: var(--omp-beacon);
+	height: var(--omp-beacon);
 	flex-shrink: 0;
 	border-radius: 9999px;
+}
+
+.omp-working-dot--sm {
+	--omp-beacon: 10px;
+}
+
+.omp-working-dot::before {
+	content: "";
+	position: absolute;
+	inset: 28%;
+	border-radius: inherit;
 	background: var(--omp-accent);
-	animation: omp-pulse-dot 1.6s ease-in-out infinite; /* motion-ok: waiting signal */
+	animation: omp-beacon-core 1.6s ease-in-out infinite; /* motion-ok: waiting signal */
+}
+
+.omp-working-dot::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	padding: 1.5px;
+	border-radius: inherit;
+	background: conic-gradient(
+		from var(--omp-loading-angle),
+		transparent 0 45%,
+		color-mix(in srgb, var(--omp-accent) 60%, transparent) 80%,
+		var(--omp-accent)
+	);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	animation: omp-loading-orbit 1.1s linear infinite; /* motion-ok: agent working */
+}
+
+@keyframes omp-beacon-core {
+	0%,
+	100% {
+		opacity: 0.55;
+		transform: scale(0.8);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+/* While the agent works, the composer border carries a slow accent arc: the
+   place the user is looking acknowledges the run without moving anything. */
+.omp-composer-box {
+	position: relative;
+}
+
+.omp-composer-box::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	padding: 2px;
+	border-radius: inherit;
+	background: conic-gradient(
+		from var(--omp-loading-angle),
+		transparent 0 40%,
+		color-mix(in srgb, var(--omp-accent) 45%, transparent) 80%,
+		var(--omp-accent)
+	);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--omp-motion-med) var(--omp-ease);
+}
+
+.omp-composer-box[data-working="true"]::after {
+	opacity: 1;
+	animation: omp-loading-orbit 3.2s linear infinite; /* motion-ok: agent working */
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.omp-working-dot::after,
+	.omp-composer-box[data-working="true"]::after {
+		animation: none;
+	}
 }
 
 /* A tab whose agent is starting: the logo inside a slowly orbiting arc. */
@@ -1037,7 +1124,7 @@
 .omp-transcript-editorial .omp-thinking-header {
 	min-height: 26px;
 	padding: 2px 0;
-	font-size: calc(var(--gui-font-size, 15px) * 13.5 / 15);
+	font-size: var(--text-omp-md);
 }
 
 .omp-transcript-editorial .omp-thinking-header:hover {
@@ -1094,7 +1181,7 @@
 }
 
 .omp-transcript-editorial .omp-assistant-turn--compact > .min-w-0 > .markdown-body {
-	font-size: calc(var(--gui-font-size, 15px) * 13.5 / 15);
+	font-size: var(--text-omp-md);
 	line-height: 1.5;
 }
 
@@ -1885,4 +1972,257 @@
 .omp-sidebar-agent-pill[data-holds-active] {
 	border-color: color-mix(in srgb, var(--omp-accent) 45%, transparent);
 	color: var(--omp-accent);
+}
+
+/* ============================================================================
+   Hierarchy pass
+   Everything below leans on theme tokens only, so all named themes inherit it.
+   The accent leads: your message, the focused composer, the primary action and
+   the active tab carry it; everything else stays quiet.
+   ============================================================================ */
+
+/* Your message is the anchor of each turn: tinted with the accent, hairlined. */
+.omp-transcript-editorial .omp-user-bubble {
+	border: 1px solid color-mix(in srgb, var(--omp-accent) 16%, transparent);
+	background: color-mix(in srgb, var(--omp-accent) 8%, var(--omp-bg-primary));
+	padding: 9px 15px;
+}
+
+/* A finished or running step group reads as a quiet chip, not loose text. */
+.omp-transcript-editorial .omp-execution-group-header {
+	padding: 3px 10px 3px 8px;
+	border: 1px solid var(--omp-border-muted);
+	border-radius: 9999px;
+	transition:
+		background-color var(--omp-motion-fast) var(--omp-ease),
+		border-color var(--omp-motion-fast) var(--omp-ease),
+		color var(--omp-motion-fast) var(--omp-ease);
+}
+
+.omp-transcript-editorial .omp-execution-group-header:hover {
+	border-color: var(--omp-border);
+	background: var(--omp-selected-bg);
+}
+
+/* The composer is the one raised surface: it lifts off the canvas, and focus
+   brings the accent in as a soft ring. */
+.omp-composer-box {
+	box-shadow: var(--omp-shadow-md);
+}
+
+.omp-composer-box:focus-within {
+	border-color: color-mix(in srgb, var(--omp-accent) 50%, var(--omp-input-border));
+	box-shadow:
+		0 0 0 3px color-mix(in srgb, var(--omp-accent) 14%, transparent),
+		var(--omp-shadow-md);
+}
+
+/* Send is the primary action. The label color is the canvas color so it holds
+   contrast on both a deep light-theme accent and a bright dark-theme one. */
+.omp-send-button:not(:disabled):not(.omp-send-button--secondary):not(.omp-send-button--follow-up) {
+	background: var(--omp-accent);
+	color: var(--omp-bg-primary);
+}
+
+/* Primary navigation action, tinted so it is the first thing in the sidebar. */
+[data-sidebar-new-agent] {
+	background: color-mix(in srgb, var(--omp-accent) 10%, transparent);
+}
+
+[data-sidebar-new-agent]:hover {
+	background: color-mix(in srgb, var(--omp-accent) 18%, transparent) !important;
+}
+
+[data-sidebar-new-agent] > svg {
+	color: var(--omp-accent);
+}
+
+/* The active tab says so with a short accent bar, not only a grey fill. */
+.omp-tab-unit[aria-selected="true"]::before {
+	content: "";
+	position: absolute;
+	inset: auto 12px 0;
+	height: 2px;
+	border-radius: 2px 2px 0 0;
+	background: var(--omp-accent);
+	animation: omp-fade-in var(--omp-motion-fast) var(--omp-ease) both;
+}
+
+/* Starter cards fan in on the empty canvas instead of landing as one block. */
+.omp-starter-grid > * {
+	animation: omp-fade-up var(--omp-motion-spring) var(--omp-ease-spring) both;
+}
+
+.omp-starter-grid > :nth-child(2) {
+	animation-delay: var(--omp-stagger);
+}
+
+.omp-starter-grid > :nth-child(3) {
+	animation-delay: calc(var(--omp-stagger) * 2);
+}
+
+.omp-starter-grid > :nth-child(n + 4) {
+	animation-delay: calc(var(--omp-stagger) * 3);
+}
+
+/* ============================================================================
+   Settings & dialogs hierarchy
+   ============================================================================ */
+
+/* Where you are in the settings tree: an accent-tinted row and icon. */
+.settings-nav-item[aria-current="page"] {
+	background: color-mix(in srgb, var(--omp-accent) 11%, transparent);
+	color: var(--omp-text);
+}
+
+.settings-nav-item[aria-current="page"] > span:first-child {
+	color: var(--omp-accent);
+}
+
+.settings-nav-group-label {
+	font-weight: 600;
+}
+
+/* A page is a stack of sections; each opens with a real heading, an accent
+   tick and a hairline, instead of a bold label the same size as its rows. */
+.settings-content > section > h3 {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+	color: var(--omp-text);
+	font-size: var(--text-omp-lg);
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
+
+.settings-content > section > h3::before {
+	content: "";
+	width: 3px;
+	height: 14px;
+	flex-shrink: 0;
+	border-radius: 2px;
+	background: var(--omp-accent);
+}
+
+.settings-content > section + section {
+	margin-top: 14px;
+	padding-top: 22px;
+	border-top: 1px solid var(--omp-border-muted);
+}
+
+/* Toggle rows breathe and read as targets. */
+.settings-content section > button:has(> .omp-switch-track) {
+	padding-block: 10px;
+	border-radius: 10px;
+}
+
+/* Dialogs: a blurred, dimmed backdrop pushes the page back, and an accent
+   edge on the panel gives every dialog the same identity. */
+.omp-dialog-overlay {
+	backdrop-filter: blur(5px) saturate(1.05);
+}
+
+.omp-dialog-panel {
+	position: relative;
+}
+
+.omp-dialog-panel::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 auto;
+	z-index: 1;
+	height: 2px;
+	pointer-events: none;
+	background: linear-gradient(90deg, var(--omp-accent), color-mix(in srgb, var(--omp-accent) 0%, transparent) 70%);
+}
+
+/* ============================================================================
+   Management pages (providers, model roles, security)
+   ============================================================================ */
+
+/* A row in a list of things you manage: it answers hover, and a ready one
+   (a signed-in provider) carries a green edge instead of looking the same as
+   one that needs setup. */
+.omp-list-row {
+	transition:
+		border-color var(--omp-motion-fast) var(--omp-ease),
+		background-color var(--omp-motion-fast) var(--omp-ease),
+		box-shadow var(--omp-motion-fast) var(--omp-ease);
+}
+
+.omp-list-row:hover {
+	border-color: var(--omp-border);
+	background: color-mix(in srgb, var(--omp-selected-bg) 60%, transparent);
+}
+
+.omp-list-row[data-ready="true"] {
+	border-color: color-mix(in srgb, var(--omp-success) 28%, var(--omp-border-muted));
+	box-shadow: inset 3px 0 0 var(--omp-success);
+}
+
+/* Section labels inside dialogs read as headings, with a count chip. */
+.omp-section-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--omp-text);
+	font-size: var(--text-omp-md);
+	font-weight: 650;
+	letter-spacing: -0.005em;
+}
+
+.omp-section-count {
+	min-width: 20px;
+	padding: 0 6px;
+	border-radius: 9999px;
+	background: var(--omp-badge-bg);
+	color: var(--omp-badge-text);
+	font-size: var(--text-omp-xs);
+	font-weight: 500;
+	line-height: 18px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+/* An empty list invites the next step instead of just reporting nothing. */
+.omp-empty-hint {
+	border-style: dashed;
+	background: color-mix(in srgb, var(--omp-accent) 4%, transparent);
+}
+
+/* Explanatory notes are set off from actionable rows by an accent edge. */
+.omp-note {
+	border-left: 3px solid color-mix(in srgb, var(--omp-accent) 45%, transparent);
+	border-radius: 0 8px 8px 0;
+	background: color-mix(in srgb, var(--omp-accent) 3%, transparent);
+}
+
+.omp-empty-icon {
+	display: grid;
+	width: 52px;
+	height: 52px;
+	margin-bottom: 4px;
+	place-items: center;
+	border-radius: 9999px;
+	background: var(--omp-accent-dim);
+	color: var(--omp-accent);
+}
+
+.omp-empty-icon[data-tone="success"] {
+	background: var(--omp-success-dim);
+	color: var(--omp-success);
+}
+
+/* ---------------------------------------------------------------------------
+   Inline Markdown spans (lib/inline-markdown.tsx): the same chip as
+   `.markdown-body code`, for one-line snippets rendered outside a report.
+   ------------------------------------------------------------------------- */
+.omp-inline-code {
+	font-family: var(--font-mono);
+	font-size: 0.86em;
+	background: var(--omp-selected-bg);
+	border-radius: 5px;
+	padding: 0.08em 0.34em;
+	color: var(--omp-md-code);
 }

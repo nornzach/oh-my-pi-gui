@@ -15,7 +15,7 @@ import {
 	Zap,
 } from "lucide-react";
 import type { ClipboardEvent, DragEvent, KeyboardEvent } from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AvailableCommand, ImageContent } from "../../../shared/rpc-types";
 import { useFollowUpModifierHeld } from "../../hooks/use-follow-up-modifier";
@@ -112,6 +112,12 @@ export function InputArea() {
 	const images = useComposerStore(s => s.images);
 	const setImages = useComposerStore(s => s.setImages);
 	const [menu, setMenu] = useState<CompletionMenu | null>(null);
+	const menuListRef = useRef<HTMLDivElement>(null);
+	// The menu lists every match and scrolls; keep the keyboard selection in view.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the selected index and the item set are what move it.
+	useEffect(() => {
+		menuListRef.current?.querySelector('[data-menu-active="true"]')?.scrollIntoView?.({ block: "nearest" });
+	}, [menu?.index, menu?.items]);
 	const [commands, setCommands] = useState<AvailableCommand[]>([]);
 	const sending = useComposerStore(state => state.sending);
 	const setSending = useComposerStore(state => state.setSending);
@@ -545,6 +551,18 @@ export function InputArea() {
 		useUiStore.getState().openComposerEditor(expandPasteMarkers(text));
 	};
 
+	/** Types the `/` trigger at the caret so the completion menu opens on every command. */
+	const openCommandMenu = () => {
+		const el = textareaRef.current;
+		const needsSpace = text.length > 0 && !/\s$/.test(text);
+		setText(`${text}${needsSpace ? " " : ""}/`);
+		requestAnimationFrame(() => {
+			el?.focus();
+			const end = el?.value.length ?? 0;
+			el?.setSelectionRange(end, end);
+		});
+	};
+
 	const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
 		// IME composition (Chinese/Japanese/Korean input): while the candidate
 		// window is open, Enter and friends belong to the IME — committing the
@@ -784,32 +802,44 @@ export function InputArea() {
 				    above the input box instead of the surrounding composer region. */}
 				<div className="relative">
 					{menu && (
-						<div className="absolute bottom-full left-0 z-10 mb-2 max-h-[60vh] w-[420px] max-w-full overflow-y-auto rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-1 shadow-[var(--omp-shadow-lg)]">
+						<div
+							ref={menuListRef}
+							className="absolute bottom-full left-0 z-10 mb-2 max-h-[60vh] w-[420px] max-w-full overflow-y-auto rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-1 shadow-[var(--omp-shadow-lg)]"
+						>
 							{menu.items.map((item, index) => (
-								<button
-									key={`${menu.source}:${item.label}`}
-									type="button"
-									onMouseDown={event => {
-										event.preventDefault();
-										insertCompletion(item);
-									}}
-									className={cx(
-										"flex w-full items-baseline gap-3 rounded-lg px-3 py-2.5 text-left",
-										index === menu.index ? "bg-[var(--omp-selected-bg)]" : "",
+								<Fragment key={`${menu.source}:${item.label}`}>
+									{menu.source === "command" && item.group && item.group !== menu.items[index - 1]?.group && (
+										<div className="px-3 pt-2.5 pb-1 text-omp-xs font-medium text-(--omp-dim)">
+											{t(`input.commandGroup.${item.group}`)}
+										</div>
 									)}
-								>
-									<span className="font-mono text-omp-lg font-medium text-[var(--omp-accent)]">
-										{item.label}
-									</span>
-									{item.description && (
-										<span className="truncate text-omp-md text-[var(--omp-muted)]">{item.description}</span>
-									)}
-									{item.hint && (
-										<span className="ml-auto shrink-0 font-mono text-omp-xs text-[var(--omp-dim)]">
-											{item.hint}
+									<button
+										data-menu-active={index === menu.index}
+										type="button"
+										onMouseDown={event => {
+											event.preventDefault();
+											insertCompletion(item);
+										}}
+										className={cx(
+											"flex w-full items-baseline gap-3 rounded-lg px-3 py-2.5 text-left",
+											index === menu.index ? "bg-[var(--omp-selected-bg)]" : "",
+										)}
+									>
+										<span className="font-mono text-omp-lg font-medium text-[var(--omp-accent)]">
+											{item.label}
 										</span>
-									)}
-								</button>
+										{item.description && (
+											<span className="truncate text-omp-md text-[var(--omp-muted)]">
+												{item.description}
+											</span>
+										)}
+										{item.hint && (
+											<span className="ml-auto shrink-0 font-mono text-omp-xs text-[var(--omp-dim)]">
+												{item.hint}
+											</span>
+										)}
+									</button>
+								</Fragment>
 							))}
 						</div>
 					)}
@@ -838,6 +868,7 @@ export function InputArea() {
 							"omp-composer-box overflow-hidden",
 							dragActive && "ring-2 ring-[var(--omp-accent)] ring-offset-0",
 						)}
+						data-working={isStreaming}
 						style={modeColor ? { borderColor: modeColor } : undefined}
 						onDragOver={handleDragOver}
 						onDragLeave={handleDragLeave}
@@ -1010,6 +1041,15 @@ export function InputArea() {
 												onSelect: () => {
 													setAddMenu(null);
 													fileInputRef.current?.click();
+												},
+											},
+											{
+												id: "composer-commands",
+												label: t("input.commands"),
+												hint: "/",
+												onSelect: () => {
+													setAddMenu(null);
+													openCommandMenu();
 												},
 											},
 											{

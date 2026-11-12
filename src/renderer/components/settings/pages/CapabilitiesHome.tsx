@@ -199,7 +199,7 @@ export function CapabilitiesHome({
 					<Sparkles size={12} />
 					{t("settings.capabilities.eyebrow")}
 				</div>
-				<h2 className="text-xl font-semibold tracking-tight text-(--omp-text)">
+				<h2 className="text-omp-2xl font-semibold tracking-tight text-(--omp-text)">
 					{t("settings.capabilities.title")}
 				</h2>
 				<p className="mt-2 text-omp-md leading-relaxed text-(--omp-muted)">

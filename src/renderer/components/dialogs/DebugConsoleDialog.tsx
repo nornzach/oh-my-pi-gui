@@ -597,7 +597,7 @@ export function DebugConsoleDialog() {
 			<div className="flex flex-col gap-4">
 				<section>
 					<div className="mb-1 flex items-center justify-between">
-						<span className="text-xs font-medium text-(--omp-text)">{t("debug.sessions")}</span>
+						<span className="text-omp-xs font-medium text-(--omp-text)">{t("debug.sessions")}</span>
 						<Button
 							disabled={!sidecarReady || pending > 0}
 							icon={<RefreshCw size={12} />}
@@ -691,14 +691,14 @@ export function DebugConsoleDialog() {
 				</div>
 
 				{error ? (
-					<div className="rounded-md border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent p-3 text-sm text-(--omp-error)">
+					<div className="rounded-md border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent p-3 text-omp-md text-(--omp-error)">
 						{error}
 					</div>
 				) : null}
 
 				<section>
 					<div className="mb-1 flex items-center justify-between">
-						<span className="text-xs font-medium text-(--omp-text)">{t("debug.result")}</span>
+						<span className="text-omp-xs font-medium text-(--omp-text)">{t("debug.result")}</span>
 						{pending > 0 ? <Spinner label={t("debug.running")} size="sm" /> : null}
 					</div>
 					<div className="max-h-72 min-h-28 overflow-auto rounded-lg border border-(--omp-border-muted) bg-transparent p-3">
@@ -738,7 +738,7 @@ export function DebugConsoleDialog() {
 								))}
 							</div>
 							<div>
-								<label className="mb-1 block text-xs font-medium text-(--omp-text)" htmlFor="debug-request">
+								<label className="mb-1 block text-omp-xs font-medium text-(--omp-text)" htmlFor="debug-request">
 									{t("debug.request")}
 								</label>
 								<TextArea

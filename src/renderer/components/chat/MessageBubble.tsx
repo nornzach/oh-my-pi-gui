@@ -277,7 +277,7 @@ function ContextBubble({ message }: { message: AgentMessage }) {
 	return (
 		<div className="omp-context-turn px-6 py-3">
 			<div className="omp-transcript-content rounded-[10px] border border-[var(--omp-border-muted)] px-3.5 py-3">
-				<div className="mb-2 flex items-center gap-1.5 text-omp-xs font-bold text-[var(--omp-status-context)]">
+				<div className="mb-2 flex items-center gap-1.5 text-omp-xs font-semibold text-[var(--omp-status-context)]">
 					{isFiles ? <FileText size={12} /> : <Archive size={12} />}
 					{label}
 				</div>
@@ -512,7 +512,7 @@ export const MessageBubble = memo(function MessageBubble({
 						<span className="omp-user-bubble-author">{readOnly ? readOnly.authorLabel : t("live.you")}</span>
 						<div className="omp-user-bubble-content">
 							{isSteering && (
-								<div className="mb-1.5 flex items-center gap-1.5 text-omp-xs font-bold text-[var(--omp-custom-msg-label)]">
+								<div className="mb-1.5 flex items-center gap-1.5 text-omp-xs font-semibold text-[var(--omp-custom-msg-label)]">
 									<span className="h-1 w-1 rounded-full bg-current" />
 									{t("chat.steering")}
 								</div>
@@ -627,10 +627,10 @@ export const MessageBubble = memo(function MessageBubble({
 		>
 			<div className="omp-transcript-content min-w-0">
 				{customLabel && (
-					<div className="mb-2 text-omp-sm font-bold text-[var(--omp-status-context)]">{customLabel}</div>
+					<div className="mb-2 text-omp-sm font-semibold text-[var(--omp-status-context)]">{customLabel}</div>
 				)}
 				{isSteering && (
-					<div className="mb-2 flex items-center gap-1.5 text-omp-sm font-bold text-[var(--omp-custom-msg-label)]">
+					<div className="mb-2 flex items-center gap-1.5 text-omp-sm font-semibold text-[var(--omp-custom-msg-label)]">
 						<span className="h-1.5 w-1.5 rounded-full bg-current" />
 						{t("chat.steeringResponse")}
 					</div>

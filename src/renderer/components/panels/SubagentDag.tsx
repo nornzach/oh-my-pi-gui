@@ -241,7 +241,7 @@ export function SubagentDag({
 				<div className="flex max-h-[45%] shrink-0 flex-col border-t border-(--omp-border-muted)">
 					<div className="flex items-center gap-2 px-3 pt-1.5">
 						<Bot className="shrink-0 text-(--omp-status-subagents)" size={13} />
-						<span className="min-w-0 flex-1 truncate text-xs font-medium text-(--omp-text)">
+						<span className="min-w-0 flex-1 truncate text-omp-xs font-medium text-(--omp-text)">
 							{subagentPrimaryLabel(selected)}
 						</span>
 						<Badge

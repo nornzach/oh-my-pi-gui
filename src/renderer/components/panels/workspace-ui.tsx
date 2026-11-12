@@ -288,7 +288,7 @@ const SPLIT_LINE_CLASS: Record<DiffLine["type"], string> = {
 function SplitDiff({ diff }: { diff: string }) {
 	const rows = useMemo(() => toSplitRows(parseDiff(diff)), [diff]);
 	return (
-		<div className="grid grid-cols-2 divide-x divide-(--omp-border-muted) overflow-x-auto font-mono text-xs leading-[1.4]">
+		<div className="grid grid-cols-2 divide-x divide-(--omp-border-muted) overflow-x-auto font-mono text-omp-xs leading-[1.4]">
 			{(["left", "right"] as const).map(side => (
 				<div className="min-w-0 overflow-x-auto" key={side}>
 					{rows.map((row, index) => {

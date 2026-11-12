@@ -128,7 +128,6 @@ const TODO_STATUS_SUFFIX: Record<TodoTask["status"], string> = {
 	in_progress: " _(in progress)_",
 	completed: "",
 	abandoned: " _(abandoned)_",
-	blocked: " _(blocked)_",
 };
 
 /** Render todo phases as a GFM task list (`- [x]` completed, `- [ ]` open). */

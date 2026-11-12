@@ -11,6 +11,9 @@
  *    fills may paint.
  *  - raw pixel font class `text-[<N>px]` below 16px — use the text-omp-*
  *    scale (global.css @theme). Display sizes ≥16px are exempt.
+ *  - Tailwind's named font sizes (`text-xs`, `text-sm`, `text-lg`, …): they
+ *    are fixed rem steps off the scale that ignore the GUI font-size
+ *    preference, so a row mixing them with text-omp-* drifts apart.
  *
  * A deliberate exception carries `surface-ok` on the same line (spell the
  * reason next to it). The styles/ directory (token definitions) is skipped
@@ -32,6 +35,7 @@ const BARE_MS = /(?<!var\(--omp-motion-(?:fast|med)\))(?<![-\w])(\d+(?:\.\d+)?)m
 const FILL_PAREN = /(?:[a-z-]+:)*bg-\(--omp-bg-(?:primary|secondary|tertiary)\)/g;
 const FILL_BRACKET = /(?:[a-z-]+:)*bg-\[var\(--omp-bg-(?:primary|secondary|tertiary)\)\]/g;
 const RAW_PX = /\btext-\[(\d+(?:\.\d+)?)px\]/g;
+const NAMED_SIZE = /(?<![\w-])text-(?:xs|sm|base|lg|[2-9]?xl)(?![\w-])/g;
 
 /** @returns {string[]} */
 function collect(dir) {
@@ -64,6 +68,10 @@ for (const file of collect(ROOT)) {
 		for (const match of line.matchAll(RAW_PX)) {
 			if (Number.parseFloat(match[1]) >= 16) continue;
 			violations.push(`${rel}:${index + 1}  raw pixel font class  ${match[0]}  (use text-omp-*)`);
+		}
+		NAMED_SIZE.lastIndex = 0;
+		for (const match of line.matchAll(NAMED_SIZE)) {
+			violations.push(`${rel}:${index + 1}  fixed Tailwind font size  ${match[0]}  (use text-omp-*)`);
 		}
 	});
 }

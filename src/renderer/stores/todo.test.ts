@@ -8,7 +8,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentMessage, TodoPhase } from "../../shared/rpc-types";
-import { todoHistoryFromMessages, useTodoStore } from "./todo";
+import { todoHistoryFromMessages, todoPhasesFromToolResult, useTodoStore } from "./todo";
 
 function phase(name: string, ...tasks: Array<[string, string]>): TodoPhase {
 	return {
@@ -138,5 +138,27 @@ describe("todo archive of a reopened session", () => {
 		const history = useTodoStore.getState().history;
 		expect(history.map(row => row.id)).toEqual([restored[0]?.id]);
 		expect(history[0]?.phases[0]?.tasks.map(task => task.status)).toEqual(["completed", "pending"]);
+	});
+});
+
+describe("todo results saved before omp 18.19", () => {
+	it("reads a since-removed blocked task as pending instead of dropping the whole plan", () => {
+		const phases = todoPhasesFromToolResult({
+			details: {
+				phases: [
+					{
+						name: "Ship",
+						tasks: [
+							{ content: "Wait on review", status: "blocked", blocker: "reviewer out" },
+							{ content: "Merge", status: "completed" },
+						],
+					},
+				],
+			},
+		});
+		expect(phases?.[0]?.tasks.map(task => [task.content, task.status])).toEqual([
+			["Wait on review", "pending"],
+			["Merge", "completed"],
+		]);
 	});
 });

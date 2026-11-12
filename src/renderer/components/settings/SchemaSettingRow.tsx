@@ -5,10 +5,11 @@ import { type TabRpc, useTabRpc } from "../../lib/tab-rpc";
  * numbers (input), arrays/records (JSON/structured editors).
  */
 
-import { Check, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, Check, Eye, EyeOff, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SettingEntry, SettingProvenance } from "../../../shared/rpc-types";
 import { describeError } from "../../lib/errors";
+import { cx } from "../../lib/format";
 import { useLang, useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import {
@@ -18,6 +19,8 @@ import {
 	THEMES,
 	type ThemeName,
 } from "../../lib/themes";
+import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { notePendingRestart, usePendingRestarts } from "../../stores/settings-restart";
 import { toast } from "../../stores/toast";
 import { Button, Input, TextArea } from "../common";
 import { ArrayChipEditor } from "./editors/ArrayChipEditor";
@@ -91,6 +94,26 @@ function SettingStatus({ dirty, saving, saved }: { dirty: boolean; saving: boole
 	return null;
 }
 
+/**
+ * What a save did, as the row reports it: in effect now, waiting for the
+ * session to restart, written but outranked by a higher config layer, or not
+ * written at all. Only "applied" earns a transient "Saved"; the others keep a
+ * notice on the row, since the value the user picked is not what runs yet.
+ */
+type SaveOutcome = "applied" | "restart" | "overridden" | "failed";
+
+/** Config layers above global, highest precedence first. */
+const OVERRIDE_LAYERS = ["runtime", "overlay", "project"] as const;
+
+/** The highest layer above global that sets this setting: it wins over anything saved here. */
+function overridingLayer(provenance: SettingProvenance | undefined): (typeof OVERRIDE_LAYERS)[number] | undefined {
+	return OVERRIDE_LAYERS.find(layer => provenance?.layers.includes(layer));
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+	return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function draftFor(entry: SettingEntry, value: unknown): string {
 	if (entry.type === "array" || entry.type === "record") {
 		return JSON.stringify(value ?? (entry.type === "array" ? [] : {}), null, 2);
@@ -99,7 +122,7 @@ function draftFor(entry: SettingEntry, value: unknown): string {
 }
 
 const SELECT_CLASS =
-	"w-full rounded-md border border-(--omp-border-muted) bg-(--omp-input-bg) px-2.5 py-1.5 text-xs text-(--omp-text) transition-colors duration-100 focus:border-(--omp-border-accent) focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+	"w-full rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-2.5 py-1.5 text-omp-md leading-[1.45] text-(--omp-text) transition-colors duration-100 hover:border-(--omp-border-strong) focus:border-(--omp-input-focus-border) focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 
 /** String settings holding a prompt: a one-line field is too narrow to read or write one. */
 const PROMPT_SETTINGS = new Set(["chat.systemPrompt"]);
@@ -121,7 +144,11 @@ function SchemaSettingRow({
 	const [error, setError] = useState<string | null>(null);
 	const [savedProvenance, setSavedProvenance] = useState<SettingProvenance>();
 	const [revealed, setRevealed] = useState(false);
+	// The last save was written globally but a higher layer kept the old value.
+	const [overriddenSave, setOverriddenSave] = useState(false);
 	const savedTimer = useRef<number | undefined>(undefined);
+	const tabId = useRuntimeTabId();
+	const restartPending = usePendingRestarts(tabId).some(pending => pending.path === entry.path);
 
 	const generation = useRef(0);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: a different session client or setting invalidates pending saves.
@@ -132,6 +159,7 @@ function SchemaSettingRow({
 		setSaving(false);
 		setSaved(false);
 		setSavedProvenance(undefined);
+		setOverriddenSave(false);
 		return () => {
 			generation.current++;
 		};
@@ -163,46 +191,63 @@ function SchemaSettingRow({
 	const dirty = draft !== null && draft !== baseDraft;
 
 	const commit = useCallback(
-		async (next: unknown) => {
+		async (next: unknown): Promise<SaveOutcome> => {
 			const requestGeneration = ++generation.current;
+			const previous = value;
 			setSaving(true);
 			try {
 				const res = await tabRpc.setSetting(entry.path, next);
-				if (generation.current !== requestGeneration) return;
-				if (res.success) {
-					const data = res.data as { value?: unknown; provenance?: SettingProvenance } | undefined;
-					if (data?.provenance) {
-						onCommitted(entry.path, data.value);
-						setSavedProvenance(data.provenance);
-					} else {
-						// Older cores returned the submitted value; read back the effective value.
-						const readback = await tabRpc.getSettings([entry.path]);
-						if (generation.current !== requestGeneration) return;
-						if (!readback.success) throw new Error(readback.error);
-						const effective = readback.data as { values?: Record<string, unknown> } | undefined;
-						if (!effective?.values) throw new Error(t("settings.savedUnverified"));
-						onCommitted(entry.path, effective.values[entry.path]);
-					}
-					setDraft(null);
-					setError(null);
-					if (entry.type !== "boolean") {
-						setSaved(true);
-						window.clearTimeout(savedTimer.current);
-						savedTimer.current = window.setTimeout(() => setSaved(false), 2000);
-					}
-				} else {
+				if (generation.current !== requestGeneration) return "failed";
+				if (!res.success) {
 					setError(describeError(res.error));
 					toast({ variant: "error", title: t("settings.saveFailed"), message: res.error });
+					return "failed";
 				}
+				const data = res.data as { value?: unknown; provenance?: SettingProvenance } | undefined;
+				let effective: unknown;
+				if (data?.provenance) {
+					effective = data.value;
+					setSavedProvenance(data.provenance);
+				} else {
+					// Older cores returned the submitted value; read back the effective value.
+					const readback = await tabRpc.getSettings([entry.path]);
+					if (generation.current !== requestGeneration) return "failed";
+					if (!readback.success) throw new Error(readback.error);
+					const values = (readback.data as { values?: Record<string, unknown> } | undefined)?.values;
+					if (!values) throw new Error(t("settings.savedUnverified"));
+					effective = values[entry.path];
+				}
+				onCommitted(entry.path, effective);
+				setDraft(null);
+				setError(null);
+				// The write landed in the global layer; a project, launch or runtime
+				// layer that also sets this keeps the session on its own value.
+				const outranked =
+					next !== undefined &&
+					!sameValue(effective, next) &&
+					overridingLayer(data?.provenance ?? entry.provenance) !== undefined;
+				setOverriddenSave(outranked);
+				if (outranked) return "overridden";
+				if (entry.restartRequired === true && !sameValue(effective, previous)) {
+					if (tabId) notePendingRestart(tabId, { path: entry.path, label });
+					return "restart";
+				}
+				if (entry.type !== "boolean") {
+					setSaved(true);
+					window.clearTimeout(savedTimer.current);
+					savedTimer.current = window.setTimeout(() => setSaved(false), 2000);
+				}
+				return "applied";
 			} catch (err) {
-				if (generation.current !== requestGeneration) return;
+				if (generation.current !== requestGeneration) return "failed";
 				setError(describeError(err));
 				toast({ variant: "error", title: t("settings.saveFailed"), message: String(err) });
+				return "failed";
 			} finally {
 				if (generation.current === requestGeneration) setSaving(false);
 			}
 		},
-		[entry.path, entry.type, onCommitted, t, tabRpc],
+		[entry.path, entry.type, entry.restartRequired, entry.provenance, label, onCommitted, t, tabId, tabRpc, value],
 	);
 
 	const commitText = useCallback(() => {
@@ -278,7 +323,9 @@ function SchemaSettingRow({
 					description={description}
 					disabled={saving}
 					label={label}
-					onChange={next => void commit(next)}
+					// Only a save that is in effect now confirms with "Saved"; the
+					// row's notice covers one that waits on a restart or is outranked.
+					onChange={async next => (await commit(next)) === "applied"}
 				/>
 			);
 		}
@@ -324,7 +371,7 @@ function SchemaSettingRow({
 			return (
 				<div className="rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
 					<div className="flex items-center gap-2">
-						<span className="text-xs font-medium text-(--omp-text)" title={entry.path}>
+						<span className="text-omp-md font-medium text-(--omp-text)" title={entry.path}>
 							{label}
 						</span>
 
@@ -336,7 +383,7 @@ function SchemaSettingRow({
 					)}
 					{masked ? (
 						<div className="mt-2 flex items-center justify-between rounded-md border border-(--omp-border-muted) px-2.5 py-2">
-							<span className="text-xs text-(--omp-muted)">••••••••</span>
+							<span className="text-omp-md text-(--omp-muted)">••••••••</span>
 							<Button onClick={() => setRevealed(true)} size="sm" type="button" variant="ghost">
 								<Eye size={12} className="mr-1 inline" />
 								{t("common.reveal")}
@@ -376,6 +423,7 @@ function SchemaSettingRow({
 					) : (
 						<>
 							<TextArea
+								compact
 								autoGrow
 								className="mt-2"
 								disabled={saving}
@@ -431,7 +479,7 @@ function SchemaSettingRow({
 			return (
 				<div className="rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
 					<div className="flex items-center gap-2">
-						<span className="text-xs font-medium text-(--omp-text)" title={entry.path}>
+						<span className="text-omp-md font-medium text-(--omp-text)" title={entry.path}>
 							{label}
 						</span>
 
@@ -442,6 +490,7 @@ function SchemaSettingRow({
 						<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-muted)">{description}</span>
 					)}
 					<TextArea
+						compact
 						autoGrow
 						className="mt-2"
 						disabled={saving}
@@ -490,6 +539,7 @@ function SchemaSettingRow({
 			if (options.length === 0) {
 				control = (
 					<Input
+						compact
 						disabled={saving}
 						onBlur={commitText}
 						onChange={event => setDraft(event.target.value)}
@@ -524,6 +574,7 @@ function SchemaSettingRow({
 		} else if (entry.type === "number") {
 			control = (
 				<Input
+					compact
 					disabled={saving}
 					error={error ?? undefined}
 					onBlur={commitText}
@@ -579,6 +630,7 @@ function SchemaSettingRow({
 				control = (
 					<div className="relative">
 						<Input
+							compact
 							disabled={saving}
 							onBlur={commitText}
 							onChange={event => setDraft(event.target.value)}
@@ -605,7 +657,7 @@ function SchemaSettingRow({
 			<div className="settings-field-row rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
 				<div className="min-w-0 flex-1">
 					<div className="flex items-center gap-2">
-						<span className="text-xs font-medium text-(--omp-text)" title={entry.path}>
+						<span className="text-omp-md font-medium text-(--omp-text)" title={entry.path}>
 							{label}
 						</span>
 
@@ -621,6 +673,20 @@ function SchemaSettingRow({
 		);
 	};
 	const provenance = savedProvenance ?? entry.provenance;
+	const overrideLayer = overridingLayer(provenance);
+	/** The value this session runs with, in the words the control uses. */
+	const displayValue = (current: unknown): string => {
+		if (entry.secret) return "••••••";
+		if (typeof current === "boolean") return t(current ? "settings.effect.on" : "settings.effect.off");
+		const option = entry.options?.find(candidate => candidate.value === current);
+		if (option) return schemaOptionText(lang, option.label);
+		const text = typeof current === "string" ? current : JSON.stringify(current);
+		return text === undefined || text === ""
+			? t("settings.source.default")
+			: text.length > 60
+				? `${text.slice(0, 57)}…`
+				: text;
+	};
 	return (
 		<div>
 			{renderControl()}
@@ -636,22 +702,51 @@ function SchemaSettingRow({
 					{error}
 				</p>
 			)}
-			{/* Only worth showing when a non-global layer overrides the value —
-			    "default/unset" and "set globally" add no information the value
-			    itself doesn't already give. */}
-			{provenance?.layers.some(layer => layer !== "global") && (
-				<details className="px-2 pb-2 text-omp-xs text-(--omp-dim)">
-					<summary className="cursor-pointer">
-						{t("settings.source.label")}:{" "}
-						{provenance.layers.map(layer => t(`settings.source.${layer}`)).join(" → ")}
-					</summary>
-					<p className="mt-1">{t("settings.source.saveGlobal")}</p>
-					<code className="block break-words whitespace-pre-wrap">
-						{entry.secret ? "••••••" : (JSON.stringify(provenance.globalValue) ?? t("settings.source.default"))}
-					</code>
-					{provenance.globalPath && <p className="break-all">{provenance.globalPath}</p>}
-				</details>
+			{restartPending && !overriddenSave && (
+				<p className="mx-2 mb-2 flex items-center gap-1.5 text-omp-xs text-(--omp-warning)" role="status">
+					<RotateCw aria-hidden size={11} />
+					{t("settings.effect.restartPending")}
+				</p>
 			)}
+			{/* Only a layer above global changes what this row can do: the
+			    value it shows is that layer's, and edits here save underneath it. */}
+			{/* Polite live region: a save that turned out outranked is announced
+			    without stealing the summary's own disclosure-button role. */}
+			<div aria-live="polite">
+				{overrideLayer && provenance && (
+					<details
+						className={cx(
+							"mx-2 mb-2 rounded-md px-2 py-1.5 text-omp-xs",
+							overriddenSave
+								? "border border-[var(--omp-warning)]/40 bg-[var(--omp-warning)]/8 text-(--omp-text)"
+								: "text-(--omp-muted)",
+						)}
+					>
+						<summary className="cursor-pointer">
+							<AlertTriangle aria-hidden className="mx-1 inline align-[-1px] text-(--omp-warning)" size={11} />
+							{overriddenSave
+								? t("settings.effect.overriddenAfterSave", {
+										source: t(`settings.effect.source.${overrideLayer}`),
+										value: displayValue(value),
+									})
+								: t("settings.effect.overridden", { source: t(`settings.effect.source.${overrideLayer}`) })}
+						</summary>
+						<div className="mt-1.5 space-y-1 pl-4 text-(--omp-dim)">
+							<p>
+								{t("settings.source.label")}:{" "}
+								{provenance.layers.map(layer => t(`settings.source.${layer}`)).join(" → ")}
+							</p>
+							<p>{t("settings.source.saveGlobal")}</p>
+							<code className="block break-words whitespace-pre-wrap">
+								{entry.secret
+									? "••••••"
+									: (JSON.stringify(provenance.globalValue) ?? t("settings.source.default"))}
+							</code>
+							{provenance.globalPath && <p className="break-all">{provenance.globalPath}</p>}
+						</div>
+					</details>
+				)}
+			</div>
 		</div>
 	);
 }

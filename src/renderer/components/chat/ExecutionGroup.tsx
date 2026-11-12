@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useToolsStore } from "../../stores/tools";
+import { Collapse } from "../common/Collapse";
 
 interface ExecutionGroupProps {
 	children: ReactNode;
@@ -67,10 +68,7 @@ export function ExecutionGroup({
 				aria-label={`${t("chat.process.title")}: ${summary}`}
 			>
 				{active && (
-					<span
-						aria-hidden="true"
-						className="omp-execution-group-live-dot h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--omp-accent)]"
-					/>
+					<span aria-hidden="true" className="omp-execution-group-live-dot omp-working-dot omp-working-dot--sm" />
 				)}
 				<span className="omp-execution-group-title shrink-0 text-omp-sm font-medium text-[var(--omp-text)]">
 					{t("chat.process.title")}
@@ -94,7 +92,9 @@ export function ExecutionGroup({
 					size={14}
 				/>
 			</button>
-			{expanded && <div className="omp-execution-group-body">{children}</div>}
+			<Collapse open={expanded}>
+				<div className="omp-execution-group-body">{children}</div>
+			</Collapse>
 		</section>
 	);
 }

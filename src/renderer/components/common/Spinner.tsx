@@ -46,7 +46,7 @@ export function Spinner({ size = "md", label, className }: SpinnerProps) {
 
 	return (
 		<span
-			className={`inline-flex items-center gap-2 text-xs text-(--omp-muted) ${className ?? ""}`.trim()}
+			className={`inline-flex items-center gap-2 text-omp-xs text-(--omp-muted) ${className ?? ""}`.trim()}
 			role="status"
 		>
 			{svg}

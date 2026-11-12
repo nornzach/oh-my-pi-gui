@@ -161,3 +161,38 @@ export function removeExtensionRequest(id: string): void {
 	defaultExtensionUiStore.getState().removeRequest(id);
 	for (const { store } of runtimeExtensionStores()) store.getState().removeRequest(id);
 }
+
+/** A sign-in's browser step, or a prompt it is waiting on (a pasted code, an API key). */
+function isSignInRequest(request: ExtensionUIRequest): boolean {
+	if (request.method === "open_url") return true;
+	return request.method === "input" && (request.authCodeFor !== undefined || request.loginPromptFor !== undefined);
+}
+
+function pendingSignInIds(): Set<string> {
+	const stores = [defaultExtensionUiStore, ...runtimeExtensionStores().map(entry => entry.store)];
+	const ids = new Set<string>();
+	for (const store of stores) {
+		for (const request of store.getState().pendingRequests) if (isSignInRequest(request)) ids.add(request.id);
+	}
+	return ids;
+}
+
+/**
+ * Safety net for a sign-in the GUI started: the agent normally closes the
+ * browser step itself when the login ends, but if its close never reaches this
+ * window the dialog would sit there until Cancel. Call this when the sign-in
+ * starts and the returned function when it settles; it removes only the
+ * sign-in dialogs that appeared in between, so a dialog that was already open
+ * (an MCP re-authorization, say, which shares `open_url`) is left alone.
+ */
+export function watchSignInRequests(): () => void {
+	const before = pendingSignInIds();
+	return () => {
+		const stores = [defaultExtensionUiStore, ...runtimeExtensionStores().map(entry => entry.store)];
+		for (const store of stores) {
+			for (const request of store.getState().pendingRequests) {
+				if (isSignInRequest(request) && !before.has(request.id)) store.getState().removeRequest(request.id);
+			}
+		}
+	};
+}

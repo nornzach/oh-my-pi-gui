@@ -14,7 +14,7 @@ const innerHighlight = (textToken: string) =>
 	`shadow-[inset_0_1px_0_0_color-mix(in_srgb,var(${textToken})_12%,transparent),var(--omp-shadow-sm)]`;
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-	primary: `border-transparent bg-(--omp-btn-primary-bg) text-(--omp-btn-primary-text) ${innerHighlight("--omp-btn-primary-text")} hover:brightness-110 active:brightness-95 disabled:hover:brightness-100`,
+	primary: `border-transparent bg-(--omp-accent) text-(--omp-bg-primary) ${innerHighlight("--omp-bg-primary")} hover:brightness-110 active:brightness-95 disabled:hover:brightness-100`,
 	secondary:
 		"border-(--omp-border) bg-(--omp-btn-secondary-bg) text-(--omp-btn-secondary-text) shadow-(--omp-shadow-sm) hover:border-(--omp-border-strong) hover:bg-(--omp-selected-bg) active:brightness-[0.96]",
 	ghost: "border-transparent bg-transparent text-(--omp-muted) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)",

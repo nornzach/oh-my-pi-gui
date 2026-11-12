@@ -124,11 +124,11 @@ export function BtwDialog() {
 			<div className="flex max-h-[70vh] flex-col">
 				<div className="min-h-0 flex-1 overflow-y-auto pr-1">
 					{pending && !record ? (
-						<div className="flex items-center justify-center gap-2 py-16 text-sm text-(--omp-dim)">
+						<div className="flex items-center justify-center gap-2 py-16 text-omp-md text-(--omp-dim)">
 							<Spinner size="sm" /> {t("btw.thinking")}
 						</div>
 					) : error ? (
-						<div className="rounded-lg border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent p-3 text-sm text-[var(--omp-error)]">
+						<div className="rounded-lg border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent p-3 text-omp-md text-[var(--omp-error)]">
 							{error}
 						</div>
 					) : record && latest ? (
@@ -143,11 +143,11 @@ export function BtwDialog() {
 								{answerText ? (
 									<BtwAnswer answer={answerText} inject={record.inject} recordId={record.id} />
 								) : running ? (
-									<div className="flex items-center gap-2 py-3 text-sm text-(--omp-dim)">
+									<div className="flex items-center gap-2 py-3 text-omp-md text-(--omp-dim)">
 										<Spinner size="sm" /> {t("btw.thinking")}
 									</div>
 								) : null}
-								{statusNote ? <div className="text-xs text-(--omp-dim)">{statusNote}</div> : null}
+								{statusNote ? <div className="text-omp-xs text-(--omp-dim)">{statusNote}</div> : null}
 							</div>
 						</div>
 					) : null}

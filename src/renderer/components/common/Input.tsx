@@ -14,7 +14,16 @@ import {
 } from "react";
 
 const BASE_INPUT =
-	"w-full rounded-lg border bg-(--omp-input-bg) px-3 py-[9px] text-omp-lg leading-[1.45] text-(--omp-text) placeholder:text-(--omp-dim) shadow-(--omp-shadow-sm) transition-[border-color,box-shadow] duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+	"w-full rounded-lg border bg-(--omp-input-bg) leading-[1.45] text-(--omp-text) placeholder:text-(--omp-dim) shadow-(--omp-shadow-sm) transition-[border-color,box-shadow] duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * Field metrics. `compact` is the dense-form size (settings rows), the same
+ * height and type step as the dropdowns beside it; the default suits dialogs.
+ */
+export const FIELD_SIZE = {
+	default: "px-3 py-[9px] text-omp-lg",
+	compact: "px-2.5 py-1.5 text-omp-md",
+} as const;
 
 /** Resting hairline + teal focus ring; error swaps both for the error tokens. */
 function stateClasses(error: boolean): string {
@@ -55,17 +64,19 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 	hint?: string;
 	/** Monospace (code) styling. */
 	mono?: boolean;
+	/** Dense-form size; see FIELD_SIZE. */
+	compact?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-	{ label, error, hint, mono, className, ...rest },
+	{ label, error, hint, mono, compact, className, ...rest },
 	ref,
 ) {
 	return (
 		<FieldShell label={label} error={error} hint={hint}>
 			<input
 				ref={ref}
-				className={`${BASE_INPUT} ${stateClasses(Boolean(error))} ${mono ? "font-mono" : ""} ${className ?? ""}`.trim()}
+				className={`${BASE_INPUT} ${FIELD_SIZE[compact ? "compact" : "default"]} ${stateClasses(Boolean(error))} ${mono ? "font-mono" : ""} ${className ?? ""}`.trim()}
 				{...rest}
 			/>
 		</FieldShell>
@@ -77,12 +88,14 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
 	error?: string;
 	hint?: string;
 	mono?: boolean;
+	/** Dense-form size; see FIELD_SIZE. */
+	compact?: boolean;
 	/** Grow height with content instead of scrolling. */
 	autoGrow?: boolean;
 }
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
-	{ label, error, hint, mono, autoGrow, className, rows = 3, onInput, ...rest },
+	{ label, error, hint, mono, compact, autoGrow, className, rows = 3, onInput, ...rest },
 	ref,
 ) {
 	const innerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -106,7 +119,7 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
 					if (typeof ref === "function") ref(node);
 					else if (ref) ref.current = node;
 				}}
-				className={`${BASE_INPUT} resize-none leading-relaxed ${stateClasses(Boolean(error))} ${mono ? "font-mono" : ""} ${className ?? ""}`.trim()}
+				className={`${BASE_INPUT} ${FIELD_SIZE[compact ? "compact" : "default"]} resize-none leading-relaxed ${stateClasses(Boolean(error))} ${mono ? "font-mono" : ""} ${className ?? ""}`.trim()}
 				onInput={event => {
 					resize();
 					onInput?.(event);

@@ -68,7 +68,7 @@ export function AsyncSection({
 		return (
 			<div className={cx(PLAIN_STATE_CLASS, "gap-2.5", box)}>
 				<Spinner size="md" />
-				{loadingLabel && <span className="text-xs text-(--omp-dim)">{loadingLabel}</span>}
+				{loadingLabel && <span className="text-omp-xs text-(--omp-dim)">{loadingLabel}</span>}
 			</div>
 		);
 	}
@@ -76,7 +76,7 @@ export function AsyncSection({
 		return (
 			<div className={cx(PLAIN_STATE_CLASS, "gap-3", box)}>
 				<AlertTriangle className="text-(--omp-warning)" size={20} />
-				<div className="max-w-sm text-xs leading-relaxed text-(--omp-muted)">
+				<div className="max-w-sm text-omp-xs leading-relaxed text-(--omp-muted)">
 					{errorTitle && (
 						<>
 							<span className="font-semibold text-(--omp-text)">{errorTitle}</span>
@@ -93,7 +93,7 @@ export function AsyncSection({
 		return (
 			<div className={cx(PLAIN_STATE_CLASS, box)}>
 				<Inbox className="text-(--omp-dim)" size={20} />
-				{emptyLabel && <span className="text-xs text-(--omp-dim)">{emptyLabel}</span>}
+				{emptyLabel && <span className="text-omp-xs text-(--omp-dim)">{emptyLabel}</span>}
 			</div>
 		);
 	}

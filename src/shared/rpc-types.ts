@@ -90,6 +90,7 @@ export type RpcCommand =
 	| { id?: string; type: "get_messages_page"; cursor?: string; limit?: number }
 	| { id?: string; type: "get_login_providers" }
 	| { id?: string; type: "login"; providerId: string }
+	| { id?: string; type: "set_api_key"; providerId: string; apiKey: string }
 	| { id?: string; type: "get_logout_accounts"; providerId: string }
 	| { id?: string; type: "logout"; providerId: string; credentialId: number }
 	| { id?: string; type: "get_usage" }
@@ -350,6 +351,8 @@ export interface RpcContextUsageBreakdown {
 	systemPromptTokens: number;
 	systemToolsTokens: number;
 	systemContextTokens: number;
+	/** Loaded instruction files (AGENTS.md and the like), counted apart from the system prompt; absent before omp 18.18.9. */
+	instructionFilesTokens?: number;
 	skillsTokens: number;
 	messagesTokens: number;
 }
@@ -2135,7 +2138,8 @@ export interface TodoPhase {
 
 export interface TodoTask {
 	content: string;
-	status: "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
+	/** omp 18.19 dropped `blocked`; the agent restores such tasks as pending (see stores/todo.ts). */
+	status: "pending" | "in_progress" | "completed" | "abandoned";
 }
 
 // ============================================================================
@@ -2357,6 +2361,8 @@ export interface ProviderInfo {
 	authKind?: "oauth" | "apikey" | "env";
 	account?: string;
 	loginAvailable: boolean;
+	/** True when `set_api_key` can sign the provider in (it also reads an API key from the environment). */
+	apiKeyLogin?: boolean;
 	disabled: boolean;
 	baseUrl?: string;
 	modelCount: number;

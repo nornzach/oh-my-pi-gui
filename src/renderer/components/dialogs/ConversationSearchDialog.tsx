@@ -376,7 +376,7 @@ function SearchPanel() {
 					{slow ? <Spinner size="sm" /> : <Search className="shrink-0 text-(--omp-dim)" size={14} />}
 					<input
 						aria-label={t("search.title")}
-						className="min-w-0 flex-1 bg-transparent text-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+						className="min-w-0 flex-1 bg-transparent text-omp-md text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 						onChange={event => setQuery(event.target.value)}
 						placeholder={t("search.placeholder")}
 						ref={inputRef}

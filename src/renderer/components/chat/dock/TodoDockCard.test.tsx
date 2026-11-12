@@ -252,9 +252,9 @@ describe("TodoDockCard", () => {
 		expect(useToastStore.getState().toasts).toEqual([]);
 	});
 
-	it("keeps blocked and abandoned out of the single-click cycle", async () => {
-		// "blocked" is a verdict the agent re-plans around, so one click on a
-		// finished task must not reach it.
+	it("cycles a finished task back to pending, not on to a verdict", async () => {
+		// Abandoned is a verdict set from the row menu; one click on a finished
+		// task must not reach it.
 		useTodoStore.getState().setPhases([
 			{
 				name: "Live",

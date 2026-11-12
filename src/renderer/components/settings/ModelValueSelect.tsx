@@ -87,7 +87,7 @@ export interface ModelValueSelectProps {
 
 const TRIGGER_CLASS = {
 	compact:
-		"flex w-full items-center gap-1.5 rounded-md border border-(--omp-border-muted) bg-(--omp-input-bg) px-2.5 py-1.5 text-left text-xs transition-colors duration-100 focus:border-(--omp-border-accent) focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+		"flex w-full items-center gap-1.5 rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-2.5 py-1.5 text-omp-md leading-[1.45] text-left transition-colors duration-100 hover:border-(--omp-border-strong) focus:border-(--omp-input-focus-border) focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
 	field: "flex w-full items-center gap-2 rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-3 py-[9px] text-left text-omp-lg leading-[1.45] shadow-(--omp-shadow-sm) transition-[border-color,box-shadow] duration-150 hover:border-(--omp-border-strong) focus:border-(--omp-input-focus-border) focus:shadow-[0_0_0_3px_var(--omp-input-glow)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
 };
 
@@ -226,7 +226,7 @@ export function ModelValueSelect({
 				type="button"
 			>
 				<span
-					className={`min-w-0 flex-1 truncate font-mono text-xs ${
+					className={`min-w-0 flex-1 truncate font-mono text-omp-xs ${
 						selected ? "font-semibold text-(--omp-accent)" : "text-(--omp-text)"
 					}`}
 				>
@@ -271,7 +271,7 @@ export function ModelValueSelect({
 						<Search className="shrink-0 text-(--omp-dim)" size={12} />
 						<input
 							aria-label={t("modelValue.searchAria", { noun })}
-							className="min-w-0 flex-1 bg-transparent text-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+							className="min-w-0 flex-1 bg-transparent text-omp-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 							onChange={event => setQuery(event.target.value)}
 							onKeyDown={event => {
 								if (isImeKeyEvent(event)) return;
@@ -289,7 +289,7 @@ export function ModelValueSelect({
 					<div className="min-h-0 flex-1 overflow-y-auto p-1" role="listbox">
 						{fetchState === "error" ? (
 							<div className="flex flex-col items-center gap-2 py-6">
-								<span className="px-3 text-center text-xs text-(--omp-error)">
+								<span className="px-3 text-center text-omp-xs text-(--omp-error)">
 									{fetchError ?? t("modelValue.loadFailed", { noun })}
 								</span>
 								<button
@@ -303,7 +303,7 @@ export function ModelValueSelect({
 						) : fetchState !== "ready" ? (
 							<div className="flex items-center justify-center gap-2 py-6">
 								<Spinner size="sm" />
-								<span className="text-xs text-(--omp-dim)">{t("modelValue.loading", { noun })}</span>
+								<span className="text-omp-xs text-(--omp-dim)">{t("modelValue.loading", { noun })}</span>
 							</div>
 						) : (
 							<>
@@ -317,7 +317,7 @@ export function ModelValueSelect({
 								)}
 								{filtered.map(renderOption)}
 								{filtered.length === 0 && !queryIsCustom && (
-									<div className="px-2 py-6 text-center text-xs text-(--omp-dim)">
+									<div className="px-2 py-6 text-center text-omp-xs text-(--omp-dim)">
 										{options.length === 0
 											? t("modelValue.noneAvailable", { noun })
 											: t("modelValue.noMatch", { noun, query: trimmedQuery })}
@@ -325,7 +325,7 @@ export function ModelValueSelect({
 								)}
 								{queryIsCustom && (
 									<button className={ROW_CLASS} onClick={() => choose(trimmedQuery)} type="button">
-										<span className="min-w-0 flex-1 truncate text-xs text-(--omp-text)">
+										<span className="min-w-0 flex-1 truncate text-omp-xs text-(--omp-text)">
 											{t("modelValue.useCustom", { query: trimmedQuery })}
 										</span>
 									</button>
@@ -336,7 +336,9 @@ export function ModelValueSelect({
 										onClick={() => choose("")}
 										type="button"
 									>
-										<span className="min-w-0 flex-1 text-xs text-(--omp-dim)">{t("modelValue.clear")}</span>
+										<span className="min-w-0 flex-1 text-omp-xs text-(--omp-dim)">
+											{t("modelValue.clear")}
+										</span>
 									</button>
 								)}
 							</>

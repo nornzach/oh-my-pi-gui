@@ -139,7 +139,7 @@ function SettingFieldRow({
 
 	const header = (
 		<div className="flex items-center gap-2">
-			<span className="text-xs font-medium text-(--omp-text)" title={field.key}>
+			<span className="text-omp-xs font-medium text-(--omp-text)" title={field.key}>
 				{field.key}
 			</span>
 			{field.secret && <Badge variant="warning">{t("pluginDetail.secretBadge")}</Badge>}
@@ -193,7 +193,7 @@ function SettingFieldRow({
 				</div>
 			) : (
 				<div className="mt-2 flex items-center justify-between rounded-md border border-(--omp-border-muted) px-2.5 py-2">
-					<span className="text-xs text-(--omp-muted)">••••••••</span>
+					<span className="text-omp-xs text-(--omp-muted)">••••••••</span>
 					<Button disabled={saving} onClick={onReplace} size="sm" type="button" variant="ghost">
 						{t("pluginDetail.replace")}
 					</Button>

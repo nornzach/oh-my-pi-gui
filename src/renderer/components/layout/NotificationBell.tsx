@@ -91,7 +91,7 @@ export function NotificationBell({ className }: { className: string }) {
 					<span
 						aria-hidden="true"
 						data-notification-count=""
-						className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-(--omp-error) px-1 text-[9px] leading-none font-semibold text-white tabular-nums"
+						className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-(--omp-error) px-1 text-omp-xxs leading-none font-semibold text-white tabular-nums"
 					>
 						{unread > 9 ? "9+" : unread}
 					</span>

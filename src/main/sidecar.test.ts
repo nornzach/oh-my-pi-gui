@@ -108,6 +108,35 @@ describe("SidecarManager", () => {
 		}
 	});
 
+	it("restarts fresh, without auto-resuming the folder's latest session, when asked", async () => {
+		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-restart-fresh-"));
+		const logPath = path.join(tempDir, "argv.json");
+		const binaryPath = path.join(tempDir, "fake-sidecar.ts");
+		await fs.writeFile(
+			binaryPath,
+			`#!/usr/bin/env bun\nimport * as fs from "node:fs/promises";\nawait fs.writeFile(${JSON.stringify(logPath)}, JSON.stringify(process.argv.slice(2)));\nprocess.stdout.write(JSON.stringify({ type: "ready", protocolVersion: 1, supportedProtocolVersions: [1] }) + "\\n");\nprocess.stdin.resume();\n`,
+		);
+		await fs.chmod(binaryPath, 0o755);
+
+		const sidecar = new SidecarManager({ binaryPath, cwd: tempDir });
+		try {
+			const firstReady = waitForReady(sidecar);
+			sidecar.start();
+			await firstReady;
+
+			// A tab restarted before its first message: its session has no file yet.
+			const restarted = waitForReady(sidecar);
+			sidecar.restart(undefined, undefined, { fresh: true });
+			await restarted;
+
+			const launch: unknown = JSON.parse(await fs.readFile(logPath, "utf8"));
+			expect(launch).toEqual(["--mode", "rpc-ui", "--no-auto-resume"]);
+		} finally {
+			sidecar.dispose();
+			await fs.rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
 	it("configures v2 sidecars with the GUI event filter", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-sidecar-filter-"));
 		const commandLog = path.join(tempDir, "commands.json");

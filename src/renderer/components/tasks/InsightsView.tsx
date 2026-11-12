@@ -13,6 +13,7 @@ import { getFormattingLocale, useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
 import { Spinner } from "../common";
 import { EmptyState } from "./TasksView";
+import { trimLeadingEmptyDays } from "./task-format";
 
 const PERIODS = [7, 30, 90] as const;
 
@@ -45,18 +46,31 @@ function dayLabel(day: string): string {
 	});
 }
 
-function DayChart({ days }: { days: InsightsDay[] }) {
+/**
+ * Runs per day, stacked by outcome. Days before the first run are dropped
+ * (see trimLeadingEmptyDays). `compact` is the task page's sparkline: the
+ * whole period at a fixed day width, so tasks compare side by side, with no
+ * scale, date axis or legend; each day's counts stay in its hover text.
+ */
+export function DayChart({ days: allDays, compact = false }: { days: InsightsDay[]; compact?: boolean }) {
 	const t = useT();
+	const days = compact ? allDays : trimLeadingEmptyDays(allDays);
 	const max = Math.max(1, ...days.map(day => day.succeeded + day.quiet + day.failed + day.skipped));
 	const labelEvery = days.length > 31 ? 14 : days.length > 10 ? 5 : 1;
 	return (
 		<div>
 			{/* The scale: a hairline at the busiest day's height, labelled with its count. */}
-			<div className="relative">
-				<span className="absolute -top-4 right-0 text-omp-xxs text-(--omp-dim) tabular-nums">{max}</span>
-				<div className="absolute inset-x-0 top-0 border-t border-dashed border-(--omp-border-muted)" />
-			</div>
-			<div className="flex h-40 items-end gap-[3px]" role="img" aria-label={t("tasks.insights.chartLabel")}>
+			{!compact && (
+				<div className="relative">
+					<span className="absolute -top-4 right-0 text-omp-xxs text-(--omp-dim) tabular-nums">{max}</span>
+					<div className="absolute inset-x-0 top-0 border-t border-dashed border-(--omp-border-muted)" />
+				</div>
+			)}
+			<div
+				className={cx("flex items-end", compact ? "h-10 gap-0.5" : "h-40 gap-[3px]")}
+				role="img"
+				aria-label={t("tasks.insights.chartLabel")}
+			>
 				{days.map((day, index) => {
 					const total = day.succeeded + day.quiet + day.failed + day.skipped;
 					return (
@@ -72,7 +86,7 @@ function DayChart({ days }: { days: InsightsDay[] }) {
 							})}
 						>
 							<div
-								className="omp-insights-bar flex w-full flex-col-reverse overflow-hidden rounded-[3px] transition-[filter] duration-150 group-hover:brightness-110"
+								className="omp-insights-bar mx-auto flex w-full max-w-9 flex-col-reverse overflow-hidden rounded-[3px] transition-[filter] duration-150 group-hover:brightness-110"
 								style={{ height: `${(total / max) * 100}%`, animationDelay: `${Math.min(index, 30) * 12}ms` }}
 							>
 								{SERIES.map(series =>
@@ -85,26 +99,30 @@ function DayChart({ days }: { days: InsightsDay[] }) {
 									) : null,
 								)}
 							</div>
-							{total === 0 && <div className="h-px w-full bg-(--omp-border-muted)" />}
+							{total === 0 && <div className="mx-auto h-px w-full max-w-9 bg-(--omp-border-muted)" />}
 						</div>
 					);
 				})}
 			</div>
-			<div className="mt-1.5 flex gap-[3px] text-omp-xxs text-(--omp-dim) tabular-nums">
-				{days.map((day, index) => (
-					<span className="min-w-0 flex-1 overflow-visible text-center whitespace-nowrap" key={day.day}>
-						{index % labelEvery === 0 ? dayLabel(day.day) : ""}
-					</span>
-				))}
-			</div>
-			<div className="mt-3 flex flex-wrap gap-4">
-				{SERIES.map(series => (
-					<span className="flex items-center gap-1.5 text-omp-sm text-(--omp-muted)" key={series.key}>
-						<span className={cx("size-2 rounded-[2px]", series.className)} />
-						{t(`tasks.insights.series.${series.key}`)}
-					</span>
-				))}
-			</div>
+			{!compact && (
+				<>
+					<div className="mt-1.5 flex gap-[3px] text-omp-xxs text-(--omp-dim) tabular-nums">
+						{days.map((day, index) => (
+							<span className="min-w-0 flex-1 overflow-visible text-center whitespace-nowrap" key={day.day}>
+								{index % labelEvery === 0 ? dayLabel(day.day) : ""}
+							</span>
+						))}
+					</div>
+					<div className="mt-3 flex flex-wrap gap-4">
+						{SERIES.map(series => (
+							<span className="flex items-center gap-1.5 text-omp-sm text-(--omp-muted)" key={series.key}>
+								<span className={cx("size-2 rounded-[2px]", series.className)} />
+								{t(`tasks.insights.series.${series.key}`)}
+							</span>
+						))}
+					</div>
+				</>
+			)}
 		</div>
 	);
 }
@@ -147,6 +165,7 @@ export function InsightsView() {
 	}
 	const rate = (value: number | null) => (value === null ? "—" : formatPercent(value * 100, 0));
 	const maxCost = Math.max(0.0001, ...insights.costByTask.map(entry => entry.costUsd));
+	const charted = trimLeadingEmptyDays(insights.perDay);
 
 	return (
 		<div className="h-full overflow-y-auto px-6 py-5">
@@ -189,8 +208,13 @@ export function InsightsView() {
 					/>
 				</div>
 				<section className="rounded-xl border border-(--omp-border-muted) px-4 py-4">
-					<h3 className="mb-3 text-omp-sm font-semibold tracking-wide text-(--omp-muted) uppercase">
+					<h3 className="mb-3 flex items-baseline gap-2 text-omp-sm font-semibold tracking-wide text-(--omp-muted) uppercase">
 						{t("tasks.insights.perDay")}
+						{charted.length < insights.perDay.length && (
+							<span className="font-normal tracking-normal text-(--omp-dim) normal-case">
+								{t("tasks.insights.since", { day: dayLabel(charted[0].day) })}
+							</span>
+						)}
 					</h3>
 					<DayChart days={insights.perDay} />
 				</section>

@@ -2,6 +2,7 @@ import { parseHTML } from "linkedom";
 import { act, type ReactNode, useState } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
+import { OVERLAY_EXIT_MS } from "../../hooks/use-overlay-presence";
 import { I18nProvider } from "../../lib/i18n";
 import { type ToolEntry, useToolsStore } from "../../stores/tools";
 
@@ -142,6 +143,10 @@ describe("ExecutionGroup", () => {
 			(container.querySelector("button") as unknown as { click: () => void }).click();
 			useToolsStore.setState({ activeTools: new Map([["tool-1", toolEntry("running")]]) });
 		});
+		// The body plays its exit before it unmounts.
+		await act(async () => {
+			await new Promise(resolve => setTimeout(resolve, OVERLAY_EXIT_MS + 40));
+		});
 		expect(container.querySelector('[data-testid="details"]')).toBeNull();
 	});
 
@@ -169,7 +174,7 @@ describe("ExecutionGroup", () => {
 			}
 		});
 
-		expect(container.querySelectorAll(".animate-spin, .animate-pulse")).toHaveLength(1);
+		expect(container.querySelectorAll(".animate-spin, .animate-pulse, .omp-working-dot")).toHaveLength(1);
 		expect(container.querySelectorAll(".omp-tool-status-icon")).toHaveLength(2);
 		expect(container.querySelector('[role="status"]')?.textContent).toContain("2 running");
 	});

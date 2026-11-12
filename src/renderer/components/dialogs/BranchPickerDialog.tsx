@@ -161,7 +161,7 @@ export function BranchPickerDialog() {
 						aria-activedescendant={filtered.length > 0 ? `${listboxId}-option-${activeIndex}` : undefined}
 						aria-controls={listboxId}
 						aria-label={t("branchPicker.searchLabel")}
-						className="min-w-0 flex-1 bg-transparent text-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+						className="min-w-0 flex-1 bg-transparent text-omp-md text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 						onChange={event => setQuery(event.target.value)}
 						onKeyDown={onKeyDown}
 						placeholder={t("branchPicker.placeholder")}
@@ -180,7 +180,7 @@ export function BranchPickerDialog() {
 				>
 					{error ? (
 						<div className="flex flex-col items-center gap-2 py-10 text-center">
-							<p role="alert" className="text-xs text-[var(--omp-error)]">
+							<p role="alert" className="text-omp-xs text-[var(--omp-error)]">
 								{error}
 							</p>
 							<Button
@@ -197,10 +197,10 @@ export function BranchPickerDialog() {
 					) : loading ? (
 						<div className="flex items-center justify-center gap-2 py-10">
 							<Spinner size="sm" />
-							<span className="text-xs text-(--omp-dim)">{t("branchPicker.loading")}</span>
+							<span className="text-omp-xs text-(--omp-dim)">{t("branchPicker.loading")}</span>
 						</div>
 					) : filtered.length === 0 ? (
-						<div className="py-10 text-center text-xs text-(--omp-dim)">
+						<div className="py-10 text-center text-omp-xs text-(--omp-dim)">
 							{entries.length === 0 ? t("branchPicker.empty") : t("branchPicker.noMatch", { query })}
 						</div>
 					) : (
@@ -226,7 +226,7 @@ export function BranchPickerDialog() {
 										className={`shrink-0 ${isActive ? "text-(--omp-accent)" : "text-(--omp-dim)"}`}
 										size={13}
 									/>
-									<span className="min-w-0 flex-1 truncate text-xs text-(--omp-text)">{entry.text}</span>
+									<span className="min-w-0 flex-1 truncate text-omp-xs text-(--omp-text)">{entry.text}</span>
 									{branching === entry.entryId && <Spinner size="sm" />}
 								</button>
 							);

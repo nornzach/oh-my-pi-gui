@@ -103,6 +103,73 @@ export function runDotClass(run: TaskRun): string {
 	}
 }
 
+/**
+ * The first readable line of a Markdown report summary, for one-line list
+ * rows: block markers (headings, quotes, bullets), fenced code and link targets
+ * dropped; inline `code` and **bold** are kept for InlineMarkdown.
+ */
+export function summaryLine(markdown: string): string {
+	let fenced = false;
+	for (const raw of markdown.split("\n")) {
+		if (raw.trimStart().startsWith("```")) {
+			fenced = !fenced;
+			continue;
+		}
+		if (fenced) continue;
+		const line = raw
+			.replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, "")
+			.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+			.trim();
+		if (line) return line;
+	}
+	return "";
+}
+
+/** A run that found nothing and needs nothing: the bulk of a healthy task's history. */
+export function isQuietRun(run: TaskRun): boolean {
+	return runOutcome(run).key === "tasks.run.outcome.quiet";
+}
+
+export type HistoryItem = { kind: "run"; run: TaskRun } | { kind: "quiet"; runs: TaskRun[] };
+
+/**
+ * A task's history (newest first) with each streak of two or more quiet runs
+ * folded into one item, so the runs that found or broke something stand out.
+ */
+export function groupHistory(runs: readonly TaskRun[]): HistoryItem[] {
+	const items: HistoryItem[] = [];
+	let streak: TaskRun[] = [];
+	const flush = () => {
+		if (streak.length === 1) items.push({ kind: "run", run: streak[0] });
+		else if (streak.length > 1) items.push({ kind: "quiet", runs: streak });
+		streak = [];
+	};
+	for (const run of runs) {
+		if (isQuietRun(run)) {
+			streak.push(run);
+			continue;
+		}
+		flush();
+		items.push({ kind: "run", run });
+	}
+	flush();
+	return items;
+}
+
+/**
+ * A per-day series without the empty days before the first run, so a task
+ * that started this week fills the chart instead of hugging its right edge.
+ * At least `minDays` days stay, so a single day still reads as a series.
+ */
+export function trimLeadingEmptyDays<T extends { succeeded: number; quiet: number; failed: number; skipped: number }>(
+	days: readonly T[],
+	minDays = 7,
+): T[] {
+	const first = days.findIndex(day => day.succeeded + day.quiet + day.failed + day.skipped > 0);
+	if (first === -1) return days.slice(-minDays);
+	return days.slice(Math.max(0, Math.min(first, days.length - minDays)));
+}
+
 export const TASK_STATE_VARIANT: Record<TaskState, BadgeVariant> = {
 	active: "success",
 	paused: "muted",

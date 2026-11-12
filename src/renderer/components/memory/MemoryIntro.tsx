@@ -34,7 +34,7 @@ export function MemoryIntro({ overview, onEnable }: { overview: RpcMemoryOvervie
 				<span className="grid size-11 place-items-center rounded-xl border border-(--omp-border-muted) bg-(--omp-accent-dim) text-(--omp-accent)">
 					<Brain size={22} strokeWidth={1.75} />
 				</span>
-				<h2 className="mt-5 text-[1.35rem] font-semibold tracking-[-0.015em] text-(--omp-text)">
+				<h2 className="mt-5 text-omp-2xl font-semibold tracking-[-0.015em] text-(--omp-text)">
 					{t("memory.intro.title")}
 				</h2>
 				<p className="mt-2 text-omp-md leading-relaxed text-(--omp-text-secondary)">

@@ -146,7 +146,7 @@ export function BtwPanel() {
 			</div>
 
 			{error ? (
-				<div className="flex shrink-0 items-start gap-2 border-b border-(--omp-border-muted) px-3 py-2 text-xs text-[var(--omp-error)]">
+				<div className="flex shrink-0 items-start gap-2 border-b border-(--omp-border-muted) px-3 py-2 text-omp-xs text-[var(--omp-error)]">
 					<div className="min-w-0 flex-1">
 						<div className="font-medium">{t("btw.historyFailed")}</div>
 						<div className="mt-0.5 break-words">{error}</div>

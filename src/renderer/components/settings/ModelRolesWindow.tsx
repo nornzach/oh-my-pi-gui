@@ -179,11 +179,11 @@ function RoleRow({
 				: t("modelRoles.default");
 
 	return (
-		<div className="flex items-center gap-3 rounded-lg border border-[var(--omp-border-muted)] px-3 py-2.5">
+		<div className="omp-list-row flex items-center gap-3 rounded-lg border border-[var(--omp-border-muted)] px-3 py-2.5">
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<div className="flex items-center gap-2">
 					<Tag size={12} style={{ color }} />
-					<span className="text-omp-lg font-medium text-[var(--omp-text)]">{role.name}</span>
+					<span className="text-omp-lg font-semibold text-[var(--omp-text)]">{role.name}</span>
 					{role.tag && (
 						<span
 							className="rounded px-1.5 py-px text-omp-xxs font-bold tracking-wider"
@@ -433,7 +433,7 @@ export function ModelRolesWindow() {
 		<Modal open={open} onClose={close} title={t("modelRoles.title")} size="lg">
 			<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
 				<div className="flex items-center justify-between">
-					<span className="text-omp-sm font-semibold text-[var(--omp-muted)]">{t("modelRoles.header")}</span>
+					<span className="omp-section-label">{t("modelRoles.header")}</span>
 					<Button
 						size="sm"
 						variant="ghost"
@@ -460,9 +460,7 @@ export function ModelRolesWindow() {
 				>
 					{sections.map(section => (
 						<div key={section.key} className="mb-4 flex flex-col gap-2">
-							<span className="text-omp-xs font-semibold text-[var(--omp-dim)]">
-								{t(`modelRoles.section.${section.key}`)}
-							</span>
+							<span className="omp-section-label">{t(`modelRoles.section.${section.key}`)}</span>
 							{section.roles.map(role => (
 								<RoleRow
 									key={role.id}

@@ -503,7 +503,7 @@ export function DiffView({ diff, filePath, className }: DiffViewProps) {
 			>
 				{copied ? <Check size={12} className="text-[var(--omp-success)]" /> : <Copy size={12} />}
 			</button>
-			<div className={cx("font-mono text-xs leading-[1.4] overflow-x-auto [tab-size:4]", className)}>
+			<div className={cx("font-mono text-omp-xs leading-[1.4] overflow-x-auto [tab-size:4]", className)}>
 				{viewRows.map((row, i) => {
 					if (row.type === "gap") {
 						return (

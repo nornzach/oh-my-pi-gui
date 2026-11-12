@@ -295,7 +295,7 @@ export function SkillsSettingsPage({ query }: { query: string }) {
 				<div>
 					<div className="flex items-center gap-2">
 						<BookOpen className="text-(--omp-accent)" size={17} />
-						<h2 className="text-[16px] font-semibold tracking-[-0.01em] text-(--omp-text)">
+						<h2 className="text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)">
 							{t("settings.skills.title")}
 						</h2>
 					</div>

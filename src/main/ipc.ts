@@ -1127,7 +1127,12 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		if (!sidecar) throw new Error("Unknown tab");
 		const sessionPath =
 			typeof payload?.sessionPath === "string" && payload.sessionPath ? payload.sessionPath : undefined;
-		sidecar.restart(undefined, sessionPath);
+		// A tab's session file is written with its first message. Restarted
+		// before then, it has no file for `--session` to open (the agent exits
+		// "Session not found") and nothing to keep, so it starts as a new
+		// session rather than auto-resuming an older one from the folder.
+		if (sessionPath && !existsSync(sessionPath)) sidecar.restart(undefined, undefined, { fresh: true });
+		else sidecar.restart(undefined, sessionPath);
 	});
 
 	ipcMain.handle(IPC_COMMANDS.SIDECAR_SELECT_PROJECT, async event => {

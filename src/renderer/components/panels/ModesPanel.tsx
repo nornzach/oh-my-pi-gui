@@ -346,7 +346,7 @@ function Toggle({
 	return (
 		<label className="flex cursor-pointer items-start justify-between gap-4 rounded-md px-2 py-2 transition-colors hover:bg-(--omp-bg-tertiary)">
 			<span className="min-w-0">
-				<span className="block text-xs font-medium text-(--omp-text)">{label}</span>
+				<span className="block text-omp-xs font-medium text-(--omp-text)">{label}</span>
 				{description && (
 					<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-muted)">{description}</span>
 				)}

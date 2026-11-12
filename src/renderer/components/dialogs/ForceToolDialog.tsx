@@ -122,7 +122,7 @@ export function ForceToolDialog() {
 			<div className="flex min-h-0 flex-1 flex-col gap-3">
 				{/* Current forced tool + clear */}
 				<div className="flex items-center justify-between rounded-lg border border-(--omp-border-muted) bg-transparent px-3 py-2">
-					<div className="flex min-w-0 items-center gap-2 text-sm">
+					<div className="flex min-w-0 items-center gap-2 text-omp-md">
 						<Wrench className="h-4 w-4 shrink-0 text-(--omp-muted)" />
 						{current ? (
 							<span className="truncate font-medium text-(--omp-text)">{current}</span>
@@ -155,9 +155,9 @@ export function ForceToolDialog() {
 							<Spinner />
 						</div>
 					) : loadError ? (
-						<div className="p-3 text-sm text-(--omp-error)">{loadError}</div>
+						<div className="p-3 text-omp-md text-(--omp-error)">{loadError}</div>
 					) : filtered.length === 0 ? (
-						<div className="p-3 text-sm text-(--omp-muted)">{t("forceTool.empty")}</div>
+						<div className="p-3 text-omp-md text-(--omp-muted)">{t("forceTool.empty")}</div>
 					) : (
 						filtered.map(tool => (
 							<button
@@ -174,7 +174,7 @@ export function ForceToolDialog() {
 								<span className="min-w-0">
 									<span className="block truncate font-mono text-omp-lg text-(--omp-text)">{tool.name}</span>
 									{tool.description ? (
-										<span className="block truncate text-xs text-(--omp-muted)">{tool.description}</span>
+										<span className="block truncate text-omp-xs text-(--omp-muted)">{tool.description}</span>
 									) : null}
 								</span>
 							</button>

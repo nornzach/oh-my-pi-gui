@@ -43,6 +43,15 @@ describe("contextSegments", () => {
 		expect(segmentsAt(120_000, null).slice(-1)).toEqual([{ key: "free", tokens: 80_000 }]);
 	});
 
+	it("counts instruction files as their own category, so the measured parts still add up to what is used", () => {
+		// omp 18.18.9+ reports instruction files apart from the system prompt instead of inside it.
+		const sized = { ...breakdown, usedTokens: 120_000, messagesTokens: 97_000, instructionFilesTokens: 3_000 };
+		const segments = contextSegments(sized, contextUsageView(null, sized), null);
+		expect(segments.find(segment => segment.key === "instructionFiles")?.tokens).toBe(3_000);
+		const measured = segments.filter(segment => segment.key !== "free" && segment.key !== "autocompact");
+		expect(measured.reduce((sum, segment) => sum + segment.tokens, 0)).toBe(120_000);
+	});
+
 	it("lists only measured categories when the window is unknown", () => {
 		const unknown = { ...breakdown, contextWindow: 0 };
 		expect(contextSegments(unknown, contextUsageView(null, unknown), 170_000).map(s => s.key)).toEqual([

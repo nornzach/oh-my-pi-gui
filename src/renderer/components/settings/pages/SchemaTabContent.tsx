@@ -39,7 +39,7 @@ export function SchemaTabContent({
 	const t = useT();
 
 	if (tabEntries.length === 0) {
-		return <div className="py-10 text-center text-xs text-(--omp-dim)">{t("settings.sectionEmpty")}</div>;
+		return <div className="py-10 text-center text-omp-xs text-(--omp-dim)">{t("settings.sectionEmpty")}</div>;
 	}
 
 	const renderRow = (entry: SettingEntry) => (

@@ -187,7 +187,7 @@ function ChoiceFieldInput({
 	return (
 		<div className="space-y-1">
 			{field.label.length > 0 && (
-				<p className="text-xs font-medium break-words whitespace-pre-wrap text-(--omp-text)">
+				<p className="text-omp-xs font-medium break-words whitespace-pre-wrap text-(--omp-text)">
 					<Spans spans={field.label} />
 				</p>
 			)}
@@ -199,7 +199,7 @@ function ChoiceFieldInput({
 					multi={field.multi}
 					onClick={() => toggle(index)}
 				>
-					<span className="block text-xs break-words whitespace-pre-wrap text-(--omp-text)">
+					<span className="block text-omp-xs break-words whitespace-pre-wrap text-(--omp-text)">
 						<Spans spans={option.label} />
 					</span>
 				</ChoiceRow>
@@ -227,7 +227,7 @@ function ContextBlock({ block }: { block: Exclude<ExtensionFormBlock, { kind: "f
 			return (
 				<p
 					className={cx(
-						"text-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-text)",
+						"text-omp-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-text)",
 						block.heading && "font-medium",
 					)}
 				>
@@ -239,7 +239,7 @@ function ContextBlock({ block }: { block: Exclude<ExtensionFormBlock, { kind: "f
 			return (
 				<List
 					className={cx(
-						"space-y-0.5 pl-5 text-xs text-(--omp-text)",
+						"space-y-0.5 pl-5 text-omp-xs text-(--omp-text)",
 						block.ordered ? "list-decimal" : "list-disc",
 					)}
 				>
@@ -359,7 +359,7 @@ export function FormDialog({
 				{sections.map((section, sectionIndex) => (
 					<div className="space-y-3" key={sectionIndex}>
 						{section.title.length > 0 && (
-							<h3 className="text-xs font-semibold break-words whitespace-pre-wrap text-(--omp-text)">
+							<h3 className="text-omp-xs font-semibold break-words whitespace-pre-wrap text-(--omp-text)">
 								<Spans spans={section.title} />
 							</h3>
 						)}

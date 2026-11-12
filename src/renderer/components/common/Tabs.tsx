@@ -59,7 +59,7 @@ export function Tabs({ tabs, activeId, onChange, compact, className, ariaLabel }
 					<button
 						aria-selected={active}
 						className={`relative -mb-px shrink-0 border-b-2 font-medium whitespace-nowrap transition-colors duration-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--omp-border-accent) disabled:cursor-not-allowed disabled:opacity-70 ${
-							compact ? "px-2 py-1 text-omp-sm" : "px-3 py-1.5 text-xs"
+							compact ? "px-2 py-1 text-omp-sm" : "px-3 py-1.5 text-omp-xs"
 						} ${
 							active
 								? "border-(--omp-accent) text-(--omp-text)"

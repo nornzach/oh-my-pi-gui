@@ -247,7 +247,7 @@ export function SshSettingsPage() {
 		<div>
 			<header className="mb-4 flex items-start justify-between gap-4">
 				<div>
-					<h2 className="text-[20px] font-semibold tracking-[-0.015em] text-(--omp-text)">{t("ssh.title")}</h2>
+					<h2 className="text-omp-2xl font-semibold tracking-[-0.015em] text-(--omp-text)">{t("ssh.title")}</h2>
 					<p className="mt-1 text-omp-md text-(--omp-muted)">{t("ssh.subtitle")}</p>
 				</div>
 			</header>

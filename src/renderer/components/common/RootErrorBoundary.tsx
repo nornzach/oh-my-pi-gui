@@ -44,8 +44,10 @@ function RootErrorFallback({ error }: { error: Error }) {
 		<main className="drag-region flex h-full w-full items-center justify-center px-6 text-[var(--omp-text)]">
 			<section className="no-drag w-full max-w-xl rounded-2xl border border-[var(--omp-border)] p-6 shadow-2xl">
 				<div className="mb-4 h-1 w-12 rounded-full bg-[var(--omp-error)]" />
-				<h1 className="font-display text-lg font-semibold">{translate("appError.title")}</h1>
-				<p className="mt-2 text-sm leading-relaxed text-[var(--omp-muted)]">{translate("appError.description")}</p>
+				<h1 className="font-display text-omp-xl font-semibold">{translate("appError.title")}</h1>
+				<p className="mt-2 text-omp-md leading-relaxed text-[var(--omp-muted)]">
+					{translate("appError.description")}
+				</p>
 				<details className="mt-4">
 					<summary className="cursor-pointer text-omp-sm text-[var(--omp-dim)]">
 						{translate("errors.technicalDetails")}
@@ -63,14 +65,14 @@ function RootErrorFallback({ error }: { error: Error }) {
 					<button
 						type="button"
 						onClick={() => window.location.reload()}
-						className="omp-pressable rounded-lg bg-(--omp-btn-primary-bg) px-4 py-2 text-xs font-semibold text-(--omp-btn-primary-text) hover:brightness-110"
+						className="omp-pressable rounded-lg bg-(--omp-btn-primary-bg) px-4 py-2 text-omp-xs font-semibold text-(--omp-btn-primary-text) hover:brightness-110"
 					>
 						{translate("appError.reload")}
 					</button>
 					<button
 						type="button"
 						onClick={() => reportOnGithub(error)}
-						className="omp-pressable rounded-lg border border-(--omp-border-muted) px-4 py-2 text-xs font-semibold text-(--omp-muted) hover:text-(--omp-text)"
+						className="omp-pressable rounded-lg border border-(--omp-border-muted) px-4 py-2 text-omp-xs font-semibold text-(--omp-muted) hover:text-(--omp-text)"
 					>
 						{translate("appError.report")}
 					</button>

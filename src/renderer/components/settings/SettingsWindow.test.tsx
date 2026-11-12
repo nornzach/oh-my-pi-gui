@@ -33,12 +33,14 @@ afterEach(() => {
 describe("Toggle", () => {
 	it("uses the entire row as one switch without overlaying save text", () => {
 		const html = renderToStaticMarkup(
-			<Toggle
-				checked={false}
-				description="Applies immediately."
-				label="Advisor for Subagents"
-				onChange={() => {}}
-			/>,
+			<I18nProvider>
+				<Toggle
+					checked={false}
+					description="Applies immediately."
+					label="Advisor for Subagents"
+					onChange={() => {}}
+				/>
+			</I18nProvider>,
 		);
 
 		expect(html.startsWith("<button")).toBe(true);

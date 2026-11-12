@@ -1,10 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
-  <!-- macOS-style app icon: rounded ink tile inset with transparent margin,
-       teal π mark centered. The π glyph mirrors the in-app PiLogo mark. -->
-  <rect x="92" y="92" width="840" height="840" rx="190" fill="#21262c"/>
-  <g stroke="#0d9488" stroke-width="88" stroke-linecap="round" fill="none">
-    <path d="M330 350 H694"/>
-    <path d="M445 350 V690"/>
-    <path d="M615 350 V628 C615 668 578 690 538 690"/>
+  <!-- omp app icon: a deep-navy tile with a luminous π. The crossbar arches, the
+       left leg is straight and the right foot flicks outward, so the mark reads as
+       a pi and not as a letter. The in-app PiLogo uses the same geometry. -->
+  <defs>
+    <linearGradient id="tile" x1="512" y1="92" x2="512" y2="932" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1d2a4f"/>
+      <stop offset="1" stop-color="#0b1122"/>
+    </linearGradient>
+    <linearGradient id="glyph" x1="300" y1="320" x2="720" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b4dcff"/>
+      <stop offset="1" stop-color="#5b8cff"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="512" cy="300" r="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b8cff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#5b8cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="92" y="92" width="840" height="840" rx="190" fill="url(#tile)"/>
+  <rect x="92" y="92" width="840" height="840" rx="190" fill="url(#glow)"/>
+  <rect x="93" y="93" width="838" height="838" rx="189" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2"/>
+  <g stroke="url(#glyph)" stroke-width="80" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M292 352 Q512 316 732 352"/>
+    <path d="M420 346 V690"/>
+    <path d="M604 346 V610 C604 664 628 690 676 690"/>
   </g>
 </svg>

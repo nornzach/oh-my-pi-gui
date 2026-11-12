@@ -44,7 +44,7 @@ export function TranscriptLoading() {
 					<PiLogo size={30} />
 				</div>
 				<div className="flex flex-col items-center gap-2">
-					<p className="omp-shimmer-text font-display text-[20px] font-semibold tracking-[-0.01em]">
+					<p className="omp-shimmer-text font-display text-omp-2xl font-semibold tracking-[-0.01em]">
 						{t("chat.loading.label")}
 					</p>
 					<p className="h-5 text-omp-md tabular-nums text-[var(--omp-muted)]">

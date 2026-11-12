@@ -120,7 +120,7 @@ function EditPreview({ entry }: { entry: DiffCandidate }) {
 			<p className={cx("mb-1.5 text-omp-xs", entry.isError ? "text-(--omp-error)" : "text-(--omp-dim)")}>
 				{t(entry.isError ? "diffPanel.failedEdit" : "diffPanel.writtenContent")}
 			</p>
-			<pre className="overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-[1.45] text-(--omp-text-secondary)">
+			<pre className="overflow-auto whitespace-pre-wrap break-words font-mono text-omp-xs leading-[1.45] text-(--omp-text-secondary)">
 				{entry.diff.slice(0, PREVIEW_TEXT_CHARS)}
 			</pre>
 			{entry.diff.length > PREVIEW_TEXT_CHARS && (

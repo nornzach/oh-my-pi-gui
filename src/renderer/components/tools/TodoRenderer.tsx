@@ -5,8 +5,13 @@ import { useT } from "../../lib/i18n";
 import { resultBodyText, resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
 
-/** Task payload inside `details.phases` — rpc TodoTask plus the optional blocker note. */
-type TodoDetailsTask = TodoTask & { blocker?: string };
+/**
+ * Task payload inside `details.phases`. A todo result saved before omp 18.19
+ * can carry the since-removed `blocked` status with its blocker note; the
+ * transcript shows it as it happened.
+ */
+type TodoDetailsStatus = TodoTask["status"] | "blocked";
+type TodoDetailsTask = Omit<TodoTask, "status"> & { status: TodoDetailsStatus; blocker?: string };
 
 interface TodoDetailsPhase {
 	name: string;
@@ -19,7 +24,7 @@ interface TodoCompletionTransition {
 	content: string;
 }
 
-const STATUS_META: Record<TodoTask["status"], { icon: typeof Circle; color: string }> = {
+const STATUS_META: Record<TodoDetailsStatus, { icon: typeof Circle; color: string }> = {
 	pending: { icon: Circle, color: "var(--omp-dim)" },
 	in_progress: { icon: CircleDot, color: "var(--omp-accent)" },
 	completed: { icon: CheckCircle2, color: "var(--omp-success)" },

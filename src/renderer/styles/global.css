@@ -20,10 +20,13 @@
 	   body, 500 labels/rows, 600 section/page titles. */
 	--text-omp-xxs: calc(var(--gui-font-size, 15px) * 11 / 15);
 	--text-omp-xs: calc(var(--gui-font-size, 15px) * 12 / 15);
-	--text-omp-sm: calc(var(--gui-font-size, 15px) * 12.5 / 15);
-	--text-omp-md: calc(var(--gui-font-size, 15px) * 13.5 / 15);
-	--text-omp-lg: calc(var(--gui-font-size, 15px) * 14.5 / 15);
-	--text-omp-xl: calc(var(--gui-font-size, 15px) * 15 / 15);
+	--text-omp-sm: calc(var(--gui-font-size, 15px) * 13 / 15);
+	--text-omp-md: calc(var(--gui-font-size, 15px) * 14 / 15);
+	--text-omp-lg: calc(var(--gui-font-size, 15px) * 15 / 15);
+	--text-omp-xl: calc(var(--gui-font-size, 15px) * 17 / 15);
+	--text-omp-2xl: calc(var(--gui-font-size, 15px) * 20 / 15);
+	/* One hero headline per screen (the new-session greeting), never body copy. */
+	--text-omp-display: calc(var(--gui-font-size, 15px) * 30 / 15);
 
 	/* Modern geometry — one step rounder than the Tailwind defaults, so every
 	   rounded-* call site picks up the softer language from a single place. */
@@ -83,7 +86,8 @@ body,
 
 body {
 	font-family: var(--font-body);
-	font-size: 14px;
+	/* Unclassed text follows the GUI font-size preference like the scale does. */
+	font-size: var(--text-omp-md);
 	line-height: 1.55;
 	color: var(--omp-text);
 	background: var(--omp-bg-primary);
@@ -275,14 +279,23 @@ kbd,
 	--omp-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 	--omp-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
 	--omp-ease-exit: cubic-bezier(0.4, 0, 1, 1);
-	/* Historical name; deliberately no overshoot. */
-	--omp-ease-spring: var(--omp-ease-enter);
+	/* Damped spring with a ~15% overshoot, sampled into linear(). Entrances that
+	   should feel physical (dialogs, popovers, toasts, chevrons) ride this curve
+	   at --omp-motion-spring; it needs a longer duration than the CSS beziers
+	   because the settle is part of the curve. */
+	--omp-ease-spring: linear(
+		0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121,
+		1.149 24.3%, 1.159, 1.163 27%, 1.154, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991,
+		0.977 51%, 0.974 53.8%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1
+	);
+	--omp-motion-spring: 460ms; /* motion-ok: token definition */
+	--omp-stagger: 32ms; /* motion-ok: token definition */
 }
 
 @keyframes omp-fade-up {
 	from {
 		opacity: 0;
-		transform: translateY(6px);
+		transform: translateY(12px);
 	}
 	to {
 		opacity: 1;
@@ -302,7 +315,7 @@ kbd,
 @keyframes omp-scale-in {
 	from {
 		opacity: 0;
-		transform: translateY(8px) scale(0.97);
+		transform: translateY(14px) scale(0.94);
 	}
 	to {
 		opacity: 1;
@@ -313,7 +326,7 @@ kbd,
 @keyframes omp-toast-in {
 	from {
 		opacity: 0;
-		transform: translateY(10px) scale(0.98);
+		transform: translateY(18px) scale(0.94);
 	}
 	to {
 		opacity: 1;
@@ -324,7 +337,7 @@ kbd,
 @keyframes omp-pop-in {
 	from {
 		opacity: 0;
-		transform: translateY(4px) scale(0.97);
+		transform: translateY(6px) scale(0.92);
 	}
 	to {
 		opacity: 1;
@@ -335,7 +348,7 @@ kbd,
 @keyframes omp-slide-in-right {
 	from {
 		opacity: 0;
-		transform: translateX(16px);
+		transform: translateX(28px);
 	}
 	to {
 		opacity: 1;
@@ -349,27 +362,6 @@ kbd,
 	}
 	to {
 		background-position: -200% 0;
-	}
-}
-
-/* Live-work signals: opacity only, slow, low amplitude — no scaling or glow. */
-@keyframes omp-pulse-dot {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.45;
-	}
-}
-
-@keyframes omp-signal-light {
-	0%,
-	100% {
-		opacity: 0.5;
-	}
-	50% {
-		opacity: 1;
 	}
 }
 
@@ -394,11 +386,11 @@ kbd,
    panel, which makes it the containing block of every `position: fixed`
    popover inside, so those open in the wrong place, clipped by the panel. */
 .omp-scale-in {
-	animation: omp-scale-in var(--omp-motion-slow) var(--omp-ease-enter) backwards;
+	animation: omp-scale-in var(--omp-motion-spring) var(--omp-ease-spring) backwards;
 }
 
 .omp-toast-in {
-	animation: omp-toast-in var(--omp-motion-med) var(--omp-ease-enter) both;
+	animation: omp-toast-in var(--omp-motion-spring) var(--omp-ease-spring) both;
 }
 @keyframes omp-toast-out {
 	from {
@@ -414,11 +406,11 @@ kbd,
 }
 
 .omp-pop-in {
-	animation: omp-pop-in var(--omp-motion-med) var(--omp-ease-enter) both;
+	animation: omp-pop-in var(--omp-motion-spring) var(--omp-ease-spring) both;
 }
 
 .omp-slide-in-right {
-	animation: omp-slide-in-right var(--omp-motion-slow) var(--omp-ease-enter) both;
+	animation: omp-slide-in-right var(--omp-motion-spring) var(--omp-ease-spring) both;
 }
 
 /* The exit half of the enter utilities above. Keyframes alone are not a class:
@@ -463,10 +455,6 @@ kbd,
 	animation: omp-shimmer 1.4s linear infinite; /* motion-ok: loading placeholder sweep */
 }
 
-.omp-pulse-dot {
-	animation: omp-pulse-dot 2s ease-in-out infinite; /* motion-ok: waiting signal */
-}
-
 /* Status reads as a small dot, never as a bar: a bar beside a row reads as
    selection or quotation. Idle rows show nothing at all. */
 .omp-signal-light {
@@ -482,8 +470,42 @@ kbd,
 	opacity: 0;
 }
 
+/* Live work is the same mark everywhere (see .omp-working-dot): the dot
+   breathes as the core and an arc in its color orbits just outside it. The
+   dot's own color (currentColor) carries the semantics. */
 .omp-signal-light--active {
-	animation: omp-signal-light 1.8s ease-in-out infinite; /* motion-ok: slow semantic status signal */
+	position: relative;
+	background: transparent;
+}
+
+.omp-signal-light--active::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background: currentColor;
+	animation: omp-beacon-core 1.6s ease-in-out infinite; /* motion-ok: slow semantic status signal */
+}
+
+.omp-signal-light--active::after {
+	content: "";
+	position: absolute;
+	inset: -3px;
+	padding: 1.25px;
+	border-radius: 9999px;
+	background: conic-gradient(
+		from var(--omp-loading-angle),
+		transparent 0 45%,
+		color-mix(in srgb, currentColor 60%, transparent) 80%,
+		currentColor
+	);
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	pointer-events: none;
+	animation: omp-loading-orbit 1.1s linear infinite; /* motion-ok: agent working */
 }
 
 .omp-indeterminate-progress {
@@ -515,7 +537,44 @@ kbd,
 }
 
 .omp-disclosure-chevron {
-	transition: transform var(--omp-motion-fast) var(--omp-ease);
+	transition: transform var(--omp-motion-spring) var(--omp-ease-spring);
+}
+
+/* Disclosure body: rows animate 0fr <-> 1fr so the height is never measured.
+   Closing is the quicker half (it must finish inside OVERLAY_EXIT_MS). */
+.omp-collapse {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows var(--omp-motion-fast) var(--omp-ease-exit);
+}
+
+.omp-collapse[data-open="true"] {
+	grid-template-rows: 1fr;
+	/* Not the spring: an overshooting row count dips below the content height
+	   and visibly squeezes the body. */
+	transition: grid-template-rows var(--omp-motion-slow) var(--omp-ease-enter);
+}
+
+.omp-collapse-inner {
+	min-height: 0;
+	overflow: hidden;
+	opacity: 0;
+	transition: opacity var(--omp-motion-fast) var(--omp-ease);
+}
+
+.omp-collapse[data-open="true"] > .omp-collapse-inner {
+	opacity: 1;
+}
+
+.omp-collapse[data-settled="true"] > .omp-collapse-inner {
+	overflow: visible;
+}
+
+/* Siblings that enter together fan in instead of landing as one block. Give
+   each child --omp-i (0, 1, 2…); capped so long lists never feel slow. */
+.omp-stagger > * {
+	animation: omp-fade-up var(--omp-motion-spring) var(--omp-ease-spring) both;
+	animation-delay: calc(min(var(--omp-i, 0), 8) * var(--omp-stagger));
 }
 
 /* ============================================================================
@@ -824,7 +883,7 @@ kbd,
 		z-index: 30;
 		width: min(460px, calc(100vw - 56px)) !important;
 		box-shadow: var(--omp-shadow-lg);
-		animation: omp-slide-in-right var(--omp-motion-slow) var(--omp-ease-enter) both;
+		animation: omp-slide-in-right var(--omp-motion-spring) var(--omp-ease-spring) both;
 	}
 }
 
@@ -833,7 +892,7 @@ kbd,
    ============================================================================ */
 
 .settings-sidebar {
-	width: 14rem;
+	width: 15.5rem;
 }
 
 .settings-content {
@@ -1053,6 +1112,10 @@ kbd,
 
 	.omp-sidebar-action {
 		transition-delay: 0ms !important;
+	}
+
+	.omp-signal-light--active::after {
+		animation: none;
 	}
 
 	.omp-indeterminate-progress {

@@ -278,7 +278,7 @@ export function ModelPicker() {
 						aria-activedescendant={flatOptions.length > 0 ? `${listboxId}-option-${activeIndex}` : undefined}
 						aria-controls={listboxId}
 						aria-label={t("modelPicker.searchLabel")}
-						className="min-w-0 flex-1 bg-transparent text-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+						className="min-w-0 flex-1 bg-transparent text-omp-md text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 						onChange={event => {
 							setQuery(event.target.value);
 							setSearchCollapsed(new Set());
@@ -300,7 +300,7 @@ export function ModelPicker() {
 				>
 					{error ? (
 						<div className="flex flex-col items-center gap-3 py-10">
-							<span className="text-xs text-[var(--omp-error)]">{error}</span>
+							<span className="text-omp-xs text-[var(--omp-error)]">{error}</span>
 							<span className="text-omp-xs text-[var(--omp-dim)]">{t("modelPicker.notRespondingHint")}</span>
 							<button
 								type="button"
@@ -315,12 +315,12 @@ export function ModelPicker() {
 					) : loading ? (
 						<div className="flex items-center justify-center gap-2 py-10">
 							<Spinner size="sm" />
-							<span className="text-xs text-(--omp-dim)">{t("modelPicker.loading")}</span>
+							<span className="text-omp-xs text-(--omp-dim)">{t("modelPicker.loading")}</span>
 						</div>
 					) : availableModels.length === 0 ? (
-						<div className="py-10 text-center text-xs text-(--omp-dim)">{t("modelPicker.empty")}</div>
+						<div className="py-10 text-center text-omp-xs text-(--omp-dim)">{t("modelPicker.empty")}</div>
 					) : groups.length === 0 ? (
-						<div className="py-10 text-center text-xs text-(--omp-dim)">
+						<div className="py-10 text-center text-omp-xs text-(--omp-dim)">
 							{t("modelPicker.noMatch", { query })}
 						</div>
 					) : (
@@ -408,7 +408,7 @@ export function ModelPicker() {
 														<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 															<div className="flex min-w-0 items-center gap-1.5">
 																<span
-																	className={`truncate text-xs ${isCurrent ? "font-semibold text-(--omp-accent)" : over ? "text-(--omp-dim)" : "text-(--omp-text)"}`}
+																	className={`truncate text-omp-xs ${isCurrent ? "font-semibold text-(--omp-accent)" : over ? "text-(--omp-dim)" : "text-(--omp-text)"}`}
 																>
 																	{model.name || model.id}
 																</span>

@@ -62,7 +62,7 @@ export function MetricCard({
 	return (
 		<div className="rounded-lg border border-(--omp-border-muted) bg-transparent px-3.5 py-3 transition-colors hover:border-(--omp-border)">
 			<div className="text-omp-xxs font-semibold text-(--omp-dim)">{label}</div>
-			<div className={`mt-1 text-xl font-semibold tabular-nums ${valueColor}`}>{value}</div>
+			<div className={`mt-1 text-omp-2xl font-semibold tabular-nums ${valueColor}`}>{value}</div>
 			{sub && <div className="mt-0.5 text-omp-xs text-(--omp-muted)">{sub}</div>}
 		</div>
 	);

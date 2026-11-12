@@ -173,7 +173,7 @@ function SearchBox({
 			<Search className="shrink-0 text-(--omp-dim)" size={13} />
 			<input
 				aria-label={placeholder}
-				className="min-w-0 flex-1 bg-transparent text-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+				className="min-w-0 flex-1 bg-transparent text-omp-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 				onChange={event => onChange(event.target.value)}
 				placeholder={placeholder}
 				value={value}
@@ -953,7 +953,7 @@ export function InventorySettingsPage({ initialTab = "plugins", query }: { initi
 			<header>
 				<div className="flex items-center gap-2 text-(--omp-accent)">
 					<PackageOpen aria-hidden="true" size={17} />
-					<h2 className="text-[16px] font-semibold tracking-[-0.01em] text-(--omp-text)">
+					<h2 className="text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)">
 						{t("settings.resources.title")}
 					</h2>
 				</div>

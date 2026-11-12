@@ -231,6 +231,7 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		getMessagesPage: (cursor?: string, limit?: number) => rpcCommand({ type: "get_messages_page", cursor, limit }),
 		getLoginProviders: () => rpcCommand({ type: "get_login_providers" }),
 		login: (providerId: string) => rpcCommand({ type: "login", providerId }),
+		setApiKey: (providerId: string, apiKey: string) => rpcCommand({ type: "set_api_key", providerId, apiKey }),
 		getLogoutAccounts: (providerId: string) => rpcCommand({ type: "get_logout_accounts", providerId }),
 		logout: (providerId: string, credentialId: number) => rpcCommand({ type: "logout", providerId, credentialId }),
 		getUsage: () => rpcCommand({ type: "get_usage" }),

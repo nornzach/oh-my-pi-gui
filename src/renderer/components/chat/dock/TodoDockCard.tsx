@@ -54,15 +54,13 @@ const STATUS_LABEL_KEY: Record<TodoTask["status"], string> = {
 	pending: "todoPanel.status.pending",
 	in_progress: "todoPanel.status.inProgress",
 	completed: "todoPanel.status.completed",
-	blocked: "todoPanel.status.blocked",
 	abandoned: "todoPanel.status.abandoned",
 };
 
 /**
- * Blocked and abandoned are verdicts about a task, not steps on the way to done,
- * so they stay out of the click loop: one click on a finished task used to claim
- * it was stuck, which the agent then re-planned around. They are set from the
- * row's context menu, and a click on such a task returns it to pending.
+ * Abandoned is a verdict about a task, not a step on the way to done, so it
+ * stays out of the click loop: it is set from the row's context menu, and a
+ * click on an abandoned task returns it to pending.
  */
 const STATUS_CYCLE: TodoTask["status"][] = ["pending", "in_progress", "completed"];
 
@@ -77,7 +75,7 @@ function TodoStatusIcon({ status }: { status: TodoTask["status"] }) {
 	if (status === "completed") {
 		return <CheckCircle2 aria-hidden="true" className="text-[var(--omp-muted)]" size={15} />;
 	}
-	if (status === "blocked" || status === "abandoned") {
+	if (status === "abandoned") {
 		return <AlertCircle aria-hidden="true" className="text-[var(--omp-error)]" size={15} />;
 	}
 	return <Circle aria-hidden="true" className="text-[var(--omp-dim)]" size={15} strokeDasharray="2.5 2.5" />;
@@ -103,15 +101,6 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 	const [draft, setDraft] = useState(task.content);
 	const [statusMenu, setStatusMenu] = useState<ContextMenuAnchor>();
 	const statusItems: ContextMenuItem[] = [
-		{
-			id: "blocked",
-			icon: AlertCircle,
-			label: t("todoPanel.markBlocked"),
-			onSelect: () => {
-				setStatusMenu(undefined);
-				onPatch(phaseId, task.id, { status: "blocked" });
-			},
-		},
 		{
 			danger: true,
 			id: "abandoned",
@@ -176,7 +165,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 				<span className="flex min-w-0 flex-1 items-center gap-1">
 					<input
 						autoFocus
-						className="w-full min-w-0 rounded border border-(--omp-border-accent) bg-(--omp-input-bg) px-1.5 py-0.5 text-xs text-(--omp-text) focus:outline-none"
+						className="w-full min-w-0 rounded border border-(--omp-border-accent) bg-(--omp-input-bg) px-1.5 py-0.5 text-omp-xs text-(--omp-text) focus:outline-none"
 						onBlur={commit}
 						onChange={event => setDraft(event.target.value)}
 						onKeyDown={event => {
@@ -385,7 +374,7 @@ export function TodoDockCard() {
 		const tasks = phases.flatMap(phase => phase.tasks);
 		return {
 			running: tasks.filter(task => task.status === "in_progress").length,
-			pending: tasks.filter(task => task.status === "pending" || task.status === "blocked").length,
+			pending: tasks.filter(task => task.status === "pending").length,
 			completed: tasks.filter(task => task.status === "completed").length,
 		};
 	}, [phases]);

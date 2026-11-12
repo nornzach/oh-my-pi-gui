@@ -13,6 +13,7 @@ import { useT } from "../../lib/i18n";
 import { mergeReadGroupEntries, type ReadGroupEntry, type ReadGroupUsage, readGroupTitle } from "../../lib/read-group";
 import { useToolsStore } from "../../stores/tools";
 import { UsageRow } from "../chat/UsageRow";
+import { Collapse } from "../common/Collapse";
 import { type RunningIndicator, ToolCard } from "./ToolCard";
 
 function statusOf(status: string | undefined): "pending" | "success" | "error" | "aborted" {
@@ -86,11 +87,11 @@ export function ReadGroupCard({
 					</span>
 					<ChevronRight size={12} className={cx("omp-disclosure-chevron ml-auto shrink-0", open && "rotate-90")} />
 				</button>
-				{open && (
+				<Collapse open={open}>
 					<div className="omp-read-group-body ml-4 mt-1">
 						<ToolCard toolCallId={entry.toolKey} toolName="read" args={entry.args} runningIndicator="dot" />
 					</div>
-				)}
+				</Collapse>
 				{usage?.map((item, index) => (
 					<UsageRow key={index} message={item} />
 				))}
@@ -119,7 +120,7 @@ export function ReadGroupCard({
 					{rows.length === 1 ? rows[0]!.path : t("readGroup.files", { count: rows.length })}
 				</span>
 			</button>
-			{open && (
+			<Collapse open={open}>
 				<div className="omp-read-group-body ml-6 mt-1 space-y-1.5">
 					{entries.map(entry => (
 						<ToolCard
@@ -131,7 +132,7 @@ export function ReadGroupCard({
 						/>
 					))}
 				</div>
-			)}
+			</Collapse>
 			{usage?.map((item, index) => (
 				<UsageRow key={index} message={item} />
 			))}

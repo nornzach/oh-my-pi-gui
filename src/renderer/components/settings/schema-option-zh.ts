@@ -1031,4 +1031,11 @@ export const ZH_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
 	"Every 3 prompts": "每 3 次提示",
 	"Every 5 prompts": "每 5 次提示",
 	"Every 10 prompts": "每 10 次提示",
+	"Ask before spending; never spend without a prompt.": "先询问；从不在未提示时使用。",
+	"Spend eligible saved resets without asking.": "不询问，直接使用符合条件的已保存重置。",
+	"Never spend saved resets for this window.": "从不为此窗口使用已保存重置。",
+	"Never split prompts": "从不拆分提示",
+	"Judge each prompt and report the split without acting on it": "判断每条提示并报告拆分方式，但不据此行动",
+	"When a prompt splits into independent subtasks, tell the agent to delegate them in parallel":
+		"提示可拆分为相互独立的子任务时，让代理并行委派它们",
 };

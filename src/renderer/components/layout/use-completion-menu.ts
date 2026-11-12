@@ -28,6 +28,50 @@ export interface CompletionItem {
 	label: string;
 	description?: string;
 	hint?: string;
+	/** Section the item sits under in the menu (slash commands: their source). */
+	group?: string;
+}
+
+/** Order the `/` menu sections appear in; sources not listed sort last. */
+export const COMMAND_GROUP_ORDER = ["builtin", "skill", "extension", "custom", "mcp_prompt", "file"] as const;
+
+/**
+ * Slash-command menu rows: every available command (no cap, the menu scrolls),
+ * name-prefix matches before substring matches, then grouped by source so the
+ * built-ins, skills and extension commands read as separate sections.
+ */
+export function slashCommandItems(commands: AvailableCommand[], query: string, tabKind: SessionKind): CompletionItem[] {
+	const lower = query.toLowerCase();
+	const rank = (command: AvailableCommand): number | null => {
+		if (!lower) return 2;
+		const names = [command.name, ...(command.aliases ?? [])].map(name => name.toLowerCase());
+		if (names.some(name => name.startsWith(lower))) return 0;
+		return names.some(name => name.includes(lower)) ? 1 : null;
+	};
+	const groupIndex = (command: AvailableCommand): number => {
+		const index = COMMAND_GROUP_ORDER.indexOf((command.source ?? "builtin") as (typeof COMMAND_GROUP_ORDER)[number]);
+		return index === -1 ? COMMAND_GROUP_ORDER.length : index;
+	};
+	const ranked: { command: AvailableCommand; rank: number; group: number }[] = [];
+	for (const command of commands) {
+		// Every surface shares one availability rule: never offer a command
+		// that does nothing in this tab kind.
+		if (!isCommandAvailable(tabKind, command.name)) continue;
+		const matched = rank(command);
+		if (matched !== null) ranked.push({ command, rank: matched, group: groupIndex(command) });
+	}
+	ranked.sort(
+		(a, b) =>
+			(lower ? a.rank - b.rank || a.group - b.group : a.group - b.group) ||
+			a.command.name.localeCompare(b.command.name),
+	);
+	return ranked.map(({ command }) => ({
+		value: `/${command.name} `,
+		label: `/${command.name}`,
+		description: command.description,
+		hint: command.input?.hint,
+		group: command.source ?? "builtin",
+	}));
 }
 
 /** Completion menu state: the winning provider's items + replace range. */
@@ -200,22 +244,7 @@ export function useCompletionMenu({
 		const cmdMatch = SLASH_NAME_RE.exec(before);
 		if (cmdMatch) {
 			const query = (cmdMatch[2] ?? "").toLowerCase();
-			const items = commands
-				.filter(
-					command =>
-						// Every surface shares one availability rule: never offer a command
-						// that does nothing in this tab kind.
-						isCommandAvailable(tabKind, command.name) &&
-						(!query ||
-							command.name.toLowerCase().includes(query) ||
-							command.aliases?.some(alias => alias.toLowerCase().includes(query))),
-				)
-				.slice(0, MAX_MENU_ITEMS)
-				.map(command => ({
-					value: `/${command.name} `,
-					label: `/${command.name}`,
-					description: command.description,
-				}));
+			const items = slashCommandItems(commands, query, tabKind);
 			apply({ source: "command", rangeStart: cursor - query.length - 1, items });
 			return () => {
 				cancelled = true;

@@ -799,7 +799,7 @@ function SessionTranscript() {
 							<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--omp-border-muted)] bg-[var(--omp-selected-bg)] text-[var(--omp-accent)]">
 								<PiLogo size={22} />
 							</div>
-							<h1 className="font-display text-[30px] font-semibold leading-tight tracking-[-0.025em] text-[var(--omp-text)]">
+							<h1 className="font-display text-omp-display font-semibold leading-tight tracking-[-0.025em] text-[var(--omp-text)]">
 								{isChat ? t("chat.empty.title.chat") : t("chat.empty.title")}
 							</h1>
 							<p className="mt-2 max-w-2xl text-omp-xl leading-relaxed text-[var(--omp-muted)]">
@@ -1425,9 +1425,7 @@ function TodoSnapshotCard({ entry }: { entry: TodoSnapshot }) {
 													? "bg-[var(--omp-link)]"
 													: task.status === "abandoned"
 														? "bg-[var(--omp-error)]"
-														: task.status === "blocked"
-															? "bg-[var(--omp-warning)]"
-															: "bg-[var(--omp-border)]",
+														: "bg-[var(--omp-border)]",
 										)}
 									/>
 									<span

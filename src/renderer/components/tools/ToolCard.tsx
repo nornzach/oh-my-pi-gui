@@ -5,6 +5,7 @@ import { useT } from "../../lib/i18n";
 import { useNowTick } from "../../lib/now-tick";
 import { useToolsStore } from "../../stores/tools";
 import { useUiStore } from "../../stores/ui";
+import { Collapse } from "../common/Collapse";
 import { GenericRenderer } from "./GenericRenderer";
 import { getToolRenderer, getToolSummary } from "./index";
 
@@ -157,7 +158,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 					)}
 				/>
 			</button>
-			{expanded && (
+			<Collapse open={expanded}>
 				<div className="omp-tool-body border-t border-[var(--omp-border-muted)]/70 px-3.5 py-2.5">
 					{isAborted && (
 						<div className="mb-1.5 flex items-center gap-1.5 font-mono text-omp-sm text-[var(--omp-warning)]">
@@ -180,7 +181,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 						/>
 					)}
 				</div>
-			)}
+			</Collapse>
 		</div>
 	);
 }

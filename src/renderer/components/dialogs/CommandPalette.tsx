@@ -643,7 +643,7 @@ export function CommandPalette() {
 				)}
 				<span className="min-w-0 flex-1">
 					<span className="flex items-center gap-1.5">
-						<span className="truncate text-xs font-medium text-(--omp-text)">{item.label}</span>
+						<span className="truncate text-omp-xs font-medium text-(--omp-text)">{item.label}</span>
 						{toggleOn !== null && (
 							<span
 								className={`rounded px-1 text-omp-xxs font-semibold ${
@@ -714,7 +714,7 @@ export function CommandPalette() {
 					<Search className="shrink-0 text-(--omp-dim)" size={14} />
 					<input
 						aria-label={t("palette.searchLabel")}
-						className="min-w-0 flex-1 bg-transparent text-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+						className="min-w-0 flex-1 bg-transparent text-omp-md text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 						onChange={event => setQuery(event.target.value)}
 						placeholder={submenu ? t("palette.searchSubmenu", { name: submenu.label }) : t("palette.search")}
 						ref={inputRef}
@@ -745,7 +745,7 @@ export function CommandPalette() {
 				)}
 				<div className="omp-command-list overflow-y-auto p-1.5" ref={listRef}>
 					{flatList.length === 0 && !loading && (
-						<div className="px-3 py-8 text-center text-xs text-(--omp-dim)">
+						<div className="px-3 py-8 text-center text-omp-xs text-(--omp-dim)">
 							{workingItems.length === 0 ? t("palette.noCommands") : t("palette.noMatch")}
 						</div>
 					)}

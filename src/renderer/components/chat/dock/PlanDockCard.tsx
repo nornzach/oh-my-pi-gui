@@ -402,7 +402,7 @@ export function PlanDockCard() {
 			) : content == null ? (
 				<div className="flex flex-col items-center justify-center gap-2 px-6 py-4 text-center">
 					<ClipboardList className="text-(--omp-dim)" size={20} />
-					<div className="text-xs text-(--omp-muted)">{t("planPanel.emptyTitle")}</div>
+					<div className="text-omp-xs text-(--omp-muted)">{t("planPanel.emptyTitle")}</div>
 					<div className="text-omp-sm leading-snug text-(--omp-dim)">
 						{t("planPanel.emptyDescPre")}
 						<span className="font-mono">local://&lt;slug&gt;-plan.md</span>
@@ -470,7 +470,7 @@ export function PlanDockCard() {
 														)}
 														<span
 															className={cx(
-																"min-w-0 flex-1 text-xs leading-snug",
+																"min-w-0 flex-1 text-omp-xs leading-snug",
 																step.done ? "text-(--omp-muted) line-through" : "text-(--omp-text)",
 															)}
 														>

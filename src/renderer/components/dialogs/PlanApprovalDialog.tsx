@@ -204,7 +204,7 @@ export function PlanApprovalDialog() {
 					{pending.planContent.trim().length > 0 ? (
 						<MarkdownRenderer content={pending.planContent} />
 					) : (
-						<p className="text-xs text-(--omp-dim)">{t("planApproval.emptyPlan")}</p>
+						<p className="text-omp-xs text-(--omp-dim)">{t("planApproval.emptyPlan")}</p>
 					)}
 				</div>
 				{notice !== null && (

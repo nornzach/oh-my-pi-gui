@@ -72,8 +72,10 @@ function TerminalChip({
 						aria-label={t(asking ? "terminal.state.input" : "terminal.state.busy")}
 						title={t(asking ? "terminal.state.input" : "terminal.state.busy")}
 						className={cx(
-							"size-1.5 shrink-0 rounded-full",
-							asking ? "bg-(--omp-warning)" : "animate-pulse bg-(--omp-accent)",
+							"shrink-0",
+							asking
+								? "size-1.5 rounded-full bg-(--omp-warning)"
+								: "omp-signal-light omp-signal-light--active text-(--omp-accent)",
 						)}
 					/>
 				)}

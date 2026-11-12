@@ -28,7 +28,7 @@ describe("dock summaries", () => {
 				tasks: [
 					task("pending", "pending"),
 					task("running", "in_progress"),
-					task("blocked", "blocked"),
+					task("queued", "pending"),
 					task("done-1", "completed"),
 					task("done-2", "completed"),
 					task("done-3", "completed"),
@@ -43,7 +43,7 @@ describe("dock summaries", () => {
 
 		const summary = buildTodoDockSummary(phases);
 		const ids = summary.phases.flatMap(phase => phase.tasks.map(item => item.id));
-		expect(ids).toEqual(["pending", "running", "blocked", "done-4", "done-5", "done-6"]);
+		expect(ids).toEqual(["pending", "running", "queued", "done-4", "done-5", "done-6"]);
 		expect(summary).toMatchObject({ totalCount: 11, hiddenCount: 5 });
 	});
 

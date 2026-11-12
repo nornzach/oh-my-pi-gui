@@ -93,15 +93,15 @@ export function JobsDialog() {
 		<div className="px-3 py-2" key={job.id} style={indent(depth)}>
 			<div className="flex items-center gap-2">
 				{nestMark(depth)}
-				<span className="font-mono text-xs text-(--omp-dim)">[{job.id}]</span>
-				<span className="text-xs font-medium text-(--omp-text)">{t(`jobs.type.${job.type}`)}</span>
+				<span className="font-mono text-omp-xs text-(--omp-dim)">[{job.id}]</span>
+				<span className="text-omp-xs font-medium text-(--omp-text)">{t(`jobs.type.${job.type}`)}</span>
 				<Badge dot pulse={job.status === "running"} variant={STATUS_VARIANT[job.status]}>
 					{t(job.cancellationPending ? "jobs.cancelling" : `jobs.status.${job.status}`)}
 				</Badge>
 				{agentId && agentId !== job.id ? (
-					<span className="truncate font-mono text-xs text-(--omp-dim)">{agentId}</span>
+					<span className="truncate font-mono text-omp-xs text-(--omp-dim)">{agentId}</span>
 				) : null}
-				<span className="ml-auto shrink-0 text-xs tabular-nums text-(--omp-dim)">
+				<span className="ml-auto shrink-0 text-omp-xs tabular-nums text-(--omp-dim)">
 					{job.status === "running" || job.cancellationPending || job.endedAt !== undefined
 						? formatDuration(Math.max(0, (job.endedAt ?? now) - job.startTime))
 						: t("jobs.durationUnavailable")}
@@ -113,12 +113,15 @@ export function JobsDialog() {
 				</div>
 			) : null}
 			{job.caption ? (
-				<div data-job-caption="" className="mt-0.5 break-words text-xs text-(--omp-text-secondary) italic">
+				<div data-job-caption="" className="mt-0.5 break-words text-omp-xs text-(--omp-text-secondary) italic">
 					{job.caption}
 				</div>
 			) : null}
 			<div
-				className={cx("mt-0.5 break-words whitespace-pre-wrap text-xs text-(--omp-dim)", job.intent && "font-mono")}
+				className={cx(
+					"mt-0.5 break-words whitespace-pre-wrap text-omp-xs text-(--omp-dim)",
+					job.intent && "font-mono",
+				)}
 				title={job.command && job.command !== job.label ? job.command : undefined}
 			>
 				{job.label}
@@ -147,18 +150,18 @@ export function JobsDialog() {
 				</p>
 			)}
 			{loading ? (
-				<div className="flex items-center justify-center gap-2 py-8 text-sm text-(--omp-dim)">
+				<div className="flex items-center justify-center gap-2 py-8 text-omp-md text-(--omp-dim)">
 					<Spinner size="sm" /> {t("jobs.loading")}
 				</div>
 			) : total === 0 && !error ? (
 				<div className="space-y-2 py-4">
-					<div className="text-sm text-(--omp-text)">{t("jobs.empty")}</div>
-					<div className="text-xs text-(--omp-dim)">{t("jobs.emptyHint")}</div>
+					<div className="text-omp-md text-(--omp-text)">{t("jobs.empty")}</div>
+					<div className="text-omp-xs text-(--omp-dim)">{t("jobs.emptyHint")}</div>
 				</div>
 			) : tree ? (
 				<section>
 					<div className="mb-1.5 flex items-center gap-2">
-						<span className="text-xs font-semibold text-(--omp-text)">{t("jobs.tree")}</span>
+						<span className="text-omp-xs font-semibold text-(--omp-text)">{t("jobs.tree")}</span>
 						<Badge variant="muted">{t("jobs.runningCount", { count: treeJobs.filter(isRunning).length })}</Badge>
 					</div>
 					<div className="divide-y divide-(--omp-border-muted) rounded-lg border border-(--omp-border-muted)">
@@ -173,7 +176,7 @@ export function JobsDialog() {
 								>
 									{nestMark(row.depth)}
 									<Badge variant="muted">{t("jobs.subagent")}</Badge>
-									<span className="truncate font-mono text-xs text-(--omp-text)">{row.agentId}</span>
+									<span className="truncate font-mono text-omp-xs text-(--omp-text)">{row.agentId}</span>
 								</div>
 							),
 						)}
@@ -184,7 +187,7 @@ export function JobsDialog() {
 					{running.length > 0 ? (
 						<section>
 							<div className="mb-1.5 flex items-center gap-2">
-								<span className="text-xs font-semibold text-(--omp-text)">{t("jobs.running")}</span>
+								<span className="text-omp-xs font-semibold text-(--omp-text)">{t("jobs.running")}</span>
 								<Badge variant="muted">{running.length}</Badge>
 							</div>
 							<div className="divide-y divide-(--omp-border-muted) rounded-lg border border-(--omp-border-muted)">
@@ -195,7 +198,7 @@ export function JobsDialog() {
 					{recent.length > 0 ? (
 						<section>
 							<div className="mb-1.5 flex items-center gap-2">
-								<span className="text-xs font-semibold text-(--omp-text)">{t("jobs.recentLimited")}</span>
+								<span className="text-omp-xs font-semibold text-(--omp-text)">{t("jobs.recentLimited")}</span>
 								<Badge variant="muted">{recent.length}</Badge>
 							</div>
 							<div className="divide-y divide-(--omp-border-muted) rounded-lg border border-(--omp-border-muted)">

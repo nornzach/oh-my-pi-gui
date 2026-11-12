@@ -6,7 +6,6 @@
  */
 
 import type { RpcJobWidgetBlock, RpcJobWidgetTrend, RpcJobWidgetView, RpcWidgetTone } from "../../../shared/rpc-types";
-import { cx } from "../../lib/format";
 
 const TONE_VAR: Record<RpcWidgetTone, string> = {
 	neutral: "var(--omp-muted)",
@@ -204,13 +203,14 @@ function WidgetBlock({ block }: { block: RpcJobWidgetBlock }) {
 export function JobWidgetCard({ widget }: { widget: RpcJobWidgetView }) {
 	const headline = widget.headline;
 	return (
-		<div
-			className={cx(
-				"mt-1.5 rounded-md border border-(--omp-border-muted) bg-(--omp-code-bg) px-2.5 py-1.5 text-omp-xs",
-				widget.state === "authoring" && "animate-pulse",
-			)}
-		>
+		<div className="mt-1.5 rounded-md border border-(--omp-border-muted) bg-(--omp-code-bg) px-2.5 py-1.5 text-omp-xs">
 			<div className="flex items-baseline gap-2">
+				{widget.state === "authoring" && (
+					<span
+						aria-hidden
+						className="omp-signal-light omp-signal-light--active self-center text-(--omp-accent)"
+					/>
+				)}
 				<span className="min-w-0 truncate font-medium text-(--omp-text)">{widget.title}</span>
 				{headline ? (
 					<span className="shrink-0 font-semibold tabular-nums text-(--omp-accent)">

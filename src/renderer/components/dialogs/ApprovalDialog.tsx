@@ -91,7 +91,7 @@ export function ApprovalDialog({
 			<div className="flex flex-col">
 				<div className="flex items-center gap-2.5">
 					<ShieldAlert className="shrink-0 text-(--omp-warning)" size={18} />
-					<span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-(--omp-text)">
+					<span className="min-w-0 flex-1 truncate font-mono text-omp-md font-semibold text-(--omp-text)">
 						{toolName}
 					</span>
 					<Badge dot variant={tier.variant}>

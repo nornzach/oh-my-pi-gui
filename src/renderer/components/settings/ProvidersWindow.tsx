@@ -5,18 +5,20 @@ import { useTabRpc } from "../../lib/tab-rpc";
  * Login triggers the existing extension_ui open_url flow via rpc.login().
  */
 
-import { Edit, ExternalLink, Globe, LogIn, LogOut, Plus, RefreshCw } from "lucide-react";
+import { Edit, ExternalLink, Globe, KeyRound, LogIn, LogOut, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { customProviderNeedsApiKey } from "../../../shared/custom-provider";
 import type { CustomProviderView } from "../../../shared/ipc-types";
 import type { LogoutAccount, ProviderDiscoveryState, ProviderInfo, ProvidersResult } from "../../../shared/rpc-types";
 import { describeError, describeProviderError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
+import { watchSignInRequests } from "../../stores/extension-ui";
 import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Badge, Button, ConfirmDialog, Input, LongTaskStatus, Modal, Spinner } from "../common";
+import { ApiKeyDialog } from "./ApiKeyDialog";
 
 /** Lists past this length get a filter box: the bundled catalog alone is ~80 rows. */
 const SEARCH_THRESHOLD = 8;
@@ -81,6 +83,7 @@ export function ProviderRow({
 	provider,
 	customConfigs,
 	onLogin,
+	onApiKey,
 	onLogout,
 	onEdit,
 	busy,
@@ -91,6 +94,7 @@ export function ProviderRow({
 	provider: ProviderInfo;
 	customConfigs: CustomProviderView[];
 	onLogin: (id: string) => void;
+	onApiKey: (id: string) => void;
 	onLogout: (id: string) => void;
 	onEdit: (id: string) => void;
 	busy: boolean;
@@ -110,10 +114,13 @@ export function ProviderRow({
 	const showLogout =
 		provider.authenticated && !customConfigs.some(config => config.id === provider.id && config.hasApiKey);
 	return (
-		<div className="flex items-center gap-3 rounded-lg border border-[var(--omp-border-muted)] px-3 py-2.5">
+		<div
+			className="omp-list-row flex items-center gap-3 rounded-lg border border-[var(--omp-border-muted)] px-3 py-2.5"
+			data-ready={provider.authenticated ? "true" : undefined}
+		>
 			<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 				<div className="flex items-center gap-2">
-					<span className="text-omp-lg font-medium text-[var(--omp-text)]">{provider.name}</span>
+					<span className="text-omp-lg font-semibold text-[var(--omp-text)]">{provider.name}</span>
 					<AuthBadge provider={provider} keyless={keyless} t={t} />
 					{provider.disabled && <Badge variant="warning">{t("providers.badge.disabled")}</Badge>}
 				</div>
@@ -172,6 +179,18 @@ export function ProviderRow({
 						title={!sidecarReady ? t("providers.notConnected") : undefined}
 					>
 						{t("providers.login")}
+					</Button>
+				)}
+				{provider.apiKeyLogin && !provider.authenticated && (
+					<Button
+						size="sm"
+						variant="ghost"
+						icon={<KeyRound size={12} />}
+						disabled={busy || !sidecarReady}
+						onClick={() => onApiKey(provider.id)}
+						title={!sidecarReady ? t("providers.notConnected") : undefined}
+					>
+						{t("providers.apiKey.use")}
 					</Button>
 				)}
 				{showLogout && (
@@ -282,6 +301,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 		const name = providers.find(p => p.id === providerId)?.name ?? providerId;
 		setBusyProvider(providerId);
 		setSignIn({ providerId, startedAt: Date.now() });
+		const dismissLeftoverSignIn = watchSignInRequests();
 		try {
 			const res = await tabRpc.login(providerId);
 			if (!res.success) {
@@ -295,8 +315,29 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 		} catch (cause) {
 			toast({ variant: "error", title: t("providers.loginFailed"), message: String(cause) });
 		} finally {
+			// The sign-in is over whichever way it ended; drop any of its dialogs the agent did not close.
+			dismissLeftoverSignIn();
 			setBusyProvider(null);
 			setSignIn(null);
+		}
+	};
+
+	const [apiKeyFor, setApiKeyFor] = useState<string | null>(null);
+
+	/** Returns the failure message, or null once the key is stored and the list is fresh. */
+	const handleSaveApiKey = async (providerId: string, apiKey: string): Promise<string | null> => {
+		const name = providers.find(p => p.id === providerId)?.name ?? providerId;
+		setBusyProvider(providerId);
+		try {
+			const res = await tabRpc.setApiKey(providerId, apiKey);
+			if (!res.success) return res.error;
+			await load(true);
+			toast({ variant: "success", message: t("providers.apiKey.saved", { provider: name }) });
+			return null;
+		} catch (cause) {
+			return describeError(cause);
+		} finally {
+			setBusyProvider(null);
 		}
 	};
 
@@ -399,16 +440,25 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 
 	return (
 		<>
+			{apiKeyFor !== null && (
+				<ApiKeyDialog
+					onClose={() => setApiKeyFor(null)}
+					onSave={apiKey => handleSaveApiKey(apiKeyFor, apiKey)}
+					open
+					providerName={providers.find(p => p.id === apiKeyFor)?.name ?? apiKeyFor}
+				/>
+			)}
 			<Modal open={open} onClose={close} title={t("providers.title")} size="lg">
 				<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
 					<div className="flex items-center justify-between">
-						<span className="text-omp-sm font-semibold text-[var(--omp-muted)]">
+						<span className="omp-section-label">
 							{t("providers.authenticated")}
+							<span className="omp-section-count">{authenticated.length}</span>
 						</span>
 						<div className="flex items-center gap-1.5">
 							<Button
 								size="sm"
-								variant="ghost"
+								variant="primary"
 								icon={<Plus size={12} />}
 								onClick={() => openProviderConfig("new")}
 							>
@@ -504,7 +554,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 					)}
 
 					{!loading && !error && readyCount === 0 && (
-						<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-dim)]">
+						<div className="omp-empty-hint rounded-md border border-[var(--omp-border-muted)] px-3 py-4 text-center text-omp-md text-[var(--omp-muted)]">
 							{t("providers.noAuth")}
 						</div>
 					)}
@@ -517,6 +567,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 									provider={p}
 									customConfigs={customConfigs}
 									onLogin={handleLogin}
+									onApiKey={setApiKeyFor}
 									onLogout={requestLogout}
 									onEdit={handleEdit}
 									// One credential flow at a time: a second Login would overwrite the
@@ -532,8 +583,9 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 
 					{unauthenticated.length > 0 && (
 						<>
-							<span className="text-omp-sm font-semibold text-[var(--omp-muted)]">
+							<span className="omp-section-label">
 								{t("providers.available")}
+								<span className="omp-section-count">{unauthenticated.length}</span>
 							</span>
 							<div className="flex flex-col gap-2">
 								{unauthenticated.map(p => (
@@ -542,6 +594,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 										provider={p}
 										customConfigs={customConfigs}
 										onLogin={handleLogin}
+										onApiKey={setApiKeyFor}
 										onLogout={requestLogout}
 										onEdit={handleEdit}
 										// One credential flow at a time: a second Login would overwrite the
@@ -562,7 +615,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 						</div>
 					)}
 
-					<div className="rounded-md border border-[var(--omp-border-muted)] px-3 py-2.5">
+					<div className="omp-note rounded-md border border-[var(--omp-border-muted)] px-3 py-2.5">
 						<div className="mb-1 text-omp-sm font-semibold text-[var(--omp-text)]">
 							{t("providers.customTitle")}
 						</div>

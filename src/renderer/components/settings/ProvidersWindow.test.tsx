@@ -115,6 +115,7 @@ describe("ProviderRow", () => {
 			<ProviderRow
 				busy={false}
 				customConfigs={[]}
+				onApiKey={noop}
 				onEdit={noop}
 				onLogin={noop}
 				onLogout={noop}
@@ -131,6 +132,7 @@ describe("ProviderRow", () => {
 			<ProviderRow
 				busy={false}
 				customConfigs={[]}
+				onApiKey={noop}
 				onEdit={noop}
 				onLogin={noop}
 				onLogout={noop}
@@ -148,6 +150,7 @@ describe("ProviderRow", () => {
 			<ProviderRow
 				busy={false}
 				customConfigs={[custom]}
+				onApiKey={noop}
 				onEdit={noop}
 				onLogin={noop}
 				onLogout={noop}
@@ -164,6 +167,7 @@ describe("ProviderRow", () => {
 			<ProviderRow
 				busy={false}
 				customConfigs={[]}
+				onApiKey={noop}
 				onEdit={noop}
 				onLogin={noop}
 				onLogout={noop}
@@ -182,6 +186,7 @@ describe("ProviderRow", () => {
 			<ProviderRow
 				busy={false}
 				customConfigs={[config("infronai")]}
+				onApiKey={noop}
 				onEdit={noop}
 				onLogin={noop}
 				onLogout={noop}
@@ -193,11 +198,35 @@ describe("ProviderRow", () => {
 		expect(html).not.toContain("providers.logout");
 	});
 
+	it("offers an API key sign-in only for a signed-out provider that accepts a key", () => {
+		const render = (info: ProviderInfo) =>
+			renderToStaticMarkup(
+				<ProviderRow
+					busy={false}
+					customConfigs={[]}
+					onApiKey={noop}
+					onEdit={noop}
+					onLogin={noop}
+					onLogout={noop}
+					provider={info}
+					t={t}
+				/>,
+			);
+		const keyed = { ...provider("anthropic", true, false), apiKeyLogin: true };
+
+		expect(render(keyed)).toContain("providers.apiKey.use");
+		// A login that only works through its flow (an account sign-in) has no key to paste.
+		expect(render({ ...keyed, apiKeyLogin: false })).not.toContain("providers.apiKey.use");
+		// Once signed in there is nothing left to enter.
+		expect(render({ ...keyed, authenticated: true })).not.toContain("providers.apiKey.use");
+	});
+
 	it("locks sidecar login actions and explains a disconnected provider list", () => {
 		const html = renderToStaticMarkup(
 			<ProviderRow
 				busy={false}
 				customConfigs={[]}
+				onApiKey={noop}
 				onEdit={noop}
 				onLogin={noop}
 				onLogout={noop}

@@ -10,6 +10,8 @@ const SEGMENT_STYLE: Record<ContextSegmentKey, CSSProperties> = {
 	// No single theme token stays apart from both amber tools and purple prompt
 	// in every theme; this pink does.
 	systemContext: { backgroundColor: "color-mix(in srgb, var(--omp-error) 60%, var(--omp-syntax-function))" },
+	// Between the prompt's purple and the skills' green, so the three read as related but apart.
+	instructionFiles: { backgroundColor: "color-mix(in srgb, var(--omp-success) 50%, var(--omp-syntax-function))" },
 	skills: { backgroundColor: "var(--omp-success)" },
 	autocompact: { backgroundColor: "var(--omp-dim)", opacity: 0.5 },
 	free: { backgroundColor: "var(--omp-progress-bg)", boxShadow: "inset 0 0 0 1px var(--omp-border-strong)" },

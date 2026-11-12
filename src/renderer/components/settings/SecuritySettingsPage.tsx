@@ -315,7 +315,7 @@ export function SecuritySettingsPage() {
 		<div>
 			<header className="mb-4 flex items-start justify-between gap-4">
 				<div>
-					<h2 className="text-[20px] font-semibold tracking-[-0.015em] text-(--omp-text)">
+					<h2 className="text-omp-2xl font-semibold tracking-[-0.015em] text-(--omp-text)">
 						{t("security.title")}
 					</h2>
 					<p className="mt-1 text-omp-md text-(--omp-muted)">{t("security.subtitle")}</p>
@@ -463,13 +463,15 @@ export function SecuritySettingsPage() {
 							role="status"
 							className="flex min-h-56 flex-col items-center justify-center gap-2 px-4 text-center"
 						>
-							{emptyState === "clear" ? (
-								<ShieldCheck className="text-(--omp-success)" size={24} />
-							) : emptyState === "running" ? (
-								<Spinner />
-							) : (
-								<ScanSearch className="text-(--omp-muted)" size={24} />
-							)}
+							<span className="omp-empty-icon" data-tone={emptyState === "clear" ? "success" : undefined}>
+								{emptyState === "clear" ? (
+									<ShieldCheck size={24} />
+								) : emptyState === "running" ? (
+									<Spinner />
+								) : (
+									<ScanSearch size={24} />
+								)}
+							</span>
 							<div className="text-omp-md font-medium text-(--omp-text)">
 								{t(emptyState === "clear" ? "security.empty.title" : `security.empty.${emptyState}`)}
 							</div>
@@ -491,7 +493,7 @@ export function SecuritySettingsPage() {
 										</div>
 										{group.map(finding => (
 											<button
-												className={`grid w-full grid-cols-[8px_minmax(0,1fr)_46px_64px_68px] items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-(--omp-bg-tertiary) ${selectedFindingId === finding.id ? "bg-(--omp-selected-bg)" : ""}`}
+												className={`grid w-full grid-cols-[8px_minmax(0,1fr)_46px_64px_68px] items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-(--omp-bg-tertiary) ${selectedFindingId === finding.id ? "bg-(--omp-selected-bg) shadow-[inset_3px_0_0_var(--omp-accent)]" : ""}`}
 												key={finding.id}
 												onClick={() => setSelectedFindingId(finding.id)}
 												type="button"

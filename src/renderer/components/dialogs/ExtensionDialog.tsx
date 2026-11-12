@@ -137,7 +137,7 @@ function SelectDialog({
 				{request.options.map((option, index) => (
 					<button
 						autoFocus={index === 0}
-						className="flex w-full items-center gap-2 rounded-md border border-(--omp-border-muted) px-3 py-2 text-left text-xs text-(--omp-text) transition-colors hover:border-(--omp-border-accent) hover:bg-(--omp-selected-bg) focus-visible:outline-2 focus-visible:outline-(--omp-border-accent)"
+						className="flex w-full items-center gap-2 rounded-md border border-(--omp-border-muted) px-3 py-2 text-left text-omp-xs text-(--omp-text) transition-colors hover:border-(--omp-border-accent) hover:bg-(--omp-selected-bg) focus-visible:outline-2 focus-visible:outline-(--omp-border-accent)"
 						key={option}
 						onClick={() => onValue(option)}
 						type="button"
@@ -178,7 +178,9 @@ function ConfirmDialog({
 	const t = useT();
 	return (
 		<Modal onClose={onCancel} open size="sm" title={request.title}>
-			<p className="text-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-muted)">{request.message}</p>
+			<p className="text-omp-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-muted)">
+				{request.message}
+			</p>
 			<div className="mt-4 flex items-center justify-between gap-2">
 				<TimeoutFooter remaining={remaining} />
 				<div className="flex gap-2">
@@ -342,7 +344,7 @@ function AskDialog({
 							{question.header && (
 								<div className="text-omp-xxs font-medium text-(--omp-dim)">{question.header}</div>
 							)}
-							<p className="text-xs leading-relaxed font-medium break-words whitespace-pre-wrap text-(--omp-text)">
+							<p className="text-omp-xs leading-relaxed font-medium break-words whitespace-pre-wrap text-(--omp-text)">
 								{request.questions.length > 1 ? `${questionIndex + 1}. ` : ""}
 								{question.question}
 							</p>
@@ -356,7 +358,7 @@ function AskDialog({
 											multi={question.multi ?? false}
 											onClick={() => toggleOption(questionIndex, option.label)}
 										>
-											<span className="flex items-center gap-1.5 text-xs text-(--omp-text)">
+											<span className="flex items-center gap-1.5 text-omp-xs text-(--omp-text)">
 												<span className="min-w-0 break-words">{option.label}</span>
 												{question.recommended === optionIndex && (
 													<span className="shrink-0 rounded border border-(--omp-border-accent) px-1 py-px text-omp-xxs font-medium text-(--omp-accent)">
@@ -556,7 +558,7 @@ function OpenUrlDialog({
 		>
 			<div className="space-y-3">
 				{request.instructions && (
-					<p className="text-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-muted)">
+					<p className="text-omp-xs leading-relaxed break-words whitespace-pre-wrap text-(--omp-muted)">
 						{request.instructions}
 					</p>
 				)}
@@ -564,7 +566,7 @@ function OpenUrlDialog({
 					{target}
 				</div>
 				{opened && !loginPrompt && (
-					<div className="flex items-center gap-2 text-xs text-(--omp-muted)" role="status">
+					<div className="flex items-center gap-2 text-omp-xs text-(--omp-muted)" role="status">
 						<Spinner size="sm" />
 						<span>{t("extDialog.openUrl.waiting")}</span>
 					</div>

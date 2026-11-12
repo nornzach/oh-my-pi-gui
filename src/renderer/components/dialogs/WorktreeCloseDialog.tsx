@@ -86,7 +86,7 @@ export function WorktreeCloseDialog() {
 	return (
 		<Modal open onClose={closePrompt} title={t("worktreeClose.title", { name: worktree.name })} size="sm">
 			{query.phase === "loading" ? (
-				<div className="flex items-center justify-center gap-2 py-6 text-xs text-(--omp-dim)">
+				<div className="flex items-center justify-center gap-2 py-6 text-omp-xs text-(--omp-dim)">
 					<Spinner size="sm" />
 					<span>{t("worktreeClose.checking")}</span>
 				</div>

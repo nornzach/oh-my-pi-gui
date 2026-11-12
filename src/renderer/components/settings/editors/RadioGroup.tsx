@@ -33,7 +33,7 @@ export function RadioGroup<T extends string>({
 						type="radio"
 					/>
 					<span className="min-w-0">
-						<span className="block text-xs font-medium text-(--omp-text)">{option.label}</span>
+						<span className="block text-omp-xs font-medium text-(--omp-text)">{option.label}</span>
 						{option.description && (
 							<span className="mt-0.5 block text-omp-sm leading-snug text-(--omp-muted)">
 								{option.description}

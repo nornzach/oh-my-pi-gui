@@ -17,6 +17,7 @@ import {
 import { useMessagesStore } from "../../stores/messages";
 import { useModelStore } from "../../stores/model";
 import { useUiStore } from "../../stores/ui";
+import { Collapse } from "../common/Collapse";
 
 export interface ThinkingBlockProps {
 	/** Finalized thinking text (from a completed message). */
@@ -220,7 +221,7 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 					<span className="omp-thinking-duration ml-auto tabular-nums text-[var(--omp-dim)]">{duration}</span>
 				)}
 			</button>
-			{open ? (
+			<Collapse open={open}>
 				<div className="omp-thinking-body max-h-64 overflow-y-auto px-3 pb-2 font-mono text-omp-sm leading-[1.45] text-[var(--omp-muted)]">
 					{isLive ? (
 						<div className="omp-streaming-tail">
@@ -231,7 +232,7 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 						<MarkdownRenderer content={formatted} />
 					)}
 				</div>
-			) : null}
+			</Collapse>
 		</div>
 	);
 }

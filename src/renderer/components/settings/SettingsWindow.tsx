@@ -29,6 +29,7 @@ import {
 	HardDriveDownload,
 	Network,
 	RefreshCw,
+	RotateCw,
 	Search,
 	Server,
 	ShieldCheck,
@@ -62,7 +63,13 @@ import { zh } from "../../locales/zh";
 import { openHandoffDialog } from "../../stores/fork-handoff";
 import { useMessagesStore } from "../../stores/messages";
 import { useSessionStore } from "../../stores/session";
-import { focusedSessionRuntime, sessionRuntime, withSessionRuntime } from "../../stores/session-runtime-context";
+import {
+	focusedSessionRuntime,
+	sessionRuntime,
+	useRuntimeTabId,
+	withSessionRuntime,
+} from "../../stores/session-runtime-context";
+import { type PendingRestart, usePendingRestarts } from "../../stores/settings-restart";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { CodeBlock } from "../chat/CodeBlock";
@@ -115,8 +122,9 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 	const [saving, setSaving] = useState(false);
 	const save = async (next: boolean | null) => {
 		setSaving(true);
-		await setDisplayPreference(field, next);
+		const saved = await setDisplayPreference(field, next);
 		setSaving(false);
+		return saved;
 	};
 	return (
 		<div id={`setting-gui-${field}`} className="flex items-center gap-3">
@@ -128,7 +136,7 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 					description={overridden ? t("settings.display.local") : undefined}
 					checked={value}
 					disabled={saving}
-					onChange={next => void save(next)}
+					onChange={save}
 				/>
 			</div>
 			{overridden && (
@@ -136,6 +144,53 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 					{t("settings.display.inherit")}
 				</Button>
 			)}
+		</div>
+	);
+}
+
+/**
+ * Saved settings this session's agent only reads at startup, with the restart
+ * that applies them. Stays pinned while the page scrolls; a run in progress
+ * holds the restart back rather than cutting it off.
+ */
+export function PendingRestartBanner({
+	pending,
+	busy,
+	onRestart,
+}: {
+	pending: PendingRestart[];
+	busy: boolean;
+	onRestart: () => Promise<void>;
+}) {
+	const t = useT();
+	const [restarting, setRestarting] = useState(false);
+	if (pending.length === 0) return null;
+	const restart = () => {
+		setRestarting(true);
+		void onRestart().finally(() => setRestarting(false));
+	};
+	return (
+		<div
+			className="omp-fade-in sticky top-0 z-10 mb-4 flex items-start gap-3 rounded-lg border border-[var(--omp-warning)]/35 bg-(--omp-bg-elevated) px-3 py-2.5 shadow-[var(--omp-shadow-sm)]"
+			data-settings-restart-banner="true"
+			role="status"
+		>
+			<RotateCw className="mt-0.5 shrink-0 text-[var(--omp-warning)]" size={14} />
+			<div className="min-w-0 flex-1">
+				<div className="text-omp-sm font-medium text-(--omp-text)">{t("settings.restartBanner.title")}</div>
+				<div className="mt-0.5 text-omp-xs text-(--omp-muted)">{pending.map(item => item.label).join(" · ")}</div>
+				{busy && <div className="mt-1 text-omp-xs text-(--omp-dim)">{t("settings.restartBanner.busy")}</div>}
+			</div>
+			<Button
+				disabled={busy || restarting}
+				icon={<RotateCw size={12} />}
+				loading={restarting}
+				onClick={restart}
+				size="sm"
+				variant="primary"
+			>
+				{t("settings.restartBanner.action")}
+			</Button>
 		</div>
 	);
 }
@@ -256,6 +311,17 @@ export function SettingsWindow() {
 		),
 	);
 	const sidecarBusy = sessionBusy || executionBusy;
+	const runtimeTabId = useRuntimeTabId();
+	const pendingRestarts = usePendingRestarts(runtimeTabId);
+	const restartForPendingSettings = async () => {
+		const runtime = focusedSessionRuntime();
+		const sessionFile = useSessionStore.getState().sessionFile;
+		try {
+			await window.omp.sidecar.restart({ tabId: runtime?.tabId, sessionPath: sessionFile ?? undefined });
+		} catch (error) {
+			toast({ variant: "error", title: t("settings.connection.restartFailed"), message: describeError(error) });
+		}
+	};
 	const [reloadToken, setReloadToken] = useState(0);
 	const [advisorActive, setAdvisorActive] = useState<boolean>();
 	const retrySettingsConnection = useCallback(() => {
@@ -438,25 +504,25 @@ export function SettingsWindow() {
 	};
 	const applyTabRows = (multi: boolean) => {
 		const next = multi ? "multi" : "single";
-		void saveGuiPreference("tabRows", next, () => useUiStore.getState().setTabRows(next));
+		return saveGuiPreference("tabRows", next, () => useUiStore.getState().setTabRows(next));
 	};
 	const applyNotifications = (next: boolean) => {
-		void saveGuiPreference("notifications", next, () => setNotifications(next));
+		return saveGuiPreference("notifications", next, () => setNotifications(next));
 	};
 	const applyNotificationsWhenFocused = (next: boolean) => {
-		void saveGuiPreference("notificationsWhenFocused", next, () => setNotificationsWhenFocused(next));
+		return saveGuiPreference("notificationsWhenFocused", next, () => setNotificationsWhenFocused(next));
 	};
 	const applyThinkingExpanded = (next: boolean) => {
-		void saveGuiPreference("thinkingExpanded", next, () => useUiStore.getState().setThinkingExpanded(next));
+		return saveGuiPreference("thinkingExpanded", next, () => useUiStore.getState().setThinkingExpanded(next));
 	};
 	const applySidebarQuotas = (next: boolean) => {
-		void saveGuiPreference("sidebarQuotas", next, () => useUiStore.getState().setSidebarQuotas(next));
+		return saveGuiPreference("sidebarQuotas", next, () => useUiStore.getState().setSidebarQuotas(next));
 	};
 	const applyTranscriptDetail = (next: typeof transcriptDetail) => {
 		void saveGuiPreference("transcriptDetail", next, () => setTranscriptDetail(next));
 	};
 	const applyDisplayPreference = (key: "compactDensity" | "colorBlindMode" | "followAgentTheme", value: boolean) => {
-		void saveGuiPreference(key, value, () => useUiStore.setState({ [key]: value }));
+		return saveGuiPreference(key, value, () => useUiStore.setState({ [key]: value }));
 	};
 	const commitFontSize = () => {
 		if (fontSizeDraft === null) return;
@@ -589,7 +655,9 @@ export function SettingsWindow() {
 			.finally(() => setLaunchRestarting(false));
 	};
 	const applyCodeLineNumbers = async (next: boolean) => {
-		if (await setCodeLineNumbersPref(next)) setCodeLineNumbers(next);
+		const saved = await setCodeLineNumbersPref(next);
+		if (saved) setCodeLineNumbers(next);
+		return saved;
 	};
 
 	// Effective command line, refreshed live as fields change: in-progress
@@ -974,6 +1042,7 @@ export function SettingsWindow() {
 										const active = tb.id === tab;
 										return (
 											<button
+												aria-current={active ? "page" : undefined}
 												className={`settings-nav-item flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-omp-md transition-colors ${
 													active
 														? "bg-(--omp-selected-bg) font-medium text-(--omp-text)"
@@ -1064,6 +1133,11 @@ export function SettingsWindow() {
 								status={sidecarStatus}
 							/>
 						)}
+						<PendingRestartBanner
+							busy={sidecarBusy}
+							onRestart={restartForPendingSettings}
+							pending={pendingRestarts}
+						/>
 						{searchGroups === null ? (
 							<>
 								{tab === SKILLS_TAB_ID && <SkillsSettingsPage query={query} />}
@@ -1155,11 +1229,12 @@ export function SettingsWindow() {
 												id="setting-gui-pasteMenuThreshold"
 												className="flex items-center justify-between gap-4 px-2 py-2"
 											>
-												<span className="text-xs font-medium text-(--omp-text)">
+												<span className="text-omp-md font-medium text-(--omp-text)">
 													{t("settings.display.pasteMenuThreshold")}
 												</span>
 												<div className="w-24 shrink-0">
 													<Input
+														compact
 														aria-label={t("settings.display.pasteMenuThreshold")}
 														type="number"
 														min={0}
@@ -1201,6 +1276,7 @@ export function SettingsWindow() {
 										<Section id="setting-gui-fontSize" title={t("settings.gui.fontSize")}>
 											<div className="w-40">
 												<Input
+													compact
 													max={20}
 													min={10}
 													onBlur={commitFontSize}
@@ -1322,6 +1398,7 @@ export function SettingsWindow() {
 									<>
 										<Section id="setting-gui-proxy" title={t("settings.gui.proxy")}>
 											<Input
+												compact
 												disabled={proxySaving}
 												onBlur={commitProxy}
 												onChange={event => setProxyDraft(event.target.value)}
@@ -1346,10 +1423,11 @@ export function SettingsWindow() {
 										<Section id="setting-gui-launch" title={t("settings.launch.title")}>
 											<fieldset className="space-y-3" disabled={launchSaving || launchRestarting}>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.systemPrompt")}
 													</span>
 													<TextArea
+														compact
 														mono
 														onBlur={() => commitLaunchField("systemPrompt")}
 														onChange={event =>
@@ -1362,10 +1440,11 @@ export function SettingsWindow() {
 													/>
 												</div>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.appendSystemPrompt")}
 													</span>
 													<TextArea
+														compact
 														mono
 														onBlur={() => commitLaunchField("appendSystemPrompt")}
 														onChange={event =>
@@ -1383,7 +1462,7 @@ export function SettingsWindow() {
 													/>
 												</div>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.addDirs")}
 													</span>
 													<ArrayChipEditor
@@ -1406,7 +1485,7 @@ export function SettingsWindow() {
 													</p>
 												</div>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.tools")}
 													</span>
 													<ArrayChipEditor
@@ -1436,10 +1515,11 @@ export function SettingsWindow() {
 													onChange={value => updateLaunchProfile({ planYolo: value })}
 												/>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.profile")}
 													</span>
 													<Input
+														compact
 														onBlur={() => commitLaunchField("profile")}
 														onChange={event =>
 															setLaunchDrafts(prev => ({ ...prev, profile: event.target.value }))
@@ -1454,10 +1534,11 @@ export function SettingsWindow() {
 													/>
 												</div>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.sessionDir")}
 													</span>
 													<Input
+														compact
 														onBlur={() => commitLaunchField("sessionDir")}
 														onChange={event =>
 															setLaunchDrafts(prev => ({ ...prev, sessionDir: event.target.value }))
@@ -1472,10 +1553,11 @@ export function SettingsWindow() {
 													/>
 												</div>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.config")}
 													</span>
 													<Input
+														compact
 														onBlur={() => commitLaunchField("config")}
 														onChange={event =>
 															setLaunchDrafts(prev => ({ ...prev, config: event.target.value }))
@@ -1490,7 +1572,7 @@ export function SettingsWindow() {
 													/>
 												</div>
 												<div>
-													<span className="mb-1 block text-xs font-medium text-(--omp-text)">
+													<span className="mb-1 block text-omp-md font-medium text-(--omp-text)">
 														{t("settings.launch.preview")}
 													</span>
 													<CodeBlock
@@ -1532,12 +1614,12 @@ export function SettingsWindow() {
 								{isAgentSettingsTab && sidecarReady && loadState === "loading" && (
 									<div className="flex items-center justify-center gap-2 py-10">
 										<Spinner size="sm" />
-										<span className="text-xs text-(--omp-muted)">{t("settings.schemaLoading")}</span>
+										<span className="text-omp-xs text-(--omp-muted)">{t("settings.schemaLoading")}</span>
 									</div>
 								)}
 								{isAgentSettingsTab && sidecarReady && loadState === "error" && (
 									<div className="flex flex-col items-center gap-3 py-10">
-										<span className="text-xs text-(--omp-error)">
+										<span className="text-omp-xs text-(--omp-error)">
 											{loadError ?? t("settings.schemaLoadFailed")}
 										</span>
 										<span className="text-omp-xs text-(--omp-dim)">{t("settings.schemaUnavailable")}</span>
@@ -1565,7 +1647,7 @@ export function SettingsWindow() {
 								)}
 							</>
 						) : searchGroups.size === 0 && guiSearchResults.length === 0 ? (
-							<div className="py-10 text-center text-xs text-(--omp-dim)">{t("settings.noMatches")}</div>
+							<div className="py-10 text-center text-omp-xs text-(--omp-dim)">{t("settings.noMatches")}</div>
 						) : (
 							<>
 								{guiSearchResults.map(item => (

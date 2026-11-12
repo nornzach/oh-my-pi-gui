@@ -1915,4 +1915,54 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 		description:
 			"单位是你发送的提示次数，不是时间；0 表示关闭。每隔这么多次提示，让判断模型检查自动生成的会话标题是否仍符合对话，不符合时重新生成。你自己设置的标题不会被替换。",
 	},
+	"magicKeywords.chillax": {
+		label: "Chillax 关键字",
+		description:
+			"单独输入 chillax 时，把思考降到模型的最低强度（支持逐条消息调整强度的模型，回合进行中也可），并附加其隐藏提示。",
+	},
+	"codexResets.autoRedeem5h": {
+		label: "Codex 自动使用已保存重置（5 小时）",
+		description:
+			"在仅受 5 小时限制的阻塞上，以及最长聊天窗口为 5 小时的即将过期额度上，使用已保存的 Codex 重置。未设置时先询问，从不在未提示时使用；“是”直接使用；“否”从不使用。",
+	},
+	"codexResets.autoRedeemWeekly": {
+		label: "Codex 自动使用已保存重置（每周）",
+		description:
+			"在每周阻塞上，以及最长聊天窗口为每周的即将过期额度上，使用已保存的 Codex 重置。仅从短暂的 429 等待得知的阻塞需要两个 Codex 窗口都满足。未设置时先询问，从不在未提示时使用；“是”直接使用；“否”从不使用。",
+	},
+	"claudeResets.autoRedeem5h": {
+		label: "Claude 自动使用已保存重置（5 小时）",
+		description:
+			"在仅受 5 小时限制的阻塞上，以及覆盖的最长限额为 5 小时的即将过期额度上，使用 Claude Cedar 或 Juniper 重置。未设置时先询问，从不在未提示时使用；“是”直接使用；“否”从不使用。",
+	},
+	"claudeResets.autoRedeemWeekly": {
+		label: "Claude 自动使用已保存重置（每周）",
+		description:
+			"在每周或特定模型的阻塞上，以及覆盖的最长限额为每周的即将过期额度上，使用 Claude Cedar 重置。未设置时先询问，从不在未提示时使用；“是”直接使用；“否”从不使用。",
+	},
+	"claudeResets.autoRedeemFable": {
+		label: "Claude 自动使用 Fable 重置",
+		description:
+			"使用 Claude Fable 发布重置，它会恢复 Fable 每周用量以及 5 小时窗口。只有此设置控制它们。未设置时先询问，从不在未提示时使用；“是”直接使用；“否”从不使用。",
+	},
+	"task.autoParallel": {
+		label: "自动并行",
+		description:
+			"让通过“judge”角色解析的原生判断模型判断每条新的顶层提示中哪些部分可以并发运行。需要原生判断模型和 task 工具；缺少它们时不做判断。",
+	},
+	"task.steps": {
+		label: "顺序任务步骤",
+		description:
+			"派生任务接收有序的 `steps`，而不是单个 `task`：子代理先收到第一步，完成后再收到下一步；超过 4 步时，前面的消息会合并两步或更多。最后一步的结果即任务结果。",
+	},
+	"browser.webkit": {
+		label: "WebKit 浏览器",
+		description:
+			'引擎已安装时，在 omp 自带的无头 WebKit 引擎中打开浏览器标签页，而不是托管的 Chromium（未安装任何浏览器时，omp 会先把它下载到 ~/.o2/lib/abkit，再考虑 Chrome for Testing；见“浏览器 WebKit 路径”）。在引擎不提供查看窗口的平台上，可见浏览器仍使用 Chromium，引擎无法启动的标签页也是如此；显式的 app、中继、浏览器 CDP URL、Tern 和 cmux 优先；app "chromium" 可让单次打开不用它。设置 PI_BROWSER_WEBKIT=0 或 PI_BROWSER_WEBKIT=1 可覆盖。',
+	},
+	"browser.webkitPath": {
+		label: "浏览器 WebKit 路径",
+		description:
+			"omp 的 WebKit 引擎：它的宿主可执行文件，或包含它（名为 ABHost，Windows 上为 ABHost.exe）的 ABKit 引擎目录。未设置时运行已安装的引擎 ~/.o2/lib/abkit/ABHost（Windows 上为 ABHost.exe）。支持 ~。PI_BROWSER_WEBKIT_PATH 可覆盖它。",
+	},
 };

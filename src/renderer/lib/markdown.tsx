@@ -256,7 +256,7 @@ function ExternalLink({ href, children }: ComponentPropsWithoutRef<"a">) {
 function StyledTable({ children, ...props }: ComponentPropsWithoutRef<"table">) {
 	return (
 		<div className="overflow-x-auto my-2">
-			<table {...props} className="w-full border-collapse text-sm">
+			<table {...props} className="w-full border-collapse text-omp-md">
 				{children}
 			</table>
 		</div>
@@ -395,7 +395,7 @@ function InlineCode({ children, ...props }: ComponentPropsWithoutRef<"code">) {
 
 function H1({ children, ...props }: ComponentPropsWithoutRef<"h1">) {
 	return (
-		<h1 {...props} className="text-xl font-bold mt-4 mb-2 text-[var(--omp-md-heading)]">
+		<h1 {...props} className="text-omp-2xl font-bold mt-4 mb-2 text-[var(--omp-md-heading)]">
 			{children}
 		</h1>
 	);
@@ -403,7 +403,7 @@ function H1({ children, ...props }: ComponentPropsWithoutRef<"h1">) {
 
 function H2({ children, ...props }: ComponentPropsWithoutRef<"h2">) {
 	return (
-		<h2 {...props} className="text-lg font-bold mt-3 mb-2 text-[var(--omp-md-heading)]">
+		<h2 {...props} className="text-omp-xl font-bold mt-3 mb-2 text-[var(--omp-md-heading)]">
 			{children}
 		</h2>
 	);
@@ -411,7 +411,7 @@ function H2({ children, ...props }: ComponentPropsWithoutRef<"h2">) {
 
 function H3({ children, ...props }: ComponentPropsWithoutRef<"h3">) {
 	return (
-		<h3 {...props} className="text-base font-semibold mt-3 mb-1 text-[var(--omp-md-heading)]">
+		<h3 {...props} className="text-omp-lg font-semibold mt-3 mb-1 text-[var(--omp-md-heading)]">
 			{children}
 		</h3>
 	);

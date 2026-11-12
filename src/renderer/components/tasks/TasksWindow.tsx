@@ -31,7 +31,7 @@ function HealthPill() {
 				<span
 					className={
 						state === "healthy"
-							? "omp-pulse-dot size-1.5 rounded-full bg-(--omp-success)"
+							? "omp-signal-light omp-signal-light--active text-(--omp-success)"
 							: state === "paused"
 								? "size-1.5 rounded-full bg-(--omp-border-strong)"
 								: "size-1.5 rounded-full bg-(--omp-warning)"

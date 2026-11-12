@@ -400,7 +400,7 @@ export function FilesPanel() {
 							)}
 						</div>
 					) : (
-						<div className="relative flex min-w-max py-2 font-mono text-xs leading-[1.6]">
+						<div className="relative flex min-w-max py-2 font-mono text-omp-xs leading-[1.6]">
 							{lineBand && (
 								<div
 									aria-hidden="true"

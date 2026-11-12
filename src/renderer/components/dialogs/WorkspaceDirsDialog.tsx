@@ -106,7 +106,7 @@ export function WorkspaceDirsDialog() {
 	return (
 		<Modal onClose={close} open={open} size="md" title={t("workspaceDirs.title")}>
 			<div className="flex flex-col gap-3">
-				<div className="text-xs text-(--omp-dim)">{t("workspaceDirs.subtitle")}</div>
+				<div className="text-omp-xs text-(--omp-dim)">{t("workspaceDirs.subtitle")}</div>
 				<div className="max-h-[38vh] min-h-16 overflow-y-auto rounded-md border border-(--omp-border-muted)">
 					<AsyncSection
 						className="min-h-24"
@@ -125,7 +125,7 @@ export function WorkspaceDirsDialog() {
 							>
 								<FolderGit2 className="shrink-0 text-(--omp-dim)" size={14} />
 								<span
-									className="min-w-0 flex-1 truncate font-mono text-xs text-(--omp-text)"
+									className="min-w-0 flex-1 truncate font-mono text-omp-xs text-(--omp-text)"
 									title={directory.path}
 								>
 									{directory.path}
@@ -183,8 +183,8 @@ export function WorkspaceDirsDialog() {
 					</Button>
 				</div>
 				<div className="rounded-md border border-(--omp-border-muted) p-3">
-					<div className="mb-1 text-xs font-medium text-(--omp-text)">{t("workspaceDirs.moveTitle")}</div>
-					<div className="mb-2 text-xs text-(--omp-dim)">{t("workspaceDirs.moveDesc")}</div>
+					<div className="mb-1 text-omp-xs font-medium text-(--omp-text)">{t("workspaceDirs.moveTitle")}</div>
+					<div className="mb-2 text-omp-xs text-(--omp-dim)">{t("workspaceDirs.moveDesc")}</div>
 					<Button
 						disabled={mutating || busy || loading || !sidecarReady}
 						icon={<PackageOpen size={14} />}

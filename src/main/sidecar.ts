@@ -826,11 +826,13 @@ export class SidecarManager extends EventEmitter {
 		return missing;
 	}
 
-	restart(cwd?: string, resumeSessionPath?: string): void {
+	/** `fresh` starts a new session instead of letting the agent auto-resume the folder's latest one. */
+	restart(cwd?: string, resumeSessionPath?: string, options: { fresh?: boolean } = {}): void {
 		this.#parkedFrames = null;
 		this.kill();
 		if (cwd) this.#options = { ...this.#options, cwd };
 		this.#resumeSessionPath = resumeSessionPath ?? null;
+		if (options.fresh) this.#freshLaunchPending = true;
 		this.#bootModelFallback = null;
 		this.#restartCount = 0;
 		this.start();

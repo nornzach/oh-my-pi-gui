@@ -98,7 +98,7 @@ export function LiveVoiceDialog() {
 	return (
 		<Modal onClose={() => void close()} open={open} size="md" title={t("live.title")}>
 			<div className="space-y-4">
-				<div className="flex items-center justify-center gap-2 py-2 text-sm font-medium text-(--omp-text)">
+				<div className="flex items-center justify-center gap-2 py-2 text-omp-md font-medium text-(--omp-text)">
 					{connecting ? <Spinner size="sm" /> : null}
 					<span>{phaseLabel}</span>
 					{state.active && state.voice ? (
@@ -111,7 +111,7 @@ export function LiveVoiceDialog() {
 					<Level label={t("live.input")} value={state.inputLevel} />
 					<Level label={t("live.output")} value={state.outputLevel} />
 				</div>
-				<div className="max-h-64 min-h-24 space-y-2 overflow-y-auto rounded-lg border border-(--omp-border-muted) bg-transparent p-3 text-sm">
+				<div className="max-h-64 min-h-24 space-y-2 overflow-y-auto rounded-lg border border-(--omp-border-muted) bg-transparent p-3 text-omp-md">
 					{state.transcript.length > 0 ? (
 						state.transcript.map(entry => (
 							<div key={`${entry.role}:${entry.turn}`}>
@@ -130,7 +130,7 @@ export function LiveVoiceDialog() {
 					)}
 					<div ref={transcriptEnd} />
 				</div>
-				{state.error ? <div className="text-sm text-(--omp-error)">{state.error}</div> : null}
+				{state.error ? <div className="text-omp-md text-(--omp-error)">{state.error}</div> : null}
 				<div className="flex justify-end gap-2">
 					{!state.active && (
 						<Button disabled={busy} loading={busy} onClick={() => void run("live_start")}>
@@ -157,7 +157,7 @@ export function LiveVoiceDialog() {
 function Level({ label, value }: { label: string; value: number }) {
 	const percent = Math.max(0, Math.min(100, Math.round(value * 100)));
 	return (
-		<div className="grid grid-cols-[5rem_1fr_2.5rem] items-center gap-2 text-xs">
+		<div className="grid grid-cols-[5rem_1fr_2.5rem] items-center gap-2 text-omp-xs">
 			<span className="text-(--omp-dim)">{label}</span>
 			<div
 				className="h-2 overflow-hidden rounded-full bg-(--omp-bg-primary)" // surface-ok: level meter track

@@ -665,6 +665,10 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 	const description =
 		typeof args.i === "string" ? args.i : typeof args.description === "string" ? args.description : "";
 	const taskText = typeof args.task === "string" ? args.task : "";
+	// `task.steps` spawns carry ordered steps instead of one task; the child gets them one at a time.
+	const steps = Array.isArray(args.steps)
+		? args.steps.filter((step): step is string => typeof step === "string" && step.trim() !== "")
+		: [];
 
 	const statusLabel = isError
 		? t("subagent.status.failed")
@@ -778,6 +782,18 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 				<div className="max-h-32 overflow-auto whitespace-pre-wrap rounded bg-[var(--omp-code-bg)] px-2 py-1.5 text-omp-sm leading-[1.45] text-[var(--omp-tool-output)]">
 					{taskText}
 				</div>
+			)}
+			{steps.length > 0 && (
+				<ol className="flex max-h-48 flex-col gap-1.5 overflow-auto rounded bg-[var(--omp-code-bg)] px-2 py-1.5 text-omp-sm leading-[1.45] text-[var(--omp-tool-output)]">
+					{steps.map((step, index) => (
+						<li className="flex gap-2" key={`${index}-${step.slice(0, 24)}`}>
+							<span className="shrink-0 font-medium text-[var(--omp-dim)] tabular-nums">
+								{t("tools.task.step", { n: index + 1 })}
+							</span>
+							<span className="min-w-0 whitespace-pre-wrap">{step}</span>
+						</li>
+					))}
+				</ol>
 			)}
 
 			{!hasResults && progress.length > 0 && (

@@ -85,7 +85,7 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 	return (
 		<Modal onClose={close} open={open} size="lg" title={t("benchmark.title")}>
 			<div className="space-y-4">
-				<p className="text-sm text-(--omp-muted)">{t("benchmark.description")}</p>
+				<p className="text-omp-md text-(--omp-muted)">{t("benchmark.description")}</p>
 				<div className="grid grid-cols-[minmax(0,1fr)_150px_90px_90px] gap-3 max-md:grid-cols-2">
 					<div className="space-y-2">
 						<span className="text-omp-md">{t("benchmark.models")}</span>
@@ -119,7 +119,7 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 							{t("benchmark.profile")}
 						</span>
 						<select
-							className="h-10 w-full rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-3 text-sm"
+							className="h-10 w-full rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-3 text-omp-md"
 							disabled={running}
 							onChange={event => setProfile(event.target.value as IpcBenchmarkProfile)}
 							value={profile}
@@ -169,7 +169,7 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 				{(error ?? stderr) && (
 					<div
 						className={cx(
-							"rounded-lg border p-3 text-sm",
+							"rounded-lg border p-3 text-omp-md",
 							error
 								? "border-(--omp-error)/40 bg-(--omp-error-dim) text-(--omp-error)"
 								: "border-(--omp-border-muted) text-(--omp-muted)",
@@ -190,7 +190,7 @@ export function BenchmarkDialog({ open, onClose }: { open: boolean; onClose: () 
 				)}
 				{result?.success && (
 					<div className="overflow-x-auto rounded-lg border border-(--omp-border-muted)">
-						<table className="w-full text-left text-xs">
+						<table className="w-full text-left text-omp-xs">
 							<thead className="text-(--omp-muted)">
 								<tr className="border-b border-(--omp-border-muted)">
 									{["model", "success", "ttft", "prefill", "decode", "throughput", "cost"].map(key => (

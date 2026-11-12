@@ -37,6 +37,7 @@ export type ContextSegmentKey =
 	| "systemTools"
 	| "systemPrompt"
 	| "systemContext"
+	| "instructionFiles"
 	| "skills"
 	| "autocompact"
 	| "free";
@@ -63,6 +64,7 @@ export function contextSegments(
 		{ key: "systemTools", tokens: breakdown.systemToolsTokens },
 		{ key: "systemPrompt", tokens: breakdown.systemPromptTokens },
 		{ key: "systemContext", tokens: breakdown.systemContextTokens },
+		{ key: "instructionFiles", tokens: breakdown.instructionFilesTokens ?? 0 },
 		{ key: "skills", tokens: breakdown.skillsTokens },
 	];
 	if (view.capacityKnown) {

@@ -174,7 +174,7 @@ export function LogPanel() {
 			</div>
 			<div className="relative min-h-0 flex-1 border-t border-(--omp-border-muted) bg-(--omp-code-bg)">
 				<div
-					className="h-full overflow-y-auto py-1.5 font-mono text-xs leading-[1.55]"
+					className="h-full overflow-y-auto py-1.5 font-mono text-omp-xs leading-[1.55]"
 					onScroll={onScroll}
 					ref={scrollRef}
 				>

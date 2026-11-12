@@ -585,7 +585,7 @@ const RosterRow = memo(function RosterRow({
 					>
 						<span
 							aria-hidden
-							className="omp-disclosure-chevron inline-block text-[10px] leading-none"
+							className="omp-disclosure-chevron inline-block text-omp-xxs leading-none"
 							style={{ transform: collapsed ? undefined : "rotate(90deg)" }}
 						>
 							›

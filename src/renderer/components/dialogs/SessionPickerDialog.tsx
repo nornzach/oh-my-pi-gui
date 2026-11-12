@@ -231,7 +231,7 @@ export function SessionPickerDialog() {
 						aria-activedescendant={filtered.length > 0 ? `${listboxId}-option-${activeIndex}` : undefined}
 						aria-controls={listboxId}
 						aria-label={t("sessionPicker.searchLabel")}
-						className="min-w-0 flex-1 bg-transparent text-sm text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+						className="min-w-0 flex-1 bg-transparent text-omp-md text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 						onChange={event => setQuery(event.target.value)}
 						onKeyDown={onKeyDown}
 						placeholder={t("sessionPicker.placeholder")}
@@ -279,7 +279,7 @@ export function SessionPickerDialog() {
 				>
 					{error ? (
 						<div className="flex flex-col items-center gap-2 py-10 text-center">
-							<p role="alert" className="text-xs text-[var(--omp-error)]">
+							<p role="alert" className="text-omp-xs text-[var(--omp-error)]">
 								{error}
 							</p>
 							<Button
@@ -294,10 +294,10 @@ export function SessionPickerDialog() {
 					) : loading ? (
 						<div className="flex items-center justify-center gap-2 py-10">
 							<Spinner size="sm" />
-							<span className="text-xs text-(--omp-dim)">{t("sessionPicker.loading")}</span>
+							<span className="text-omp-xs text-(--omp-dim)">{t("sessionPicker.loading")}</span>
 						</div>
 					) : filtered.length === 0 ? (
-						<div className="py-10 text-center text-xs text-(--omp-dim)">
+						<div className="py-10 text-center text-omp-xs text-(--omp-dim)">
 							{sessions.length === 0
 								? scope === "local"
 									? t("sessionPicker.emptyLocal")
@@ -334,7 +334,7 @@ export function SessionPickerDialog() {
 									)}
 									<span className="min-w-0 flex-1">
 										<span
-											className={`block truncate text-xs ${isCurrent ? "font-semibold text-(--omp-accent)" : "font-medium text-(--omp-text)"}`}
+											className={`block truncate text-omp-xs ${isCurrent ? "font-semibold text-(--omp-accent)" : "font-medium text-(--omp-text)"}`}
 										>
 											{title}
 										</span>

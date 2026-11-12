@@ -57,7 +57,7 @@ function fetchOnce(fetcher: OptionsFetcher): Promise<EnumerableOption[]> {
 }
 
 const TRIGGER_CLASS =
-	"flex w-full items-center justify-between gap-2 rounded-md border border-(--omp-input-border) bg-(--omp-input-bg) px-2.5 py-1.5 text-left text-xs text-(--omp-text) transition-colors hover:border-(--omp-input-focus-border) disabled:opacity-50";
+	"flex w-full items-center justify-between gap-2 rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-2.5 py-1.5 text-omp-md leading-[1.45] text-left text-(--omp-text) transition-colors hover:border-(--omp-border-strong) disabled:opacity-50";
 
 /** One selectable row in the dropdown, in render/tab order. */
 type EnumerableItem =
@@ -245,7 +245,7 @@ export function EnumerableSelect({
 				return (
 					<button
 						{...rowProps}
-						className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
+						className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-omp-xs ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
 						key="__clear__"
 					>
 						<span className="text-(--omp-dim)">{t("settings.editors.clear")}</span>
@@ -255,7 +255,7 @@ export function EnumerableSelect({
 				return (
 					<button
 						{...rowProps}
-						className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-mono text-xs ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
+						className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-mono text-omp-xs ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
 						key="__current__"
 					>
 						<span>{item.value}</span>
@@ -266,7 +266,7 @@ export function EnumerableSelect({
 				return (
 					<button
 						{...rowProps}
-						className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-mono text-xs ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
+						className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left font-mono text-omp-xs ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
 						key={item.option.value}
 					>
 						<span className="min-w-0 flex-1 truncate">{item.option.label ?? item.option.value}</span>
@@ -277,7 +277,7 @@ export function EnumerableSelect({
 				return (
 					<button
 						{...rowProps}
-						className={`w-full rounded px-2 py-1.5 text-left font-mono text-xs text-(--omp-accent) ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
+						className={`w-full rounded px-2 py-1.5 text-left font-mono text-omp-xs text-(--omp-accent) ${isActive ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)"}`}
 						key="__custom__"
 					>
 						{t("settings.editors.useCustom", { value: item.value })}
@@ -309,7 +309,7 @@ export function EnumerableSelect({
 							aria-activedescendant={items.length > 0 ? `${listboxId}-option-${activeIndex}` : undefined}
 							aria-controls={listboxId}
 							aria-label={t("settings.editors.search")}
-							className="w-full bg-transparent text-xs text-(--omp-text) outline-none placeholder:text-(--omp-dim)"
+							className="w-full bg-transparent text-omp-xs text-(--omp-text) outline-none placeholder:text-(--omp-dim)"
 							onChange={e => setQuery(e.target.value)}
 							onKeyDown={onSearchKeyDown}
 							placeholder={t("settings.editors.search")}
@@ -319,13 +319,13 @@ export function EnumerableSelect({
 						/>
 					</div>
 					{options === null && !error && (
-						<div className="px-2 py-2 text-xs text-(--omp-dim)">
+						<div className="px-2 py-2 text-omp-xs text-(--omp-dim)">
 							{t("settings.editors.loading", { noun: noun ?? t("settings.editors.options") })}
 						</div>
 					)}
 					{error && (
 						<button
-							className="w-full rounded px-2 py-1.5 text-left text-xs text-(--omp-error) hover:bg-(--omp-bg-tertiary)"
+							className="w-full rounded px-2 py-1.5 text-left text-omp-xs text-(--omp-error) hover:bg-(--omp-bg-tertiary)"
 							onClick={() => {
 								setOptions(null);
 								setError(false);
@@ -349,7 +349,7 @@ export function EnumerableSelect({
 								{items.map(renderItem)}
 							</div>
 							{filtered.length === 0 && trimmedQuery !== "" && !allowCustom && (
-								<div className="px-2 py-2 text-xs text-(--omp-dim)">{t("settings.editors.noMatch")}</div>
+								<div className="px-2 py-2 text-omp-xs text-(--omp-dim)">{t("settings.editors.noMatch")}</div>
 							)}
 						</>
 					)}

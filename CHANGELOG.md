@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Added
+- Task cards list a spawn's ordered steps when the agent's **Sequential Task Steps** setting is on, and the context breakdown shows instruction files (AGENTS.md and the like) as their own category.
+- The composer's `/` menu lists every command grouped by source (built-in, skills, extensions, custom, MCP prompts, files) with prefix matches first, instead of cutting off at eight; a new **Commands** entry in the composer's `+` menu opens it.
+- Providers: **Use API key** signs a provider in with a key you paste, with no browser sign-in to finish or cancel. It also works for providers whose sign-in needs a secret, which the browser flow could not complete.
+- Moving parts now have weight: dialogs and toasts settle with a spring, and tool, thinking and step groups open and close smoothly instead of snapping.
+- One mark for live work: a breathing dot with an orbiting arc replaces the pulsing dots in the status bar, tabs, sidebar and task lists, and an arc circles the composer while the agent runs.
+- Settings toggles confirm with a brief "Saved", and the composer hints that `/` lists commands.
+- Settings say when a saved change is not in effect yet: a row overridden by the project's config or a launch setting says so and shows the value that still applies, and settings that need a restart show a pending notice with a **Restart session** button pinned at the top of Settings.
+
+### Changed
+
+- Bundled agent updated to upstream omp 18.19.0: multi-step tasks, omp's own WebKit browser, auto-parallel task splitting, per-model system prompt templates and the rest of 18.18.7–18.19.0; the new settings are translated into Chinese and Russian.
+- Todos no longer offer **Mark as blocked**: omp 18.19 removed the status, and a blocked task from an older session reads as pending.
+- New logo: a π that reads as a π (the old mark read as "TJ"), on a navy tile, in the app icon, favicon and sidebar badge.
+- The accent now leads the interface: your messages, the focused composer, primary buttons, the active tab and the active settings page carry it; signed-in providers get a green edge.
+- Settings pages open each section with a real heading, an accent tick and a divider; dialogs get a blurred backdrop and an accent edge.
+- Cleaner type scale in whole pixels (11 / 12 / 13 / 14 / 15 / 17 / 20), so neighbouring sizes look different.
+- All text follows the Font size preference: about 180 labels, menus and dialog lines used fixed sizes that ignored it. Settings rows share one label size and one control height, and transcript labels drop from bold to semibold.
+- Scheduled task results render as Markdown, and each run in the history shows its outcome as a coloured edge.
+- Scheduled Tasks: each task page opens with its last 30 days (last run, runs, success rate, median duration, cost and a per-day strip), its setup in a compact grid, and a history where streaks of "Nothing new" runs fold into one row.
+- Scheduled Tasks: run lists show each run's summary with `code` and **bold** rendered rather than raw Markdown, run pages lead with the task name and one line of facts, the Runs filters show how many need attention, and the Insights chart starts at the first run instead of a mostly empty month.
+
+### Fixed
+
+- A sign-in dialog no longer stays open after the sign-in has finished.
+- Settings no longer show "Saved" for a save that failed, on agent toggles and GUI preferences alike.
+- Restarting a new session before its first message (from Settings or the launch profile) starts a new session instead of leaving the agent in an error state.
+
+### Removed
+
+- The Smithery commands in the command palette: Smithery shut down its API and omp removed them.
+
 ## [0.9.40] - 2026-11-11
 
 ### Changed

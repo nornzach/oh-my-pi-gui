@@ -450,7 +450,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 	if (fatalError !== null) {
 		body = (
 			<div className="flex flex-1 flex-col items-center justify-center gap-3 py-12">
-				<span className="text-xs text-(--omp-error)">
+				<span className="text-omp-xs text-(--omp-error)">
 					{t("modelCompare.modelsFailed")}: {fatalError}
 				</span>
 				<Button icon={<RefreshCw size={12} />} onClick={() => void load()} size="sm" variant="secondary">
@@ -660,7 +660,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 						<Search className="shrink-0 text-(--omp-dim)" size={13} />
 						<input
 							aria-label={t("modelCompare.search")}
-							className="min-w-0 flex-1 bg-transparent text-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+							className="min-w-0 flex-1 bg-transparent text-omp-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 							onChange={event => setQuery(event.target.value)}
 							placeholder={t("modelCompare.search")}
 							value={query}

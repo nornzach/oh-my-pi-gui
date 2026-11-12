@@ -24,6 +24,16 @@ const DOT_CLASSES: Record<BadgeVariant, string> = {
 	muted: "bg-(--omp-dim)",
 };
 
+/** A pulsing dot is the live signal, which takes its color from `currentColor`. */
+const PULSE_TEXT_CLASSES: Record<BadgeVariant, string> = {
+	default: "text-(--omp-muted)",
+	success: "text-(--omp-success)",
+	warning: "text-(--omp-warning)",
+	error: "text-(--omp-error)",
+	info: "text-(--omp-link)",
+	muted: "text-(--omp-dim)",
+};
+
 export interface BadgeProps {
 	variant?: BadgeVariant;
 	/** Show a small colored dot before the label. */
@@ -42,7 +52,11 @@ export function Badge({ variant = "default", dot, pulse, className, children }: 
 			{dot && (
 				<span aria-hidden className="relative flex size-1.5">
 					<span
-						className={`relative inline-flex size-1.5 rounded-full ${pulse ? "omp-pulse-dot" : ""} ${DOT_CLASSES[variant]}`}
+						className={
+							pulse
+								? `omp-signal-light omp-signal-light--active ${PULSE_TEXT_CLASSES[variant]}`
+								: `relative inline-flex size-1.5 rounded-full ${DOT_CLASSES[variant]}`
+						}
 					/>
 				</span>
 			)}

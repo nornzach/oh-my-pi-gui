@@ -1204,4 +1204,12 @@ export const RU_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
 	"Every 3 prompts": "Каждые 3 запроса",
 	"Every 5 prompts": "Каждые 5 запросов",
 	"Every 10 prompts": "Каждые 10 запросов",
+	"Ask before spending; never spend without a prompt.": "Спрашивать перед тратой; никогда не тратить без вопроса.",
+	"Spend eligible saved resets without asking.": "Тратить подходящие сохранённые сбросы без вопроса.",
+	"Never spend saved resets for this window.": "Никогда не тратить сохранённые сбросы для этого окна.",
+	"Never split prompts": "Никогда не разделять запросы",
+	"Judge each prompt and report the split without acting on it":
+		"Оценивать каждый запрос и сообщать о разделении, ничего не делая",
+	"When a prompt splits into independent subtasks, tell the agent to delegate them in parallel":
+		"Если запрос делится на независимые подзадачи, велеть агенту делегировать их параллельно",
 };

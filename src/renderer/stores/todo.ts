@@ -80,38 +80,31 @@ function fingerprintTodo(phases: readonly { name: string; tasks: readonly { cont
 	return JSON.stringify(phases.map(phase => [phase.name, phase.tasks.map(task => task.content)]));
 }
 
-function isTodoStatus(value: unknown): value is TodoTask["status"] {
-	return (
-		value === "pending" ||
-		value === "in_progress" ||
-		value === "completed" ||
-		value === "abandoned" ||
-		value === "blocked"
-	);
+/**
+ * A task status as the GUI tracks it. Saved sessions from before omp 18.19 can
+ * still carry `blocked`, which the agent now restores as pending; reading it
+ * the same way keeps those sessions' todo history instead of dropping it.
+ */
+function todoStatusOf(value: unknown): TodoTask["status"] | undefined {
+	if (value === "blocked") return "pending";
+	return value === "pending" || value === "in_progress" || value === "completed" || value === "abandoned"
+		? value
+		: undefined;
 }
 
-function isTodoTask(value: unknown): value is TodoTask {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"content" in value &&
-		typeof value.content === "string" &&
-		"status" in value &&
-		isTodoStatus(value.status) &&
-		(!("blocker" in value) || value.blocker === undefined || typeof value.blocker === "string")
-	);
+function todoTaskOf(value: unknown): TodoTask | undefined {
+	if (typeof value !== "object" || value === null || !("content" in value) || typeof value.content !== "string")
+		return undefined;
+	const status = "status" in value ? todoStatusOf(value.status) : undefined;
+	return status ? { ...value, content: value.content, status } : undefined;
 }
 
-function isTodoPhase(value: unknown): value is TodoPhase {
-	return (
-		typeof value === "object" &&
-		value !== null &&
-		"name" in value &&
-		typeof value.name === "string" &&
-		"tasks" in value &&
-		Array.isArray(value.tasks) &&
-		value.tasks.every(isTodoTask)
-	);
+function todoPhaseOf(value: unknown): TodoPhase | undefined {
+	if (typeof value !== "object" || value === null || !("name" in value) || typeof value.name !== "string")
+		return undefined;
+	if (!("tasks" in value) || !Array.isArray(value.tasks)) return undefined;
+	const tasks = value.tasks.map(todoTaskOf);
+	return tasks.every(task => task !== undefined) ? { name: value.name, tasks } : undefined;
 }
 
 /** The phases a `todo` tool result carries, live or saved; undefined when it carries none. */
@@ -119,7 +112,9 @@ export function todoPhasesFromToolResult(result: unknown): TodoPhase[] | undefin
 	if (typeof result !== "object" || result === null || !("details" in result)) return undefined;
 	const details = result.details;
 	if (typeof details !== "object" || details === null || !("phases" in details)) return undefined;
-	return Array.isArray(details.phases) && details.phases.every(isTodoPhase) ? details.phases : undefined;
+	if (!Array.isArray(details.phases)) return undefined;
+	const phases = details.phases.map(todoPhaseOf);
+	return phases.every(phase => phase !== undefined) ? phases : undefined;
 }
 
 /**

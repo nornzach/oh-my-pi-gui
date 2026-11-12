@@ -104,17 +104,17 @@ export function CopySelectorDialog() {
 			<div className="grid h-[62vh] min-h-0 grid-cols-[minmax(220px,0.9fr)_minmax(0,1.3fr)]" onKeyDown={onKeyDown}>
 				<div className="min-h-0 overflow-y-auto border-r border-(--omp-border-muted) p-2" ref={listRef}>
 					{error ? (
-						<div className="p-4 text-xs text-[var(--omp-error)]">{error}</div>
+						<div className="p-4 text-omp-xs text-[var(--omp-error)]">{error}</div>
 					) : loading ? (
-						<div className="flex items-center justify-center gap-2 p-8 text-xs text-(--omp-dim)">
+						<div className="flex items-center justify-center gap-2 p-8 text-omp-xs text-(--omp-dim)">
 							<Spinner size="sm" /> {t("copySelector.loading")}
 						</div>
 					) : flat.length === 0 ? (
-						<div className="p-8 text-center text-xs text-(--omp-dim)">{t("copySelector.empty")}</div>
+						<div className="p-8 text-center text-omp-xs text-(--omp-dim)">{t("copySelector.empty")}</div>
 					) : (
 						flat.map((item, index) => (
 							<button
-								className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-xs ${
+								className={`flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-omp-xs ${
 									index === selectedIndex
 										? "bg-(--omp-selected-bg) text-(--omp-text)"
 										: "text-(--omp-dim) hover:bg-(--omp-bg-tertiary)"
@@ -137,7 +137,7 @@ export function CopySelectorDialog() {
 				<div className="flex min-h-0 flex-col">
 					<div className="min-h-0 flex-1 overflow-auto p-4">
 						<div className="mb-2 text-omp-xs font-medium text-(--omp-dim)">{t("copySelector.preview")}</div>
-						<pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-(--omp-text)">
+						<pre className="whitespace-pre-wrap break-words font-mono text-omp-xs leading-relaxed text-(--omp-text)">
 							{selected?.preview ?? ""}
 						</pre>
 					</div>

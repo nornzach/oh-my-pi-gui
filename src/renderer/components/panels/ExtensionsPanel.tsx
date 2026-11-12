@@ -405,7 +405,7 @@ function TabFrame({
 						<Search className="shrink-0 text-(--omp-dim)" size={13} />
 						<input
 							aria-label={t(`extPanel.search.${tabId}`)}
-							className="min-w-0 flex-1 bg-transparent text-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
+							className="min-w-0 flex-1 bg-transparent text-omp-xs text-(--omp-text) placeholder:text-(--omp-dim) focus:outline-none"
 							onChange={event => onQueryChange(event.target.value)}
 							placeholder={t(`extPanel.search.${tabId}`)}
 							value={query}
@@ -919,7 +919,7 @@ export function ExtensionSettingsPage({ tabId, query }: { tabId: TabId; query: s
 			<header>
 				<div className="flex items-center gap-2 text-(--omp-accent)">
 					{icon}
-					<h2 className="text-[16px] font-semibold tracking-[-0.01em] text-(--omp-text)">
+					<h2 className="text-omp-xl font-semibold tracking-[-0.01em] text-(--omp-text)">
 						{t(`settings.extensions.${tabId}.title`)}
 					</h2>
 				</div>

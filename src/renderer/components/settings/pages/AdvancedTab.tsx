@@ -46,7 +46,7 @@ function AdvancedTab({
 				/>
 			</div>
 			{filtered.length === 0 ? (
-				<div className="py-10 text-center text-xs text-(--omp-dim)">{t("settings.advancedEmpty")}</div>
+				<div className="py-10 text-center text-omp-xs text-(--omp-dim)">{t("settings.advancedEmpty")}</div>
 			) : (
 				filtered.map(entry => (
 					<div id={`setting-${entry.path}`} key={entry.path} className="scroll-mt-4">

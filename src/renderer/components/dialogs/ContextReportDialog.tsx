@@ -60,19 +60,19 @@ function ContextReportBody() {
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center gap-2 py-8 text-sm text-(--omp-dim)">
+			<div className="flex items-center justify-center gap-2 py-8 text-omp-md text-(--omp-dim)">
 				<Spinner size="sm" /> {t("contextReport.loading")}
 			</div>
 		);
 	}
 	if (error) {
 		return (
-			<div className="py-4 text-sm text-(--omp-error)">
+			<div className="py-4 text-omp-md text-(--omp-error)">
 				{t("contextReport.error")}: {error}
 			</div>
 		);
 	}
-	if (!report) return <div className="py-4 text-sm text-(--omp-dim)">{t("contextReport.unavailable")}</div>;
+	if (!report) return <div className="py-4 text-omp-md text-(--omp-dim)">{t("contextReport.unavailable")}</div>;
 
 	const breakdown = report.breakdown;
 	const view = contextUsageView(report, breakdown);
@@ -81,10 +81,10 @@ function ContextReportBody() {
 	return (
 		<div className="space-y-4">
 			<div className="flex items-baseline justify-between gap-3">
-				<div className="min-w-0 truncate text-sm font-medium text-(--omp-text)">
+				<div className="min-w-0 truncate text-omp-md font-medium text-(--omp-text)">
 					{report.model || t("contextReport.noModel")}
 				</div>
-				<div className="shrink-0 text-xs tabular-nums text-(--omp-dim)">
+				<div className="shrink-0 text-omp-xs tabular-nums text-(--omp-dim)">
 					{breakdown
 						? capacityKnown
 							? t("contextReport.usedOf", {
@@ -101,7 +101,7 @@ function ContextReportBody() {
 			{breakdown ? (
 				<>
 					<ContextBreakdown barHeight={8} segments={contextSegments(breakdown, view, autoCompactAt)} view={view} />
-					<div className="text-xs text-(--omp-dim)">
+					<div className="text-omp-xs text-(--omp-dim)">
 						{breakdown.anchored ? t("contextReport.anchored") : t("contextReport.estimated")}
 					</div>
 				</>

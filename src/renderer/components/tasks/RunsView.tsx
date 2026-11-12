@@ -81,13 +81,13 @@ export function RunsView() {
 	const selectRun = useSchedulerStore(state => state.selectRun);
 	const titles = useTitles();
 	const [filter, setFilter] = useState<RunFilter>("all");
-	const shown = runs.filter(run =>
-		filter === "all"
-			? true
-			: filter === "running"
-				? run.state === "running" || run.state === "queued"
-				: attention(run),
-	);
+	const matches = (run: TaskRun, id: RunFilter) =>
+		id === "all" ? true : id === "running" ? run.state === "running" || run.state === "queued" : attention(run);
+	const shown = runs.filter(run => matches(run, filter));
+	const counts = {
+		attention: runs.filter(run => matches(run, "attention")).length,
+		running: runs.filter(run => matches(run, "running")).length,
+	};
 	const selected = shown.find(run => run.id === selectedRunId) ?? shown[0] ?? null;
 
 	if (runs.length === 0) {
@@ -110,7 +110,7 @@ export function RunsView() {
 					{(["all", "attention", "running"] as const).map(id => (
 						<button
 							className={cx(
-								"rounded-md px-2.5 py-1 text-omp-sm font-medium transition-colors duration-150",
+								"flex items-center gap-1.5 rounded-md px-2.5 py-1 text-omp-sm font-medium transition-colors duration-150",
 								filter === id
 									? "bg-(--omp-selected-bg) text-(--omp-text)"
 									: "text-(--omp-muted) hover:text-(--omp-text)",
@@ -120,6 +120,16 @@ export function RunsView() {
 							type="button"
 						>
 							{t(`tasks.runs.filter.${id}`)}
+							{id !== "all" && counts[id] > 0 && (
+								<span
+									className={cx(
+										"tabular-nums",
+										id === "attention" ? "text-(--omp-warning)" : "text-(--omp-link)",
+									)}
+								>
+									{counts[id]}
+								</span>
+							)}
 						</button>
 					))}
 				</div>
