@@ -163,10 +163,18 @@
 	color: var(--omp-text);
 	word-break: break-word;
 }
-.markdown-body > :first-child {
+/* A streamed reply renders one .markdown-body per block, so every heading and
+   list was both first and last child of its own body and lost its margins: the
+   live text sat cramped, then jumped apart when the settled message replaced
+   it with a single body. Inside the stream (.omp-streaming) only the reply's
+   outer edges are trimmed; blocks keep the margins they will have once
+   settled, which collapse across the wrappers as they do between siblings.
+   :where() keeps the selector at its old weight, so rules that already
+   outrank it (the transcript's paragraph spacing) still do. */
+:where(:not(.omp-streaming > *), .omp-streaming > :first-child) > .markdown-body > :first-child {
 	margin-top: 0;
 }
-.markdown-body > :last-child {
+:where(:not(.omp-streaming > *), .omp-streaming > :last-child) > .markdown-body > :last-child {
 	margin-bottom: 0;
 }
 .markdown-body p {
