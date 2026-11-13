@@ -646,7 +646,7 @@ const HubRow = memo(function HubRow({
 			{/* Secondary line: agent type, provenance/kind badges, resolved model,
 			    and the latest progress note. */}
 			<div className="flex items-center gap-2 px-3 pb-2 text-omp-xs">
-				<span className="shrink-0 font-medium text-(--omp-muted)">{agent.agent}</span>
+				<span className="min-w-16 shrink-0 font-medium text-(--omp-muted)">{agent.agent}</span>
 				{agent.agentSource && <Badge variant="muted">{sourceLabel(t, agent.agentSource)}</Badge>}
 				<Badge variant="muted">
 					{agent.kind === "advisor" ? t("agentHub.hub.readOnly") : t("agentHub.hub.kind.sub")}

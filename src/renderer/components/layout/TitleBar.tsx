@@ -465,7 +465,7 @@ export function TitleBar() {
 			{pageAgentId && <AgentTitleFacts agentId={pageAgentId} />}
 			{!pageAgentId && metricParts.length > 0 && (
 				<span
-					className="omp-session-metrics no-drag flex shrink-0 items-center gap-1.5 px-1.5 font-mono text-omp-sm tabular-nums text-[var(--omp-dim)]"
+					className="omp-session-metrics no-drag flex shrink-0 items-center gap-1.5 px-1.5 text-omp-sm tabular-nums text-[var(--omp-dim)]"
 					title={metricsTitle}
 				>
 					{metricParts.map((part, index) => (

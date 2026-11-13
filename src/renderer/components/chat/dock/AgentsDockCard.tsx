@@ -94,7 +94,13 @@ const SubagentRow = memo(function SubagentRow({
 					aria-hidden
 					className={cx(
 						"absolute inset-y-2 left-0 w-0.5 rounded-full",
-						live ? "bg-(--omp-link)" : agent.status === "failed" ? "bg-(--omp-error)" : "bg-(--omp-border)",
+						// The rail repeats the pill's color: only an agent that is working is
+						// blue; one waiting or paused stays neutral.
+						meta.variant === "info"
+							? "bg-(--omp-link)"
+							: agent.status === "failed"
+								? "bg-(--omp-error)"
+								: "bg-(--omp-border)",
 					)}
 				/>
 				<div className="flex w-full items-start">

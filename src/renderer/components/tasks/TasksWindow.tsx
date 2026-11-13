@@ -106,7 +106,7 @@ export function TasksWindow() {
 					/>
 					<div className="ml-auto flex items-center gap-3 pb-1.5">
 						<HealthPill />
-						<Button icon={<Plus size={12} />} onClick={newTask} size="sm" variant="primary">
+						<Button icon={<Plus size={12} />} onClick={newTask} size="sm">
 							{t("tasks.new")}
 						</Button>
 					</div>

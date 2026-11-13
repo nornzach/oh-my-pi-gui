@@ -427,26 +427,24 @@ export function ModelPicker() {
 																)}
 															</div>
 															{((model.name && model.name !== model.id) || model.description) && (
-																<span
-																	className="truncate font-mono text-omp-xxs text-(--omp-dim)"
-																	title={model.description}
-																>
-																	{[
-																		model.name && model.name !== model.id ? model.id : null,
-																		model.description,
-																	]
-																		.filter(Boolean)
-																		.join(" · ")}
+																<span className="truncate text-omp-xxs text-(--omp-dim)" title={model.description}>
+																	{/* Only the id is code; the description is prose and stays
+																	    in the interface face, which carries CJK text. */}
+																	{model.name && model.name !== model.id && (
+																		<span className="font-mono">{model.id}</span>
+																	)}
+																	{model.name && model.name !== model.id && model.description && " · "}
+																	{model.description}
 																</span>
 															)}
 														</div>
 														{model.int != null && Number.isFinite(model.int) && (
-															<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
+															<span className="shrink-0 text-omp-xxs tabular-nums text-(--omp-dim)">
 																{t("modelPicker.intelligence", { value: Math.round(model.int) })}
 															</span>
 														)}
 														{model.tps != null && Number.isFinite(model.tps) && model.tps > 0 && (
-															<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
+															<span className="shrink-0 text-omp-xxs tabular-nums text-(--omp-dim)">
 																{t("modelPicker.speed", {
 																	value:
 																		model.tps >= 10 ? Math.round(model.tps) : model.tps.toFixed(1),

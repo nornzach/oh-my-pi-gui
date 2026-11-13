@@ -37,16 +37,21 @@ export interface StatusMeta {
 const STATUS_META: Record<string, StatusMeta> = {
 	started: { label: "running", variant: "info", live: true, labelKey: "subagent.status.started" },
 	running: { label: "running", variant: "info", live: true, labelKey: "subagent.status.started" },
-	pending: { label: "pending", variant: "muted", live: true, labelKey: "subagent.status.pending" },
-	idle: { label: "idle", variant: "muted", live: true, labelKey: "subagent.status.idle" },
-	parked: { label: "parked", variant: "muted", live: true, labelKey: "subagent.status.parked" },
+	pending: { label: "pending", variant: "default", live: true, labelKey: "subagent.status.pending" },
+	idle: { label: "idle", variant: "default", live: true, labelKey: "subagent.status.idle" },
+	parked: { label: "parked", variant: "default", live: true, labelKey: "subagent.status.parked" },
 	stale: { label: "stale", variant: "warning", live: false, labelKey: "subagent.status.stale" },
 	completed: { label: "completed", variant: "success", live: false, labelKey: "subagent.status.completed" },
 	failed: { label: "failed", variant: "error", live: false, labelKey: "subagent.status.failed" },
-	aborted: { label: "cancelled", variant: "muted", live: false, labelKey: "subagent.status.cancelled" },
-	cancelled: { label: "cancelled", variant: "muted", live: false, labelKey: "subagent.status.cancelled" },
+	aborted: { label: "cancelled", variant: "default", live: false, labelKey: "subagent.status.cancelled" },
+	cancelled: { label: "cancelled", variant: "default", live: false, labelKey: "subagent.status.cancelled" },
 };
 
+/*
+ * Every known status draws the same outlined pill; quiet states take the
+ * neutral "default" outline rather than the borderless "muted" tag, so a row of
+ * agents reads as one column of pills whatever state each is in.
+ */
 /** Total lookup — unknown/future statuses degrade to a muted badge with the raw status text. */
 export function statusMeta(status: string): StatusMeta {
 	return STATUS_META[status] ?? { label: status, variant: "muted", live: false, labelKey: "subagent.status.unknown" };

@@ -469,7 +469,9 @@
 }
 
 .omp-transcript-editorial .omp-transcript-scroll {
-	scrollbar-gutter: stable;
+	/* Both edges: a gutter on the bar's side alone centers the transcript half
+	   a bar left of the composer below it, and the two columns stop lining up. */
+	scrollbar-gutter: stable both-edges;
 	/* TanStack Virtual owns transcript anchoring. Native browser anchoring can
 	   otherwise move the viewport a second time as the live row grows/swaps. */
 	overflow-anchor: none;

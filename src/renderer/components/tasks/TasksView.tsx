@@ -309,12 +309,12 @@ function TaskDetail({ task, runs }: { task: ScheduledTask; runs: TaskRun[] }) {
 						</Button>
 					)}
 					{task.state === "active" && (
-						<Button icon={<Pause size={12} />} onClick={() => void store.setEnabled(task.id, false)} size="sm">
+						<Button icon={<Pause size={12} />} onClick={() => void store.setEnabled(task.id, false)} size="sm" variant="ghost">
 							{t("tasks.detail.pause")}
 						</Button>
 					)}
 					{(task.state === "paused" || task.state === "disabled") && (
-						<Button icon={<Play size={12} />} onClick={() => void store.setEnabled(task.id, true)} size="sm">
+						<Button icon={<Play size={12} />} onClick={() => void store.setEnabled(task.id, true)} size="sm" variant="ghost">
 							{t("tasks.detail.resume")}
 						</Button>
 					)}

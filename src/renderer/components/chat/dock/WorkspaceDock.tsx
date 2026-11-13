@@ -124,7 +124,9 @@ function WorkspaceDockContent() {
 					)}
 					<div
 						className={cx(
-							"flex flex-col gap-1.5 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]",
+							// The reserved gutter hangs outside the column (negative margin of the
+							// bar's width), so the cards end on the composer's right edge.
+							"-mr-(--omp-scrollbar-size) flex flex-col gap-1.5 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]",
 							// Summary state stays compact. A FOCUSED card renders the full
 							// list; its cap is an INLINE style — arbitrary-value classes
 							// cannot express `calc(100dvh - 240px)` (the bare dash makes

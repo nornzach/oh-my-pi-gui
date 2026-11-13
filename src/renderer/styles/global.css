@@ -137,9 +137,15 @@ kbd,
    Scrollbars
    ============================================================================ */
 
+/* One size for every bar, named so a column that reserves a gutter can
+   compensate for exactly this width. */
+:root {
+	--omp-scrollbar-size: 9px;
+}
+
 ::-webkit-scrollbar {
-	width: 9px;
-	height: 9px;
+	width: var(--omp-scrollbar-size);
+	height: var(--omp-scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
