@@ -294,6 +294,16 @@
 	padding: 0.5em 1.25em 0.5em 0;
 	text-align: left;
 }
+/* A narrow column is as wide as its header and never narrower than a short
+   word, so "Owner", a date or a two-word note stays on one line while the
+   long column beside it takes the wrapping. The table scrolls sideways when
+   that no longer fits. */
+.markdown-body th {
+	white-space: nowrap;
+}
+.markdown-body td {
+	min-width: 6.25em;
+}
 .markdown-body th {
 	background: transparent;
 	font-weight: 600;
@@ -455,6 +465,14 @@
 
 .omp-column-workspace {
 	max-width: calc(var(--omp-column-workspace) + 2 * var(--omp-column-pad));
+}
+
+/* The dock's summary cap. In a short window it yields to the transcript: 40vh
+   of a 520px window left the conversation a 50px strip above it. The last
+   term keeps about a third of the height for reading and never squeezes the
+   dock below one card header. */
+.omp-dock-summary {
+	max-height: min(40vh, 320px, max(72px, calc(100dvh - 440px)));
 }
 
 /* Surface policy card: the single content-card recipe (hairline, no fill). */

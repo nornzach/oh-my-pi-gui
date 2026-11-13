@@ -15,9 +15,9 @@ import { Spinner } from "../common/Spinner";
 import { CodeBlock } from "./CodeBlock";
 
 let mermaidPromise: Promise<Mermaid> | null = null;
-/** Theme the shared mermaid singleton was last initialized with. */
-let initializedTheme: ResolvedTheme | null = null;
-/** Rendered SVG cache, keyed by `${theme}:${fnv(source)}`. */
+/** Palette the shared mermaid singleton was last initialized with. */
+let initializedPalette: string | null = null;
+/** Rendered SVG cache, keyed by `${palette.signature}:${fnv(source)}`. */
 const svgCache = new Map<string, string>();
 const CACHE_LIMIT = 50;
 let renderSeq = 0;
@@ -74,22 +74,164 @@ function sanitizeSvg(svg: string): string {
 		scrub(node as Element);
 		node = walker.nextNode();
 	}
+	// The diagram is shown through <img>. Mermaid sizes its root as width="100%"
+	// with a max-width style, which gives an image no intrinsic size, so the
+	// browser stretched every diagram to the full column and a three-node graph
+	// drew its labels at twice the size of the prose around it. The viewBox is
+	// the diagram's natural size: stating it lets the image scale down to fit
+	// and never up.
+	const viewBox = root
+		.getAttribute("viewBox")
+		?.trim()
+		.split(/[\s,]+/)
+		.map(Number);
+	if (viewBox?.length === 4 && viewBox[2] > 0 && viewBox[3] > 0) {
+		root.setAttribute("width", String(Math.ceil(viewBox[2])));
+		root.setAttribute("height", String(Math.ceil(viewBox[3])));
+		(root as unknown as SVGElement).style.removeProperty("max-width");
+	}
 	return new XMLSerializer().serializeToString(root);
 }
 
-async function renderDiagram(source: string, theme: ResolvedTheme): Promise<string> {
-	const key = `${theme}:${hashSource(source)}`;
+/** The interface colors a diagram is drawn with, as the hex values mermaid's theme engine needs. */
+interface DiagramPalette {
+	dark: boolean;
+	canvas: string;
+	text: string;
+	line: string;
+	accent: string;
+	fontFamily: string;
+	/** Identity of the palette: cache key and re-initialization trigger. */
+	signature: string;
+}
+
+type Rgb = [number, number, number];
+
+function toHex([r, g, b]: Rgb): string {
+	return `#${[r, g, b]
+		.map(channel =>
+			Math.round(Math.min(255, Math.max(0, channel)))
+				.toString(16)
+				.padStart(2, "0"),
+		)
+		.join("")}`;
+}
+
+function mix(from: Rgb, to: Rgb, amount: number): Rgb {
+	return [0, 1, 2].map(i => from[i] + (to[i] - from[i]) * amount) as Rgb;
+}
+
+/** Computed colors arrive as rgb()/rgba() or, for color-mix() tokens, color(srgb …). */
+function parseColor(value: string, behind: Rgb): Rgb | null {
+	const numbers = value.match(/-?\d*\.?\d+(?:e-?\d+)?/g)?.map(Number);
+	if (!numbers || numbers.length < 3) return null;
+	const scale = value.startsWith("color(") ? 255 : 1;
+	const rgb = numbers.slice(0, 3).map(channel => channel * scale) as Rgb;
+	const alpha = numbers.length > 3 ? numbers[3] : 1;
+	return alpha >= 1 ? rgb : mix(behind, rgb, alpha);
+}
+
+/**
+ * Diagrams follow the interface theme instead of mermaid's own palettes, whose
+ * lavender nodes were the one color on screen outside the accent family. The
+ * SVG is shown through <img>, where the page's custom properties do not reach,
+ * so the tokens are resolved to concrete colors here.
+ */
+function readDiagramPalette(): DiagramPalette {
+	// No layout engine (server render, the linkedom test harness): nothing is
+	// drawn there, so the palette only has to exist.
+	if (typeof window === "undefined" || typeof getComputedStyle !== "function" || !document.body) {
+		return {
+			dark: true,
+			canvas: "#181818",
+			text: "#ebebeb",
+			line: "#8f8f8f",
+			accent: "#ebebeb",
+			fontFamily: "sans-serif",
+			signature: "static",
+		};
+	}
+	const probe = document.createElement("span");
+	probe.style.display = "none";
+	document.body.appendChild(probe);
+	const read = (token: string, behind: Rgb, fallback: Rgb): Rgb => {
+		probe.style.color = `var(${token})`;
+		return parseColor(getComputedStyle(probe).color, behind) ?? fallback;
+	};
+	const dark = readResolvedTheme() === "dark";
+	const canvas = read(
+		"--omp-bg-primary",
+		dark ? [24, 24, 24] : [255, 255, 255],
+		dark ? [24, 24, 24] : [255, 255, 255],
+	);
+	const text = read("--omp-text", canvas, dark ? [235, 235, 235] : [20, 20, 20]);
+	const line = read("--omp-muted", canvas, mix(canvas, text, 0.55));
+	const accent = read("--omp-accent", canvas, text);
+	const fontFamily = getComputedStyle(document.body).fontFamily;
+	probe.remove();
+	const colors = [canvas, text, line, accent].map(toHex);
+	return {
+		dark,
+		canvas: colors[0],
+		text: colors[1],
+		line: colors[2],
+		accent: colors[3],
+		fontFamily,
+		signature: `${dark ? "d" : "l"}${colors.join("")}`,
+	};
+}
+
+function hexToRgb(hex: string): Rgb {
+	return [1, 3, 5].map(at => Number.parseInt(hex.slice(at, at + 2), 16)) as Rgb;
+}
+
+function diagramConfig(palette: DiagramPalette): MermaidConfig {
+	const canvas = hexToRgb(palette.canvas);
+	const accent = hexToRgb(palette.accent);
+	const text = hexToRgb(palette.text);
+	const fill = toHex(mix(canvas, accent, palette.dark ? 0.16 : 0.07));
+	const border = toHex(mix(canvas, accent, 0.55));
+	const quiet = toHex(mix(canvas, text, 0.05));
+	const hairline = toHex(mix(canvas, text, 0.2));
+	return {
+		startOnLoad: false,
+		theme: "base",
+		securityLevel: "strict",
+		themeVariables: {
+			darkMode: palette.dark,
+			background: palette.canvas,
+			fontFamily: palette.fontFamily,
+			fontSize: "14px",
+			primaryColor: fill,
+			primaryTextColor: palette.text,
+			primaryBorderColor: border,
+			secondaryColor: quiet,
+			secondaryTextColor: palette.text,
+			secondaryBorderColor: hairline,
+			tertiaryColor: quiet,
+			tertiaryTextColor: palette.text,
+			tertiaryBorderColor: hairline,
+			lineColor: palette.line,
+			textColor: palette.text,
+			titleColor: palette.text,
+			edgeLabelBackground: palette.canvas,
+			clusterBkg: quiet,
+			clusterBorder: hairline,
+			noteBkgColor: quiet,
+			noteTextColor: palette.text,
+			noteBorderColor: hairline,
+		},
+	};
+}
+
+async function renderDiagram(source: string, palette: DiagramPalette): Promise<string> {
+	const key = `${palette.signature}:${hashSource(source)}`;
 	const cached = svgCache.get(key);
 	if (cached !== undefined) return cached;
 	const mermaid = await loadMermaid();
-	if (initializedTheme !== theme) {
-		const config: MermaidConfig = {
-			startOnLoad: false,
-			theme: theme === "dark" ? "dark" : "default",
-			securityLevel: "strict",
-		};
-		mermaid.initialize(config);
-		initializedTheme = theme;
+	if (initializedPalette !== palette.signature) {
+		mermaid.initialize(diagramConfig(palette));
+		initializedPalette = palette.signature;
 	}
 	const id = `omp-mermaid-${renderSeq++}`;
 	let svg: string;
@@ -117,17 +259,24 @@ function readResolvedTheme(): ResolvedTheme {
 }
 
 /**
- * Resolved GUI scheme, tracked via the `data-theme` attribute on <html> so
- * custom themes (lib/themes) and OS flips in "system" mode both re-render.
+ * The palette diagrams are drawn with, re-read when <html> changes its scheme
+ * (`data-theme`, including OS flips in "system" mode) or its inline tokens (a
+ * custom theme from lib/themes), so diagrams re-render with the new colors.
  */
-function useResolvedTheme(): ResolvedTheme {
-	const [theme, setTheme] = useState<ResolvedTheme>(readResolvedTheme);
+function useDiagramPalette(): DiagramPalette {
+	const [palette, setPalette] = useState<DiagramPalette>(readDiagramPalette);
 	useEffect(() => {
-		const observer = new MutationObserver(() => setTheme(readResolvedTheme()));
-		observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+		const observer = new MutationObserver(() => {
+			const next = readDiagramPalette();
+			setPalette(current => (current.signature === next.signature ? current : next));
+		});
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["data-theme", "style", "class"],
+		});
 		return () => observer.disconnect();
 	}, []);
-	return theme;
+	return palette;
 }
 
 interface MermaidImageProps {
@@ -155,8 +304,8 @@ interface RenderState {
 
 export const MermaidBlock = memo(function MermaidBlock({ code, className }: MermaidBlockProps) {
 	const t = useT();
-	const theme = useResolvedTheme();
-	const cacheKey = `${theme}:${hashSource(code)}`;
+	const palette = useDiagramPalette();
+	const cacheKey = `${palette.signature}:${hashSource(code)}`;
 	const [state, setState] = useState<RenderState>(() => ({
 		key: cacheKey,
 		svg: svgCache.get(cacheKey) ?? null,
@@ -171,7 +320,7 @@ export const MermaidBlock = memo(function MermaidBlock({ code, className }: Merm
 		}
 		setState({ key: cacheKey, svg: null, failed: false });
 		let cancelled = false;
-		renderDiagram(code, theme).then(
+		renderDiagram(code, palette).then(
 			clean => {
 				if (!cancelled) setState({ key: cacheKey, svg: clean, failed: false });
 			},
@@ -182,7 +331,7 @@ export const MermaidBlock = memo(function MermaidBlock({ code, className }: Merm
 		return () => {
 			cancelled = true;
 		};
-	}, [code, theme, cacheKey]);
+	}, [code, palette, cacheKey]);
 
 	// Guard against showing the previous diagram while the effect for a new
 	// (code, theme) pair has not run yet.

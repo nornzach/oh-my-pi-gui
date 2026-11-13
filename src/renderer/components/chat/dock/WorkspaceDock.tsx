@@ -132,7 +132,8 @@ function WorkspaceDockContent() {
 							// cannot express `calc(100dvh - 240px)` (the bare dash makes
 							// the declaration invalid, silently removing every bound and
 							// killing scrollability).
-							focusedCard ? undefined : "max-h-[min(40vh,320px)]",
+							// The utility is the bound; .omp-dock-summary tightens it in a short window.
+							focusedCard ? undefined : "omp-dock-summary max-h-[min(40vh,320px)]",
 						)}
 						data-testid="workspace-dock"
 						ref={scrollerRef}
