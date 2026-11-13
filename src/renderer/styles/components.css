@@ -1729,6 +1729,74 @@
 	--omp-column-settings: 46rem;
 }
 
+/* ============================================================================
+   Travelling selection (components/common/Glide.tsx)
+
+   One mark under the selected item that slides to the next selection. This is
+   the one place a thing already on screen moves: the mark is the selection
+   itself changing place, and the content it sits under stays where it is.
+   The items' own selected styling steps aside only once the mark has a box
+   ([data-glide-ready]); without one they look as they always did.
+   ============================================================================ */
+.omp-glide {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: var(--glide-w);
+	height: var(--glide-h);
+	pointer-events: none;
+	transform: translate(var(--glide-x), var(--glide-y));
+	transition:
+		transform var(--omp-motion-med) var(--omp-ease-enter),
+		width var(--omp-motion-med) var(--omp-ease-enter),
+		height var(--omp-motion-med) var(--omp-ease-enter);
+}
+
+.omp-glide--pill {
+	border-radius: 0.5rem;
+	background: var(--omp-selected-bg);
+}
+
+.omp-glide--thumb {
+	border-radius: 8px;
+	background: var(--omp-segment-thumb);
+	box-shadow: var(--omp-shadow-sm);
+}
+
+.omp-glide--underline {
+	height: 2px;
+	border-radius: 1px;
+	background: var(--omp-accent);
+	transform: translate(var(--glide-x), calc(var(--glide-y) + var(--glide-h) - 2px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.omp-glide {
+		transition: none;
+	}
+}
+
+.omp-segmented {
+	position: relative;
+}
+
+.omp-segmented > button {
+	position: relative;
+}
+
+.omp-segmented[data-glide-ready] > button[aria-pressed="true"] {
+	background: transparent;
+	box-shadow: none;
+}
+
+.omp-sidebar-list[data-glide-ready] .omp-sidebar-session-row[data-glide-target] {
+	background: transparent;
+}
+
+.omp-tabs[data-glide-ready] > [role="tab"][aria-selected="true"] {
+	border-bottom-color: transparent;
+}
+
 /* Switches glide rather than snap. */
 .omp-switch-track {
 	transition: background-color var(--omp-motion-med) var(--omp-ease);

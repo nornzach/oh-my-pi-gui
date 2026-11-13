@@ -4,6 +4,7 @@
  */
 
 import { type KeyboardEvent, useRef } from "react";
+import { Glide } from "./Glide";
 
 export interface TabItem {
 	id: string;
@@ -48,11 +49,12 @@ export function Tabs({ tabs, activeId, onChange, compact, className, ariaLabel }
 	return (
 		<div
 			aria-label={ariaLabel}
-			className={`flex items-center gap-0.5 border-b border-(--omp-border-muted) ${className ?? ""}`.trim()}
+			className={`omp-tabs relative flex items-center gap-0.5 border-b border-(--omp-border-muted) ${className ?? ""}`.trim()}
 			onKeyDown={onKeyDown}
 			ref={listRef}
 			role="tablist"
 		>
+			<Glide activeKey={activeId} selector='[aria-selected="true"]' variant="underline" />
 			{tabs.map(tab => {
 				const active = tab.id === activeId;
 				return (

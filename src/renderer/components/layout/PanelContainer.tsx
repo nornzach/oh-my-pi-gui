@@ -9,6 +9,7 @@ import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { CHAT_PANEL_TABS, type PanelTab, useUiStore } from "../../stores/ui";
 import { AgentRoster, useAgentsTabSignal } from "../agents/AgentRoster";
 import { PanelErrorBoundary } from "../common";
+import { Glide } from "../common/Glide";
 import { BrowserPanel } from "../panels/BrowserPanel";
 import { BtwPanel } from "../panels/BtwPanel";
 import { DiffPanel } from "../panels/DiffPanel";
@@ -202,6 +203,7 @@ export function PanelContainer() {
 					{t("panel.title")} — {t("panel.subtitle")}
 				</h2>
 				<div className="omp-segmented omp-tab-scroller no-drag" onWheel={scrollStripOnWheel}>
+					<Glide activeKey={visiblePanelTab} selector='[aria-pressed="true"]' variant="thumb" />
 					{visibleTabs.map(({ id, labelKey, icon }) => {
 						const active = visiblePanelTab === id;
 						return (

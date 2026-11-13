@@ -6,6 +6,7 @@ export { AsyncSection, type AsyncSectionProps } from "./AsyncSection";
 export { Badge, type BadgeProps, type BadgeVariant } from "./Badge";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
 export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
+export { Glide, type GlideProps, type GlideVariant } from "./Glide";
 export { Input, type InputProps, TextArea, type TextAreaProps } from "./Input";
 export { Kbd, kbdClass } from "./Kbd";
 export { LangSwitcher, type LangSwitcherProps } from "./LangSwitcher";

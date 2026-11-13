@@ -33,6 +33,7 @@ import { useSessionStore } from "../../stores/session";
 import { type ToolEntry, useToolsStore } from "../../stores/tools";
 import { type DiffScope, useUiStore } from "../../stores/ui";
 import { ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
+import { Glide } from "../common/Glide";
 import { RepositoryChanges } from "./RepositoryChanges";
 import {
 	DiffBody,
@@ -541,6 +542,7 @@ export function DiffPanel() {
 				<span className="flex-1" />
 				{showLayout && (
 					<div className="omp-segmented" role="group" aria-label={t("diffPanel.layout")}>
+						<Glide activeKey={split ? "split" : "unified"} selector='[aria-pressed="true"]' variant="thumb" />
 						<button
 							aria-label={t("diffPanel.unified")}
 							title={t("diffPanel.unified")}

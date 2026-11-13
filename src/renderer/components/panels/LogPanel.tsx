@@ -11,6 +11,7 @@ import { copyText, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { toast } from "../../stores/toast";
 import { Button } from "../common";
+import { Glide } from "../common/Glide";
 import { type LogLevel, type ParsedLogLine, parseLogLine } from "./log-line";
 import { PanelEmpty, PanelSearch, PanelToolbar, ToolbarIconButton } from "./workspace-ui";
 
@@ -142,6 +143,7 @@ export function LogPanel() {
 			</PanelToolbar>
 			<div className="flex h-8 shrink-0 items-center gap-2 px-3 pb-1">
 				<div className="omp-segmented" role="group" aria-label={t("logPanel.levelLabel")}>
+					<Glide activeKey={levelFilter} selector='[aria-pressed="true"]' variant="thumb" />
 					{(["all", "info", "warn", "error"] as const).map(level => (
 						<button
 							className="flex h-6 items-center gap-1 px-2 text-omp-xs font-medium"

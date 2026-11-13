@@ -91,6 +91,7 @@ import {
 import { Button } from "../common";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
+import { Glide } from "../common/Glide";
 import { LangSwitcher } from "../common/LangSwitcher";
 import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
 import { useUnreadNoticeCount } from "./NotificationBell";
@@ -947,6 +948,7 @@ export function Sidebar() {
 				}}
 				data-active={active}
 				data-selected={selected || undefined}
+				data-glide-target={(active && !selecting && !agents?.pageShown) || undefined}
 				data-switch-pending={switchPendingTo === session.id || undefined}
 				data-has-actions={hasActions && !selecting}
 				data-actions-open={renaming}
@@ -1361,6 +1363,7 @@ export function Sidebar() {
 				{/* Header: the lane switch and session search. */}
 				<div className="drag-region flex h-12 shrink-0 items-center gap-1 px-2.5">
 					<div role="group" aria-label={t("sidebar.mode.aria")} className="omp-segmented no-drag">
+						<Glide activeKey={mode} selector='[aria-pressed="true"]' variant="thumb" />
 						{(["code", "work"] as const).map(value => {
 							const Icon = value === "code" ? Code2 : BriefcaseBusiness;
 							return (
@@ -1477,7 +1480,8 @@ export function Sidebar() {
 					</button>
 				</div>
 
-				<div className="omp-sidebar-list min-h-0 flex-1 overflow-y-auto px-2 pb-3 [overflow-anchor:none]">
+				<div className="omp-sidebar-list relative min-h-0 flex-1 overflow-y-auto px-2 pb-3 [overflow-anchor:none]">
+					<Glide activeKey={sessionId ?? null} selector="[data-glide-target]" variant="pill" />
 					{listError && sessions.length > 0 && (
 						<p role="alert" className="mx-2 mb-1 break-words text-omp-xs text-[var(--omp-error)]">
 							{t("sidebar.stale")}: {listError}
