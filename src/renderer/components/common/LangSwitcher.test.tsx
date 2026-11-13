@@ -122,7 +122,7 @@ describe("LangSwitcher", () => {
 		});
 		await flush();
 		const choices = [...document.querySelectorAll('[role="menuitem"]')];
-		expect(choices.map(choice => choice.textContent)).toEqual(["English✓", "Русский", "中文"]);
+		expect(choices.map(choice => choice.textContent)).toEqual(["English✓", "Русский", "中文", "ไทย"]);
 		await act(async () => {
 			choices[1].dispatchEvent(new Event("click", { bubbles: true }));
 		});
@@ -143,6 +143,7 @@ describe("LangSwitcher", () => {
 	it.each([
 		["zh", "中文"],
 		["ru", "RU"],
+		["th", "TH"],
 	])("rehydrates the persisted language %s", async (language, label) => {
 		// I18nProvider reads the LANG_KEY at mount; install a stub store first.
 		const store: Record<string, string> = { "omp.lang": language };

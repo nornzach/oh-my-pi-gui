@@ -10,6 +10,7 @@ import { type Language, languageDetails } from "../shared/languages";
 import { quotaPercentText } from "../shared/quotas";
 import { truncateMiddle } from "../shared/text";
 import { RU_TRAY_TEXT } from "./native-ru";
+import { TH_TRAY_TEXT } from "./native-th";
 
 export type TrayStatus = TrayState["status"];
 export type TrayLang = Language;
@@ -52,7 +53,14 @@ export const TRAY_LABELS = {
 export type TrayLabelKey = keyof typeof TRAY_LABELS;
 
 export function t(lang: TrayLang, key: TrayLabelKey): string {
-	return lang === "ru" ? RU_TRAY_TEXT[key] : TRAY_LABELS[key][lang];
+	switch (lang) {
+		case "ru":
+			return RU_TRAY_TEXT[key];
+		case "th":
+			return TH_TRAY_TEXT[key];
+		default:
+			return TRAY_LABELS[key][lang];
+	}
 }
 
 /** Which run state to show; the aggregate across windows, never per-window. */
