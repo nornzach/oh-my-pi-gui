@@ -2,7 +2,24 @@
 
 ## [Unreleased]
 
+## [0.9.43] - 2026-11-13
+
+### Added
+- Thai interface ([#50](https://github.com/nornzach/oh-my-pi-gui/pull/50) by [@T5ive](https://github.com/T5ive)).
+- Every command in the command palette has its own icon, so a section of a dozen commands no longer reads as one repeated mark.
+- The selection mark slides to the next item instead of fading out and in again: the tab underline, the segmented switches (Code/Work, inspector tabs, diff layout, log level) and the selected session in the sidebar.
+
+### Changed
+- Bundled agent: monorepo `90704a76`, upstream omp 18.20.0.
+- The agents dock gives way to the conversation in a short window, so the transcript keeps room to read.
+- Quiet agent states (paused, pending, idle, cancelled) draw the same outlined pill as running and completed, and only an agent that is working has the blue rail.
+- Diagrams in replies take their colors from the interface theme, and tables keep short columns on one line.
+
 ### Fixed
+- A reply no longer jumps apart when it finishes: headings and lists keep the same spacing while streaming as once the message settles.
+- The transcript, agents dock, composer and context bar share the same left and right edges.
+- Diagrams in replies are shown at their natural size instead of stretched to the full column.
+- The tasks window has a single primary button; model descriptions and the title bar's usage figures no longer set Chinese text in a monospace face.
 - Finished sub-agents no longer pile up in the Agents card above the composer. The card lists only the task calls still at work, so completed, failed, cancelled and stale agents from earlier tasks drop out of it. The drawer's Agents tab still lists every one.
 - An expanded step group no longer runs off the right edge of the transcript: with a long one-line command inside, the group and the text around it overflowed the column and the transcript scrolled sideways. Thinking blocks and tool details opened the same way are fixed too.
 - A running turn no longer shows a reply twice, once without its tool rows and once with them. Each reply now appears once, with its tool rows, while its tools run.
