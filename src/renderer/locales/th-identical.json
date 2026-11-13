@@ -55,6 +55,7 @@
 	"extPanel.tabs.mcp",
 	"feedback.envLine",
 	"hotkeys.row.prCenter",
+	"input.commandGroup.skill",
 	"input.githubIssue",
 	"input.githubPullRequest",
 	"invPanel.memory.scope",
