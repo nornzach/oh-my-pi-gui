@@ -6,25 +6,7 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
  * submenus, prompts) instead of injecting "/command" text into the composer.
  */
 
-import {
-	Blocks,
-	Check,
-	ChevronRight,
-	CornerDownLeft,
-	Cpu,
-	FolderTree,
-	Gauge,
-	History,
-	Layers,
-	LayoutPanelLeft,
-	type LucideIcon,
-	MessageSquare,
-	Plug,
-	Search,
-	Slash,
-	Wrench,
-	X,
-} from "lucide-react";
+import { Check, ChevronRight, CornerDownLeft, History, Search, X } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AvailableCommand } from "../../../shared/rpc-types";
 import { hydrateSession, hydrateTabSession } from "../../hooks/use-rpc-events";
@@ -33,7 +15,6 @@ import { scoreCommand } from "../../lib/command-ranking";
 import {
 	buildCommandMenu,
 	type CommandAffordance,
-	type CommandCategory,
 	type CommandMenuItem,
 	commandArgPrefill,
 	forkSessionFromGui,
@@ -53,6 +34,7 @@ import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Kbd, Spinner } from "../common";
 import { DIALOG_OVERLAY_Z, isTopmostDialog, registerDialogLayer } from "../common/dialog-layer";
+import { commandIcon } from "./command-icons";
 
 const RECENT_KEY = "omp.palette.recent";
 const RECENT_LIMIT = 5;
@@ -134,20 +116,6 @@ async function runAffordance(
 			return;
 	}
 }
-
-/** One glyph per category, so a long list reads by kind instead of repeating one marker. */
-const CATEGORY_ICONS: Record<CommandCategory, LucideIcon> = {
-	session: MessageSquare,
-	model: Cpu,
-	context: Gauge,
-	tools: Wrench,
-	providers: Plug,
-	extensions: Blocks,
-	modes: Layers,
-	view: LayoutPanelLeft,
-	workspace: FolderTree,
-	other: Slash,
-};
 
 export function CommandPalette() {
 	const tabRpc = useTabRpc();
@@ -596,7 +564,7 @@ export function CommandPalette() {
 		const disabled = item.affordance.kind === "unavailable" || blocked;
 		const isSubmenu = item.affordance.kind === "submenu";
 		const toggleOn = item.affordance.kind === "toggle" ? item.affordance.get() : null;
-		const CategoryIcon = CATEGORY_ICONS[item.category] ?? Slash;
+		const CommandIcon = commandIcon(item);
 
 		return (
 			<button
@@ -617,7 +585,7 @@ export function CommandPalette() {
 				{options?.recent ? (
 					<History className="shrink-0 text-(--omp-muted)" size={13} />
 				) : (
-					<CategoryIcon className="shrink-0 text-(--omp-muted)" size={13} />
+					<CommandIcon className="shrink-0 text-(--omp-muted)" size={13} />
 				)}
 				<span className="min-w-0 flex-1">
 					<span className="flex items-center gap-1.5">
