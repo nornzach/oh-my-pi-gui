@@ -628,6 +628,27 @@ describe("useRpcEvents stale run repair", () => {
 		expect(session.getState().isStreaming).toBe(false);
 		expect(session.getState().awaitingModelSince).toBeNull();
 	});
+
+	it("drops a maintenance row whose auto_compaction_end never arrived once the probe reports idle", async () => {
+		const { emitTabStatus } = installTabRoutedMockOmp();
+		const session = seedReadyTab("t-compact");
+		await mount(<RpcEventsProbe heartbeatMs={25} />);
+		emitTabStatus({ status: "ready", cwd: "/alpha" }, "t-compact");
+		await flush();
+
+		// auto_compaction_start landed, but its end was dropped (session switch / parked tab).
+		session.setState({ isCompacting: true, compactionInfo: { reason: "overflow", action: "compact" } });
+
+		vi.spyOn(window.omp.rpc, "getState").mockResolvedValue(settledState({}));
+		await act(async () => {
+			const { promise, resolve } = Promise.withResolvers<void>();
+			setTimeout(resolve, 80);
+			await promise;
+		});
+
+		expect(session.getState().isCompacting).toBe(false);
+		expect(session.getState().compactionInfo).toBeNull();
+	});
 });
 
 describe("useRpcEvents awaiting-model marker", () => {

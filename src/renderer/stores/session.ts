@@ -148,6 +148,9 @@ export const createSessionStore = () =>
 				cwd: state.cwd,
 				isStreaming: state.isStreaming,
 				isCompacting: state.isCompacting,
+				// The status row keys off compactionInfo alone; a missed
+				// auto_compaction_end must not leave it up once the agent reports idle.
+				...(state.isCompacting ? {} : { compactionInfo: null }),
 				contextUsage: state.contextUsage ?? null,
 				messageCount: state.messageCount,
 				queuedMessageCount: state.queuedMessageCount,

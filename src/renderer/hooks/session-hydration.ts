@@ -355,7 +355,10 @@ export function repairStaleRunState(
 ): void {
 	const session = sessionRuntimeStore<SessionStore>(tabId, "session")?.getState();
 	if (!session || session.eventVersion !== eventVersionAtProbe) return;
-	if (session.isStreaming === (state.isStreaming === true)) return;
+	const streamingAgrees = session.isStreaming === (state.isStreaming === true);
+	// A lost auto_compaction_end leaves the maintenance row up on an idle tab.
+	const compactingAgrees = state.isCompacting === true || (!session.isCompacting && session.compactionInfo == null);
+	if (streamingAgrees && compactingAgrees) return;
 	void hydrateTabSession(tabId);
 }
 
