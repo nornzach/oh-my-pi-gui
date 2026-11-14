@@ -10,7 +10,7 @@
 - The selection mark slides to the next item instead of fading out and in again: the tab underline, the segmented switches (Code/Work, inspector tabs, diff layout, log level) and the selected session in the sidebar.
 
 ### Changed
-- Bundled agent: monorepo `90704a76`, upstream omp 18.20.0.
+- Bundled agent: monorepo `3d754e99c6`, upstream omp 18.20.0: prepend project and overlay bash pattern arrays onto global rules, visually indicate covered vs prompted segments in compound bash approval prompts, compound bash approval row judgment with env allowlists, TUI diff-line parsing optimisations.
 - The agents dock gives way to the conversation in a short window, so the transcript keeps room to read.
 - Quiet agent states (paused, pending, idle, cancelled) draw the same outlined pill as running and completed, and only an agent that is working has the blue rail.
 - Diagrams in replies take their colors from the interface theme, and tables keep short columns on one line.

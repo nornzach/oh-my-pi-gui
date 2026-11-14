@@ -25,7 +25,7 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
 [Features](#en-features) · [What's new in 0.9.43](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.43 release.** The improvements below are included in v0.9.43, with the bundled agent built from monorepo `90704a76` (upstream omp 18.20.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+> **v0.9.43 release.** The improvements below are included in v0.9.43, with the bundled agent built from monorepo `3d754e99c6` (upstream omp 18.20.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -75,7 +75,7 @@ v0.9.43 polishes the surfaces you look at all day and brings in omp 18.20:
 | **Lined up** | The transcript, agents dock, composer and context bar share the same edges; quiet agent states draw the same outlined pill as running ones. |
 | **In a short window** | The agents dock gives way so the conversation keeps room to read. |
 | **Thai interface** | Thai joins English, Chinese and Russian ([#50](https://github.com/nornzach/oh-my-pi-gui/pull/50)). |
-| **Bundled agent** | Monorepo `90704a76`, upstream omp 18.20.0. |
+| **Bundled agent** | Rebuilt from monorepo `3d754e99c6`, upstream omp 18.20.0: prepend project and overlay bash pattern arrays onto global rules, visual coverage indicators in compound bash approval prompts, TUI diff-line parsing optimisations. |
 <a id="en-gallery"></a>
 ### Explore the interface
 
@@ -400,7 +400,7 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 [功能全览](#zh-features) · [0.9.43 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.43 功能展示。** 下文改进均纳入 v0.9.43，内置 Agent 基于 monorepo `90704a76` 构建（上游 omp 18.20.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.43 功能展示。** 下文改进均纳入 v0.9.43，内置 Agent 基于 monorepo `3d754e99c6` 构建（上游 omp 18.20.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -450,7 +450,7 @@ v0.9.43 打磨了每天都在看的界面，并带来 omp 18.20：
 | **边缘对齐** | 对话、代理面板、输入框和上下文栏共用同样的左右边缘；安静状态的代理与运行中的代理使用同一种描边标签。 |
 | **短窗口** | 窗口较矮时代理面板会让位，对话区保留阅读空间。 |
 | **泰语界面** | 泰语加入英文、中文和俄文（[#50](https://github.com/nornzach/oh-my-pi-gui/pull/50)）。 |
-| **内置代理** | monorepo `90704a76`，上游 omp 18.20.0。 |
+| **内置代理** | 基于 monorepo `3d754e99c6` 重新构建，上游 omp 18.20.0：项目与 overlay bash 模式数组前置到全局规则，复合 bash 审批提示中的覆盖/提示段可视化指示，TUI diff 行解析性能优化。 |
 <a id="zh-gallery"></a>
 ### 界面导览
 
