@@ -419,7 +419,9 @@ export function InputArea() {
 			if (!quote) return;
 			const el = textareaRef.current;
 			const draft = useComposerStore.getState().draft;
-			const caret = el && document.activeElement === el ? el.selectionStart : draft.length;
+			// Selecting the excerpt moved focus to the transcript, but a blurred
+			// textarea still holds its caret: that is where the reply was going.
+			const caret = el ? el.selectionStart : draft.length;
 			const next = insertQuote(draft, caret, quote);
 			setText(next.text);
 			requestAnimationFrame(() => {

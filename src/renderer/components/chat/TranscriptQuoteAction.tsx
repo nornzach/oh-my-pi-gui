@@ -32,6 +32,9 @@ export function TranscriptQuoteAction({
 	const [anchor, setAnchor] = useState<Anchor | null>(null);
 	const pointerDown = useRef(false);
 	const pending = useRef<number | null>(null);
+	const buttonRef = useRef<HTMLButtonElement>(null);
+	const shown = useRef(false);
+	shown.current = anchor !== null;
 
 	useEffect(() => {
 		const measure = () => {
@@ -49,7 +52,9 @@ export function TranscriptQuoteAction({
 				setAnchor(null);
 				return;
 			}
-			const below = first.top < FLIP_MARGIN;
+			// Flip below when the space above the selection inside the transcript runs
+			// out, so the action never covers the tab bar or title bar.
+			const below = first.top < transcript.getBoundingClientRect().top + FLIP_MARGIN;
 			setAnchor(
 				below
 					? { x: last.left + last.width / 2, y: last.bottom, below: true }
@@ -72,7 +77,22 @@ export function TranscriptQuoteAction({
 		};
 		const hide = () => setAnchor(null);
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") hide();
+			if (event.key === "Escape") {
+				// Leaving the action hands focus back to the transcript it came from.
+				if (document.activeElement === buttonRef.current) transcriptRef.current?.focus();
+				hide();
+			}
+			// A keyboard selection reaches the action with Tab; focusing a button keeps
+			// the selection, and Enter then quotes it.
+			if (
+				event.key === "Tab" &&
+				!event.shiftKey &&
+				shown.current &&
+				transcriptRef.current?.contains(document.activeElement)
+			) {
+				event.preventDefault();
+				buttonRef.current?.focus();
+			}
 		};
 		document.addEventListener("selectionchange", schedule);
 		document.addEventListener("pointerdown", onPointerDown, true);
@@ -111,6 +131,7 @@ export function TranscriptQuoteAction({
 		<button
 			type="button"
 			data-quote-action
+			ref={buttonRef}
 			className="omp-quote-action omp-pop-in fixed z-[90] flex h-7 items-center gap-1.5 rounded-lg border border-(--omp-border) bg-(--omp-bg-elevated) px-2.5 text-omp-xs font-medium text-(--omp-text) shadow-(--omp-shadow-md) hover:bg-(--omp-selected-bg)"
 			onClick={quote}
 			// Keep the selection: a mousedown on a button would otherwise collapse it first.

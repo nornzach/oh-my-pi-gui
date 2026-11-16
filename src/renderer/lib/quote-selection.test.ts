@@ -1,5 +1,49 @@
+import { parseHTML } from "linkedom";
 import { describe, expect, it } from "vitest";
-import { insertQuote, toBlockquote } from "./quote-selection";
+import { insertQuote, quotableContainer, toBlockquote } from "./quote-selection";
+
+const { document } = parseHTML(`<html><body>
+	<div id="transcript">
+		<div class="omp-user-bubble-content"><div class="markdown-body"><p id="user">Question</p></div></div>
+		<div class="omp-assistant-turn"><div class="markdown-body"><p id="a1">First</p><p id="a2">Second</p></div>
+			<div class="omp-tool-card"><div class="markdown-body"><p id="tool">Tool output</p></div></div>
+		</div>
+		<div class="omp-streaming-turn">
+			<div class="omp-thinking-block"><div class="markdown-body"><p id="thinking">Live thought</p></div></div>
+		</div>
+	</div>
+	<div class="markdown-body"><p id="outside">Elsewhere</p></div>
+</body></html>`);
+const transcript = document.getElementById("transcript") as unknown as Element;
+
+/** A one-range selection from the text of `fromId` to the text of `toId`. */
+function selectionOf(fromId: string, toId = fromId): Selection {
+	const text = (id: string) => (document.getElementById(id) as unknown as Element).firstChild as Node;
+	return {
+		isCollapsed: false,
+		rangeCount: 1,
+		getRangeAt: () => ({ startContainer: text(fromId), endContainer: text(toId) }) as unknown as Range,
+	} as unknown as Selection;
+}
+
+describe("quotableContainer", () => {
+	it("accepts a selection inside one settled message, across its paragraphs", () => {
+		expect(quotableContainer(selectionOf("a1", "a2"), transcript)).not.toBeNull();
+	});
+
+	it("refuses a selection that spans two messages", () => {
+		expect(quotableContainer(selectionOf("user", "a1"), transcript)).toBeNull();
+	});
+
+	it("refuses the live turn, including its thinking block beside the streamed text", () => {
+		expect(quotableContainer(selectionOf("thinking"), transcript)).toBeNull();
+	});
+
+	it("refuses tool output and text outside the transcript", () => {
+		expect(quotableContainer(selectionOf("tool"), transcript)).toBeNull();
+		expect(quotableContainer(selectionOf("outside"), transcript)).toBeNull();
+	});
+});
 
 describe("toBlockquote", () => {
 	it("prefixes every line, keeps inner blank lines as bare markers and trims blank edges", () => {

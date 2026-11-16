@@ -631,6 +631,30 @@ describe("InputArea prompt history", () => {
 	});
 });
 
+describe("InputArea transcript quote", () => {
+	it("inserts a quote at the caret the textarea kept after losing focus (#54)", async () => {
+		await mount();
+		await typeInto(findTextarea(), "First point.Second point.");
+		// Selecting the excerpt moved focus to the transcript; the blurred textarea
+		// still remembers where the reply was being written.
+		Object.defineProperty(findTextarea(), "selectionStart", { configurable: true, value: "First point.".length });
+		(document.activeElement as unknown as { blur?: () => void } | null)?.blur?.();
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent("omp:quote-composer", { detail: { quote: "> quoted", tabId: "t0" } }));
+		});
+		expect(useComposerStore.getState().draft).toBe("First point.\n\n> quoted\n\nSecond point.");
+	});
+
+	it("ignores a quote addressed to another tab", async () => {
+		await mount();
+		await typeInto(findTextarea(), "draft");
+		await act(async () => {
+			window.dispatchEvent(new CustomEvent("omp:quote-composer", { detail: { quote: "> other", tabId: "t1" } }));
+		});
+		expect(useComposerStore.getState().draft).toBe("draft");
+	});
+});
+
 describe("InputArea draft editor", () => {
 	// ⌃G alone was undiscoverable: the full-screen editor had no visible entry
 	// point, and both entries must hand it the expanded draft — a marker pasted

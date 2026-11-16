@@ -8,8 +8,12 @@
 
 /** Containers a quote may come from: one message's rendered text. */
 const QUOTABLE = ".markdown-body, .omp-user-bubble-content";
-/** Inside these the text is not the conversation itself, or not settled yet. */
-const EXCLUDED = ".omp-streaming, .omp-tool-card";
+/**
+ * Inside these the text is not the conversation itself, or not settled yet. The
+ * live turn as a whole: its thinking block renders beside the streamed text,
+ * not inside it, and changes just as much.
+ */
+const EXCLUDED = ".omp-streaming-turn, .omp-streaming, .omp-tool-card";
 /** Chrome rendered inside message text that is not part of what was said. */
 const CHROME = "button, .omp-code-block-header, .katex-mathml, [aria-hidden='true']:not(.katex-html)";
 
@@ -28,7 +32,7 @@ export function quotableContainer(selection: Selection | null, transcript: Eleme
 }
 
 function elementOf(node: Node): Element | null {
-	return node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+	return node.nodeType === 1 ? (node as Element) : node.parentElement;
 }
 
 /**
