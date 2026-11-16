@@ -49,6 +49,7 @@ const TERMINAL_DISPLAY_SETTINGS = new Set([
 	"theme.dark",
 	"theme.light",
 	"tui.tight",
+	"tui.spinnerInterval",
 	"colorBlindMode",
 	"spelling.typoDetection",
 	"spelling.autocomplete",

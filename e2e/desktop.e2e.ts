@@ -109,7 +109,7 @@ test("settings expose eight groups, translated search and independent display pr
 	await page.getByRole("button", { name: "Settings", exact: true }).click();
 	const settings = page.getByRole("dialog");
 	await expect(settings.locator(".settings-nav-group-label")).toHaveCount(8);
-	await settings.getByRole("button", { name: "Appearance & use", exact: true }).click();
+	await settings.getByRole("button", { name: "GUI", exact: true }).click();
 	await expect(settings).toContainText("Choose GUI theme");
 	await page.screenshot({ path: "test-results/01-settings.png", scale: "css", animations: "disabled" });
 	const search = settings.getByPlaceholder("Search settings…");
@@ -200,6 +200,61 @@ test("math survives history reload and scrolls inside its column in both themes"
 		await page.screenshot({ path: `test-results/math-${theme}.png`, scale: "css", animations: "disabled" });
 	}
 	await page.setViewportSize(viewport);
+	expect(errors).toEqual([]);
+});
+
+test("quoting keeps the draft caret, preserves formula source and excludes the live turn", async () => {
+	await command("fixture math");
+	const markdown = page
+		.locator(".markdown-body")
+		.filter({ has: page.locator(".katex-display") })
+		.last();
+	const paragraph = markdown.locator("p").first();
+	const input = page.locator("textarea").first();
+	await input.fill("Before. After.");
+	await input.evaluate(element => (element as HTMLTextAreaElement).setSelectionRange(7, 7));
+	await paragraph.scrollIntoViewIfNeeded();
+	await paragraph.click();
+	await paragraph.evaluate(element => {
+		const range = document.createRange();
+		range.selectNodeContents(element);
+		document.getSelection()?.removeAllRanges();
+		document.getSelection()?.addRange(range);
+	});
+	const quote = page.getByRole("button", { name: "Quote", exact: true });
+	await expect(quote).toBeInViewport();
+	await page.screenshot({ path: "test-results/quote-selection.png", scale: "css", animations: "disabled" });
+	await quote.click();
+	const expected = "Before.\n\n> 只有统计口径相同时，才有：\n\nAfter.";
+	await expect(input).toHaveValue(expected);
+	expect(await input.evaluate(element => (element as HTMLTextAreaElement).selectionStart)).toBe(
+		expected.indexOf("After."),
+	);
+	await input.fill("");
+	const formula = markdown.locator(".katex-display").first();
+	const tex = await formula.locator('annotation[encoding="application/x-tex"]').textContent();
+	await formula.scrollIntoViewIfNeeded();
+	await formula.click();
+	await formula.evaluate(element => {
+		const range = document.createRange();
+		range.selectNode(element);
+		document.getSelection()?.removeAllRanges();
+		document.getSelection()?.addRange(range);
+	});
+	await expect(quote).toBeVisible();
+	await quote.click();
+	await expect(input).toHaveValue(`> $$${tex?.trim()}$$\n\n`);
+	await command("fixture stream");
+	const live = page.locator(".omp-streaming-turn .markdown-body").last();
+	await expect(live).toContainText("Stream chunk");
+	await live.evaluate(element => {
+		const range = document.createRange();
+		range.selectNodeContents(element);
+		document.getSelection()?.removeAllRanges();
+		document.getSelection()?.addRange(range);
+	});
+	await expect(quote).toHaveCount(0);
+	await page.getByRole("button", { name: "Abort", exact: true }).click();
 	expect(errors).toEqual([]);
 });
 
@@ -310,7 +365,11 @@ test("security distinguishes unavailable, disabled, unscanned, running, failed a
 		await page.evaluate(value => window.omp.rpc.bash(`fixture:security:${value}`), state);
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const modal = page.getByRole("dialog");
-		await modal.getByRole("button", { name: "Permissions & security", exact: true }).click();
+		const security = modal.getByRole("button", { name: "Security Center", exact: true });
+		if (!(await security.isVisible())) {
+			await modal.getByRole("button", { name: "Permissions & security", exact: true }).click();
+		}
+		await security.click();
 		await expect(modal).toContainText(expected);
 		if (state !== "clear") await expect(modal).not.toContainText("No findings in this scan");
 		await page.screenshot({ path: `test-results/security-${state}.png`, scale: "css", animations: "disabled" });
@@ -379,7 +438,7 @@ test("narrow windows and 200 percent zoom keep settings and primary actions reac
 		);
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const modal = page.getByRole("dialog");
-		await modal.getByRole("button", { name: "Appearance & use", exact: true }).click();
+		await modal.getByRole("button", { name: "GUI", exact: true }).click();
 		const toggle = modal.getByRole("switch", { name: "Compact conversation spacing", exact: true });
 		await toggle.scrollIntoViewIfNeeded();
 		await toggle.click();

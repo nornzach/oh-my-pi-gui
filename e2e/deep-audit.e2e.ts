@@ -76,6 +76,7 @@ const TERMINAL_DISPLAY_PATHS = new Set([
 	"theme.dark",
 	"theme.light",
 	"tui.tight",
+	"tui.spinnerInterval",
 	"colorBlindMode",
 	"hideThinkingBlock",
 	"proseOnlyThinking",
@@ -177,7 +178,8 @@ function alternateNumber(input: {
 	const max = input.max === null || input.max === "" ? Number.POSITIVE_INFINITY : Number(input.max);
 	const step =
 		input.step === null || input.step === "" || input.step === "any" ? 1 : Math.abs(Number(input.step)) || 1;
-	const candidates = [current + step, current - step, 1, 0];
+	const delta = Number.isInteger(current) ? step : Math.min(step, 0.01);
+	const candidates = [Number((current + delta).toFixed(8)), Number((current - delta).toFixed(8)), 1, 0];
 	return candidates.find(
 		candidate => Number.isFinite(candidate) && candidate >= min && candidate <= max && candidate !== current,
 	);
@@ -283,6 +285,41 @@ async function mutateEntry(
 				return { write: "skipped-no-control", readback: "not-run", restore: "not-run", notes };
 			const next = initial !== true;
 			await toggle.click();
+			if (entry.provenance?.layers.some(layer => ["runtime", "overlay", "project"].includes(layer))) {
+				const readProvenance = async () => {
+					const response = await page.evaluate(() => window.omp.rpc.getSettingsSchema());
+					if (!response.success) throw new Error(response.error);
+					return (response.data as SettingsSchemaResult).entries.find(item => item.path === entry.path)
+						?.provenance;
+				};
+				await expect.poll(async () => (await readProvenance())?.globalValue).toEqual(next);
+				if (equalJson(await readSetting(page, entry.path), initial)) {
+					await expect(row.locator('[aria-live="polite"]')).toContainText(
+						"Saved globally, but not in effect here",
+					);
+					const readbackValue = await pollSetting(page, entry.path, initial);
+					const globalBefore = entry.provenance.globalValue;
+					const reset = row.getByRole("button", { name: "Remove global override", exact: true });
+					const restoredInUi = globalBefore === undefined && (await reset.count()) > 0;
+					if (restoredInUi) {
+						await reset.click();
+					} else {
+						await writeSetting(page, entry.path, globalBefore);
+					}
+					await expect.poll(async () => (await readProvenance())?.globalValue).toEqual(globalBefore);
+					await pollSetting(page, entry.path, initial);
+					return {
+						write: "passed",
+						readback: "passed",
+						restore: restoredInUi ? "passed" : "rpc-fallback",
+						changedTo: next,
+						readbackValue,
+						notes: [
+							"global write and reset verified; overriding layer retains the effective value and GUI explains it",
+						],
+					};
+				}
+			}
 			const readbackValue = await pollSetting(page, entry.path, next);
 			if (initial === undefined) {
 				const restore = await restoreInitial(page, entry.path, initial);
@@ -394,14 +431,17 @@ async function mutateEntry(
 			if ((await input.count()) === 0)
 				return { write: "skipped-no-control", readback: "not-run", restore: "not-run", notes };
 			const next = safeStringValue(entry, profile);
+			const apply = row.getByRole("button", { name: /Apply|应用/ });
 			await input.fill(next);
-			await input.press("Enter").catch(() => input.blur());
+			if ((await apply.count()) > 0) await apply.click();
+			else await input.press("Enter").catch(() => input.blur());
 			const readbackValue = await pollSetting(page, entry.path, next);
 			const restore = await restoreInitial(page, entry.path, initial);
 			if (initial === undefined)
 				return { write: "passed", readback: "passed", restore, changedTo: next, readbackValue, notes };
 			await input.fill(initial == null ? "" : String(initial));
-			await input.press("Enter").catch(() => input.blur());
+			if ((await apply.count()) > 0) await apply.click();
+			else await input.press("Enter").catch(() => input.blur());
 			await pollSetting(page, entry.path, initial == null ? "" : initial);
 			return { write: "passed", readback: "passed", restore: "passed", changedTo: next, readbackValue, notes };
 		}
@@ -414,7 +454,9 @@ async function mutateEntry(
 				const changed =
 					entry.path === "bash.patterns"
 						? [{ match: "echo gui-audit-block", approval: "deny" }]
-						: ["__gui_audit__"];
+						: entry.path === "bashInterceptor.patterns"
+							? [{ pattern: "^echo gui-audit$", tool: "read", message: "GUI audit rule" }]
+							: ["__gui_audit__"];
 				await textarea.fill(JSON.stringify(changed, null, 2));
 				await row.getByRole("button", { name: /Apply|应用/ }).click();
 				const readbackValue = await pollSetting(page, entry.path, changed);
@@ -570,12 +612,11 @@ async function mutateEntry(
 				await add.click();
 				const changed = await readSetting(page, entry.path);
 				if (!changed || typeof changed !== "object" || Array.isArray(changed) || equalJson(changed, initial)) {
-					await page.keyboard.press("Escape");
 					return {
 						write: "skipped-no-control",
 						readback: "not-run",
 						restore: "not-run",
-						notes: ["record editor has no available provider/key option"],
+						notes: ["record editor opened an incomplete draft; no value was written"],
 					};
 				}
 				const readbackValue = changed;
@@ -806,6 +847,11 @@ test("deep GUI audit: settings rows, nested controls, and command discoverabilit
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const capabilitiesSettings = page.getByRole("dialog", { name: "Settings", exact: true });
 		await expect(capabilitiesSettings).toBeVisible();
+		const capabilitiesNav = capabilitiesSettings.locator(".settings-nav-item", { hasText: "OMP Capabilities" });
+		if (!(await capabilitiesNav.isVisible())) {
+			await capabilitiesSettings.locator(".settings-nav-group-label", { hasText: "Extensions & resources" }).click();
+		}
+		await capabilitiesNav.click();
 		const settingsCommandCenter = capabilitiesSettings.locator('[data-command-center-entry="true"]');
 		await expect(settingsCommandCenter).toBeVisible();
 		await settingsCommandCenter.click();
@@ -813,8 +859,8 @@ test("deep GUI audit: settings rows, nested controls, and command discoverabilit
 		await expect(page.getByRole("dialog")).toBeVisible();
 		await page.keyboard.press("Escape");
 		await expect(page.getByRole("dialog")).toHaveCount(0);
-		await expect(page.locator('button[data-command-center-entry="true"]').first().locator("kbd")).toContainText(
-			"⌘K / ⌃K",
+		await expect(page.locator('button[data-command-center-entry="true"]').first()).toHaveAccessibleName(
+			"Commands ⌘K",
 		);
 		await page.locator('button[data-command-center-entry="true"]').first().click();
 		const palette = page.getByRole("dialog");

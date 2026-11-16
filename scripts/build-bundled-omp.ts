@@ -319,13 +319,21 @@ await stageNativeAddon(target);
 try {
 	try {
 		await runPackageScript(statsDir, "gen:stats");
-		// The content-addressed export viewer, as upstream's build-binary.ts embeds it.
+		// Fork builds have no upstream CDN release for their viewer hash. Embed the
+		// generated viewer so exported sessions can open without that hosted asset.
 		await runPackageScript(collabWebDir, "gen:export-viewer");
+		const viewerAsset = (await Bun.file(
+			path.join(codingAgentDir, "src/export/html/viewer.generated.json"),
+		).json()) as { file: string; integrity: string };
+		const exportViewer = await Bun.file(path.join(codingAgentDir, "export-assets", viewerAsset.file)).text();
+		const integrity = `sha256-${Buffer.from(Bun.SHA256.hash(exportViewer)).toBase64()}`;
+		if (integrity !== viewerAsset.integrity) throw new Error("Generated export viewer integrity mismatch");
 		const [platform, arch] = target.platformTag.split("-");
 		await compileCodingAgent({
 			repoRoot,
 			entrypoint: path.join(codingAgentDir, "src", "cli.ts"),
 			outfile: out,
+			exportViewer,
 			native: { platform: platform!, arch: arch! },
 			...(target.target ? { target: target.target } : {}),
 			skipBuiltinCodesign: shouldAdhocSign,

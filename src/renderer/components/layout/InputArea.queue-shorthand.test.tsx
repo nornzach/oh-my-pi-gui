@@ -635,6 +635,8 @@ describe("InputArea transcript quote", () => {
 	it("inserts a quote at the caret the textarea kept after losing focus (#54)", async () => {
 		await mount();
 		await typeInto(findTextarea(), "First point.Second point.");
+		const setSelectionRange = vi.fn();
+		Object.assign(findTextarea(), { setSelectionRange });
 		// Selecting the excerpt moved focus to the transcript; the blurred textarea
 		// still remembers where the reply was being written.
 		Object.defineProperty(findTextarea(), "selectionStart", { configurable: true, value: "First point.".length });
@@ -642,7 +644,10 @@ describe("InputArea transcript quote", () => {
 		await act(async () => {
 			window.dispatchEvent(new CustomEvent("omp:quote-composer", { detail: { quote: "> quoted", tabId: "t0" } }));
 		});
+		await flush();
 		expect(useComposerStore.getState().draft).toBe("First point.\n\n> quoted\n\nSecond point.");
+		const caretAfterQuote = "First point.\n\n> quoted\n\n".length;
+		expect(setSelectionRange).toHaveBeenCalledWith(caretAfterQuote, caretAfterQuote);
 	});
 
 	it("ignores a quote addressed to another tab", async () => {

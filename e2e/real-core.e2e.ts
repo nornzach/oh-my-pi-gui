@@ -46,9 +46,8 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 	const page = await app.firstWindow();
 	const errors: string[] = [];
 	page.on("pageerror", error => errors.push(error.message));
-	const closeWelcomeIfPresent = async (title: string, closeLabel: string) => {
+	const closeWelcome = async (title: string | RegExp, closeLabel: string | RegExp) => {
 		const welcome = page.getByRole("dialog", { name: title, exact: true });
-		if ((await welcome.count()) === 0) return;
 		await expect(welcome).toBeVisible();
 		await welcome.getByRole("button", { name: closeLabel, exact: true }).click();
 		await expect(welcome).toHaveCount(0);
@@ -77,6 +76,9 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 				const before = await rpc.getState();
 				const settings = await rpc.getSettings();
 				const schema = await rpc.getSettingsSchema();
+				const brokerSet = await rpc.setSetting("auth.broker.url", "http://127.0.0.1:9/gui-audit");
+				const brokerReset = await rpc.setSetting("auth.broker.url", undefined);
+				const brokerAfterReset = await rpc.getSettings(["auth.broker.url"]);
 				const changed = await rpc.setSetting("compaction.enabled", false);
 				const effective = await rpc.getState();
 				const changes = await rpc.getGitChanges();
@@ -93,6 +95,9 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 					before,
 					settings,
 					schema,
+					brokerSet,
+					brokerReset,
+					brokerAfterReset,
 					changed,
 					effective,
 					changes,
@@ -108,6 +113,10 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			path.join(profile, "audit-export.html"),
 		);
 		for (const response of Object.values(evidence)) expect(response.success, JSON.stringify(response)).toBe(true);
+		expect(evidence.brokerAfterReset.data).toMatchObject({ values: {} });
+		expect(
+			(evidence.brokerAfterReset.data as { values: Record<string, unknown> }).values["auth.broker.url"],
+		).toBeUndefined();
 		expect(evidence.changed.data).toMatchObject({ value: false });
 		expect(evidence.effective.data).toMatchObject({ autoCompactionEnabled: false });
 		expect(evidence.changes.data).toMatchObject({ isRepo: false });
@@ -148,7 +157,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		}, original.sessionFile!);
 		await page.reload();
 		await expect(page.locator("[data-transcript-kind]")).toContainText(["arm audit ok"]);
-		await closeWelcomeIfPresent("Welcome to omp", "Close");
+		await closeWelcome("Welcome to omp", "Close");
 		// App-wide tools live in the sidebar's "More" menu.
 		await page.getByRole("button", { name: "Show more navigation", exact: true }).click();
 		await page.getByRole("menuitem", { name: /^Session stats/ }).click();
@@ -161,7 +170,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			"Tools",
 			"Costs",
 			"Errors",
-			"Behavior",
+			"Frustration",
 			"Gain",
 			"Projects",
 			"Requests",
@@ -177,7 +186,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		});
 		await page.reload();
 		await expect(page.getByRole("button", { name: "设置", exact: true })).toBeVisible();
-		await closeWelcomeIfPresent("欢迎使用 omp", "关闭");
+		await closeWelcome("欢迎使用 omp", "关闭");
 		await page.getByRole("button", { name: "设置", exact: true }).click();
 		await expect(page.getByRole("dialog")).toContainText("权限与安全");
 		await expect(page.getByRole("dialog").locator(".settings-nav-group-label")).toHaveCount(8);
@@ -208,10 +217,13 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			}
 		}
 		await fs.writeFile("test-results/settings-pages.json", JSON.stringify(settingsPages, null, 2));
-		const settingsSearch = page.getByRole("dialog").getByPlaceholder("搜索设置和管理资源…");
+		const settingsSearch = page.getByRole("dialog").getByPlaceholder("搜索设置…");
 		await settingsSearch.fill("bash.patterns");
-		await page.getByRole("button", { name: /Bash 审批模式 bash.patterns/ }).click();
-		const rules = page.locator('[title="bash.patterns"]').locator("..").locator("..");
+		await page
+			.getByRole("button")
+			.filter({ has: page.getByText("bash.patterns", { exact: true }) })
+			.click();
+		const rules = page.locator('[id="setting-bash.patterns"]');
 		await expect(rules.locator("textarea")).toHaveValue("[]");
 		const rule = { match: "echo audit-blocked", approval: "deny" };
 		await rules.locator("textarea").fill(JSON.stringify([rule]));
@@ -224,7 +236,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		await expect
 			.poll(() => page.evaluate(() => window.omp.rpc.getSettings(["bash.patterns"])))
 			.toMatchObject({ success: true, data: { values: { "bash.patterns": [] } } });
-		await page.getByRole("dialog").getByRole("button", { name: "外观与使用", exact: true }).click();
+		await page.getByRole("dialog").getByRole("button", { name: "界面", exact: true }).click();
 		await expect(page.getByRole("dialog")).toContainText("选择 GUI 主题");
 		await page.screenshot({ path: "test-results/05-packaged-zh.png", scale: "css", animations: "disabled" });
 		await page.keyboard.press("Escape");
@@ -264,7 +276,8 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		await page.reload();
 		await expect.poll(() => app.evaluate(() => Reflect.get(globalThis, "auditPrefsRequested"))).toBe(true);
 		await expect(page.getByRole("button", { name: "选择主题", exact: true })).toBeVisible();
-		await closeWelcomeIfPresent("欢迎使用 omp", "关闭");
+		// Preferences are held below, so startup can still be in either locale.
+		await closeWelcome(/^(Welcome to omp|欢迎使用 omp)$/, /^(Close|关闭)$/);
 		await page.getByRole("button", { name: "选择主题", exact: true }).click();
 		const freshPicker = page.getByRole("dialog", { name: "选择主题", exact: true });
 		await freshPicker.getByPlaceholder("搜索主题…").fill("瓷白");
@@ -274,7 +287,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			getComputedStyle(document.documentElement).getPropertyValue("--omp-bg-primary"),
 		);
 		await page.getByRole("button", { name: "设置", exact: true }).click();
-		await page.getByRole("dialog").getByRole("button", { name: "外观与使用", exact: true }).click();
+		await page.getByRole("dialog").getByRole("button", { name: "界面", exact: true }).click();
 		const font = page.locator('#setting-gui-fontSize input[type="number"]');
 		const chosenFont = await font.inputValue();
 		for (const value of [String(Number(chosenFont) + 1), chosenFont]) {

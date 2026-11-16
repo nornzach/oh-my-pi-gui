@@ -160,6 +160,7 @@ describe("GUI settings visibility", () => {
 			"theme.dark",
 			"theme.light",
 			"tui.tight",
+			"tui.spinnerInterval",
 			"colorBlindMode",
 			"display.showTokenUsage",
 			"terminal.showProgress",

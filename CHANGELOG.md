@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.9.44] - 2026-11-17
+
+### Added
+
+- Select text in a settled transcript message to quote it into your draft at the caret; formulas keep their TeX source ([#54](https://github.com/nornzach/oh-my-pi-gui/issues/54)).
+- Sort workspaces by name in the sidebar's Recent section; the order stays put when you open a session ([#55](https://github.com/nornzach/oh-my-pi-gui/issues/55)).
+- Settings → GUI offers a switch to skip confirmation for `/delete` and `/drop` ([#57](https://github.com/nornzach/oh-my-pi-gui/issues/57)).
+
+### Changed
+
+- Bundled agent updated to omp 18.21.0, with native addon 18.21.0; built from the monorepo commit recorded in `sidecar-source.json`.
+- Dialog and drop overlays on Windows and Linux dim the background without blurring it, keeping large windows responsive ([#52](https://github.com/nornzach/oh-my-pi-gui/issues/52)).
+
+### Fixed
+
+- Terminal-only spinner timing is no longer offered as a GUI setting.
+- Removing a global settings override works with the updated core and restores the remaining configuration layers.
+- Exported HTML sessions include their viewer, so this build no longer depends on an unavailable upstream viewer release. The shared Markdown and highlighting libraries still need internet access.
+- Explicit queue shorthand keeps targeting the agent while a `/btw` question has focus, and model discovery keeps unknown reasoning support available for capability detection.
+- A late idle state clears a stale auto-compaction status row.
+
 ## [0.9.43] - 2026-11-13
 
 ### Added
