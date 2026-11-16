@@ -42,7 +42,7 @@ function SplitDropOverlay({ placement }: { placement: SplitPlacement }) {
 		{ placement: "bottom", className: "col-start-2 row-start-3" },
 	];
 	return (
-		<div className="pointer-events-none absolute inset-0 z-50 grid grid-cols-3 grid-rows-3 gap-3 bg-[var(--omp-overlay-bg)] p-6 backdrop-blur-[2px]">
+		<div className="pointer-events-none absolute inset-0 z-50 grid grid-cols-3 grid-rows-3 gap-3 bg-[var(--omp-overlay-bg)] p-6 omp-drop-overlay backdrop-blur-[2px]">
 			{zones.map(zone => (
 				<div
 					key={zone.placement}
@@ -78,7 +78,7 @@ function PaneDropOverlay({ axis, ratio, firstPane }: { axis: SplitAxis; ratio: n
 	);
 	return (
 		<div
-			className="pointer-events-none absolute inset-0 z-50 grid bg-[var(--omp-overlay-bg)] backdrop-blur-[2px]"
+			className="pointer-events-none absolute inset-0 z-50 grid bg-[var(--omp-overlay-bg)] omp-drop-overlay backdrop-blur-[2px]"
 			style={splitGrid(axis, ratio)}
 		>
 			{cell(firstPane)}

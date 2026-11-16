@@ -533,6 +533,9 @@ export const zh: Record<string, string> = {
 	"sidebar.openInNewWindow": "在新窗口打开",
 	"sidebar.newWindowFailed": "无法打开新窗口",
 	"sidebar.deleteFailed": "无法删除会话",
+	"sidebar.sort.byRecentHint": "按最近使用排序，点击改为按名称排序工作区",
+	"sidebar.sort.byNameHint": "按名称排序，点击改为按最近使用排序工作区",
+	"sidebar.sort.failed": "无法保存排序方式",
 	"sidebar.recent": "最近",
 	"sidebar.chats": "聊天",
 	"sidebar.rename": "重命名会话",
@@ -1929,6 +1932,9 @@ export const zh: Record<string, string> = {
 		"正在查看 omp 窗口时也发出通知。关闭时，聚焦中的窗口保持安静，因为对话里已经显示结果。",
 	"settings.gui.thinkingExpanded": "默认展开推理内容",
 	"settings.gui.thinkingExpandedDesc": "无需逐条点击即可查看模型的推理过程，仍可单独折叠某一条。",
+	"settings.gui.confirmSessionDelete": "删除会话前确认",
+	"settings.gui.confirmSessionDeleteDesc":
+		"执行 /delete（/drop）删除当前会话前先弹出确认。关闭后会立即删除，无法撤销。",
 	"settings.gui.sidebarQuotas": "侧边栏显示配额",
 	"settings.gui.sidebarQuotasDesc":
 		"在“设置”上方显示各提供商的配额用量，每个时间窗口一个圆环。已登录的提供商报告配额后才会出现。",
@@ -2637,6 +2643,7 @@ export const zh: Record<string, string> = {
 	"markdown.imageFailed": "图片加载失败",
 	"markdown.remoteImage": "远程图片未加载",
 	"markdown.remoteImageOpen": "打开",
+	"chat.quoteSelection": "引用",
 	"chat.copyMessage": "复制消息文本",
 	"chat.branchFromHere": "从此处分支到新标签页",
 	"chat.branchSaved": "分支已创建，请从最近会话中打开。",

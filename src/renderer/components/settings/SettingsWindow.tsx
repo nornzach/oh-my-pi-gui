@@ -278,6 +278,7 @@ export function SettingsWindow() {
 	const notificationsWhenFocused = useUiStore(state => state.notificationsWhenFocused);
 	const thinkingExpanded = useUiStore(state => state.thinkingExpanded);
 	const sidebarQuotas = useUiStore(state => state.sidebarQuotas);
+	const confirmSessionDelete = useUiStore(state => state.confirmSessionDelete);
 	const transcriptDetail = useUiStore(state => state.transcriptDetail);
 	const tabWidth = useUiStore(state => state.tabWidth);
 	const tabRows = useUiStore(state => state.tabRows);
@@ -1396,6 +1397,22 @@ export function SettingsWindow() {
 														description={t("settings.gui.sidebarQuotasDesc")}
 														label={t("settings.gui.sidebarQuotas")}
 														onChange={applySidebarQuotas}
+													/>
+												</Section>
+												<Section
+													id="setting-gui-confirmSessionDelete"
+													title={t("settings.gui.confirmSessionDelete")}
+												>
+													<Toggle
+														className="omp-settings-row"
+														checked={confirmSessionDelete}
+														description={t("settings.gui.confirmSessionDeleteDesc")}
+														label={t("settings.gui.confirmSessionDelete")}
+														onChange={value =>
+															void saveGuiPreference("confirmSessionDelete", value, () =>
+																useUiStore.setState({ confirmSessionDelete: value }),
+															)
+														}
 													/>
 												</Section>
 												<Section id="setting-gui-notifications" title={t("settings.gui.notifications")}>

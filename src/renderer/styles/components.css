@@ -2223,6 +2223,13 @@
 	backdrop-filter: blur(5px) saturate(1.05);
 }
 
+/* Windows and Linux compositors re-blur every pixel under the overlay on each
+   frame, and the cost grows with the window: on a 4K window the whole app
+   stalled while a dialog was open (#52). There the backdrop only dims. */
+:root:is([data-platform="win32"], [data-platform="linux"]) :is(.omp-dialog-overlay, .omp-drop-overlay) {
+	backdrop-filter: none;
+}
+
 .omp-dialog-panel {
 	position: relative;
 }

@@ -94,6 +94,7 @@ beforeEach(() => {
 		fresh: vi.fn(async () => ok({})),
 		shakeContext: vi.fn(async () => ok({ removed: "Shook 2 tool results (~1200 tokens freed)." })),
 		reloadPlugins: vi.fn(async () => ok({ plugins: 3, skills: 5, commands: 42 })),
+		dropSession: vi.fn(async () => ok({ cancelled: true })),
 	};
 	confirmMock = vi.fn(() => true);
 	dispatchMock = vi.fn();
@@ -107,7 +108,7 @@ beforeEach(() => {
 	ctx = { ...baseCtx, hydrateSession, rpc: { ...baseCtx.rpc, setPrewalk: rpc.setPrewalk } };
 	useToastStore.setState({ toasts: [] });
 	useSessionStore.setState({ isStreaming: false, isCompacting: false, prewalkArmed: false });
-	useUiStore.setState({ forceToolOpen: false });
+	useUiStore.setState({ forceToolOpen: false, confirmSessionDelete: true });
 });
 
 afterEach(() => {
@@ -160,6 +161,20 @@ describe("one-shot action wiring", () => {
 		await affordance.run();
 		expect(rpc.shakeContext).toHaveBeenCalledWith("thinking");
 		expect(lastToast()?.variant).toBe("success");
+	});
+
+	it("delete asks first unless the confirmation setting is off (#57)", async () => {
+		const affordance = wired("delete");
+		if (affordance.kind !== "action") throw new Error("expected action");
+		confirmMock.mockReturnValueOnce(false);
+		await affordance.run();
+		expect(confirmMock).toHaveBeenCalledTimes(1);
+		expect(rpc.dropSession).not.toHaveBeenCalled();
+
+		useUiStore.setState({ confirmSessionDelete: false });
+		await affordance.run();
+		expect(confirmMock).toHaveBeenCalledTimes(1);
+		expect(rpc.dropSession).toHaveBeenCalledTimes(1);
 	});
 
 	it("fresh calls the fresh RPC and toasts success", async () => {

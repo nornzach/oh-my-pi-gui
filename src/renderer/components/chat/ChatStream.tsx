@@ -69,6 +69,7 @@ import { StreamingText } from "./StreamingText";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { TranscriptFindBar } from "./TranscriptFindBar";
 import { TranscriptLoading } from "./TranscriptLoading";
+import { TranscriptQuoteAction } from "./TranscriptQuoteAction";
 import { findRangesInRow, findTranscriptMatches, paintFindHighlights } from "./transcript-find";
 import { useReadOnlyTranscript } from "./transcript-mode";
 
@@ -788,6 +789,7 @@ function SessionTranscript() {
 					tabIndex={0}
 					className="omp-transcript-scroll h-full overflow-y-auto overscroll-contain"
 				>
+					{readOnly === null && <TranscriptQuoteAction tabId={tabId} transcriptRef={parentRef} />}
 					{switchPending && (
 						<div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px overflow-hidden">
 							<div className="omp-indeterminate-progress h-full bg-[var(--omp-accent)]" />

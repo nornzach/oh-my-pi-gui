@@ -353,6 +353,42 @@ describe("Sidebar menus and pinned ordering", () => {
 		);
 	});
 
+	it("sorted by name, workspaces keep their order when a session is opened, and the choice persists (#55)", async () => {
+		const omp = installMockOmp(LIST);
+		useSessionStore.setState({ sessionId: "", cwd: "/neutral", isStreaming: false });
+		useTabsStore.setState({
+			tabs: [{ id: "chat", cwd: "/neutral", status: "ready", kind: "chat", unreadDone: false }],
+			activeTabId: "chat",
+			bundles: new Map(),
+		});
+		useSidebarPrefs.setState({ hydrated: true });
+		await mount(<SidebarWithRecency />);
+		const workspaceOrder = () =>
+			[...container.querySelectorAll("[data-workspace-group]")].map(element =>
+				(element as unknown as Element).getAttribute("data-workspace-group"),
+			);
+		// Last-used order puts beta (the newest session) first.
+		expect(workspaceOrder()).toEqual(["/work/beta", "/work/alpha"]);
+
+		await fire(container.querySelector("[data-workspace-sort]"), "onClick");
+		expect(workspaceOrder()).toEqual(["/work/alpha", "/work/beta"]);
+		expect(omp.prefs.set).toHaveBeenCalledWith("sidebar", expect.objectContaining({ workspaceSort: "name" }));
+
+		await act(async () => {
+			useTabsStore.setState({
+				tabs: [{ id: "agent", cwd: "/work/beta", status: "ready", kind: "agent", unreadDone: false }],
+				activeTabId: "agent",
+			});
+			useSessionStore.setState({
+				sessionId: "/work/beta/three.jsonl",
+				sessionFile: "/work/beta/three.jsonl",
+				cwd: "/work/beta",
+			});
+		});
+		await flush();
+		expect(workspaceOrder()).toEqual(["/work/alpha", "/work/beta"]);
+	});
+
 	it("switches from an active Chat to Work and exposes only the full agent action", async () => {
 		const omp = installMockOmp(LIST);
 		useSessionStore.setState({ sessionId: "chat", cwd: "/work/alpha", isStreaming: false });

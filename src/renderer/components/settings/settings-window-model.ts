@@ -172,6 +172,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "sidebarQuotas quota usage limit sidebar 配额 用量 侧边栏 квоты",
 	},
 	{
+		id: "confirmSessionDelete",
+		labelKey: "settings.gui.confirmSessionDelete",
+		aliases: "confirmSessionDelete delete drop confirm session 删除 确认 会话 удалить подтверждение ลบ",
+	},
+	{
 		id: "notifications",
 		labelKey: "settings.gui.notifications",
 		aliases: "notifications notify focused focus 通知 聚焦 前台 уведомления фокус",

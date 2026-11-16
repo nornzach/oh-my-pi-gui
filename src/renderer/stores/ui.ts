@@ -152,6 +152,8 @@ interface UiStore {
 	thinkingExpanded: boolean;
 	/** Provider quotas above the sidebar footer (Settings → GUI, default off). */
 	sidebarQuotas: boolean;
+	/** Ask before `/delete` (`/drop`) deletes the current session; off deletes at once (#57). */
+	confirmSessionDelete: boolean;
 	/** Transcript density: compact folds reasoning/tools; full shows every step. */
 	transcriptDetail: TranscriptDetail;
 	tabWidth: TabWidth;
@@ -331,6 +333,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	notificationsWhenFocused: false,
 	thinkingExpanded: false,
 	sidebarQuotas: false,
+	confirmSessionDelete: true,
 	transcriptDetail: "compact",
 	tabWidth: "default",
 	tabRows: "single",

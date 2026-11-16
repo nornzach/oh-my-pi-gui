@@ -1,6 +1,7 @@
 import {
 	Archive,
 	ArchiveRestore,
+	ArrowDownAZ,
 	BarChart3,
 	Bot,
 	Brain,
@@ -9,6 +10,7 @@ import {
 	CheckCheck,
 	ChevronDown,
 	ChevronRight,
+	ClockArrowDown,
 	Code2,
 	Coins,
 	Columns2,
@@ -183,6 +185,9 @@ function SidebarRowTitle({ className, title }: { className?: string; title: stri
  * workspace with no folder picker. The main action creates an agent, while the
  * adjacent quick-chat action creates a chat.
  */
+/** Workspace names compare as people read them: case-insensitive, numbers by value ("web2" before "web10"). */
+const workspaceNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
 export function Sidebar() {
 	const tabRpc = useTabRpc();
 	const t = useT();
@@ -294,6 +299,8 @@ export function Sidebar() {
 	const archived = useMemo(() => new Set(archivedPaths), [archivedPaths]);
 	const groupAliases = useSidebarPrefs(s => s.groupAliases);
 	const workspaceLastUsed = useSidebarPrefs(s => s.workspaceLastUsed);
+	const workspaceSort = useSidebarPrefs(s => s.workspaceSort);
+	const setWorkspaceSort = useSidebarPrefs(s => s.setWorkspaceSort);
 	const sessionLastUsed = useSidebarPrefs(s => s.sessionLastUsed);
 	const touchSession = useSidebarPrefs(s => s.touchSession);
 	const renameRef = useRef<HTMLInputElement>(null);
@@ -453,12 +460,26 @@ export function Sidebar() {
 			const aPinned = pinnedGroups.includes(a.cwd) ? 0 : 1;
 			const bPinned = pinnedGroups.includes(b.cwd) ? 0 : 1;
 			if (aPinned !== bPinned) return aPinned - bPinned;
+			// By name the order holds still while you work: opening a session no
+			// longer lifts its workspace to the top (#55).
+			if (workspaceSort === "name") {
+				return workspaceNameCollator.compare(a.name, b.name) || a.cwd.localeCompare(b.cwd);
+			}
 			const aRecency = Math.max(workspaceLastUsed[a.cwd] ?? 0, ...a.sessions.map(recencyForSession));
 			const bRecency = Math.max(workspaceLastUsed[b.cwd] ?? 0, ...b.sessions.map(recencyForSession));
 			return bRecency - aRecency;
 		});
 		return result;
-	}, [codeSessions, familyRoot, groupAliases, pinnedGroups, pinnedSessions, recencyForSession, workspaceLastUsed]);
+	}, [
+		codeSessions,
+		familyRoot,
+		groupAliases,
+		pinnedGroups,
+		pinnedSessions,
+		recencyForSession,
+		workspaceLastUsed,
+		workspaceSort,
+	]);
 	function isCollapsedGroup(groupCwd: string): boolean {
 		if (groupCwd in collapsed) return collapsed[groupCwd] === true;
 		// Default: current workspace expanded, others collapsed (Codex-style).
@@ -1462,6 +1483,22 @@ export function Sidebar() {
 					<span className="min-w-0 flex-1 truncate text-omp-xs font-medium text-[var(--omp-dim)]">
 						{t("sidebar.recent")}
 					</span>
+					{mode === "code" && (
+						<button
+							type="button"
+							onClick={() => void setWorkspaceSort(workspaceSort === "name" ? "recent" : "name")}
+							title={t(workspaceSort === "name" ? "sidebar.sort.byNameHint" : "sidebar.sort.byRecentHint")}
+							aria-label={t(workspaceSort === "name" ? "sidebar.sort.byNameHint" : "sidebar.sort.byRecentHint")}
+							data-workspace-sort={workspaceSort}
+							className="omp-pressable flex h-6 w-6 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+						>
+							{workspaceSort === "name" ? (
+								<ArrowDownAZ aria-hidden="true" size={13} />
+							) : (
+								<ClockArrowDown aria-hidden="true" size={13} />
+							)}
+						</button>
+					)}
 					<button
 						type="button"
 						data-sidebar-select

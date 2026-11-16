@@ -1970,7 +1970,7 @@ export async function retryFailedTurn(): Promise<void> {
 export async function dropSessionFromGui(): Promise<void> {
 	const runtime = focusedSessionRuntime();
 	const rpc = runtime ? createTabRpc(runtime.command) : window.omp.rpc;
-	if (!window.confirm(translate("drop.confirm"))) return;
+	if (useUiStore.getState().confirmSessionDelete && !window.confirm(translate("drop.confirm"))) return;
 	const response = await rpc.dropSession();
 	if (!response.success) throw new Error(response.error);
 	const data = response.data as { cancelled?: boolean } | undefined;

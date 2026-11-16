@@ -549,6 +549,9 @@ export const ru: Record<string, string> = {
 	"sidebar.openInNewWindow": "Открыть в новом окне",
 	"sidebar.newWindowFailed": "Не удалось открыть новое окно",
 	"sidebar.deleteFailed": "Не удалось удалить сессию",
+	"sidebar.sort.byRecentHint": "По последнему использованию. Нажмите, чтобы сортировать рабочие области по имени",
+	"sidebar.sort.byNameHint": "По имени. Нажмите, чтобы сортировать рабочие области по последнему использованию",
+	"sidebar.sort.failed": "Не удалось сохранить порядок сортировки",
 	"sidebar.recent": "Недавние",
 	"sidebar.chats": "Чаты",
 	"sidebar.rename": "Переименовать сессию",
@@ -1934,6 +1937,9 @@ export const ru: Record<string, string> = {
 	"settings.gui.thinkingExpanded": "Разворачивать рассуждения по умолчанию",
 	"settings.gui.thinkingExpandedDesc":
 		"Показывать трассировку рассуждений модели без нажатия на каждый блок; блоки можно сворачивать отдельно.",
+	"settings.gui.confirmSessionDelete": "Подтверждать удаление сеанса",
+	"settings.gui.confirmSessionDeleteDesc":
+		"Спрашивать, прежде чем /delete (/drop) удалит текущий сеанс. Если выключено, сеанс удаляется сразу, без возможности отмены.",
 	"settings.gui.sidebarQuotas": "Квоты в боковой панели",
 	"settings.gui.sidebarQuotasDesc":
 		"Показывать над «Настройками», сколько квоты каждого провайдера использовано: по кольцу на каждое окно времени. Появляется, когда провайдер, в который выполнен вход, сообщает квоты.",
@@ -2568,6 +2574,7 @@ export const ru: Record<string, string> = {
 	"markdown.imageFailed": "Не удалось загрузить изображение",
 	"markdown.remoteImage": "Удалённое изображение не загружено",
 	"markdown.remoteImageOpen": "Открыть",
+	"chat.quoteSelection": "Цитировать",
 	"chat.copyMessage": "Скопировать текст сообщения",
 	"chat.branchFromHere": "Создать ветку обсуждения в новой вкладке отсюда",
 	"chat.branchSaved": "Ветка обсуждения создана. Откройте её в недавних сеансах.",

@@ -39,6 +39,7 @@ import {
 	wrapPasteInAttachmentBlock,
 } from "../../lib/paste-blobs";
 import { parseQueueShorthand, splitQueuedMessages } from "../../lib/queue-input";
+import { insertQuote } from "../../lib/quote-selection";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
@@ -407,6 +408,30 @@ export function InputArea() {
 		setImages,
 		runtimeTabId,
 	]);
+
+	// A transcript excerpt quoted from the selection action (#54): it goes in at
+	// the caret, so a reply can quote several passages and answer each in turn.
+	useEffect(() => {
+		const onQuote = (event: Event) => {
+			const detail = (event as CustomEvent<{ quote?: string; tabId?: string }>).detail;
+			if ((detail?.tabId ?? useTabsStore.getState().activeTabId) !== runtimeTabId) return;
+			const quote = detail?.quote;
+			if (!quote) return;
+			const el = textareaRef.current;
+			const draft = useComposerStore.getState().draft;
+			const caret = el && document.activeElement === el ? el.selectionStart : draft.length;
+			const next = insertQuote(draft, caret, quote);
+			setText(next.text);
+			requestAnimationFrame(() => {
+				const target = textareaRef.current;
+				if (!target) return;
+				target.focus();
+				target.setSelectionRange(next.caret, next.caret);
+			});
+		};
+		window.addEventListener("omp:quote-composer", onQuote);
+		return () => window.removeEventListener("omp:quote-composer", onQuote);
+	}, [setText, runtimeTabId]);
 
 	const insertCompletion = useCallback(
 		(item: CompletionItem) => {

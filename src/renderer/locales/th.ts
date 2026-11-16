@@ -535,6 +535,9 @@ export const th: Record<string, string> = {
 	"sidebar.openInNewWindow": "เปิดในหน้าต่างใหม่",
 	"sidebar.newWindowFailed": "เปิดหน้าต่างใหม่ไม่สำเร็จ",
 	"sidebar.deleteFailed": "ลบเซสชันไม่สำเร็จ",
+	"sidebar.sort.byRecentHint": "เรียงตามการใช้งานล่าสุด คลิกเพื่อเรียงพื้นที่ทำงานตามชื่อ",
+	"sidebar.sort.byNameHint": "เรียงตามชื่อ คลิกเพื่อเรียงพื้นที่ทำงานตามการใช้งานล่าสุด",
+	"sidebar.sort.failed": "ไม่สามารถบันทึกการเรียงลำดับได้",
 	"sidebar.recent": "ล่าสุด",
 	"sidebar.chats": "Chat",
 	"sidebar.rename": "เปลี่ยนชื่อเซสชัน",
@@ -1938,6 +1941,9 @@ export const th: Record<string, string> = {
 		"แจ้งเตือนด้วยแม้คุณกำลังดูหน้าต่าง omp อยู่ ถ้าปิด หน้าต่างที่กำลังโฟกัสจะเงียบ และ transcript ก็แสดงผลลัพธ์อยู่แล้ว",
 	"settings.gui.thinkingExpanded": "ขยาย reasoning ไว้เป็นค่าเริ่มต้น",
 	"settings.gui.thinkingExpandedDesc": "แสดงลำดับ reasoning ของโมเดลทันทีโดยไม่ต้องคลิกทีละบล็อก และยังยุบแต่ละบล็อกแยกได้เหมือนเดิม",
+	"settings.gui.confirmSessionDelete": "ยืนยันก่อนลบเซสชัน",
+	"settings.gui.confirmSessionDeleteDesc":
+		"ถามก่อนที่ /delete (/drop) จะลบเซสชันปัจจุบัน หากปิดไว้ เซสชันจะถูกลบทันทีและไม่สามารถย้อนกลับได้",
 	"settings.gui.sidebarQuotas": "โควตาในแถบด้านข้าง",
 	"settings.gui.sidebarQuotasDesc":
 		"แสดงว่าโควตาของผู้ให้บริการแต่ละรายถูกใช้ไปเท่าไร เหนือหน้าการตั้งค่า: วงแหวนหนึ่งวงต่อช่วงเวลา จะปรากฏเมื่อผู้ให้บริการที่ล็อกอินอยู่รายงานค่าโควตา",
@@ -2636,6 +2642,7 @@ export const th: Record<string, string> = {
 	"markdown.imageFailed": "โหลดรูปภาพไม่สำเร็จ",
 	"markdown.remoteImage": "ยังไม่ได้โหลดรูปภาพระยะไกล",
 	"markdown.remoteImageOpen": "เปิด",
+	"chat.quoteSelection": "อ้างอิง",
 	"chat.copyMessage": "คัดลอกข้อความ",
 	"chat.branchFromHere": "แตก branch ไปยังแท็บใหม่จากจุดนี้",
 	"chat.branchSaved": "สร้าง branch แล้ว เปิดได้จากเซสชันล่าสุด",

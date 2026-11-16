@@ -561,6 +561,9 @@ export const en: Record<string, string> = {
 	"sidebar.openInNewWindow": "Open in new window",
 	"sidebar.newWindowFailed": "Could not open a new window",
 	"sidebar.deleteFailed": "Could not delete session",
+	"sidebar.sort.byRecentHint": "Sorted by last used. Click to sort workspaces by name",
+	"sidebar.sort.byNameHint": "Sorted by name. Click to sort workspaces by last used",
+	"sidebar.sort.failed": "Could not save the sort order",
 	"sidebar.recent": "Recent",
 	"sidebar.chats": "Chats",
 	"sidebar.rename": "Rename session",
@@ -1989,6 +1992,9 @@ export const en: Record<string, string> = {
 	"settings.gui.thinkingExpanded": "Expand reasoning by default",
 	"settings.gui.thinkingExpandedDesc":
 		"Show the model's reasoning trace without clicking each block; blocks can still be collapsed individually.",
+	"settings.gui.confirmSessionDelete": "Confirm before deleting a session",
+	"settings.gui.confirmSessionDeleteDesc":
+		"Ask before /delete (/drop) deletes the current session. When off, the session is deleted at once; this cannot be undone.",
 	"settings.gui.sidebarQuotas": "Quotas in the sidebar",
 	"settings.gui.sidebarQuotasDesc":
 		"Show how much of each provider's quota is used, above Settings: a ring per time window. Appears once a signed-in provider reports quotas.",
@@ -2705,6 +2711,7 @@ export const en: Record<string, string> = {
 	"markdown.imageFailed": "Image failed to load",
 	"markdown.remoteImage": "Remote image not loaded",
 	"markdown.remoteImageOpen": "Open",
+	"chat.quoteSelection": "Quote",
 	"chat.copyMessage": "Copy message text",
 	"chat.branchFromHere": "Branch to a new tab from here",
 	"chat.branchSaved": "Branch created. Open it from Recent sessions.",

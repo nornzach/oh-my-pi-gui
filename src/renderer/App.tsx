@@ -244,6 +244,7 @@ export function App() {
 				"notificationsWhenFocused",
 				"thinkingExpanded",
 				"sidebarQuotas",
+				"confirmSessionDelete",
 				"transcriptDetail",
 				"tabWidth",
 				"tabRows",
@@ -286,6 +287,9 @@ export function App() {
 				}
 				if (typeof prefs.thinkingExpanded === "boolean" && !changedPreferences.has("thinkingExpanded")) {
 					useUiStore.setState({ thinkingExpanded: prefs.thinkingExpanded });
+				}
+				if (typeof prefs.confirmSessionDelete === "boolean" && !changedPreferences.has("confirmSessionDelete")) {
+					useUiStore.setState({ confirmSessionDelete: prefs.confirmSessionDelete });
 				}
 				if (typeof prefs.sidebarQuotas === "boolean" && !changedPreferences.has("sidebarQuotas")) {
 					useUiStore.setState({ sidebarQuotas: prefs.sidebarQuotas });

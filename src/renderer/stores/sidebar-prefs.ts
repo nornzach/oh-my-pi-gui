@@ -21,7 +21,11 @@ interface SidebarPrefsBlob {
 	groupAliases?: Record<string, string>;
 	workspaceLastUsed?: Record<string, number>;
 	sessionLastUsed?: Record<string, number>;
+	workspaceSort?: WorkspaceSort;
 }
+
+/** How the Recent section orders workspace groups; pinned groups stay first either way (#55). */
+export type WorkspaceSort = "recent" | "name";
 
 interface SidebarPrefsStore {
 	pinnedGroups: string[];
@@ -31,6 +35,7 @@ interface SidebarPrefsStore {
 	groupAliases: Record<string, string>;
 	workspaceLastUsed: Record<string, number>;
 	sessionLastUsed: Record<string, number>;
+	workspaceSort: WorkspaceSort;
 	hydrated: boolean;
 	hydrate: () => Promise<void>;
 	toggleGroupPin: (cwd: string) => Promise<void>;
@@ -41,6 +46,7 @@ interface SidebarPrefsStore {
 	/** Move pins and archive marks from files no longer listed to the sessions that carry them on. */
 	inheritSessions: (heirs: ReadonlyMap<string, string>) => void;
 	setGroupAlias: (cwd: string, alias: string | null) => Promise<void>;
+	setWorkspaceSort: (sort: WorkspaceSort) => Promise<void>;
 	touchWorkspace: (cwd: string) => void;
 	touchSession: (path: string, cwd?: string) => void;
 	reset: () => void;
@@ -86,6 +92,7 @@ function prefsBlob(state: SidebarPrefsStore): SidebarPrefsBlob {
 		groupAliases: state.groupAliases,
 		workspaceLastUsed: state.workspaceLastUsed,
 		sessionLastUsed: state.sessionLastUsed,
+		workspaceSort: state.workspaceSort,
 	};
 }
 
@@ -111,6 +118,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 	groupAliases: {},
 	workspaceLastUsed: {},
 	sessionLastUsed: {},
+	workspaceSort: "recent",
 	hydrated: false,
 
 	hydrate: async () => {
@@ -124,6 +132,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 				groupAliases: blob?.groupAliases && typeof blob.groupAliases === "object" ? blob.groupAliases : {},
 				workspaceLastUsed: validRecencyMap(blob?.workspaceLastUsed),
 				sessionLastUsed: validRecencyMap(blob?.sessionLastUsed),
+				workspaceSort: blob?.workspaceSort === "name" ? "name" : "recent",
 				hydrated: true,
 			});
 		} catch {
@@ -209,6 +218,14 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 			onFailure: message => toast({ variant: "error", title: translate("sidebar.renameFailed"), message }),
 		}),
 
+	setWorkspaceSort: sort =>
+		optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: () => ({ workspaceSort: sort }),
+			persist: () => writePrefs(get),
+			onFailure: message => toast({ variant: "error", title: translate("sidebar.sort.failed"), message }),
+		}),
+
 	touchWorkspace: cwd => {
 		if (!cwd) return;
 		const state = get();
@@ -238,6 +255,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 			groupAliases: {},
 			workspaceLastUsed: {},
 			sessionLastUsed: {},
+			workspaceSort: "recent",
 			hydrated: false,
 		}),
 }));
