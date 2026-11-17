@@ -25,7 +25,7 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
 [Features](#en-features) · [What's new in 0.9.45](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.45 release.** The improvements below are included in v0.9.45, with the bundled agent built from monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0` (upstream omp 18.22.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+> **v0.9.45 release.** The improvements below are included in v0.9.45, with the bundled agent built from monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` (upstream omp 18.22.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -71,7 +71,7 @@ v0.9.45 fixes image-message reconciliation, adds self-hosted live voice configur
 |---|---|
 | **Image messages** | A sent image appears once in the transcript, including when persisted history stores its bytes by reference. |
 | **Self-hosted live voice** | Configure an OpenAI Realtime-compatible endpoint and its API key in Settings → Providers. |
-| **Bundled agent** | Updated to omp 18.22.0 with native addon 18.22.0, built from monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0`. |
+| **Bundled agent** | Updated to omp 18.22.0 with native addon 18.22.0, built from monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0`. |
 
 <a id="en-gallery"></a>
 ### Explore the interface
@@ -397,7 +397,7 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 [功能全览](#zh-features) · [0.9.45 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.45 功能展示。** 下文改进均纳入 v0.9.45，内置 Agent 基于 monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0` 构建（上游 omp 18.22.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.45 功能展示。** 下文改进均纳入 v0.9.45，内置 Agent 基于 monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` 构建（上游 omp 18.22.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -443,7 +443,7 @@ v0.9.45 修复了图片消息重复显示，加入自托管实时语音配置，
 |---|---|
 | **图片消息** | 发送图片后，对话中只显示一条消息；即使持久化记录将图片字节保存为引用也能正确对应。 |
 | **自托管实时语音** | 可在设置 → Provider 中配置兼容 OpenAI Realtime 的端点及 API key。 |
-| **内置代理** | 更新到 omp 18.22.0 和原生插件 18.22.0，基于 monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0` 构建。 |
+| **内置代理** | 更新到 omp 18.22.0 和原生插件 18.22.0，基于 monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` 构建。 |
 
 <a id="zh-gallery"></a>
 ### 界面导览
