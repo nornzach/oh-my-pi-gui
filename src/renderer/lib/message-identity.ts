@@ -1,4 +1,8 @@
+import { sha256 } from "@noble/hashes/sha2.js";
 import type { AgentMessage, MessageContent, ThinkingContent } from "../../shared/rpc-types";
+
+const BLOB_REF_RE = /^blob:sha256:([a-f0-9]{64})$/;
+const imageDigests = new WeakMap<AgentMessage, Map<string, string>>();
 
 /** Identity shared by live delivery, persisted transcript reconciliation, and viewport anchors. */
 export function messageIdentity(message: AgentMessage): string | undefined {
@@ -7,11 +11,63 @@ export function messageIdentity(message: AgentMessage): string | undefined {
 	return message.entryId;
 }
 
+function imagePayloadDigest(message: AgentMessage, data: string): string | null {
+	const blobHash = BLOB_REF_RE.exec(data)?.[1];
+	if (blobHash) return blobHash;
+
+	let cache = imageDigests.get(message);
+	const cached = cache?.get(data);
+	if (cached) return cached;
+	if (typeof atob !== "function") return null;
+
+	try {
+		const binary = atob(data);
+		const bytes = new Uint8Array(binary.length);
+		for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+		const digest = Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+		if (!cache) {
+			cache = new Map();
+			imageDigests.set(message, cache);
+		}
+		cache.set(data, digest);
+		return digest;
+	} catch {
+		return null;
+	}
+}
+
+function sameContentBlock(
+	leftMessage: AgentMessage,
+	rightMessage: AgentMessage,
+	left: MessageContent,
+	right: MessageContent,
+): boolean {
+	if (JSON.stringify(left) === JSON.stringify(right)) return true;
+	if (left.type !== "image" || right.type !== "image") return false;
+	const { data: leftData, ...leftMetadata } = left;
+	const { data: rightData, ...rightMetadata } = right;
+	if (JSON.stringify(leftMetadata) !== JSON.stringify(rightMetadata)) return false;
+	const leftDigest = imagePayloadDigest(leftMessage, leftData);
+	return leftDigest !== null && leftDigest === imagePayloadDigest(rightMessage, rightData);
+}
+
 /** User text can arrive as either a string or text blocks on the wire. */
 export function sameMessageContent(left: AgentMessage, right: AgentMessage): boolean {
-	const leftContent = typeof left.content === "string" ? [{ type: "text", text: left.content }] : left.content;
-	const rightContent = typeof right.content === "string" ? [{ type: "text", text: right.content }] : right.content;
-	return left.role === right.role && JSON.stringify(leftContent) === JSON.stringify(rightContent);
+	const leftContent =
+		typeof left.content === "string" ? [{ type: "text" as const, text: left.content }] : left.content;
+	const rightContent =
+		typeof right.content === "string" ? [{ type: "text" as const, text: right.content }] : right.content;
+	if (left.role !== right.role) return false;
+	if (!Array.isArray(leftContent) || !Array.isArray(rightContent)) {
+		return JSON.stringify(leftContent) === JSON.stringify(rightContent);
+	}
+	return (
+		leftContent.length === rightContent.length &&
+		leftContent.every((block, index) => {
+			const other = rightContent[index];
+			return other !== undefined && sameContentBlock(left, right, block, other);
+		})
+	);
 }
 
 /** A content block as the transcript normalizes it: thinking without its signature. */

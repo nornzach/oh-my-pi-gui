@@ -186,7 +186,8 @@ function alternateNumber(input: {
 }
 
 function safeStringValue(entry: SettingEntry, profile: string): string {
-	if (entry.path.includes("Url") || entry.path.toLowerCase().includes("url")) return "http://127.0.0.1:9/gui-audit";
+	if (entry.path.toLowerCase().includes("url") || entry.path.toLowerCase().includes("endpoint"))
+		return "http://127.0.0.1:9/gui-audit";
 	if (entry.path.toLowerCase().includes("path") || entry.path.includes("directory")) return profile;
 	if (entry.path.includes("interpreter")) return "/usr/bin/python3";
 	return `__gui_audit__${entry.path.replaceAll(".", "_")}`;

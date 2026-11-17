@@ -114,6 +114,82 @@ describe("messages streaming snapshots", () => {
 });
 
 describe("committed transcript ownership", () => {
+	it("retires an image prompt when persistence replaces its base64 with a blob reference", () => {
+		const delivered: AgentMessage = {
+			role: "user",
+			content: [
+				{ type: "text", text: "look at this" },
+				{ type: "image", data: "AQID", mimeType: "image/png" },
+			],
+			timestamp: 10,
+		};
+		const committed: AgentMessage = {
+			...delivered,
+			content: [
+				{ type: "text", text: "look at this" },
+				{
+					type: "image",
+					data: "blob:sha256:039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+					mimeType: "image/png",
+				},
+			],
+			entryId: "user-entry",
+		};
+		useMessagesStore.getState().appendLiveMessage({
+			...delivered,
+			optimistic: true,
+			optimisticAfterEntryId: null,
+		});
+
+		useMessagesStore.getState().applyEvents([{ type: "message_end", message: delivered }]);
+		useMessagesStore.getState().applyEvents([{ type: "agent_end", messages: [committed], isTerminal: true }]);
+
+		const state = useMessagesStore.getState();
+		expect(state.messages).toEqual([committed]);
+		expect(state.liveMessages).toEqual([]);
+	});
+
+	it("reconciles the matching image after transcript hydration without swallowing another image at the same timestamp", () => {
+		const persisted: AgentMessage = {
+			role: "user",
+			content: [
+				{ type: "text", text: "look at this" },
+				{
+					type: "image",
+					data: "blob:sha256:039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+					mimeType: "image/png",
+				},
+			],
+			timestamp: 10,
+			entryId: "user-entry",
+		};
+		const delivered: AgentMessage = {
+			role: "user",
+			content: [
+				{ type: "text", text: "look at this" },
+				{ type: "image", data: "AQID", mimeType: "image/png" },
+			],
+			timestamp: 10,
+		};
+		const otherImage: AgentMessage = {
+			...delivered,
+			content: [
+				{ type: "text", text: "look at this" },
+				{ type: "image", data: "BAUG", mimeType: "image/png" },
+			],
+		};
+		const store = createMessagesStore();
+		store.getState().reconcileFetched([persisted]);
+
+		store.getState().applyEvents([
+			{ type: "message_end", message: delivered },
+			{ type: "message_end", message: otherImage },
+		]);
+
+		expect(store.getState().messages).toEqual([persisted]);
+		expect(store.getState().liveMessages).toEqual([otherImage]);
+	});
+
 	it("keeps the original prompt when steering and follow-up deliveries join the same run", () => {
 		const original: AgentMessage = { role: "user", content: [{ type: "text", text: "original" }], timestamp: 10 };
 		useMessagesStore.getState().appendLiveMessage({ ...original, optimistic: true, optimisticAfterEntryId: null });

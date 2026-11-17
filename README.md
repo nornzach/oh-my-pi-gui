@@ -24,8 +24,8 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
-[Features](#en-features) · [What's new in 0.9.44](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.44 release.** The improvements below are included in v0.9.44, with the bundled agent built from monorepo `aed530c29c` (upstream omp 18.21.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+[Features](#en-features) · [What's new in 0.9.45](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
+> **v0.9.45 release.** The improvements below are included in v0.9.45, with the bundled agent built from monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0` (upstream omp 18.22.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -63,19 +63,15 @@ The distinctive part is not just a chat window: it is being able to **separate p
 Model requests still go to the providers you configure. The bundled agent removes the separate runtime install, not the need to configure credentials, project dependencies, external Git/OpenSSH/MCP tools, or optional services. Only connect tools and services you trust.
 
 <a id="en-recent"></a>
-### What's new in 0.9.44
+### What's new in 0.9.45
 
-v0.9.44 adds ways to work with your conversation and updates the bundled agent to omp 18.21.0:
+v0.9.45 fixes image-message reconciliation, adds self-hosted live voice configuration, and updates the bundled agent to omp 18.22.0:
 
 | In daily use | What has improved |
 |---|---|
-| **Quote a passage** | Select text in a settled message and choose Quote. It goes into your draft at the caret as a Markdown blockquote; formulas keep their TeX source. |
-| **Keep projects in order** | Sort Recent workspaces by name; opening a session keeps that order. |
-| **Choose delete confirmation** | Settings → GUI can skip the confirmation for `/delete` and `/drop`. It stays on by default. |
-| **Responsive large windows** | Windows and Linux overlays dim without a costly background blur. |
-| **Working HTML exports** | The viewer ships inside the bundled agent, so exports do not depend on an unpublished viewer at upstream's CDN. The shared Markdown and highlighting libraries still load from the internet. |
-| **Settings** | Removing a global override works with the updated core; terminal-only spinner timing is hidden from GUI settings. |
-| **Bundled agent** | Rebuilt from monorepo `aed530c29c`, upstream omp 18.21.0 and native addon 18.21.0. Explicit queue shorthand and discovered reasoning capabilities retain their intended behavior after the sync. |
+| **Image messages** | A sent image appears once in the transcript, including when persisted history stores its bytes by reference. |
+| **Self-hosted live voice** | Configure an OpenAI Realtime-compatible endpoint and its API key in Settings → Providers. |
+| **Bundled agent** | Updated to omp 18.22.0 with native addon 18.22.0, built from monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0`. |
 
 <a id="en-gallery"></a>
 ### Explore the interface
@@ -193,22 +189,22 @@ Talk to the agent, share a session over a relay, and work through a debug sessio
 <a id="en-install"></a>
 ### Install & start
 
-**Documented install baseline: [v0.9.44](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.44).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
+**Documented install baseline: [v0.9.45](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.45).** Check [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) for authoritative current downloads and release notes.
 
-| Mac | v0.9.44 download |
+| Mac | v0.9.45 download |
 |---|---|
-| Apple Silicon | [omp-0.9.44-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44-arm64.dmg) |
-| Intel | [omp-0.9.44.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44.dmg) |
+| Apple Silicon | [omp-0.9.45-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45-arm64.dmg) |
+| Intel | [omp-0.9.45.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45.dmg) |
 
-| Windows x64 | v0.9.44 download |
+| Windows x64 | v0.9.45 download |
 |---|---|
-| Installer | [omp-0.9.44-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44-setup.exe) |
-| Portable | [omp-0.9.44-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44-portable.exe) |
+| Installer | [omp-0.9.45-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45-setup.exe) |
+| Portable | [omp-0.9.45-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45-portable.exe) |
 
-| Linux x64 | v0.9.44 download |
+| Linux x64 | v0.9.45 download |
 |---|---|
-| AppImage | [omp-0.9.44.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44.AppImage) |
-| Debian/Ubuntu | [omp_0.9.44_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp_0.9.44_amd64.deb) |
+| AppImage | [omp-0.9.45.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45.AppImage) |
+| Debian/Ubuntu | [omp_0.9.45_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp_0.9.45_amd64.deb) |
 
 Open the DMG and drag **omp** into **Applications**. The app and bundled macOS sidecar are ad-hoc signed but not notarized. If macOS blocks the first launch, use **right-click → Open**, or **System Settings → Privacy & Security → Open Anyway**, after confirming the download's source.
 
@@ -399,9 +395,9 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 这是基于 [omp](https://github.com/can1357/oh-my-pi) 的 Electron 桌面应用，内置 Agent 二进制：**通过 DMG、NSIS 或便携版安装的用户无需另装 omp、Bun 或 Node。** GUI 与 TUI 互补，共享常规的 `~/.omp` 配置与会话。
 
-[功能全览](#zh-features) · [0.9.44 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
+[功能全览](#zh-features) · [0.9.45 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.44 功能展示。** 下文改进均纳入 v0.9.44，内置 Agent 基于 monorepo `aed530c29c` 构建（上游 omp 18.21.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.45 功能展示。** 下文改进均纳入 v0.9.45，内置 Agent 基于 monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0` 构建（上游 omp 18.22.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -439,19 +435,15 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 模型请求仍会发送到你配置的 Provider。内置 Agent 省去了单独安装运行时的步骤，但不替你配置凭据、项目依赖、外部 Git/OpenSSH/MCP 工具或可选服务。请只连接你信任的工具与服务。
 
 <a id="zh-recent"></a>
-### 0.9.44 更新内容
+### 0.9.45 更新内容
 
-v0.9.44 增加了对话操作方式，并将内置代理更新到 omp 18.21.0：
+v0.9.45 修复了图片消息重复显示，加入自托管实时语音配置，并将内置代理更新到 omp 18.22.0：
 
 | 日常场景 | 改进内容 |
 |---|---|
-| **引用一段话** | 选中已完成消息中的文字，点击「引用」，就会在草稿光标处插入 Markdown 引用；公式保留 TeX 原文。 |
-| **项目顺序固定** | 「最近」工作区可按名称排序，打开会话不会再改变这个顺序。 |
-| **选择删除确认** | 设置 → 界面可关闭 `/delete` 和 `/drop` 的删除确认，默认仍开启。 |
-| **大窗口更流畅** | Windows 和 Linux 的遮罩只压暗背景，不再执行代价较高的背景模糊。 |
-| **HTML 导出可用** | 内置代理携带本次构建的查看器，导出文件不再依赖上游 CDN 尚未发布的查看器。共享 Markdown 和高亮库仍需联网加载。 |
-| **设置** | 新版核心下可正确移除全局覆盖，GUI 设置隐藏仅对终端生效的旋转动画间隔。 |
-| **内置代理** | 基于 monorepo `aed530c29c` 重新构建，上游 omp 18.21.0、原生插件 18.21.0；同步后保留显式排队简写和推理能力探测的正确行为。 |
+| **图片消息** | 发送图片后，对话中只显示一条消息；即使持久化记录将图片字节保存为引用也能正确对应。 |
+| **自托管实时语音** | 可在设置 → Provider 中配置兼容 OpenAI Realtime 的端点及 API key。 |
+| **内置代理** | 更新到 omp 18.22.0 和原生插件 18.22.0，基于 monorepo `b3128db79749b1aef45c9b3964c7dbda3adf79d0` 构建。 |
 
 <a id="zh-gallery"></a>
 ### 界面导览
@@ -569,22 +561,22 @@ v0.9.44 增加了对话操作方式，并将内置代理更新到 omp 18.21.0：
 <a id="zh-install"></a>
 ### 安装与开始使用
 
-**本文安装基线：[v0.9.44](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.44)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+**本文安装基线：[v0.9.45](https://github.com/nornzach/oh-my-pi-gui/releases/tag/v0.9.45)。** 最新可下载版本与发布说明以 [Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
-| Mac | v0.9.44 下载 |
+| Mac | v0.9.45 下载 |
 |---|---|
-| Apple Silicon | [omp-0.9.44-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44-arm64.dmg) |
-| Intel | [omp-0.9.44.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44.dmg) |
+| Apple Silicon | [omp-0.9.45-arm64.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45-arm64.dmg) |
+| Intel | [omp-0.9.45.dmg](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45.dmg) |
 
-| Windows x64 | v0.9.44 下载 |
+| Windows x64 | v0.9.45 下载 |
 |---|---|
-| 安装程序 | [omp-0.9.44-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44-setup.exe) |
-| 便携版 | [omp-0.9.44-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44-portable.exe) |
+| 安装程序 | [omp-0.9.45-setup.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45-setup.exe) |
+| 便携版 | [omp-0.9.45-portable.exe](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45-portable.exe) |
 
-| Linux x64 | v0.9.44 下载 |
+| Linux x64 | v0.9.45 下载 |
 |---|---|
-| AppImage | [omp-0.9.44.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp-0.9.44.AppImage) |
-| Debian/Ubuntu | [omp_0.9.44_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.44/omp_0.9.44_amd64.deb) |
+| AppImage | [omp-0.9.45.AppImage](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp-0.9.45.AppImage) |
+| Debian/Ubuntu | [omp_0.9.45_amd64.deb](https://github.com/nornzach/oh-my-pi-gui/releases/download/v0.9.45/omp_0.9.45_amd64.deb) |
 
 打开 DMG，把 **omp** 拖入**应用程序**。应用与内置 macOS sidecar 均采用 ad-hoc 签名，未经公证。如果 macOS 拦截首次启动，请先确认下载来源，再使用**右键 → 打开**，或**系统设置 → 隐私与安全性 → 仍要打开**。
 

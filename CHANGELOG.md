@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.9.45] - 2026-11-18
+
+### Added
+
+- Configure a self-hosted OpenAI Realtime-compatible endpoint and its API key for live voice.
+
+### Changed
+
+- Bundled agent updated to omp 18.22.0 with native addon 18.22.0, built from the monorepo commit recorded in `sidecar-source.json` ([#59](https://github.com/nornzach/oh-my-pi-gui/issues/59)).
+
+### Fixed
+
+- Sending an image no longer leaves a duplicate message at the end of the transcript ([#58](https://github.com/nornzach/oh-my-pi-gui/issues/58)).
+
 ## [0.9.44] - 2026-11-17
 
 ### Added
