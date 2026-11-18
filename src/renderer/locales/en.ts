@@ -2202,6 +2202,9 @@ export const en: Record<string, string> = {
 		"Relocate this session to another directory; that directory becomes the new working directory.",
 	"workspaceDirs.move": "Move session…",
 	"workspaceDirs.moved": "Moved to {path}",
+	"workspaceDirs.currentWorkspace": "Workspace: {name}",
+	"workspaceDirs.selectWorkspace": "Choose workspace",
+	"workspaceDirs.changeWorkspace": "Change workspace",
 	"workspaceDirs.busy": "Unavailable while a response is in progress.",
 
 	// Changelog window

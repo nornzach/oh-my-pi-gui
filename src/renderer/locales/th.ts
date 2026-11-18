@@ -2137,6 +2137,9 @@ export const th: Record<string, string> = {
 	"workspaceDirs.moveDesc": "ย้ายเซสชันนี้ไปยังไดเรกทอรีอื่น โดยไดเรกทอรีนั้นจะกลายเป็น working directory ใหม่",
 	"workspaceDirs.move": "ย้ายเซสชัน…",
 	"workspaceDirs.moved": "ย้ายไปที่ {path} แล้ว",
+	"workspaceDirs.currentWorkspace": "พื้นที่ทำงาน: {name}",
+	"workspaceDirs.selectWorkspace": "เลือกพื้นที่ทำงาน",
+	"workspaceDirs.changeWorkspace": "เปลี่ยนพื้นที่ทำงาน",
 	"workspaceDirs.busy": "ใช้งานไม่ได้ขณะกำลังสร้างคำตอบ",
 
 	// Changelog window

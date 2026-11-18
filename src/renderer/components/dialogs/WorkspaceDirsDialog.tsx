@@ -14,17 +14,19 @@ import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import {
 	addWorkspaceDirectory,
-	moveSessionTo,
+	pickAndMoveSession,
 	pickWorkspaceDirectory,
 	type RpcWorkspaceDirectory,
 	removeWorkspaceDirectory,
 } from "../../lib/workspace-dirs";
 import { useSessionStore } from "../../stores/session";
+import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { AsyncSection, Badge, Button, Modal } from "../common";
 
 export function WorkspaceDirsDialog() {
 	const tabRpc = useTabRpc();
+	const tabId = useRuntimeTabId();
 	const t = useT();
 	const open = useUiStore(state => state.workspaceDirsOpen);
 	const close = useUiStore(state => state.closeWorkspaceDirs);
@@ -91,11 +93,9 @@ export function WorkspaceDirsDialog() {
 
 	const onMove = async (): Promise<void> => {
 		if (!sidecarReady) return;
-		const path = await pickWorkspaceDirectory();
-		if (!path) return;
 		setMutating(true);
 		try {
-			const moved = await moveSessionTo(path);
+			const moved = await pickAndMoveSession(tabId);
 			// move_session returns only the new cwd — refetch for the post-move list.
 			if (moved) await reload();
 		} finally {

@@ -659,6 +659,16 @@ describe("Sidebar menus and pinned ordering", () => {
 		}
 	});
 
+	it("groups a moved fork under its own project while its parent stays behind", async () => {
+		const parent = session("/work/original/root.jsonl", "/work/original");
+		const moved = session("/work/alpha/fork.jsonl", "/work/alpha", { parentSessionPath: parent.path });
+		installMockOmp([parent, moved]);
+		seedStores();
+		await mount(<Sidebar />);
+		expect(container.querySelector('[data-session-group="/work/alpha"]')?.textContent).toContain(moved.title);
+		expect(container.querySelector('[data-workspace-group="/work/original"]')).not.toBeNull();
+	});
+
 	it("lists legacy Work and tool-free chats together while keeping the project group and chat kind", async () => {
 		const chat = session("/work/alpha/chat.jsonl", "/work/alpha", { kind: "chat" });
 		const agent = session("/work/alpha/agent.jsonl", "/work/alpha");

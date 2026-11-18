@@ -58,7 +58,7 @@ import {
 import { isRecording, startRecording, stopRecording } from "./recording";
 import { findTextLinks } from "./terminal-links";
 import { copyTodosToClipboard, dumpTranscriptToClipboard, exportTodos, importTodosFromFile } from "./transcript-copy";
-import { addWorkspaceDirectory, moveSessionTo, pickWorkspaceDirectory } from "./workspace-dirs";
+import { addWorkspaceDirectory, pickAndMoveSession, pickWorkspaceDirectory } from "./workspace-dirs";
 
 /**
  * `action` and `prompt` carry `argUsage` when the command needs user text
@@ -1400,8 +1400,7 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 	};
 	const pickAndMove = async (): Promise<void> => {
 		if (workspaceMutationBusy()) return;
-		const path = await pickWorkspaceDirectory();
-		if (path) await moveSessionTo(path);
+		await pickAndMoveSession(runtime?.tabId);
 	};
 	add({
 		name: "move",

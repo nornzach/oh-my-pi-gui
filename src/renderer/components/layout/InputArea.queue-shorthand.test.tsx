@@ -805,6 +805,20 @@ describe("InputArea run settings", () => {
 });
 
 describe("InputArea file attachments", () => {
+	it("sends both original files when identical names are staged before and after a workspace move", async () => {
+		await mount();
+		await act(async () => {
+			useComposerStore.getState().addFiles([{ name: "notes.md", path: "/tmp/notes.md", mention: "@notes.md" }]);
+			useSessionStore.setState({ cwd: "/work/next" });
+			useComposerStore
+				.getState()
+				.addFiles([{ name: "notes.md", path: "/work/next/notes.md", mention: "@notes.md" }]);
+		});
+		await pressEnter(findTextarea());
+		await flush();
+		expect(steer).toHaveBeenCalledExactlyOnceWith("@/tmp/notes.md @notes.md", []);
+	});
+
 	it("sends a file without text and clears its card after delivery", async () => {
 		await mount();
 		const file = { name: "测试原型 V2.5.html", mention: '@"/tmp/测试原型 V2.5.html"' };

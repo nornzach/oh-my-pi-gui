@@ -28,13 +28,13 @@ import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { restoreTabComposer, useTabsStore } from "../../stores/tabs";
 import { toast, useToastStore } from "../../stores/toast";
-import { appendMentions } from "./input-area-utils";
+import { appendMentions, droppedFileMention } from "./input-area-utils";
 
 /** The agent reads file mentions on the wire. The editable draft keeps text and cards separate. */
-function withFileMentions(message: string, files: ComposerFile[]): string {
+function withFileMentions(message: string, files: ComposerFile[], cwd: string): string {
 	return appendMentions(
 		message,
-		files.map(file => file.mention),
+		files.map(file => (file.path ? droppedFileMention(file.path, cwd) : file.mention)),
 	);
 }
 
@@ -278,7 +278,8 @@ export function useComposerSubmit({
 							if (!originStillActive()) throw new Error("Tab changed during queue dispatch");
 							const draftItem = dispatchItems[index] ?? "";
 							// File references used to be at the end of the shorthand draft.
-							const item = index === dispatchItems.length - 1 ? withFileMentions(draftItem, files) : draftItem;
+							const item =
+								index === dispatchItems.length - 1 ? withFileMentions(draftItem, files, originCwd) : draftItem;
 							const itemImages = index === 0 ? payload : undefined;
 							const isExtensionCommand =
 								item.startsWith("/") && extensionCommandNames.has(/^\/([a-z0-9-]+)/i.exec(item)?.[1] ?? "");
@@ -299,7 +300,7 @@ export function useComposerSubmit({
 						// Only a fully dispatched shorthand enters history. A partial run
 						// restores the unsent remainder as the draft, so recording the
 						// original would offer ↑ a list whose first items already ran.
-						useInputHistoryStore.getState().record(withFileMentions(message, files), originCwd);
+						useInputHistoryStore.getState().record(withFileMentions(message, files, originCwd), originCwd);
 						if (originStillActive()) dropReferencedPastes(message);
 					} catch (error) {
 						if (deliveryPending) markUncertain();
@@ -339,7 +340,7 @@ export function useComposerSubmit({
 			// while streaming), session-replacing commands are blocked while
 			// busy, and local-only resolutions rehydrate the transcript.
 			const payload = images.map(image => image.content);
-			const wireMessage = withFileMentions(expandedMessage, files);
+			const wireMessage = withFileMentions(expandedMessage, files, originCwd);
 			const submit = planComposerSubmit({
 				message: expandedMessage,
 				wireMessage,
@@ -452,7 +453,7 @@ export function useComposerSubmit({
 							return;
 						}
 						accepted = true;
-						useInputHistoryStore.getState().record(withFileMentions(message, files), originCwd);
+						useInputHistoryStore.getState().record(withFileMentions(message, files, originCwd), originCwd);
 						if (!originStillActive()) return;
 						dropReferencedPastes(message);
 						await settleComposerResponse(response, () => hydrateTabSession(originTabId));

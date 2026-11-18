@@ -2138,6 +2138,9 @@ export const zh: Record<string, string> = {
 	"workspaceDirs.moveDesc": "将会话迁移到另一个目录，该目录将成为新的工作目录。",
 	"workspaceDirs.move": "移动会话…",
 	"workspaceDirs.moved": "已移动到 {path}",
+	"workspaceDirs.currentWorkspace": "工作区：{name}",
+	"workspaceDirs.selectWorkspace": "选择工作区",
+	"workspaceDirs.changeWorkspace": "更换工作区",
 	"workspaceDirs.busy": "响应进行中暂不可用。",
 
 	// 更新日志窗口

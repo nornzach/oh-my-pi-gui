@@ -351,6 +351,8 @@ export function Sidebar() {
 		(session: SessionInfo) => {
 			let root = session;
 			for (let parent = parentOf.get(root.path); parent; parent = parentOf.get(root.path)) {
+				// A conversation moved to another project starts a new visible group there.
+				if (!isSubagentSession(root) && root.cwd && parent.cwd && root.cwd !== parent.cwd) break;
 				root = parent;
 			}
 			return root;

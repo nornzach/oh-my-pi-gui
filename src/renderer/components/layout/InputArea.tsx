@@ -43,7 +43,7 @@ import {
 import { parseQueueShorthand, splitQueuedMessages } from "../../lib/queue-input";
 import { insertQuote } from "../../lib/quote-selection";
 import { useTabRpc } from "../../lib/tab-rpc";
-import { useComposerStore } from "../../stores/composer";
+import { composerFileKey, useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
 import { type ModelSpeed, useModelStore } from "../../stores/model";
 import { type SessionStore, useSessionStore } from "../../stores/session";
@@ -60,6 +60,7 @@ import { ApprovalControl } from "./ApprovalControl";
 import { ChatContextBar } from "./ChatContextBar";
 import { ComposerModes } from "./ComposerModes";
 import { ContextStrategyBar } from "./ContextStrategyBar";
+import { CurrentWorkspaceControl } from "./CurrentWorkspaceControl";
 import { DictationStrip } from "./DictationStrip";
 import { HistorySearchOverlay } from "./HistorySearchOverlay";
 import { fileToImage, listMentionFiles, mentionFileCache } from "./input-area-utils";
@@ -90,6 +91,7 @@ export function InputArea() {
 	const tabKind = useActiveTabKind();
 	const isChat = tabKind === "chat";
 	const status = useSessionStore(s => s.status);
+	const isCompacting = useSessionStore(s => s.isCompacting);
 	const sessionId = useSessionStore(s => s.sessionId);
 	const queuedMessageCount = useSessionStore(s => s.queuedMessageCount);
 	const cwd = useSessionStore(s => s.cwd);
@@ -906,10 +908,10 @@ export function InputArea() {
 									))}
 									{attachedFiles.map(file => (
 										<FileAttachmentCard
-											key={file.mention}
+											key={composerFileKey(file)}
 											name={file.name}
 											path={file.path ?? splitAttachmentMentions(file.mention).paths[0] ?? file.name}
-											onRemove={() => removeFile(file.mention)}
+											onRemove={() => removeFile(composerFileKey(file))}
 											removeDisabled={collabReadOnly}
 										/>
 									))}
@@ -1109,6 +1111,14 @@ export function InputArea() {
 									</button>
 								)}
 
+								{!isChat && (
+									<CurrentWorkspaceControl
+										tabId={runtimeTabId}
+										disabled={
+											collabReadOnly || !routeReady || status !== "ready" || isStreaming || isCompacting
+										}
+									/>
+								)}
 								<button
 									type="button"
 									onClick={() => {

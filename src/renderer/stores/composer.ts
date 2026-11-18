@@ -22,8 +22,10 @@ export interface ComposerFile {
 	path?: string;
 }
 
+export const composerFileKey = (file: ComposerFile): string => file.path ?? file.mention;
+
 export function mergeComposerFiles(first: ComposerFile[], second: ComposerFile[]): ComposerFile[] {
-	return [...new Map([...first, ...second].map(file => [file.mention, file])).values()];
+	return [...new Map([...first, ...second].map(file => [composerFileKey(file), file])).values()];
 }
 
 export interface ComposerStore {
@@ -39,7 +41,7 @@ export interface ComposerStore {
 	setDraft: (next: string | ((current: string) => string)) => void;
 	setImages: (next: ComposerImage[] | ((current: ComposerImage[]) => ComposerImage[])) => void;
 	addFiles: (files: ComposerFile[]) => void;
-	removeFile: (mention: string) => void;
+	removeFile: (key: string) => void;
 	reset: () => void;
 }
 
@@ -55,7 +57,7 @@ export const createComposerStore = () =>
 		setDraft: next => set(state => ({ draft: typeof next === "function" ? next(state.draft) : next })),
 		setImages: next => set(state => ({ images: typeof next === "function" ? next(state.images) : next })),
 		addFiles: files => set(state => ({ files: mergeComposerFiles(state.files, files) })),
-		removeFile: mention => set(state => ({ files: state.files.filter(file => file.mention !== mention) })),
+		removeFile: key => set(state => ({ files: state.files.filter(file => composerFileKey(file) !== key) })),
 		reset: () => set({ draft: "", images: [], files: [], sending: false, submissionUncertain: false }),
 	}));
 

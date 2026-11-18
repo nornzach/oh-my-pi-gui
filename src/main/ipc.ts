@@ -616,7 +616,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 					// cwd. Adopt it so the tab chip tracks the session, and sync
 					// the window record (menu "New Window" reads cwd from it) —
 					// the same tail as a project switch, minus the respawn.
-					if (state?.cwd && sidecarPool.adoptSessionCwd(issuerTabId, state.cwd)) {
+					if (
+						state?.cwd &&
+						sidecarPool.adoptSessionCwd(issuerTabId, state.cwd) &&
+						issuerTabId === sidecarPool.activeTabForWindow(win)
+					) {
 						windowManager.setRecordCwd(win, state.cwd);
 					}
 				}

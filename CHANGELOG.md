@@ -4,6 +4,7 @@
 
 ### Added
 
+- View or change the current task’s workspace beside the model picker, keeping the conversation in the destination project ([#62](https://github.com/nornzach/oh-my-pi-gui/issues/62)).
 - Preview and open attachments from the composer or sent messages, including macOS Quick Look previews for supported Office documents ([#61](https://github.com/nornzach/oh-my-pi-gui/pull/61) by [@y26s4824k264](https://github.com/y26s4824k264)).
 - Open and edit multiple workspace files in tabs alongside the directory tree, with Markdown source and preview views ([#61](https://github.com/nornzach/oh-my-pi-gui/pull/61) by [@y26s4824k264](https://github.com/y26s4824k264)).
 - Create conversations within projects or without a project, and rename projects in the sidebar ([#61](https://github.com/nornzach/oh-my-pi-gui/pull/61) by [@y26s4824k264](https://github.com/y26s4824k264)).
