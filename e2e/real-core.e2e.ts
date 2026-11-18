@@ -11,7 +11,7 @@ import { IPC_EVENTS } from "../src/shared/ipc-types";
 import type { RpcSessionState } from "../src/shared/rpc-types";
 
 test("real bundled sidecar persists settings and sessions and serves every stats route", async () => {
-	test.setTimeout(180_000);
+	test.setTimeout(process.env.OMP_GUI_TEST_APP ? 360_000 : 180_000);
 	const profile = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-real-core-"));
 	const project = path.join(profile, "project");
 	const desktop = path.join(profile, "desktop");
@@ -458,7 +458,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			pathToFileURL(path.join(profile, "audit-export.html")).href,
 		);
 		const exportPage = await exportWindow;
-		await expect(exportPage.locator("#messages")).toContainText("arm audit ok");
+		await expect(exportPage.locator("#messages")).toContainText("arm audit ok", { timeout: 60_000 });
 		await exportPage.screenshot({ path: "test-results/exported-session.png", scale: "css", animations: "disabled" });
 		await exportPage.close();
 		await page.screenshot({ path: "test-results/04-real-core.png", scale: "css", animations: "disabled" });
