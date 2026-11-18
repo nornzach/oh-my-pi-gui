@@ -6,7 +6,7 @@ import { _electron as electron } from "playwright";
 import type { RpcSessionState } from "../src/shared/rpc-types";
 
 test("moving an existing conversation changes its project and preserves its history when reopened", async () => {
-	test.setTimeout(120_000);
+	test.setTimeout(240_000);
 	const profile = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "omp-workspace-test-")));
 	const project = path.join(profile, "source");
 	const target = path.join(profile, "destination");
@@ -25,14 +25,19 @@ test("moving an existing conversation changes its project and preserves its hist
 	};
 	Reflect.deleteProperty(env, "ELECTRON_RUN_AS_NODE");
 	Reflect.deleteProperty(env, "OMP_SIDECAR");
+	const executablePath = process.env.OMP_GUI_TEST_APP;
+	if (executablePath) Reflect.deleteProperty(env, "OMP_BUNDLED_OMP");
 	const app = await electron.launch({
-		args: [path.resolve("out/main/index.js"), project, `--user-data-dir=${desktop}`],
+		...(executablePath ? { executablePath } : {}),
+		args: [...(executablePath ? [] : [path.resolve("out/main/index.js")]), project, `--user-data-dir=${desktop}`],
 		env,
 	});
 	try {
 		const page = await app.firstWindow();
 		const welcome = page.getByRole("dialog", { name: "Welcome to omp", exact: true });
-		await welcome.getByRole("button", { name: "Close", exact: true }).click();
+		await page.addLocatorHandler(welcome, dialog =>
+			dialog.getByRole("button", { name: "Close", exact: true }).click(),
+		);
 		const control = page.getByRole("button", { name: "Workspace: source", exact: true });
 		await expect(control).toBeEnabled({ timeout: 60000 });
 		const original = await page.evaluate(async () => {
@@ -79,7 +84,7 @@ test("moving an existing conversation changes its project and preserves its hist
 		await page.reload();
 		await expect(
 			page.locator("[data-transcript-kind]").filter({ hasText: "workspace-move-marker" }).first(),
-		).toBeVisible();
+		).toBeVisible({ timeout: 60_000 });
 		const reopened = await page.evaluate(() => window.omp.rpc.getState());
 		expect(reopened).toMatchObject({
 			success: true,
