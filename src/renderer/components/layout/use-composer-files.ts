@@ -1,5 +1,5 @@
 import { useT } from "../../lib/i18n";
-import { type ComposerFile, useComposerStore } from "../../stores/composer";
+import { type ComposerFile, type ComposerImage, useComposerStore } from "../../stores/composer";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
 import { droppedFileMention, fileToImage, isInlineImage } from "./input-area-utils";
@@ -15,7 +15,7 @@ export function useComposerFiles() {
 	const attachFiles = (incoming: File[]) => {
 		if (readOnly) return;
 		const localFiles: ComposerFile[] = [];
-		const imageReads: ReturnType<typeof fileToImage>[] = [];
+		const imageReads: Promise<ComposerImage>[] = [];
 		let unavailable = false;
 		for (const file of incoming) {
 			if (isInlineImage(file)) {
