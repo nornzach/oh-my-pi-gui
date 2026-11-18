@@ -28,15 +28,25 @@ if [ "${SKIP_MERGE:-0}" = "1" ]; then
 	fi
 else
 	say "1/7 fetch upstream"
-	git fetch upstream --quiet
-	incoming=$(git rev-list --count HEAD..upstream/main)
+	target=upstream/main
+	if [ -n "${UPSTREAM_TAG:-}" ]; then
+		if ! [[ "$UPSTREAM_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+			echo "UPSTREAM_TAG must be a stable upstream version tag" >&2
+			exit 1
+		fi
+		target="refs/tags/$UPSTREAM_TAG"
+		git fetch --quiet upstream "$target:$target"
+	else
+		git fetch upstream --quiet
+	fi
+	incoming=$(git rev-list --count "HEAD..$target")
 	echo "incoming commits: $incoming"
-	git log --oneline HEAD..upstream/main | head -15 || true
+	git log --oneline "HEAD..$target" | head -15 || true
 
-	say "2/7 merge upstream/main"
+	say "2/7 merge $target"
 	if [ "$incoming" = "0" ]; then
 		echo "already up to date"
-	elif ! git merge upstream/main --no-edit; then
+	elif ! git merge "$target" --no-edit; then
 		echo "CONFLICT — resolve and commit the listed files, then re-run with SKIP_MERGE=1"
 		echo "  SKIP_MERGE=1 bash packages/gui/scripts/sync-upstream.sh"
 		echo "  git status --short"

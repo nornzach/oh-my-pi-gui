@@ -79,7 +79,10 @@ Conventions, fixed for every release:
 ### Phase 1 — Upstream sync (mandatory, every release)
 
 ```bash
-bash packages/gui/scripts/sync-upstream.sh        # run from anywhere; it cds to the monorepo root
+bash packages/gui/scripts/sync-upstream.sh        # upstream/main integration
+# To ship the published Core (and its matching npm native addons), sync the official
+# stable tag in a clean release checkout based on the fork before any post-tag commits:
+# UPSTREAM_TAG=vX.Y.Z bash packages/gui/scripts/sync-upstream.sh
 # merge conflict → resolve at the MONOREPO root → git add -A && git commit →
 SKIP_MERGE=1 bash packages/gui/scripts/sync-upstream.sh
 ```
