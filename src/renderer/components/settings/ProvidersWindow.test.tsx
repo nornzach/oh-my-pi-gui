@@ -368,18 +368,20 @@ describe("ProvidersWindow", () => {
 	});
 
 	it("re-reads while discovery is still running and drops the waiting banner once it lands", async () => {
+		const discovered = Promise.withResolvers<RpcResponse>();
 		getProviders
 			.mockResolvedValueOnce(
 				providersResponse(snapshot([row("my-proxy", { name: "My Proxy" })], { refreshPending: true })),
 			)
-			.mockResolvedValue(
-				providersResponse(snapshot([row("my-proxy", { name: "My Proxy", modelCount: 12 })], { generation: 2 })),
-			);
+			.mockReturnValue(discovered.promise);
 		useSessionStore.setState({ status: "ready" });
 		useUiStore.getState().openProviders();
 		await mountWindow(25);
 		expect(text()).toContain(translate("providers.refreshPending"));
 
+		discovered.resolve(
+			providersResponse(snapshot([row("my-proxy", { name: "My Proxy", modelCount: 12 })], { generation: 2 })),
+		);
 		// No push arrives for this tab (the discovery finished while the frame
 		// routing was busy elsewhere), so the only way the list updates is the
 		// window asking again.

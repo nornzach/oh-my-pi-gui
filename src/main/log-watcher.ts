@@ -95,7 +95,7 @@ export class LogWatcher {
 			for (const entry of entries) {
 				if (entry.startsWith("omp.") && entry.endsWith(".log")) {
 					const fullPath = join(this.#logsDir, entry);
-					if (!this.#files.has(fullPath) && !this.#idle.has(fullPath)) {
+					if (!this.#files.has(fullPath)) {
 						await this.#watchFile(fullPath);
 					}
 				}
@@ -113,9 +113,7 @@ export class LogWatcher {
 				const fullPath = join(this.#logsDir, filename);
 				if (!this.#files.has(fullPath)) {
 					// Something just wrote it, so an idle file is live again from where it stopped.
-					const idleSize = this.#idle.get(fullPath);
-					this.#idle.delete(fullPath);
-					void this.#watchFile(fullPath, idleSize);
+					void this.#watchFile(fullPath);
 				}
 			});
 			watcher.on("error", () => {
@@ -128,8 +126,8 @@ export class LogWatcher {
 		}
 	}
 
-	/** `resumeAt`: the size an idle file had when it was set aside; new content starts there. */
-	async #watchFile(filePath: string, resumeAt?: number): Promise<void> {
+	/** Promote an idle file from its last offset, even if two directory events arrive together. */
+	async #watchFile(filePath: string): Promise<void> {
 		let fileStat: Stats;
 		try {
 			fileStat = await stat(filePath);
@@ -138,10 +136,12 @@ export class LogWatcher {
 		}
 
 		if (!this.#running || this.#files.has(filePath)) return;
-		if (resumeAt === undefined && Date.now() - fileStat.mtimeMs > IDLE_LOG_MS) {
+		const resumeAt = this.#idle.get(filePath);
+		if (Date.now() - fileStat.mtimeMs > IDLE_LOG_MS && (resumeAt === undefined || resumeAt === fileStat.size)) {
 			this.#idle.set(filePath, fileStat.size);
 			return;
 		}
+		this.#idle.delete(filePath);
 		const watched: WatchedFile = {
 			path: filePath,
 			// Start from the end (only new content), or where an idle file left off.
