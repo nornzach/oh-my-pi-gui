@@ -104,7 +104,7 @@ export function WorkspaceDirsDialog() {
 	};
 
 	return (
-		<Modal onClose={close} open={open} size="md" title={t("workspaceDirs.title")}>
+		<Modal dockable onClose={close} open={open} size="md" title={t("workspaceDirs.title")}>
 			<div className="flex flex-col gap-3">
 				<div className="text-omp-xs text-(--omp-dim)">{t("workspaceDirs.subtitle")}</div>
 				<div className="max-h-[38vh] min-h-16 overflow-y-auto rounded-md border border-(--omp-border-muted)">

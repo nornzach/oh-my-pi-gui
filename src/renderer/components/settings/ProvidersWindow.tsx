@@ -448,7 +448,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 					providerName={providers.find(p => p.id === apiKeyFor)?.name ?? apiKeyFor}
 				/>
 			)}
-			<Modal open={open} onClose={close} title={t("providers.title")} size="lg">
+			<Modal dockable open={open} onClose={close} title={t("providers.title")} size="lg">
 				<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
 					<div className="flex items-center justify-between">
 						<span className="omp-section-label">

@@ -81,7 +81,12 @@ export const RU_MAIN_TEXT: Record<MainTextKey, string> = {
 	"tasks.notify.disabledConfig": "Она трижды подряд не смогла запуститься. Проверь папку и модель.",
 	"tasks.notify.auth": "{title}: нужно войти снова",
 	"tasks.notify.authBody": "Провайдер отклонил учётные данные. Войди снова и запусти задачу.",
+	"menu.forceReload": "Принудительная перезагрузка",
 	"quit.keepWorking": "Продолжить работу",
+	"quit.discardFiles": "Отменить изменения файлов",
+	"quit.unsavedFiles": "В файлах есть несохранённые изменения",
+	"quit.unsavedFilesBody":
+		"При закрытии или перезагрузке правки в редакторе файлов будут потеряны. Продолжите работу, чтобы сначала сохранить изменения.",
 	"quit.quitAnyway": "Всё равно выйти",
 	"quit.workingBody":
 		"Работающих сессий: {working} из {total}. Окон: {windows}. При выходе они и связанные с ними агенты остановятся.",
@@ -124,7 +129,7 @@ export const RU_TRAY_TEXT: Record<TrayLabelKey, string> = {
 	statusStreaming: "Выполняется",
 	statusWaiting: "Требуется ввод",
 	statusError: "Ошибка",
-	quotaUsed: "использовано {percent}",
+	quotaRemaining: "осталось {percent}",
 	quotaReached: "лимит исчерпан",
 	quotaResets: "сброс {time}",
 	quotaUpdated: "Обновлено {time}",

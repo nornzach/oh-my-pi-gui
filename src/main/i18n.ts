@@ -34,6 +34,7 @@ export type MainTextKey =
 	| "menu.edit"
 	| "menu.exportHtml"
 	| "menu.extensions"
+	| "menu.forceReload"
 	| "menu.file"
 	| "menu.find"
 	| "menu.findNext"
@@ -73,6 +74,9 @@ export type MainTextKey =
 	| "menu.workspaceChanges"
 	| "menu.workspaceDirs"
 	| "quit.keepWorking"
+	| "quit.discardFiles"
+	| "quit.unsavedFiles"
+	| "quit.unsavedFilesBody"
 	| "quit.quitAnyway"
 	| "quit.runningTasks"
 	| "quit.workingBody"
@@ -202,7 +206,14 @@ const TEXT: Record<MainTextKey, Record<Exclude<MainLanguage, "ru" | "th">, strin
 		en: "The provider rejected the credentials. Sign in again, then run the task.",
 		zh: "服务商拒绝了凭据。请重新登录后再运行该任务。",
 	},
+	"menu.forceReload": { en: "Force reload", zh: "强制重新加载" },
 	"quit.keepWorking": { en: "Keep working", zh: "继续工作" },
+	"quit.discardFiles": { en: "Discard file changes", zh: "放弃文件修改" },
+	"quit.unsavedFiles": { en: "Files have unsaved changes", zh: "文件有未保存的修改" },
+	"quit.unsavedFilesBody": {
+		en: "Closing or reloading will discard edits in the file editor. Keep working to save your changes first.",
+		zh: "关闭或重新加载将丢弃文件编辑器中的修改。选择继续工作可先保存修改。",
+	},
 	"quit.quitAnyway": { en: "Quit anyway", zh: "仍要退出" },
 	"quit.workingBody": {
 		en: "{working} of {total} sessions are still working in {windows} window(s). Quitting stops them and their agents.",

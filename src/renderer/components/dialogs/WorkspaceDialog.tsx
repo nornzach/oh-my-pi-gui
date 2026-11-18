@@ -40,6 +40,8 @@ export function WorkspaceDialog({
 	const { sessions } = useSessionList("global");
 	const cwd = useSessionStore(s => s.cwd);
 	const workspaceLastUsed = useSidebarPrefs(s => s.workspaceLastUsed);
+	const groupAliases = useSidebarPrefs(s => s.groupAliases);
+	const registeredWorkspaces = useSidebarPrefs(s => s.registeredWorkspaces);
 	const openTab = useTabsStore(s => s.openTab);
 
 	const workspaces = useMemo<WorkspaceRow[]>(() => {
@@ -60,15 +62,17 @@ export function WorkspaceDialog({
 				});
 			}
 		}
-		// Ensure the current project appears even when it has no sessions yet.
-		if (cwd && !byCwd.has(cwd)) {
-			byCwd.set(cwd, { cwd, name: basename(cwd) || cwd, lastModified: 0, sessionCount: 0 });
+		for (const path of [...registeredWorkspaces, cwd]) {
+			if (path && !byCwd.has(path)) {
+				byCwd.set(path, { cwd: path, name: basename(path) || path, lastModified: 0, sessionCount: 0 });
+			}
 		}
 		for (const workspace of byCwd.values()) {
+			workspace.name = groupAliases[workspace.cwd] ?? workspace.name;
 			workspace.lastModified = Math.max(workspace.lastModified, workspaceLastUsed[workspace.cwd] ?? 0);
 		}
 		return [...byCwd.values()].sort((a, b) => b.lastModified - a.lastModified);
-	}, [sessions, cwd, workspaceLastUsed]);
+	}, [sessions, cwd, groupAliases, registeredWorkspaces, workspaceLastUsed]);
 
 	/** In-place workspace switches abort the active sidecar run. New-session
 	 * intent opens an independent agent tab and does not need this guard. */

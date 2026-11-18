@@ -54,7 +54,7 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 	};
 
 	return (
-		<Modal onClose={close} open={open} title={t("hotkeys.title")}>
+		<Modal dockable onClose={close} open={open} title={t("hotkeys.title")}>
 			<div className="mb-3 flex items-center gap-2">
 				<div className="min-w-0 flex-1">
 					{/* Typing filters straight away: the list is what this dialog is opened to search. */}

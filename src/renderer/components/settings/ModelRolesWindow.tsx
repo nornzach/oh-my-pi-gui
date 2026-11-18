@@ -77,12 +77,6 @@ function RoleRow({
 }) {
 	const color = COLOR_MAP[role.color ?? "default"] ?? COLOR_MAP.default;
 	const candidates = role.candidates ?? [];
-	const groups = new Map<ModelRoleCandidate["kind"], ModelRoleCandidate[]>();
-	for (const candidate of candidates) {
-		const group = groups.get(candidate.kind) ?? [];
-		group.push(candidate);
-		groups.set(candidate.kind, group);
-	}
 	// The backend splits the `:level` suffix off; an older sidecar without
 	// `selected` still matches unsuffixed selectors verbatim.
 	const selectedKey = role.selected ? candidateKey(role.selected) : role.model;
@@ -156,20 +150,14 @@ function RoleRow({
 		if (!sidecarReady) setOpen(false);
 	}, [sidecarReady]);
 
-	const filteredGroups = [...groups.entries()]
-		.map(([kind, models]) => [
-			kind,
-			models.filter(model => {
-				const needle = query.trim().toLowerCase();
-				return (
-					needle.length === 0 ||
-					model.name.toLowerCase().includes(needle) ||
-					model.provider.toLowerCase().includes(needle) ||
-					model.id.toLowerCase().includes(needle)
-				);
-			}),
-		])
-		.filter(([, models]) => models.length > 0) as [ModelRoleCandidate["kind"], ModelRoleCandidate[]][];
+	const needle = query.trim().toLowerCase();
+	const providerGroups = new Map<string, ModelRoleCandidate[]>();
+	for (const model of candidates) {
+		if (!model.name.toLowerCase().includes(needle) && !candidateKey(model).toLowerCase().includes(needle)) continue;
+		const group = providerGroups.get(model.provider) ?? [];
+		group.push(model);
+		providerGroups.set(model.provider, group);
+	}
 	const currentLabel = currentCandidate
 		? `${currentCandidate.name} — ${currentCandidate.provider}/${currentCandidate.id}`
 		: savedOnly
@@ -283,10 +271,10 @@ function RoleRow({
 								{t("modelRoles.savedSelector", { model: role.model! })}
 							</button>
 						)}
-						{filteredGroups.map(([kind, models]) => (
-							<div key={kind}>
+						{[...providerGroups].map(([provider, models]) => (
+							<div aria-label={provider} key={provider} role="group">
 								<div className="px-2 pt-2 pb-0.5 text-omp-xxs font-semibold text-[var(--omp-dim)]">
-									{t(`modelRoles.kind.${kind}`)}
+									{provider}
 								</div>
 								{models.map(model => {
 									const value = candidateKey(model);
@@ -430,7 +418,7 @@ export function ModelRolesWindow() {
 	};
 
 	return (
-		<Modal open={open} onClose={close} title={t("modelRoles.title")} size="lg">
+		<Modal dockable open={open} onClose={close} title={t("modelRoles.title")} size="lg">
 			<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
 				<div className="flex items-center justify-between">
 					<span className="omp-section-label">{t("modelRoles.header")}</span>

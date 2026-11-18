@@ -11,6 +11,7 @@ import type {
 import { describeError } from "../lib/errors";
 import { translate } from "../lib/i18n";
 import { toast } from "./toast";
+import { useUiStore } from "./ui";
 
 /**
  * Scheduled tasks in this window (plan/23 §6): the main-process snapshot,
@@ -128,6 +129,7 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 			selectedTaskId: target?.taskId ?? get().selectedTaskId,
 			selectedRunId: target?.runId ?? (view === "runs" || view === "review" ? get().selectedRunId : null),
 		});
+		useUiStore.getState().openTasksPage();
 	},
 	openNotice: notice => {
 		get().openTasks(notice.target);
@@ -136,7 +138,10 @@ export const useSchedulerStore = create<SchedulerStore>()((set, get) => ({
 	markAllNoticesRead: () => {
 		if (get().notices.some(notice => !notice.read)) void window.omp.scheduler.markNoticesRead().catch(failed);
 	},
-	close: () => set({ open: false, editor: null }),
+	close: () => {
+		set({ open: false, editor: null });
+		useUiStore.getState().closeTasksPage();
+	},
 	setView: view => set({ view, selectedRunId: null }),
 	selectTask: taskId => set({ selectedTaskId: taskId }),
 	selectRun: runId => set({ selectedRunId: runId }),

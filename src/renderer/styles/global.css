@@ -249,12 +249,71 @@ kbd,
 	padding-right: calc(var(--omp-caption-right) + 0.5rem);
 }
 
+[data-inspector-left-edge] .omp-inspector-header {
+	padding-left: calc(var(--omp-caption-left) + 0.75rem);
+}
+
+.omp-docked-page-content > :first-child {
+	max-height: none;
+}
+
+.omp-docked-page-content > .omp-docked-fill {
+	height: 100%;
+	min-height: 0;
+}
+
+.omp-docked-page-content .omp-docked-master-detail > aside {
+	width: min(42%, 20rem);
+}
+
+.omp-workspace-page {
+	container: omp-workspace-page / inline-size;
+}
+
+.omp-workspace-page-header {
+	padding-right: max(1rem, var(--omp-caption-right));
+}
+
+[data-sidebar="closed"] .omp-workspace-page-header {
+	padding-left: calc(var(--omp-caption-left) + 0.75rem);
+}
+
+@container omp-workspace-page (max-width: 570px) {
+	.omp-docked-master-detail {
+		flex-direction: column;
+	}
+
+	.omp-docked-page-content .omp-docked-master-detail > aside {
+		width: 100%;
+		max-height: 36%;
+		border-right: 0;
+		border-bottom: 1px solid var(--omp-border-muted);
+	}
+}
+
 .settings-main-canvas > header {
 	padding-right: max(var(--omp-column-pad), var(--omp-caption-right));
 }
 
 .omp-image-viewer-tools {
 	right: calc(var(--omp-caption-right) + 0.75rem);
+}
+
+.omp-file-preview {
+	container: omp-file-preview / inline-size;
+}
+
+.omp-file-preview-toolbar {
+	height: auto;
+	min-height: 2.75rem;
+	flex-wrap: wrap;
+	padding-block: 0.25rem;
+}
+
+@container omp-file-preview (max-width: 20rem) {
+	.omp-file-preview-label {
+		display: none; /* The file name remains in the tab above the toolbar. */
+	}
 }
 
 /* A centered dialog tall or wide enough to reach the controls stays below them. */
@@ -662,8 +721,7 @@ kbd,
 	background: var(--omp-sidebar-item-hover);
 }
 
-.omp-sidebar-session-actions,
-.omp-sidebar-workspace-actions {
+.omp-sidebar-session-actions {
 	position: absolute;
 	top: 50%;
 	right: 4px;
@@ -686,10 +744,7 @@ kbd,
 
 .omp-sidebar-session-row[data-has-actions="true"]:hover .omp-sidebar-session-actions,
 .omp-sidebar-session-row[data-has-actions="true"]:is(:focus-visible, :has(:focus-visible)) .omp-sidebar-session-actions,
-.omp-sidebar-session-row[data-actions-open="true"] .omp-sidebar-session-actions,
-.omp-sidebar-workspace-row:hover .omp-sidebar-workspace-actions,
-.omp-sidebar-workspace-row:has(:focus-visible) .omp-sidebar-workspace-actions,
-.omp-sidebar-workspace-row[data-actions-open="true"] .omp-sidebar-workspace-actions {
+.omp-sidebar-session-row[data-actions-open="true"] .omp-sidebar-session-actions {
 	visibility: visible;
 	pointer-events: auto;
 	opacity: 1;
@@ -702,10 +757,8 @@ kbd,
 		linear-gradient(to right, transparent, var(--omp-sidebar-bg) 14px);
 }
 
-/* Recency and counts are resting information: they step aside for actions.
-   A row's family count goes too; the chevron in its status slot opens it. */
+/* Recency and family counts step aside for session actions. */
 .omp-sidebar-time,
-.omp-sidebar-group-count,
 .omp-sidebar-session-row .omp-sidebar-agent-pill {
 	transition: opacity var(--omp-motion-fast) var(--omp-ease);
 }
@@ -714,9 +767,7 @@ kbd,
 .omp-sidebar-session-row[data-has-actions="true"]:is(:focus-visible, :has(:focus-visible)) .omp-sidebar-time,
 .omp-sidebar-session-row[data-actions-open="true"] .omp-sidebar-time,
 .omp-sidebar-session-row[data-has-actions="true"]:hover .omp-sidebar-agent-pill,
-.omp-sidebar-session-row[data-has-actions="true"]:is(:focus-visible, :has(:focus-visible)) .omp-sidebar-agent-pill,
-.omp-sidebar-workspace-row:hover .omp-sidebar-group-count,
-.omp-sidebar-workspace-row:has(:focus-visible) .omp-sidebar-group-count {
+.omp-sidebar-session-row[data-has-actions="true"]:is(:focus-visible, :has(:focus-visible)) .omp-sidebar-agent-pill {
 	opacity: 0;
 }
 
@@ -895,7 +946,6 @@ kbd,
 		inset-block: 0;
 		right: 0;
 		z-index: 30;
-		width: min(460px, calc(100vw - 56px)) !important;
 		box-shadow: var(--omp-shadow-lg);
 		animation: omp-slide-in-right var(--omp-motion-spring) var(--omp-ease-spring) both;
 	}
@@ -906,7 +956,8 @@ kbd,
    ============================================================================ */
 
 .settings-sidebar {
-	width: 15.5rem;
+	width: clamp(11rem, 22vw, 15rem);
+	background: var(--omp-sidebar-bg, var(--omp-bg-secondary));
 }
 
 .settings-content {
@@ -919,10 +970,19 @@ kbd,
 	scrollbar-gutter: stable;
 }
 
-/* Form pages keep a reading measure on the column's left edge rather than
-   centering inside it, so switching pages never moves where content starts. */
+.settings-page-frame {
+	width: 100%;
+	max-width: 88rem;
+	margin-inline: auto;
+	padding-inline: clamp(1rem, 3.5vw, 2.75rem);
+}
+
+.settings-page-frame--form {
+	max-width: 61rem;
+}
+
 .settings-form-measure {
-	max-width: var(--omp-column-settings);
+	max-width: 100%;
 }
 
 .settings-capability-grid {
@@ -1043,12 +1103,35 @@ kbd,
 		padding-inline: 0.5rem;
 	}
 
-	.settings-nav-group {
-		margin-top: 0.5rem;
+	.settings-nav-item {
+		padding-inline: 0.5rem;
+	}
+}
+
+@media (max-width: 600px) {
+	.omp-settings-layout {
+		flex-direction: column;
+	}
+
+	.settings-sidebar {
+		width: 100%;
+		border-right: 0;
+		border-bottom: 1px solid var(--omp-border-muted);
+	}
+
+	.settings-sidebar > :last-child {
+		display: flex;
+		flex: none;
+		gap: 4px;
+		overflow-x: auto;
+		overflow-y: hidden;
+		padding-bottom: 6px;
 	}
 
 	.settings-nav-item {
-		padding-inline: 0.5rem;
+		width: auto;
+		flex-shrink: 0;
+		white-space: nowrap;
 	}
 }
 

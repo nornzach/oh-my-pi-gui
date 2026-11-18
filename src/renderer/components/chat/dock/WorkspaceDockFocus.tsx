@@ -1,11 +1,10 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
-
-export type WorkspaceDockFocusCard = "todo" | "agents";
+import type { DockCardId } from "../../../stores/ui";
 
 interface WorkspaceDockFocusValue {
 	managed: boolean;
-	focusedCard: WorkspaceDockFocusCard | null;
-	focusCard: (card: WorkspaceDockFocusCard) => void;
+	focusedCard: DockCardId | null;
+	focusCard: (card: DockCardId) => void;
 	clearFocus: () => void;
 }
 
@@ -22,8 +21,8 @@ const WorkspaceDockFocusContext = createContext<WorkspaceDockFocusValue>({
  * per-card collapsed state remains a durable user preference.
  */
 export function WorkspaceDockFocusProvider({ children }: { children: ReactNode }) {
-	const [focusedCard, setFocusedCard] = useState<WorkspaceDockFocusCard | null>(null);
-	const focusCard = useCallback((card: WorkspaceDockFocusCard) => setFocusedCard(card), []);
+	const [focusedCard, setFocusedCard] = useState<DockCardId | null>(null);
+	const focusCard = useCallback((card: DockCardId) => setFocusedCard(card), []);
 	const clearFocus = useCallback(() => setFocusedCard(null), []);
 	const value = useMemo<WorkspaceDockFocusValue>(
 		() => ({

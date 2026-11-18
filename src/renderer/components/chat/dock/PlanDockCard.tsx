@@ -24,12 +24,14 @@ import { useTabGuard } from "../../../hooks/use-tab-guard";
 import { describeError } from "../../../lib/errors";
 import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
+import { MarkdownRenderer } from "../../../lib/markdown";
 import { type TabRpc, useTabRpc } from "../../../lib/tab-rpc";
 import { type SessionStore, useSessionStore } from "../../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../../stores/session-runtime-context";
 import { toast } from "../../../stores/toast";
 import { Badge, Button, Spinner, Tabs, TextArea } from "../../common";
 import { DockCard } from "./DockCard";
+import { useWorkspaceDockFocus } from "./WorkspaceDockFocus";
 
 const POLL_STREAMING_MS = 3000;
 
@@ -137,6 +139,8 @@ export function PlanDockCard() {
 	const { capture, isActive } = useTabGuard();
 	const planModeEnabled = useSessionStore(s => s.planModeEnabled);
 	const isStreaming = useSessionStore(s => s.isStreaming);
+	const { managed, focusedCard, clearFocus } = useWorkspaceDockFocus();
+	const full = !managed || focusedCard === "plan";
 	const [planFilePath, setPlanFilePath] = useState<string | null>(null);
 	const [planFile, setPlanFile] = useState<string | null>(null);
 	const [localRoot, setLocalRoot] = useState<string | null>(null);
@@ -145,7 +149,7 @@ export function PlanDockCard() {
 	const [loaded, setLoaded] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [toggling, setToggling] = useState(false);
-	const [tab, setTab] = useState<"steps" | "raw">("steps");
+	const [tab, setTab] = useState("preview");
 	const [approving, setApproving] = useState(false);
 	const [planFeedback, setPlanFeedback] = useState("");
 	const [sendingPlan, setSendingPlan] = useState(false);
@@ -326,6 +330,11 @@ export function PlanDockCard() {
 	const hasChecklist = useMemo(() => sections.some(s => s.steps.some(step => step.checkbox)), [sections]);
 
 	const reviewable = planModeEnabled && content != null && content.trim().length > 0;
+	const summary = sections.flatMap(section => section.steps).find(step => !step.done)?.text;
+
+	useEffect(() => {
+		if (focusedCard === "plan" && !planModeEnabled) clearFocus();
+	}, [clearFocus, focusedCard, planModeEnabled]);
 
 	if (!planModeEnabled) return null;
 
@@ -386,6 +395,7 @@ export function PlanDockCard() {
 			icon={ClipboardList}
 			id="plan"
 			title={t("dock.plan")}
+			expandable
 		>
 			{loading && !loaded ? (
 				<div className="flex items-center justify-center py-6">
@@ -409,27 +419,38 @@ export function PlanDockCard() {
 						{t("planPanel.emptyDescPost")}
 					</div>
 					{displayPath && (
-						<div className="max-w-full truncate font-mono text-omp-xs text-(--omp-dim)" title={displayPath}>
+						<div className="max-w-full wrap-anywhere font-mono text-omp-xs text-(--omp-dim)" title={displayPath}>
 							{displayPath}
 						</div>
 					)}
 				</div>
+			) : !full ? (
+				summary && (
+					<div className="wrap-anywhere px-3 py-2 text-omp-md leading-relaxed text-(--omp-text-secondary)">
+						{summary}
+					</div>
+				)
 			) : (
 				<>
 					<Tabs
 						activeId={tab}
 						ariaLabel={t("planPanel.tabsAria")}
-						className="mx-2 mt-2"
+						className="mx-3 mt-3"
 						compact
-						onChange={id => setTab(id as "steps" | "raw")}
+						onChange={setTab}
 						tabs={[
+							{ id: "preview", label: t("filesPanel.preview") },
 							{ id: "steps", label: t("planPanel.tabs.steps"), badge: stepCount > 0 ? stepCount : undefined },
 							{ id: "raw", label: t("planPanel.tabs.raw") },
 						]}
 					/>
-					<div className="px-2 py-1.5">
-						{tab === "raw" ? (
-							<pre className="font-mono text-omp-sm leading-relaxed whitespace-pre-wrap text-(--omp-text)">
+					<div className="min-w-0 px-3 py-2.5">
+						{tab === "preview" ? (
+							<div className="min-w-0 wrap-anywhere text-omp-md" data-plan-preview>
+								<MarkdownRenderer content={content} />
+							</div>
+						) : tab === "raw" ? (
+							<pre className="font-mono text-omp-sm leading-relaxed whitespace-pre-wrap wrap-anywhere text-(--omp-text)">
 								{content}
 							</pre>
 						) : sections.length === 0 ? (
@@ -446,7 +467,7 @@ export function PlanDockCard() {
 								{sections.map((section, sectionIndex) => (
 									<section className="mb-1.5" key={sectionIndex}>
 										{section.heading && (
-											<div className="truncate px-1 py-1 text-omp-sm font-semibold text-(--omp-accent)">
+											<div className="wrap-anywhere px-1 py-1 text-omp-sm font-semibold text-(--omp-text)">
 												{section.heading}
 											</div>
 										)}
@@ -470,7 +491,7 @@ export function PlanDockCard() {
 														)}
 														<span
 															className={cx(
-																"min-w-0 flex-1 text-omp-xs leading-snug",
+																"min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere text-omp-md leading-relaxed",
 																step.done ? "text-(--omp-muted) line-through" : "text-(--omp-text)",
 															)}
 														>
@@ -478,7 +499,7 @@ export function PlanDockCard() {
 														</span>
 														<button
 															aria-label={t("planPanel.stepFeedbackAria", { index: step.index })}
-															className="mt-px shrink-0 text-(--omp-dim) opacity-0 transition-opacity group-hover:opacity-100 hover:text-(--omp-text)"
+															className="grid size-6 shrink-0 place-items-center rounded text-(--omp-dim) opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-(--omp-text)"
 															onClick={() => setStepFeedback({ step, draft: "", sending: false })}
 															title={t("planPanel.stepFeedbackHint")}
 															type="button"
@@ -526,7 +547,7 @@ export function PlanDockCard() {
 					</div>
 
 					{/* Review footer: approve / request changes, all as chat messages. */}
-					<div className="shrink-0 border-t border-(--omp-border-muted) p-2">
+					<div className="shrink-0 border-t border-(--omp-border-muted) p-3">
 						<TextArea
 							disabled={!reviewable}
 							onChange={event => setPlanFeedback(event.target.value)}
@@ -534,7 +555,7 @@ export function PlanDockCard() {
 							rows={2}
 							value={planFeedback}
 						/>
-						<div className="mt-1.5 flex items-center gap-1.5">
+						<div className="mt-2 flex flex-wrap items-center gap-1.5">
 							<Button
 								disabled={!reviewable}
 								icon={<CheckCircle2 size={12} />}

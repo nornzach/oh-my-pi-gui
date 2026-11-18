@@ -17,6 +17,10 @@ import { setFocusedSessionRuntime } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { LinkMenuHost } from "../common/LinkMenu";
 import { FilesPanel } from "./FilesPanel";
+import { useFileTabs } from "./file-tabs";
+
+// DOMPurify needs a browser DOM; this unit test exercises the preview status, not sanitization.
+vi.mock("dompurify", () => ({ default: { sanitize: (html: string) => html } }));
 
 const { document, window, Event, HTMLElement, Node } = parseHTML("<html><body></body></html>");
 
@@ -63,6 +67,7 @@ afterEach(async () => {
 	setFocusedSessionRuntime(null);
 	clearPathResolutionCache();
 	useUiStore.getState().closeFilePreview();
+	useFileTabs.setState({ workspaces: new Map() });
 });
 
 describe("FilesPanel right-click", () => {
@@ -72,7 +77,7 @@ describe("FilesPanel right-click", () => {
 		revealPath = vi.fn(async () => ({ ok: true }));
 		ompWindow.omp = {
 			fs: {
-				list: vi.fn(async () => ({
+				explore: vi.fn(async () => ({
 					ok: true,
 					entries: [{ name: "README.md", path: "README.md", kind: "file" }],
 					truncated: false,
@@ -122,7 +127,7 @@ describe("FilesPanel preview", () => {
 
 	async function open(path: string, fs: Record<string, unknown>, line?: number): Promise<void> {
 		ompWindow.omp = {
-			fs: { list: vi.fn(async () => ({ ok: true, entries: [], truncated: false })), ...fs },
+			fs: { explore: vi.fn(async () => ({ ok: true, entries: [], truncated: false })), ...fs },
 			system: { resolvePaths: vi.fn(async (paths: string[]) => paths.map(() => null)) },
 		};
 		useUiStore.getState().openFilePreview(path, line);
@@ -142,6 +147,25 @@ describe("FilesPanel preview", () => {
 	const shownImage = () => document.querySelector("[data-file-preview] img");
 	const shownText = () => document.querySelector("[data-file-preview]")?.textContent ?? "";
 
+	it("keeps the directory tree and selected file visible beside the preview", async () => {
+		await open("notes/a.txt", {
+			read: vi.fn(async () => text("preview content")),
+			explore: vi.fn(async ({ path }: { path: string }) => ({
+				ok: true,
+				truncated: false,
+				entries:
+					path === "notes"
+						? [{ kind: "file", name: "a.txt", path: "notes/a.txt" }]
+						: [{ kind: "dir", name: "notes", path: "notes" }],
+			})),
+		});
+		expect(shownText()).toContain("preview content");
+		expect(document.querySelector('[data-tree-id="file:notes/a.txt"]')?.getAttribute("aria-selected")).toBe("true");
+		await act(async () => useUiStore.getState().openImagePreview(PNG_URL, "Chat image"));
+		expect(shownImage()?.getAttribute("alt")).toBe("Chat image");
+		expect(document.querySelector('[role="tree"]')).not.toBeNull();
+	});
+
 	it("draws a binary image from the tab's workspace, not a notice or line numbers", async () => {
 		const readImage = vi.fn(async () => ({ ok: true, dataUrl: PNG_URL, mime: "image/png", size: 2048 }));
 		setFocusedSessionRuntime("tab-b");
@@ -153,6 +177,19 @@ describe("FilesPanel preview", () => {
 		expect(shownImage()?.getAttribute("alt")).toBe("shot.png");
 		expect(shownText()).not.toContain("Binary file");
 		expect(document.querySelector("[data-file-preview] pre")).toBeNull();
+	});
+
+	it("shows when a workbook preview contains only some of the document", async () => {
+		await open("budget.xlsx", {
+			documentPreview: vi.fn(async () => ({
+				kind: "document",
+				pages: [{ html: "<p>Quarterly budget</p>" }],
+				incomplete: true,
+			})),
+		});
+
+		expect(document.querySelector("[data-document-preview]")).not.toBeNull();
+		expect(shownText()).toContain("This preview shows only part of the document.");
 	});
 
 	it("says a binary file that isn't an image can't be previewed", async () => {

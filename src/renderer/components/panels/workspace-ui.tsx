@@ -82,7 +82,10 @@ export function PanelSearch({
 						onChange("");
 					}
 				}}
-				className="h-7 w-full rounded-md border border-transparent bg-(--omp-selected-bg) pr-7 pl-7.5 text-omp-sm text-(--omp-text) outline-none placeholder:text-(--omp-dim) focus:border-(--omp-input-focus-border) focus:bg-(--omp-input-bg)"
+				className={cx(
+					"h-7 w-full rounded-md border border-transparent bg-(--omp-selected-bg) pl-7.5 text-omp-sm text-(--omp-text) outline-none placeholder:text-(--omp-dim) focus:border-(--omp-input-focus-border) focus:bg-(--omp-input-bg)",
+					value ? "pr-7" : "pr-2",
+				)}
 			/>
 			{value && (
 				<button
@@ -134,17 +137,17 @@ export function PanelEmpty({
 	);
 }
 
-/** File name first, its folder after in a dimmer tone; only the folder truncates. */
+/** The file name gets first use of the available width; the folder uses what remains. */
 export function FileLabel({ path, oldPath, className }: { path: string; oldPath?: string; className?: string }) {
 	const base = basename(path) || path;
 	const dir = dirname(path);
 	const folder = dir === "/" || dir === "." ? (path.startsWith("/") && base !== path ? "/" : "") : dir;
 	return (
 		<span
-			className={cx("flex min-w-0 items-baseline gap-1.5", className)}
+			className={cx("flex min-w-0 items-baseline gap-1.5 overflow-hidden", className)}
 			title={oldPath ? `${oldPath} → ${path}` : path}
 		>
-			<span className="shrink-0 truncate text-(--omp-text)">{base}</span>
+			<span className="max-w-full shrink-0 truncate text-(--omp-text)">{base}</span>
 			{(folder || oldPath) && (
 				<span className="min-w-0 truncate text-omp-xs text-(--omp-dim)">{oldPath ? `${oldPath} →` : folder}</span>
 			)}

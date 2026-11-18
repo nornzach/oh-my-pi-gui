@@ -98,13 +98,14 @@ function runGuiOnlyBuiltin(message: string, commands: AvailableCommand[]): boole
 
 export function planComposerSubmit(input: {
 	message: string;
+	wireMessage?: string;
 	images: ImageContent[];
 	isStreaming: boolean;
 	mode: ComposerSendMode;
 	commands: AvailableCommand[];
 	rpc?: Pick<TabRpc, "compact" | "followUp" | "prompt" | "steer">;
 }): ComposerSubmit {
-	const { message, images, isStreaming, mode, commands, rpc = window.omp.rpc } = input;
+	const { message, wireMessage = message, images, isStreaming, mode, commands, rpc = window.omp.rpc } = input;
 	const isSlashCommand = message.startsWith("/");
 	if (isSlashCommand && isStreaming) {
 		const commandName = /^\/([a-z-]+)/i.exec(message)?.[1]?.toLowerCase();
@@ -130,10 +131,10 @@ export function planComposerSubmit(input: {
 	if (!isSlashCommand && isStreaming) {
 		return {
 			kind: "send",
-			request: () => (mode === "followUp" ? rpc.followUp(message, images) : rpc.steer(message, images)),
+			request: () => (mode === "followUp" ? rpc.followUp(wireMessage, images) : rpc.steer(wireMessage, images)),
 		};
 	}
-	return { kind: "send", request: () => rpc.prompt(message, images) };
+	return { kind: "send", request: () => rpc.prompt(wireMessage, images) };
 }
 
 /** Post-success settle: rehydrate after local-only slash commands. */

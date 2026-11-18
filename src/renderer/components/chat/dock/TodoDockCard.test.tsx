@@ -129,11 +129,7 @@ describe("TodoDockCard", () => {
 		expect(container.querySelector('[title="Restored task 12"]')).not.toBeNull();
 	});
 
-	it("keeps the dock internally scrollable and bounded so the composer is never clipped", async () => {
-		// The dock lives in the shrink-0 composer region, NOT inside the
-		// transcript scroll container: without its own max-height + overflow,
-		// a large list grows past the h-screen shell and clips the goal bar
-		// and composer with no reachable scrollbar.
+	it("leaves scrolling to the surrounding transcript", async () => {
 		useTodoStore
 			.getState()
 			.setPhases([{ name: "Live", tasks: [{ content: "Visible task", status: "in_progress" }] }]);
@@ -142,14 +138,10 @@ describe("TodoDockCard", () => {
 		const dock = container.querySelector('[data-testid="workspace-dock"]');
 		expect(dock).not.toBeNull();
 		const className = dock?.getAttribute("class") ?? "";
-		expect(className).toContain("overflow-y-auto");
-		expect(className).toContain("max-h-");
+		expect(className).not.toContain("overflow-y-auto");
+		expect(className).not.toContain("max-h-");
 	});
-	it("applies an explicit inline max-height when a card is focused, so long lists scroll", async () => {
-		// Regression: the focused cap was expressed as an arbitrary Tailwind
-		// class whose calc() had an invalid bare dash — the declaration was
-		// dropped, the list grew unbounded, and nothing could scroll. The
-		// contract is now an INLINE style, present the moment focus starts.
+	it("renders every task in the focused card without a separate scroll viewport", async () => {
 		useTodoStore.getState().setPhases([
 			{
 				name: "Live",
@@ -168,12 +160,8 @@ describe("TodoDockCard", () => {
 
 		const dock = container.querySelector('[data-testid="workspace-dock"]') as unknown as HTMLElement;
 		const style = dock?.getAttribute("style") ?? "";
-		expect(/max-height\s*:\s*/.test(style) || /max-height/i.test(style)).toBe(true);
-
-		// The true root cause of "cannot scroll": the scroller is flex-col, and
-		// a card whose overflow-hidden kills min-height:auto would be SHRUNK to
-		// fit the capped container, clipping its own list instead of letting the
-		// container scroll. Cards must therefore refuse to shrink.
+		expect(style).not.toContain("max-height");
+		expect(dock.querySelectorAll('[title^="Task "]')).toHaveLength(30);
 		const card = container.querySelector("[data-dock-focused]") as unknown as HTMLElement;
 		expect(card).not.toBeNull();
 		const cardClass = card.getAttribute("class") ?? "";

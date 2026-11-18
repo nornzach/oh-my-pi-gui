@@ -4,11 +4,42 @@
  * $VISUAL / $EDITOR (notepad on Windows), read the file back on a clean exit.
  */
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { promisify } from "node:util";
+import type { ConfigEditor } from "../shared/config-editor";
 import { resolveEditorCommand, spawnPath } from "./shell-env";
+
+const launch = promisify(execFile);
+const TEXTEDIT_BUNDLE = "com.apple.TextEdit";
+const SUBLIME_BUNDLES = ["com.sublimetext.4", "com.sublimetext.3"];
+const MAC_CONFIG_EDITORS = {
+	auto: [...SUBLIME_BUNDLES, TEXTEDIT_BUNDLE],
+	sublime: SUBLIME_BUNDLES,
+	textedit: [TEXTEDIT_BUNDLE],
+};
+
+async function launchMacEditor(bundleId: string, file: string): Promise<void> {
+	await launch("/usr/bin/open", ["-b", bundleId, file]);
+}
+
+export async function openMacConfigEditor(
+	file: string,
+	editor: Exclude<ConfigEditor, "system">,
+	open = launchMacEditor,
+): Promise<boolean> {
+	for (const app of MAC_CONFIG_EDITORS[editor]) {
+		try {
+			await open(app, file);
+			return true;
+		} catch {
+			// Launch Services reports a missing app as a failed launch. Try the next editor.
+		}
+	}
+	return false;
+}
 
 export interface EditorRoundTripResult {
 	/** Edited text (exit 0), null when the editor exits non-zero (draft unchanged). */

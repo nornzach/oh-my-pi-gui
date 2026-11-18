@@ -93,7 +93,7 @@ export function SessionInfoDialog() {
 	const contextView = stats?.contextUsage ? contextUsageView(stats.contextUsage) : null;
 
 	return (
-		<Modal open={open} onClose={close} title={t("sessionInfo.title")} size="md">
+		<Modal dockable open={open} onClose={close} title={t("sessionInfo.title")} size="md">
 			<AsyncSection
 				className="py-8"
 				error={error}

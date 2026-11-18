@@ -22,7 +22,6 @@ import {
 	type CatalogPlugin,
 	DEFAULT_CATALOGS,
 	type DefaultCatalog,
-	dedupeCatalog,
 	isCatalogListed,
 	type PluginAction,
 	toCatalogPlugin,
@@ -172,7 +171,7 @@ export function usePluginCatalog(open: boolean): PluginCatalogState {
 				else failures.push({ marketplace: marketplace.name, error: result.error });
 			}
 			setMarketplaces(catalogs);
-			setPlugins(dedupeCatalog(next));
+			setPlugins(next);
 			setListFailures(failures);
 		},
 		[fallbackError, tabRpc],

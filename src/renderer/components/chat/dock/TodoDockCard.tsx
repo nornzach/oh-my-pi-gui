@@ -121,7 +121,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 
 	return (
 		<div
-			className={`group flex min-h-8 items-center gap-2 rounded-lg py-1 pr-1 pl-0.5 text-omp-lg transition-colors ${
+			className={`group flex min-h-8 items-start gap-1.5 rounded-md px-1 py-1.5 text-omp-md leading-relaxed transition-colors ${
 				isDragging ? "z-10 bg-(--omp-selected-bg) shadow-md shadow-black/30" : "hover:bg-(--omp-bg-tertiary)"
 			}`}
 			ref={setNodeRef}
@@ -134,7 +134,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 		>
 			<button
 				aria-label={t("todoPanel.reorder")}
-				className="cursor-grab text-(--omp-dim) opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+				className="grid size-6 shrink-0 cursor-grab place-items-center text-(--omp-dim) opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
 				{...attributes}
 				{...listeners}
 				type="button"
@@ -162,15 +162,24 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 				/>
 			)}
 			{editing ? (
-				<span className="flex min-w-0 flex-1 items-center gap-1">
-					<input
+				<div
+					className="flex min-w-0 flex-1 flex-wrap items-start justify-end gap-1"
+					onBlur={event => {
+						if (!event.currentTarget.contains(event.relatedTarget)) commit();
+					}}
+				>
+					<textarea
 						autoFocus
-						className="w-full min-w-0 rounded border border-(--omp-border-accent) bg-(--omp-input-bg) px-1.5 py-0.5 text-omp-xs text-(--omp-text) focus:outline-none"
-						onBlur={commit}
+						aria-label={t("todoPanel.edit")}
+						className="min-h-8 w-full min-w-0 resize-y rounded-md border border-(--omp-border-accent) bg-(--omp-input-bg) px-2 py-1 text-omp-md text-(--omp-text) [field-sizing:content] focus:outline-none"
+						rows={2}
 						onChange={event => setDraft(event.target.value)}
 						onKeyDown={event => {
 							if (isImeKeyEvent(event)) return;
-							if (event.key === "Enter") commit();
+							if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								commit();
+							}
 							onEscape(event, () => {
 								setDraft(task.content);
 								setEditing(false);
@@ -192,11 +201,11 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 					>
 						<X size={12} />
 					</button>
-				</span>
+				</div>
 			) : (
 				<>
 					<span
-						className={`min-w-0 flex-1 truncate ${
+						className={`min-w-0 flex-1 whitespace-pre-wrap wrap-anywhere ${
 							task.status === "abandoned"
 								? "text-(--omp-dim) line-through"
 								: task.status === "completed"
@@ -213,7 +222,7 @@ const SortableTaskRow = memo(function SortableTaskRow({ task, phaseId, onPatch }
 					</span>
 					<button
 						aria-label={t("todoPanel.edit")}
-						className="shrink-0 text-(--omp-dim) opacity-0 transition-opacity group-hover:opacity-100 hover:text-(--omp-text)"
+						className="grid size-6 shrink-0 place-items-center rounded text-(--omp-dim) opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-(--omp-text)"
 						onClick={() => {
 							setDraft(task.content);
 							setEditing(true);
@@ -249,20 +258,20 @@ function PhaseSection({
 	const total = countSource.tasks.length;
 
 	return (
-		<section className="mb-1.5">
+		<section className="mb-2 last:mb-0">
 			{!hideHeader && (
 				<button
 					aria-expanded={!collapsed}
-					className="flex w-full items-center gap-1.5 rounded-sm px-1.5 py-1 text-left transition-colors hover:bg-(--omp-bg-tertiary)"
+					className="flex w-full items-start gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-(--omp-bg-tertiary)"
 					onClick={onToggle}
 					type="button"
 				>
 					<ChevronRight
-						className="omp-disclosure-chevron shrink-0 text-(--omp-dim)"
+						className="omp-disclosure-chevron mt-0.5 shrink-0 text-(--omp-dim)"
 						size={12}
 						style={{ transform: collapsed ? undefined : "rotate(90deg)" }}
 					/>
-					<span className="min-w-0 flex-1 truncate text-omp-sm font-semibold text-(--omp-accent)">
+					<span className="min-w-0 flex-1 wrap-anywhere text-omp-sm font-semibold text-(--omp-text)">
 						{phase.name}
 					</span>
 					<span className="shrink-0 text-omp-xs tabular-nums text-(--omp-dim)">
@@ -272,7 +281,7 @@ function PhaseSection({
 			)}
 			{(hideHeader || !collapsed) && (
 				<SortableContext items={phase.tasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
-					<div className={hideHeader ? "px-0.5" : "ml-2 border-l border-(--omp-border-muted) pl-2"}>
+					<div className={hideHeader ? undefined : "ml-2 border-l border-(--omp-border-muted) pl-1.5"}>
 						{phase.tasks.map(task => (
 							<SortableTaskRow key={task.id} onPatch={onPatch} phaseId={phase.id} task={task} />
 						))}
@@ -398,13 +407,34 @@ export function TodoDockCard() {
 	return (
 		<DockCard
 			badge={
-				<span className="min-w-0 truncate text-omp-lg tabular-nums text-[var(--omp-muted)]">{taskSummary}</span>
+				<span className="min-w-0 wrap-anywhere text-omp-xs tabular-nums text-(--omp-muted)">{taskSummary}</span>
 			}
+			expandable
 			icon={ListTodo}
 			id="todo"
 			title={t("dock.todo")}
 		>
-			<div className="px-2 py-1.5">
+			<div className="space-y-2 px-2.5 py-2">
+				{showFull && summary.totalCount > 0 && (
+					<div className="flex items-center gap-2 px-1">
+						<div
+							aria-label={t("dock.todo")}
+							aria-valuenow={taskCounts.completed}
+							aria-valuemin={0}
+							aria-valuemax={summary.totalCount}
+							className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-(--omp-border-muted)"
+							role="progressbar"
+						>
+							<div
+								className="h-full rounded-full bg-(--omp-success)"
+								style={{ width: `${(taskCounts.completed / summary.totalCount) * 100}%` }}
+							/>
+						</div>
+						<span className="shrink-0 text-omp-xs tabular-nums text-(--omp-muted)">
+							{taskCounts.completed}/{summary.totalCount}
+						</span>
+					</div>
+				)}
 				{reminderVisible && (
 					<div className="mb-1.5 flex items-start gap-2 rounded-md border border-[color-mix(in_srgb,var(--omp-warning)_40%,transparent)] bg-transparent px-2.5 py-2">
 						<AlertTriangle className="mt-px shrink-0 text-(--omp-warning)" size={13} />
@@ -429,7 +459,7 @@ export function TodoDockCard() {
 						<PhaseSection
 							collapsed={collapsed.has(phase.id)}
 							fullPhase={phases.find(candidate => candidate.id === phase.id)}
-							hideHeader={displayedPhases.length === 1}
+							hideHeader={phases.length === 1}
 							key={phase.id}
 							onPatch={patchTask}
 							onToggle={() => togglePhase(phase.id)}

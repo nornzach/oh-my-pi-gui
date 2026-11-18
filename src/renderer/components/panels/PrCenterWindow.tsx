@@ -85,8 +85,8 @@ export function PrCenterWindow() {
 	}));
 
 	return (
-		<Modal open={open} onClose={close} title={t("prCenter.title")} size="full" bodyClassName="p-0">
-			<div className="flex h-[80vh] min-h-0 flex-col">
+		<Modal dockable open={open} onClose={close} title={t("prCenter.title")} size="full" bodyClassName="p-0">
+			<div className="omp-docked-fill flex h-[80vh] min-h-0 flex-col">
 				{/* Header */}
 				<div className="flex shrink-0 items-center gap-3 border-b border-(--omp-border-muted) px-4 py-2.5">
 					{/* The modal title already names the window; this row names the repository. */}
@@ -155,9 +155,9 @@ export function PrCenterWindow() {
 						)}
 					</div>
 				) : (
-					<div className="flex min-h-0 flex-1">
+					<div className="omp-docked-master-detail flex min-h-0 flex-1">
 						{/* List pane */}
-						<div className="flex w-[300px] shrink-0 flex-col overflow-y-auto border-r border-(--omp-border-muted) p-2">
+						<aside className="flex w-[300px] shrink-0 flex-col overflow-y-auto border-r border-(--omp-border-muted) p-2">
 							{error && (
 								<p className="mb-2 rounded-md border border-[color-mix(in_srgb,var(--omp-error)_35%,transparent)] bg-transparent px-2 py-1.5 text-omp-sm text-(--omp-error)">
 									{error}
@@ -194,7 +194,7 @@ export function PrCenterWindow() {
 									/>
 								))
 							)}
-						</div>
+						</aside>
 						{/* Detail pane */}
 						<div className="min-w-0 flex-1 overflow-y-auto">
 							<PrDetailPane onCreateOpen={() => setCreateOpen(true)} />

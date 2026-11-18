@@ -18,7 +18,7 @@ import {
 	type TrayState,
 } from "../shared/ipc-types";
 import { languageDetails } from "../shared/languages";
-import { fullestWindow, quotaLevel, splitQuotaRows } from "../shared/quotas";
+import { fullestWindow, quotaLevel, remainingQuotaFraction, splitQuotaRows } from "../shared/quotas";
 import { getMainLanguage } from "./i18n";
 import { encodePng, type Rgba, ringPixels } from "./quota-icon";
 import {
@@ -106,12 +106,13 @@ function quotaIcon(quota: TrayQuota): Electron.NativeImage | undefined {
 	if (!window) return undefined;
 	const colors = QUOTA_COLORS[nativeTheme.shouldUseDarkColors ? "dark" : "light"];
 	const size = 32;
-	const png = encodePng(size, size, ringPixels(size, window.fraction, colors[quotaLevel(window)], colors.track));
+	const remaining = remainingQuotaFraction(window.fraction, window.exhausted);
+	const png = encodePng(size, size, ringPixels(size, remaining, colors[quotaLevel(window)], colors.track));
 	return nativeImage.createFromBuffer(png, { scaleFactor: 2 });
 }
 
 /**
- * A row per provider account: each window's used share, a ring for the fullest
+ * A row per provider account: each window's remaining share, a ring for the fullest
  * one, and a submenu listing every limit with its reset time (#28). Past five
  * rows, the ones nearest their limit stay on top and the rest sit under
  * "More quotas".
@@ -123,7 +124,7 @@ function quotaItems(
 ): Electron.MenuItemConstructorOptions[] {
 	const now = Date.now();
 	const row = (quota: TrayQuota): Electron.MenuItemConstructorOptions => ({
-		label: quotaRowLabel(quota),
+		label: quotaRowLabel(quota, lang),
 		icon: quotaIcon(quota),
 		submenu: [
 			...quota.windows.flatMap(window =>

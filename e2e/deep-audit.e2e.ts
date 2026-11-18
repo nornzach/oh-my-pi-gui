@@ -55,7 +55,7 @@ interface DeepAuditEvidence {
 	profile: string;
 	runtime: JsonRecord;
 	schema: { entryCount: number; tabCount: number; entriesWithUi: number; advanced: number; tuiOnly: number };
-	settingsPages: Array<{ group: string; page: string; controls: SurfaceControl[] }>;
+	settingsPages: Array<{ page: string; controls: SurfaceControl[] }>;
 	settings: SettingAuditRow[];
 	commands: {
 		availableCount: number;
@@ -714,7 +714,7 @@ test("deep GUI audit: settings rows, nested controls, and command discoverabilit
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const settings = page.getByRole("dialog", { name: "Settings", exact: true });
 		await expect(settings).toBeVisible();
-		await expect(settings.locator(".settings-nav-group-label").first()).toBeVisible();
+		await expect(settings.locator(".settings-nav-item").first()).toBeVisible();
 		const schemaResponse = await page.evaluate(() => window.omp.rpc.getSettingsSchema());
 		if (!schemaResponse.success) throw new Error(schemaResponse.error);
 		const schema = schemaResponse.data as SettingsSchemaResult;
@@ -731,22 +731,16 @@ test("deep GUI audit: settings rows, nested controls, and command discoverabilit
 		};
 
 		// Capture every settings page and every rendered control before mutating values.
-		const groupButtons = settings.locator(".settings-nav-group-label");
-		for (let groupIndex = 0; groupIndex < (await groupButtons.count()); groupIndex++) {
-			await groupButtons.nth(groupIndex).click();
-			const groupName = await groupButtons.nth(groupIndex).innerText();
-			const pages = settings.locator(".settings-nav-item");
-			for (let pageIndex = 0; pageIndex < (await pages.count()); pageIndex++) {
-				const nav = pages.nth(pageIndex);
-				const pageName = await nav.innerText();
-				await nav.click();
-				await expect(settings.locator(".settings-content .animate-spin")).toHaveCount(0, { timeout: 30_000 });
-				evidence.settingsPages.push({
-					group: groupName,
-					page: pageName,
-					controls: await captureSurfaceControls(page, pageName),
-				});
-			}
+		const pages = settings.locator(".settings-nav-item");
+		for (let pageIndex = 0, count = await pages.count(); pageIndex < count; pageIndex++) {
+			const nav = pages.nth(pageIndex);
+			const pageName = (await nav.textContent()) ?? "";
+			await nav.click();
+			await expect(settings.locator(".settings-content .animate-spin")).toHaveCount(0, { timeout: 30_000 });
+			evidence.settingsPages.push({
+				page: pageName,
+				controls: await captureSurfaceControls(page, pageName),
+			});
 		}
 
 		// Exercise every schema entry that the GUI claims to support. TUI-only and
@@ -843,15 +837,12 @@ test("deep GUI audit: settings rows, nested controls, and command discoverabilit
 		// executing it and retain the TUI-only negative contract.
 		// The settings home also exposes the same live palette entry, so the
 		// discoverability action is exercised through its second-level surface.
-		await settings.getByLabel("Close").click();
+		await settings.getByRole("button", { name: "Back to chat", exact: true }).click();
 		await expect(settings).toHaveCount(0);
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const capabilitiesSettings = page.getByRole("dialog", { name: "Settings", exact: true });
 		await expect(capabilitiesSettings).toBeVisible();
 		const capabilitiesNav = capabilitiesSettings.locator(".settings-nav-item", { hasText: "OMP Capabilities" });
-		if (!(await capabilitiesNav.isVisible())) {
-			await capabilitiesSettings.locator(".settings-nav-group-label", { hasText: "Extensions & resources" }).click();
-		}
 		await capabilitiesNav.click();
 		const settingsCommandCenter = capabilitiesSettings.locator('[data-command-center-entry="true"]');
 		await expect(settingsCommandCenter).toBeVisible();

@@ -55,7 +55,6 @@ export function rangeQuoteText(range: Range): string {
 	host.style.cssText = "position:fixed;left:-99999px;top:0;width:800px;white-space:normal;pointer-events:none";
 	host.append(fragment);
 	document.body.append(host);
-	// biome-ignore lint/performance/useDomNodeTextContent: line breaks come from layout, which textContent drops.
 	const text = host.innerText;
 	host.remove();
 	return text;

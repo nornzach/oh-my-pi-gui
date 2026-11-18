@@ -140,7 +140,7 @@ export function JobsDialog() {
 	);
 
 	return (
-		<Modal onClose={close} open={open} size="lg" title={t("jobs.title")}>
+		<Modal dockable onClose={close} open={open} size="lg" title={t("jobs.title")}>
 			{updatedAt && (
 				<p className="mb-2 text-omp-xs text-(--omp-dim)">{t("jobs.updated", { time: formatClock(updatedAt) })}</p>
 			)}

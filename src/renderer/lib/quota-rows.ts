@@ -7,6 +7,7 @@
  */
 
 import type { TrayQuota, TrayQuotaLimit, TrayQuotaWindow } from "../../shared/ipc-types";
+import { quotaLevel, remainingQuotaFraction } from "../../shared/quotas";
 import type { UsageLimit, UsageReport } from "../../shared/rpc-types";
 
 export interface QuotaRow {
@@ -90,12 +91,32 @@ export function quotaWindow(label: string): { short: string; hours: number } {
 
 /** The limit's used fraction, from whichever figures the provider reported. */
 export function limitUsedFraction(limit: UsageLimit): number | undefined {
-	if (typeof limit.usedFraction === "number" && Number.isFinite(limit.usedFraction)) return limit.usedFraction;
-	if (typeof limit.used === "number" && typeof limit.limit === "number" && limit.limit > 0)
-		return limit.used / limit.limit;
 	if (typeof limit.remainingFraction === "number" && Number.isFinite(limit.remainingFraction))
 		return 1 - limit.remainingFraction;
+	if (typeof limit.usedFraction === "number" && Number.isFinite(limit.usedFraction)) return limit.usedFraction;
+	if (
+		typeof limit.used === "number" &&
+		Number.isFinite(limit.used) &&
+		typeof limit.limit === "number" &&
+		Number.isFinite(limit.limit) &&
+		limit.limit > 0
+	)
+		return limit.used / limit.limit;
 	return undefined;
+}
+
+export function limitRemainingFraction(limit: UsageLimit): number | undefined {
+	if (limit.status === "exhausted") return 0;
+	if (typeof limit.remainingFraction === "number" && Number.isFinite(limit.remainingFraction))
+		return clamp(limit.remainingFraction);
+	const used = limitUsedFraction(limit);
+	return used === undefined || !Number.isFinite(used) ? undefined : remainingQuotaFraction(used);
+}
+
+const QUOTA_COLORS = { ok: "var(--omp-success)", warning: "var(--omp-warning)", critical: "var(--omp-error)" };
+
+export function remainingQuotaColor(remaining: number): string {
+	return QUOTA_COLORS[quotaLevel({ fraction: 1 - remaining, exhausted: remaining === 0 })];
 }
 
 function clamp(fraction: number): number {

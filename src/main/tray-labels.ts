@@ -7,7 +7,7 @@
 
 import type { TrayQuota, TrayQuotaLimit, TrayState } from "../shared/ipc-types";
 import { type Language, languageDetails } from "../shared/languages";
-import { quotaPercentText } from "../shared/quotas";
+import { quotaPercentText, remainingQuotaFraction } from "../shared/quotas";
 import { truncateMiddle } from "../shared/text";
 import { RU_TRAY_TEXT } from "./native-ru";
 import { TH_TRAY_TEXT } from "./native-th";
@@ -43,7 +43,7 @@ export const TRAY_LABELS = {
 	statusStreaming: { zh: "运行中", en: "Running" },
 	statusWaiting: { zh: "等待确认", en: "Needs input" },
 	statusError: { zh: "出错", en: "Error" },
-	quotaUsed: { zh: "已用 {percent}", en: "{percent} used" },
+	quotaRemaining: { zh: "剩余 {percent}", en: "{percent} left" },
 	quotaReached: { zh: "已用完", en: "limit reached" },
 	quotaResets: { zh: "{time} 重置", en: "resets {time}" },
 	quotaUpdated: { zh: "更新于 {time}", en: "Updated {time}" },
@@ -114,10 +114,16 @@ export function formatMenuTime(lang: TrayLang, at: number, now: number): string 
 /** Longest account name a menu row shows before its middle is cut, so one address does not widen the menu. */
 const ACCOUNT_CHARS = 24;
 
-/** A quota row: the provider (and account), then each window's used share, shortest window first. */
-export function quotaRowLabel(quota: TrayQuota): string {
+function remainingLabel(lang: TrayLang, limit: Pick<TrayQuotaLimit, "fraction" | "exhausted">): string {
+	return fill(t(lang, "quotaRemaining"), {
+		percent: quotaPercentText(remainingQuotaFraction(limit.fraction, limit.exhausted)),
+	});
+}
+
+/** A quota row: the provider (and account), then remaining share by window. */
+export function quotaRowLabel(quota: TrayQuota, lang: TrayLang = "en"): string {
 	const name = quota.account ? `${quota.name} · ${truncateMiddle(quota.account, ACCOUNT_CHARS)}` : quota.name;
-	return `${name} — ${quota.windows.map(window => `${window.window} ${quotaPercentText(window.fraction)}`).join(", ")}`;
+	return `${name} — ${quota.windows.map(window => `${window.window} ${remainingLabel(lang, window)}`).join(", ")}`;
 }
 
 /** Quota rows the menu shows directly; the rest go under "More quotas". */
@@ -127,9 +133,9 @@ export function moreQuotasLabel(lang: TrayLang, count: number): string {
 	return fill(t(lang, "moreQuotas"), { count: String(count) });
 }
 
-/** A submenu line for one limit: its used share, whether it is used up, and when it resets. */
+/** A submenu line for one limit: its remaining share, exhaustion and reset time. */
 export function quotaLimitLabel(lang: TrayLang, limit: TrayQuotaLimit, now: number): string {
-	const parts = [fill(t(lang, "quotaUsed"), { percent: quotaPercentText(limit.fraction) })];
+	const parts = [remainingLabel(lang, limit)];
 	if (limit.exhausted) parts.push(t(lang, "quotaReached"));
 	if (limit.resetsAt && limit.resetsAt > now)
 		parts.push(fill(t(lang, "quotaResets"), { time: formatMenuTime(lang, limit.resetsAt, now) }));
@@ -148,7 +154,7 @@ function quotaSignature(state: TrayState): string {
 			...quota.windows.flatMap(window =>
 				window.limits.map(
 					limit =>
-						`${limit.label}\u0000${quotaPercentText(limit.fraction)}\u0000${limit.exhausted}\u0000${Math.floor((limit.resetsAt ?? 0) / 60_000)}`,
+						`${limit.label}\u0000${remainingLabel("en", limit)}\u0000${limit.exhausted}\u0000${Math.floor((limit.resetsAt ?? 0) / 60_000)}`,
 				),
 			),
 		].join("\u0003"),

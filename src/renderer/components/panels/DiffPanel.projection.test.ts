@@ -1,7 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import type { ToolEntry } from "../../stores/tools";
 import { buildEditCandidates } from "./DiffPanel";
-import { searchFiles } from "./FilesPanel";
 
 it("separates multi-file edits, failed results, write snapshots and virtual artifacts", () => {
 	const base: ToolEntry = {
@@ -40,24 +39,4 @@ it("separates multi-file edits, failed results, write snapshots and virtual arti
 	expect(rows[1]).toMatchObject({ adds: 0, removes: 0, isError: true, diff: "permission denied" });
 	expect(rows[2]).toMatchObject({ adds: 0, removes: 0, isContent: true });
 	expect(rows[3].isVirtual).toBe(true);
-});
-
-describe("loaded workspace search", () => {
-	it("finds matching paths across collapsed directories without returning their siblings", () => {
-		const matches = searchFiles(
-			[
-				{
-					kind: "dir",
-					name: "src",
-					path: "/project/src",
-					children: [
-						{ kind: "file", name: "App.tsx", path: "/project/src/App.tsx" },
-						{ kind: "file", name: "other.ts", path: "/project/src/other.ts" },
-					],
-				},
-			],
-			" APP.TSX ",
-		);
-		expect(matches.map(file => file.path)).toEqual(["/project/src/App.tsx"]);
-	});
 });

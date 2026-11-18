@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "../locales/en";
 import { ru } from "../locales/ru";
 import { zh } from "../locales/zh";
-import { describeError, describeProviderError } from "./errors";
+import { describeError, describeProviderError, isCyberPolicyError } from "./errors";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -209,6 +209,19 @@ const CASES: Array<[string, string]> = [
 ];
 
 describe("describeError", () => {
+	it("recognizes the provider's cybersecurity policy before stripping codes and HTTP metadata", () => {
+		const cases = [
+			"Codex error event: This content was flagged for possible cybersecurity risk. (code=cyber_policy)",
+			'403 {"error":{"code":"cyber_policy","message":"Request flagged"}}',
+			{ code: "cyber_policy", message: "Request flagged" },
+		];
+		for (const cause of cases) {
+			expect(isCyberPolicyError(cause)).toBe(true);
+			expect(describeProviderError(cause)).toBe(en["errors.cyberPolicy"]);
+		}
+		expect(isCyberPolicyError("Couldn't read cyber_policy.md")).toBe(false);
+	});
+
 	it.each(CASES)("%s", (raw, expected) => {
 		expect(describeError(raw)).toBe(expected);
 	});

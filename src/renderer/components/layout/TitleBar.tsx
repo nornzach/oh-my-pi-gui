@@ -30,6 +30,7 @@ import { useAgentPagesStore, useShownAgentPage } from "../../stores/agent-pages"
 import { useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
+import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { useActiveTabKind } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useToolsStore } from "../../stores/tools";
@@ -84,7 +85,8 @@ export function TitleBar() {
 	const openSessionTree = useUiStore(s => s.openSessionTree);
 	const openLogs = useUiStore(s => s.openLogs);
 	const { sessions } = useSessionList("local");
-	const projectName = !isChat && cwd ? basename(cwd) : t("titlebar.openProject");
+	const projectAlias = useSidebarPrefs(s => s.groupAliases[cwd]);
+	const projectName = !isChat && cwd ? (projectAlias ?? (basename(cwd) || cwd)) : t("titlebar.openProject");
 
 	const [editingName, setEditingName] = useState(false);
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);

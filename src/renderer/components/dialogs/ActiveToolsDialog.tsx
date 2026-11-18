@@ -63,7 +63,7 @@ export function ActiveToolsDialog() {
 	}, [tools, query]);
 
 	return (
-		<Modal onClose={close} open={open} size="lg" title={t("activeTools.title")}>
+		<Modal dockable onClose={close} open={open} size="lg" title={t("activeTools.title")}>
 			<div className="space-y-3">
 				<div className="relative">
 					<Search

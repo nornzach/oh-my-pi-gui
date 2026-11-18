@@ -1,6 +1,7 @@
 import {
 	ArrowUp,
 	Box,
+	Check,
 	ChevronDown,
 	History,
 	ListEnd,
@@ -14,12 +15,13 @@ import {
 	X,
 	Zap,
 } from "lucide-react";
-import type { ClipboardEvent, DragEvent, KeyboardEvent } from "react";
+import type { ClipboardEvent, KeyboardEvent } from "react";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AvailableCommand, ImageContent } from "../../../shared/rpc-types";
 import { useFollowUpModifierHeld } from "../../hooks/use-follow-up-modifier";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
+import { splitAttachmentMentions } from "../../lib/attachment-mentions";
 import { useDisplayPreference } from "../../lib/display-preferences";
 import { tryEmojiInlineReplace } from "../../lib/emoji";
 import { describeError } from "../../lib/errors";
@@ -43,7 +45,7 @@ import { insertQuote } from "../../lib/quote-selection";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
-import { useModelStore } from "../../stores/model";
+import { type ModelSpeed, useModelStore } from "../../stores/model";
 import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useSettingsStore } from "../../stores/settings";
@@ -51,6 +53,7 @@ import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
+import { FileAttachmentCard } from "../common/FileAttachmentCard";
 import { ZoomableImage } from "../common/ImageViewer";
 import { AdvisorBadge } from "./AdvisorBadge";
 import { ApprovalControl } from "./ApprovalControl";
@@ -59,15 +62,10 @@ import { ComposerModes } from "./ComposerModes";
 import { ContextStrategyBar } from "./ContextStrategyBar";
 import { DictationStrip } from "./DictationStrip";
 import { HistorySearchOverlay } from "./HistorySearchOverlay";
-import {
-	appendMentions,
-	droppedFileMention,
-	fileToImage,
-	listMentionFiles,
-	mentionFileCache,
-} from "./input-area-utils";
+import { fileToImage, listMentionFiles, mentionFileCache } from "./input-area-utils";
 import { ThinkingControl } from "./ThinkingControl";
 import { type CompletionItem, type CompletionMenu, useCompletionMenu } from "./use-completion-menu";
+import { useComposerFiles } from "./use-composer-files";
 import { useComposerSubmit } from "./use-composer-submit";
 import { useDictation } from "./use-dictation";
 
@@ -80,7 +78,7 @@ const MENTION_FS_DEBOUNCE_MS = 150;
  * off macOS) queues a follow-up, which holding the modifier previews.
  */
 export function InputArea() {
-	const collabReadOnly = useSessionStore(state => state.collab?.readOnly === true);
+	const { attachFiles, readOnly: collabReadOnly } = useComposerFiles();
 	const isStreaming = useSessionStore(s => s.isStreaming);
 	const t = useT();
 	const rpc = useTabRpc();
@@ -97,7 +95,7 @@ export function InputArea() {
 	const cwd = useSessionStore(s => s.cwd);
 	const model = useModelStore(s => s.model);
 	const fastModeActive = useModelStore(s => s.fastModeActive);
-	const openModelPicker = useUiStore(s => s.openModelPicker);
+	const modelPickerOpen = useUiStore(s => s.modelPickerOpen) && runtimeTabId === activeTabId;
 	/** Agent `stt.enabled` setting: microphone dictation button in the composer. */
 	const sttEnabled = useSettingsStore(s => s.sttEnabled);
 	/** Agent `paste.largeMenuThreshold` setting: line count that triggers the paste menu. */
@@ -112,6 +110,8 @@ export function InputArea() {
 	const setText = useComposerStore(s => s.setDraft);
 	const images = useComposerStore(s => s.images);
 	const setImages = useComposerStore(s => s.setImages);
+	const attachedFiles = useComposerStore(s => s.files);
+	const removeFile = useComposerStore(s => s.removeFile);
 	const [menu, setMenu] = useState<CompletionMenu | null>(null);
 	const menuListRef = useRef<HTMLDivElement>(null);
 	// The menu lists every match and scrolls; keep the keyboard selection in view.
@@ -684,38 +684,6 @@ export function InputArea() {
 		}
 	};
 
-	// Dropping files (TUI parity: a dragged path lands in the editor): images
-	// attach like a paste; anything else becomes an @mention the agent resolves.
-	const [dragActive, setDragActive] = useState(false);
-	const draggingFiles = (e: DragEvent<HTMLDivElement>) => e.dataTransfer.types.includes("Files");
-	const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-		if (!draggingFiles(e) || collabReadOnly) return;
-		e.preventDefault();
-		e.dataTransfer.dropEffect = "copy";
-		if (!dragActive) setDragActive(true);
-	};
-	const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-		if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-		setDragActive(false);
-	};
-	const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-		setDragActive(false);
-		const files = Array.from(e.dataTransfer.files);
-		if (files.length === 0 || collabReadOnly) return;
-		e.preventDefault();
-		const dropped = files.filter(file => file.type.startsWith("image/"));
-		if (dropped.length > 0) {
-			void Promise.all(dropped.map(fileToImage)).then(added => setImages(prev => [...prev, ...added]));
-		}
-		const mentions = files
-			.filter(file => !file.type.startsWith("image/"))
-			.map(file => window.omp.app.pathForFile(file))
-			.filter(filePath => filePath.length > 0)
-			.map(filePath => droppedFileMention(filePath, cwd));
-		if (mentions.length > 0) setText(current => appendMentions(current, mentions));
-		requestAnimationFrame(() => textareaRef.current?.focus());
-	};
-
 	const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
 		const files = Array.from(e.clipboardData.files).filter(f => f.type.startsWith("image/"));
 		if (files.length > 0) {
@@ -743,7 +711,7 @@ export function InputArea() {
 		insertPasteBlob(content);
 	};
 
-	const hasDraft = text.trim().length > 0 || images.length > 0;
+	const hasDraft = text.trim().length > 0 || images.length > 0 || attachedFiles.length > 0;
 	/** Holding the follow-up modifier over a running turn turns the next send into a follow-up. */
 	const followUpHeld = useFollowUpModifierHeld(isStreaming && hasDraft);
 
@@ -892,15 +860,9 @@ export function InputArea() {
 						/>
 					)}
 					<div
-						className={cx(
-							"omp-composer-box overflow-hidden",
-							dragActive && "ring-2 ring-[var(--omp-accent)] ring-offset-0",
-						)}
+						className="omp-composer-box overflow-hidden"
 						data-working={isStreaming}
 						style={modeColor ? { borderColor: modeColor } : undefined}
-						onDragOver={handleDragOver}
-						onDragLeave={handleDragLeave}
-						onDrop={handleDrop}
 					>
 						<div className="px-4 pb-1 pt-3">
 							{submissionUncertain && (
@@ -918,14 +880,17 @@ export function InputArea() {
 									</button>
 								</div>
 							)}
-							{images.length > 0 && (
-								<div className="mb-3 flex flex-wrap gap-2">
+							{(images.length > 0 || attachedFiles.length > 0) && (
+								<div className="mb-3 flex flex-wrap items-start gap-2" data-composer-attachments>
 									{images.map((image, index) => (
-										<div key={index} className="group relative">
+										<div key={index} className="group relative max-w-full shrink-0">
 											<ZoomableImage
 												src={image.preview}
 												alt={t("input.attachmentAlt", { index: index + 1 })}
-												className="h-16 w-16 rounded-lg border border-[var(--omp-border-muted)] object-cover"
+												onOpen={() =>
+													useUiStore.getState().openImagePreview(image.preview, t("chat.attachedImage"))
+												}
+												className="h-[6.25rem] w-28 max-w-full rounded-lg border border-(--omp-border-muted) object-cover"
 											/>
 											<button
 												type="button"
@@ -933,11 +898,20 @@ export function InputArea() {
 												onClick={() =>
 													setImages(previous => previous.filter((_, itemIndex) => itemIndex !== index))
 												}
-												className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--omp-error)] text-[var(--omp-btn-danger-text)] opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100"
+												className="absolute top-1 right-1 grid size-5 place-items-center rounded-full border border-(--omp-border-muted) bg-(--omp-bg-elevated) text-(--omp-muted) hover:text-(--omp-text)"
 											>
 												<X size={11} />
 											</button>
 										</div>
+									))}
+									{attachedFiles.map(file => (
+										<FileAttachmentCard
+											key={file.mention}
+											name={file.name}
+											path={file.path ?? splitAttachmentMentions(file.mention).paths[0] ?? file.name}
+											onRemove={() => removeFile(file.mention)}
+											removeDisabled={collabReadOnly}
+										/>
 									))}
 								</div>
 							)}
@@ -1042,16 +1016,10 @@ export function InputArea() {
 								<input
 									ref={fileInputRef}
 									type="file"
-									accept="image/*"
 									multiple
 									className="hidden"
 									onChange={event => {
-										const files = Array.from(event.target.files ?? []);
-										if (files.length > 0) {
-											void Promise.all(files.map(fileToImage)).then(pasted =>
-												setImages(previous => [...previous, ...pasted]),
-											);
-										}
+										attachFiles(Array.from(event.target.files ?? []));
 										event.target.value = "";
 									}}
 								/>
@@ -1143,8 +1111,15 @@ export function InputArea() {
 
 								<button
 									type="button"
-									onClick={openModelPicker}
+									onClick={() => {
+										const ui = useUiStore.getState();
+										if (modelPickerOpen) ui.closeModelPicker();
+										else ui.openModelPicker();
+									}}
 									disabled={collabReadOnly}
+									aria-controls={modelPickerOpen ? "omp-model-picker" : undefined}
+									aria-expanded={modelPickerOpen}
+									data-model-picker-trigger={runtimeTabId ?? ""}
 									aria-label={`${t("input.model")}: ${model?.id ?? t("input.chooseModel")}`}
 									title={`${t("input.model")}: ${model?.id ?? t("input.chooseModel")}`}
 									className="omp-composer-model omp-pressable flex h-8 min-w-0 max-w-52 items-center gap-1.5 rounded-full px-2.5 text-omp-md font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
@@ -1286,24 +1261,91 @@ export function InputArea() {
 
 function FastModeControl({ menuItem = false }: { menuItem?: boolean }) {
 	const t = useT();
+	const model = useModelStore(s => s.model);
 	const enabled = useModelStore(s => s.fastModeEnabled);
 	const active = useModelStore(s => s.fastModeActive);
+	const ultrafast = useModelStore(s => s.fastModeUltrafast);
+	const supportsUltrafast = useModelStore(s => s.fastModeUltrafastSupported);
 	const toggleFastMode = useModelStore(s => s.toggleFastMode);
+	const setModelSpeed = useModelStore(s => s.setModelSpeed);
+	const [menu, setMenu] = useState<ContextMenuAnchor | null>(null);
+	const chatGpt = model?.api === "openai-codex-responses" || model?.provider === "openai-codex";
+	const selected: ModelSpeed = active ? (ultrafast ? "ultrafast" : "fast") : "standard";
+	const speeds: ModelSpeed[] = supportsUltrafast ? ["standard", "fast", "ultrafast"] : ["standard", "fast"];
+	const options = speeds.map(id => {
+		const tiers = model?.serviceTiers;
+		const disabled =
+			id === "ultrafast"
+				? !tiers?.includes("ultrafast")
+				: id === "fast" && !!tiers?.length && !tiers.includes("priority");
+		return {
+			id,
+			label: t(`input.speed.${id}`),
+			disabled,
+			disabledReason: disabled ? t("input.speed.unavailable") : undefined,
+			icon: id === selected ? Check : undefined,
+			onSelect: () => void setModelSpeed(id),
+		};
+	});
+	if (chatGpt && menuItem) {
+		return (
+			<div role="group" aria-label={t("input.speed.title")} className="flex flex-wrap gap-0.5 px-1 py-0.5">
+				{options.map(item => (
+					<button
+						key={item.id}
+						type="button"
+						role="menuitemradio"
+						aria-checked={item.id === selected}
+						title={item.disabledReason}
+						disabled={item.disabled}
+						onClick={item.onSelect}
+						className={cx(
+							"omp-pressable rounded-md px-2 py-1 text-omp-sm disabled:opacity-40",
+							item.id === selected && "bg-(--omp-selected-bg) text-(--omp-accent)",
+						)}
+					>
+						{item.label}
+					</button>
+				))}
+			</div>
+		);
+	}
 	return (
-		<button
-			type="button"
-			role={menuItem ? "menuitem" : undefined}
-			aria-pressed={enabled}
-			onClick={() => void toggleFastMode()}
-			title={`${enabled ? t("input.fast.on") : t("input.fast.off")}${active ? t("input.fast.active") : ""}`}
-			className={cx(
-				"omp-pressable flex h-8 items-center gap-1.5 rounded-full px-2.5 text-omp-md font-medium hover:bg-[var(--omp-selected-bg)]",
-				menuItem && "w-full",
-				enabled ? "text-[var(--omp-accent)]" : "text-[var(--omp-muted)]",
+		<>
+			<button
+				type="button"
+				role={menuItem ? "menuitem" : undefined}
+				aria-pressed={chatGpt ? undefined : enabled}
+				aria-haspopup={chatGpt ? "menu" : undefined}
+				aria-expanded={chatGpt ? menu !== null : undefined}
+				onClick={event => {
+					if (!chatGpt) {
+						void toggleFastMode();
+						return;
+					}
+					const rect = event.currentTarget.getBoundingClientRect();
+					setMenu(menu ? null : { x: rect.left, y: rect.top - 6 });
+				}}
+				title={
+					chatGpt
+						? t("input.speed.title")
+						: `${enabled ? t("input.fast.on") : t("input.fast.off")}${active ? t("input.fast.active") : ""}`
+				}
+				className={cx(
+					"omp-pressable flex h-8 items-center gap-1.5 rounded-full px-2.5 text-omp-md font-medium hover:bg-[var(--omp-selected-bg)]",
+					menuItem && "w-full",
+					enabled ? "text-[var(--omp-accent)]" : "text-[var(--omp-muted)]",
+				)}
+			>
+				<Zap size={14} fill={active ? "currentColor" : "none"} />
+				<span className="omp-composer-control-label">
+					{chatGpt ? t(`input.speed.${selected}`) : t("input.fast.label")}
+				</span>
+				{chatGpt && <ChevronDown aria-hidden size={11} />}
+			</button>
+			{chatGpt && menu && (
+				<ContextMenu x={menu.x} y={menu.y} placement="above" items={options} onClose={() => setMenu(null)} />
 			)}
-		>
-			<Zap size={14} fill={active ? "currentColor" : "none"} />
-			<span className="omp-composer-control-label">{t("input.fast.label")}</span>
-		</button>
+		</>
 	);
 }

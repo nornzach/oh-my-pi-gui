@@ -1,8 +1,6 @@
 /**
- * Sidebar integration contracts: Code/Work modes, first-class global chats,
- * workspace group context menu (5 items), session row
- * context menu (6 items), pinned-first ordering, per-task busy gates, and
- * tab-first opening.
+ * Sidebar integration contracts: project and projectless conversations,
+ * context menus, pinned-first ordering, per-task busy gates, and tab-first opening.
  * Same linkedom + react-dom harness as TabBar.test.tsx.
  */
 
@@ -248,7 +246,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		await mount(<Sidebar />);
 
 		const navigation = container.querySelector("[data-sidebar-navigation]");
-		for (const label of ["New task", "Commands", "Agent Hub", "Plugins", "PR Center", "More"]) {
+		for (const label of ["New session", "Commands", "Agent Hub", "Plugins", "PR Center", "More"]) {
 			expect(navigation?.textContent).toContain(label);
 		}
 		// App-wide tools do not compete with the task list until asked for.
@@ -389,29 +387,16 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(workspaceOrder()).toEqual(["/work/alpha", "/work/beta"]);
 	});
 
-	it("switches from an active Chat to Work and exposes only the full agent action", async () => {
+	it("opens a projectless agent session directly from the sidebar over an active project", async () => {
 		const omp = installMockOmp(LIST);
-		useSessionStore.setState({ sessionId: "chat", cwd: "/work/alpha", isStreaming: false });
-		useTabsStore.setState({
-			tabs: [{ id: "chat", cwd: "/work/alpha", status: "ready", kind: "chat", unreadDone: false }],
-			activeTabId: "chat",
-			bundles: new Map(),
-		});
+		seedStores();
 		await mount(<Sidebar />);
 
-		const modeSwitch = container.querySelector('[aria-label="Choose workspace mode"]');
-		const modes = [...(modeSwitch?.querySelectorAll("button") ?? [])];
-		expect(modes.map(button => button.getAttribute("title"))).toEqual([
-			"Build, debug, and ship in a project",
-			"Full agent in your default workspace",
-		]);
-		const workItem = modes.find(button => (button.textContent ?? "").includes("Work"));
-		await fire(workItem ?? null, "onClick");
-		expect(workItem?.getAttribute("aria-pressed")).toBe("true");
-		expect(container.querySelector("[data-sidebar-new-chat]")).toBeNull();
+		expect(container.querySelector('[aria-label="Choose workspace mode"]')).toBeNull();
 		await fire(container.querySelector("[data-sidebar-new-agent]"), "onClick");
+		expect(document.querySelector('[role="dialog"]')).toBeNull();
 
-		expect(omp.tabs.spawn).toHaveBeenCalledWith({
+		expect(omp.tabs.spawn).toHaveBeenCalledExactlyOnceWith({
 			cwd: undefined,
 			sessionPath: undefined,
 			kind: "agent",
@@ -421,11 +406,14 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(omp.tabs.setActive).toHaveBeenCalledWith("t-new");
 		expect(useTabsStore.getState()).toMatchObject({
 			activeTabId: "t-new",
-			tabs: expect.arrayContaining([expect.objectContaining({ id: "t-new", kind: "agent", cwd: "/default/work" })]),
+			tabs: expect.arrayContaining([
+				expect.objectContaining({ id: "t0", cwd: "/work/alpha" }),
+				expect.objectContaining({ id: "t-new", kind: "agent", cwd: "/default/work" }),
+			]),
 		});
 	});
 
-	it("creates an agent tab from New session even when the active tab is chat", async () => {
+	it("creates a project agent tab without re-rooting the current chat", async () => {
 		const omp = installMockOmp(LIST);
 		useSessionStore.setState({ sessionId: "chat", cwd: "/work/alpha", isStreaming: false });
 		useTabsStore.setState({
@@ -435,11 +423,10 @@ describe("Sidebar menus and pinned ordering", () => {
 		});
 		await mount(<Sidebar />);
 
-		await fire(container.querySelector("[data-sidebar-new-agent]"), "onClick");
-		const currentWorkspace = [...document.body.querySelectorAll("button")].find(button =>
-			(button.textContent ?? "").includes("/work/alpha"),
+		await fire(
+			container.querySelector('[data-workspace-group="/work/alpha"] [aria-label="New session in alpha"]'),
+			"onClick",
 		);
-		await fire(currentWorkspace as Element, "onClick");
 
 		expect(omp.tabs.spawn).toHaveBeenCalledWith({
 			cwd: "/work/alpha",
@@ -507,7 +494,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		await mount(<Sidebar />);
 
 		expect(container.querySelectorAll("[data-sidebar-workspace-icon]").length).toBeGreaterThan(0);
-		const chatRow = container.querySelector('[data-session-group="__chats__"] [data-session-kind="chat"]');
+		const chatRow = container.querySelector('[data-session-group="__projectless__"] [data-session-kind="chat"]');
 		const groupedAgentRow = container.querySelector('[data-session-group="/work/alpha"] [data-session-kind="agent"]');
 		for (const row of [chatRow, groupedAgentRow]) {
 			expect(row).not.toBeNull();
@@ -528,7 +515,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(labels.some(label => label.includes("New agent session here"))).toBe(true);
 		expect(labels.some(label => label.includes("New chat session here"))).toBe(false);
 		expect(labels.some(label => label.includes("New worktree tab here"))).toBe(true);
-		expect(labels.some(label => label.includes("Rename"))).toBe(true);
+		expect(labels.some(label => label.includes("Edit project"))).toBe(true);
 		expect(labels.some(label => label.includes("Select sessions"))).toBe(true);
 		expect(labels.some(label => label.includes("Pin to top"))).toBe(true);
 		expect(labels.some(label => label.includes("Delete"))).toBe(true);
@@ -672,19 +659,22 @@ describe("Sidebar menus and pinned ordering", () => {
 		}
 	});
 
-	it("keeps chats visible in their global section and creates one from the adjacent quick action", async () => {
+	it("lists legacy Work and tool-free chats together while keeping the project group and chat kind", async () => {
 		const chat = session("/work/alpha/chat.jsonl", "/work/alpha", { kind: "chat" });
 		const agent = session("/work/alpha/agent.jsonl", "/work/alpha");
-		const omp = installMockOmp([chat, agent]);
+		const work = session("/default/work/personal.jsonl", "/default/work");
+		const omp = installMockOmp([chat, agent, work]);
 		seedStores();
 		await mount(<Sidebar />);
 
 		const workspace = container.querySelector('[data-session-group="/work/alpha"]');
-		const chats = container.querySelector('[data-session-group="__chats__"]');
+		const projectless = container.querySelector('[data-session-group="__projectless__"]');
 		expect(workspace?.textContent).toContain("Session /work/alpha/agent");
 		expect(workspace?.textContent).not.toContain("Session /work/alpha/chat");
-		expect(chats?.textContent).toContain("Session /work/alpha/chat");
-		const chatRow = [...chats!.querySelectorAll('div[role="button"]')].find(element =>
+		expect(projectless?.textContent).toContain("Session /work/alpha/chat");
+		expect(projectless?.textContent).toContain("Session /default/work/personal");
+		expect(container.querySelector('[data-workspace-group="/default/work"]')).toBeNull();
+		const chatRow = [...projectless!.querySelectorAll('div[role="button"]')].find(element =>
 			(element.textContent ?? "").includes("Session /work/alpha/chat"),
 		);
 		await fire(chatRow as unknown as Element, "onClick");
@@ -694,30 +684,20 @@ describe("Sidebar menus and pinned ordering", () => {
 			sessionPath: "/work/alpha/chat.jsonl",
 			worktree: undefined,
 		});
-
-		await fire(container.querySelector("[data-sidebar-new-chat]"), "onClick");
-		expect(omp.tabs.spawn).toHaveBeenLastCalledWith({
-			cwd: "/work/alpha",
-			kind: "chat",
-			sessionPath: undefined,
-			worktree: undefined,
-		});
 	});
 
-	it("keeps an active chat in Code even when its internal cwd is the Work workspace", async () => {
-		const chat = session("/default/work/chat.jsonl", "/default/work", { kind: "chat" });
-		installMockOmp([chat]);
-		useSessionStore.setState({ sessionId: chat.id, cwd: "/default/work", isStreaming: false });
-		useTabsStore.setState({
-			tabs: [{ id: "chat", cwd: "/default/work", status: "ready", kind: "chat", unreadDone: false }],
-			activeTabId: "chat",
-			bundles: new Map(),
-		});
+	it("keeps archived project and projectless conversations in the same archive", async () => {
+		const work = session("/default/work/personal.jsonl", "/default/work");
+		const project = session("/work/alpha/archived.jsonl", "/work/alpha");
+		installMockOmp([work, project, ...LIST]);
+		seedStores();
+		useSidebarPrefs.setState({ archivedSessions: [work.path, project.path], hydrated: true });
 		await mount(<Sidebar />);
 
-		expect(container.querySelector("[data-chat-section]")).not.toBeNull();
-		const pressed = container.querySelector('[aria-label="Choose workspace mode"] [aria-pressed="true"]');
-		expect(pressed?.textContent).toContain("Code");
+		const archive = container.querySelector("[data-archived-section]");
+		await fire(archive?.querySelector("button[aria-expanded]") ?? null, "onClick");
+		expect(archive?.textContent).toContain(work.title);
+		expect(archive?.textContent).toContain(project.title);
 	});
 
 	it("keeps the active task protected while it is compacting", async () => {
@@ -740,21 +720,45 @@ describe("Sidebar menus and pinned ordering", () => {
 		);
 	});
 
-	it("workspace rows expose a hover action that creates an agent tab in that workspace", async () => {
+	it("workspace rows expose one menu and can create an agent tab from it", async () => {
 		const omp = installMockOmp(LIST);
 		seedStores();
 		await mount(<Sidebar />);
 
 		const header = container.querySelector('[data-workspace-group="/work/alpha"]') as unknown as Element;
-		const add = header.querySelector('[aria-label="New agent session here"]');
-		expect(add).not.toBeNull();
-		await fire(add, "onClick");
+		expect(header.querySelectorAll('button[aria-haspopup="menu"]')).toHaveLength(1);
+		await fire(header, "onContextMenu");
+		const add = [...document.querySelectorAll('[role="menuitem"]')].find(item =>
+			item.textContent?.includes("New agent session here"),
+		);
+		await fire(add ?? null, "onClick");
 		expect(omp.tabs.spawn).toHaveBeenCalledWith({
 			cwd: "/work/alpha",
 			kind: "agent",
 			sessionPath: undefined,
 			worktree: undefined,
 		});
+	});
+
+	it.each(["beta", "empty"])("opens a new conversation from the %s project row", async project => {
+		const omp = installMockOmp(LIST);
+		seedStores();
+		const cwd = `/work/${project}`;
+		await useSidebarPrefs.getState().addWorkspace("/work/empty");
+		useUiStore.getState().openPlugins();
+		await mount(<Sidebar />);
+
+		const header = container.querySelector(`[data-workspace-group="${cwd}"]`);
+		await fire(header?.querySelector(`button[aria-label="New session in ${project}"]`) ?? null, "onClick");
+
+		expect(omp.tabs.spawn).toHaveBeenCalledExactlyOnceWith({
+			cwd,
+			kind: "agent",
+			sessionPath: undefined,
+			worktree: undefined,
+		});
+		expect(useUiStore.getState().pluginsOpen).toBe(false);
+		expect(useTabsStore.getState().activeTabId).toBe("t-new");
 	});
 
 	it("renders collapsed groups as absent from the DOM instead of inert subtrees", async () => {

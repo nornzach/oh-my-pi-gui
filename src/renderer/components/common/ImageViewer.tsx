@@ -29,8 +29,16 @@ const FIT_MARGIN = 48;
 /** Pointer travel that turns a press on the image into a drag instead of a click. */
 const DRAG_SLOP = 4;
 
-/** An `<img>` that opens the image viewer on click, Enter or Space. */
-export function ZoomableImage({ className, onClick, onKeyDown, ...props }: ComponentPropsWithoutRef<"img">) {
+/** An `<img>` that opens a preview on click, Enter or Space. */
+export function ZoomableImage({
+	className,
+	onClick,
+	onKeyDown,
+	onOpen,
+	...props
+}: ComponentPropsWithoutRef<"img"> & {
+	onOpen?: () => void;
+}) {
 	const t = useT();
 	const [open, setOpen] = useState(false);
 	const src = typeof props.src === "string" ? props.src : undefined;
@@ -38,13 +46,14 @@ export function ZoomableImage({ className, onClick, onKeyDown, ...props }: Compo
 		// The image may sit inside a clickable row or bubble: the click is the viewer's.
 		event.stopPropagation();
 		event.preventDefault();
-		setOpen(true);
+		if (onOpen) onOpen();
+		else setOpen(true);
 	};
 	return (
 		<>
 			<img
 				{...props}
-				aria-haspopup="dialog"
+				aria-haspopup={onOpen ? undefined : "dialog"}
 				className={cx(className, src && "cursor-zoom-in")}
 				onClick={event => {
 					onClick?.(event);

@@ -16,7 +16,7 @@ export function ChangelogDialog() {
 	const open = useUiStore(state => state.changelogOpen);
 	const close = useUiStore(state => state.closeChangelog);
 	return (
-		<Modal onClose={close} open={open} size="lg" title={t("changelog.title")}>
+		<Modal dockable onClose={close} open={open} size="lg" title={t("changelog.title")}>
 			<MarkdownRenderer content={changelogMarkdown} />
 		</Modal>
 	);

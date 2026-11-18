@@ -3,7 +3,7 @@
  * backend now owns role metadata AND the eligible candidate pool per role
  * (get_model_roles returns candidates inline). Defends the observable contract —
  * the window requests roles once, filters backend-hidden roles, groups visible
- * roles by section, groups each role's candidates by model kind in the picker,
+ * roles by section, groups each role's candidates by provider in the picker,
  * and switching a role's model issues set_model_role with the canonical
  * provider/id selector. linkedom harness per AGENTS.md; stores reset in
  * afterEach (never mock.module).
@@ -49,6 +49,7 @@ const ROLES = [
 		candidates: [
 			{ provider: "anthropic", id: "claude", name: "Claude", kind: "chat" },
 			{ provider: "openai", id: "gpt", name: "GPT", kind: "chat" },
+			{ provider: "openai-codex", id: "gpt", name: "GPT", kind: "chat" },
 		],
 	},
 	{
@@ -124,7 +125,7 @@ describe("ModelRolesWindow", () => {
 		expect(document.body.textContent).toContain("Specialized roles");
 	});
 
-	it("groups each role's candidates by model kind and preselects the saved selector", async () => {
+	it("groups each role's candidates by provider, keeping same-id models separate", async () => {
 		installRpc();
 		useSessionStore.getState().setStatus("ready", "/repo");
 		useUiStore.getState().openModelRoles();
@@ -139,9 +140,11 @@ describe("ModelRolesWindow", () => {
 
 		const listbox = document.body.querySelector('[role="listbox"]');
 		expect(listbox).not.toBeNull();
-		expect(listbox?.textContent).toContain("Chat");
-		expect(listbox?.textContent).toContain("Claude");
-		expect(listbox?.textContent).toContain("openai/gpt");
+		const groups = [...(listbox?.querySelectorAll('[role="group"]') ?? [])];
+		expect(groups.map(group => group.getAttribute("aria-label"))).toEqual(["anthropic", "openai", "openai-codex"]);
+		expect(groups[0]?.querySelector('[aria-selected="true"]')?.textContent).toContain("anthropic/claude");
+		expect(groups[1]?.querySelector('[role="option"]')?.textContent).toContain("openai/gpt");
+		expect(groups[2]?.querySelector('[role="option"]')?.textContent).toContain("openai-codex/gpt");
 	});
 
 	it("says why the list cannot refresh instead of claiming no roles are configured", async () => {

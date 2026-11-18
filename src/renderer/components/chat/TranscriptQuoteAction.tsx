@@ -45,7 +45,10 @@ export function TranscriptQuoteAction({
 				setAnchor(null);
 				return;
 			}
-			const rects = [...selection.getRangeAt(0).getClientRects()].filter(rect => rect.width > 0);
+			const bounds = transcript.getBoundingClientRect();
+			const rects = [...selection.getRangeAt(0).getClientRects()].filter(
+				rect => rect.width > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom,
+			);
 			const first = rects[0];
 			const last = rects[rects.length - 1];
 			if (!first || !last) {
@@ -54,7 +57,7 @@ export function TranscriptQuoteAction({
 			}
 			// Flip below when the space above the selection inside the transcript runs
 			// out, so the action never covers the tab bar or title bar.
-			const below = first.top < transcript.getBoundingClientRect().top + FLIP_MARGIN;
+			const below = first.top < bounds.top + FLIP_MARGIN;
 			setAnchor(
 				below
 					? { x: last.left + last.width / 2, y: last.bottom, below: true }
@@ -76,6 +79,9 @@ export function TranscriptQuoteAction({
 			schedule();
 		};
 		const hide = () => setAnchor(null);
+		const reposition = () => {
+			if (shown.current) schedule();
+		};
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
 				// Leaving the action hands focus back to the transcript it came from.
@@ -97,19 +103,21 @@ export function TranscriptQuoteAction({
 		document.addEventListener("selectionchange", schedule);
 		document.addEventListener("pointerdown", onPointerDown, true);
 		document.addEventListener("pointerup", onPointerUp, true);
+		document.addEventListener("pointercancel", onPointerUp, true);
 		document.addEventListener("keydown", onKeyDown);
-		// Anything that moves the text under a fixed action leaves it behind: hide instead.
+		// Layout and auto-follow can move a selection that is still visible.
 		const transcript = transcriptRef.current;
-		transcript?.addEventListener("scroll", hide, { passive: true });
-		window.addEventListener("resize", hide);
+		transcript?.addEventListener("scroll", reposition, { passive: true });
+		window.addEventListener("resize", reposition);
 		return () => {
 			if (pending.current !== null) cancelAnimationFrame(pending.current);
 			document.removeEventListener("selectionchange", schedule);
 			document.removeEventListener("pointerdown", onPointerDown, true);
 			document.removeEventListener("pointerup", onPointerUp, true);
+			document.removeEventListener("pointercancel", onPointerUp, true);
 			document.removeEventListener("keydown", onKeyDown);
-			transcript?.removeEventListener("scroll", hide);
-			window.removeEventListener("resize", hide);
+			transcript?.removeEventListener("scroll", reposition);
+			window.removeEventListener("resize", reposition);
 		};
 	}, [transcriptRef]);
 

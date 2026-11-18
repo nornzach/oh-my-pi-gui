@@ -5,18 +5,17 @@ import {
 	BarChart3,
 	Bot,
 	Brain,
-	BriefcaseBusiness,
 	CalendarClock,
 	CheckCheck,
 	ChevronDown,
 	ChevronRight,
 	ClockArrowDown,
-	Code2,
 	Coins,
 	Columns2,
 	Command,
 	ExternalLink,
 	Folder,
+	FolderPlus,
 	GitBranchPlus,
 	GitPullRequest,
 	Keyboard,
@@ -24,7 +23,6 @@ import {
 	LoaderCircle,
 	type LucideIcon,
 	MessageCircle,
-	MessageSquarePlus,
 	MessageSquareWarning,
 	MoreHorizontal,
 	Palette,
@@ -32,6 +30,7 @@ import {
 	Pin,
 	PinOff,
 	Plug,
+	Plus,
 	Puzzle,
 	RefreshCw,
 	Rows2,
@@ -60,6 +59,7 @@ import type { SessionInfo } from "../../../shared/ipc-types";
 import { useAwaitingConfirmation } from "../../hooks/use-awaiting-confirmation";
 import { useSessionList } from "../../hooks/use-session-list";
 import { dropSessionNow, openSessionFromSidebar } from "../../hooks/use-session-switch";
+import { useViewportWidth } from "../../hooks/use-viewport-width";
 import { basename, cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
@@ -75,6 +75,7 @@ import {
 } from "../../lib/session-tree";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { tabSignalPresentation } from "../../lib/tab-signal";
+import { pickWorkspaceDirectory } from "../../lib/workspace-dirs";
 import { useAgentPagesStore } from "../../stores/agent-pages";
 import { useSchedulerStore } from "../../stores/scheduler";
 import { useSessionStore } from "../../stores/session";
@@ -83,7 +84,7 @@ import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { usePendingSkillReviews } from "../../stores/skill-review";
 import { type SplitAxis, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
-import { useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
+import { activeWorkspacePage, useEffectiveKeymapOverrides, useUiStore, type WorkspacePageId } from "../../stores/ui";
 import {
 	SessionAgentsScope,
 	type SidebarAgentsInfo,
@@ -95,7 +96,7 @@ import { ConfirmDialog } from "../common/ConfirmDialog";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
 import { Glide } from "../common/Glide";
 import { LangSwitcher } from "../common/LangSwitcher";
-import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
+import { ProjectSettingsDialog } from "../dialogs/ProjectSettingsDialog";
 import { useUnreadNoticeCount } from "./NotificationBell";
 import { SidebarQuotas } from "./SidebarQuotas";
 
@@ -128,8 +129,6 @@ type PendingDelete =
 	| { kind: "session"; session: SessionInfo }
 	| { kind: "group"; group: WorkspaceGroup }
 	| { kind: "selection"; sessions: SessionInfo[] };
-
-type SidebarMode = "code" | "work";
 
 /** Two sessions open as a split pair of tabs, by session file in pane order. */
 interface SessionPair {
@@ -179,12 +178,6 @@ function SidebarRowTitle({ className, title }: { className?: string; title: stri
 	);
 }
 
-/**
- * Left rail with two agent-capable lanes plus global tool-free chats. Code
- * groups project sessions by workspace; Work uses one GUI-owned default
- * workspace with no folder picker. The main action creates an agent, while the
- * adjacent quick-chat action creates a chat.
- */
 /** Workspace names compare as people read them: case-insensitive, numbers by value ("web2" before "web10"). */
 const workspaceNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
@@ -192,6 +185,7 @@ export function Sidebar() {
 	const tabRpc = useTabRpc();
 	const t = useT();
 	const keymapOverrides = useEffectiveKeymapOverrides();
+	const workspacePage = useUiStore(activeWorkspacePage);
 	// The chords bound to each action, as the user configured them (none when turned off).
 	const actionChords = useMemo(() => {
 		const chords = new Map<string, string[]>();
@@ -201,7 +195,6 @@ export function Sidebar() {
 		return chords;
 	}, [keymapOverrides]);
 	const paletteShortcut = (actionChords.get("palette") ?? []).join(" / ");
-	const [mode, setMode] = useState<SidebarMode>("code");
 	const [defaultWorkspace, setDefaultWorkspace] = useState<string | null>(null);
 	const switchPendingTo = useSessionStore(s => s.switchPending?.toId ?? null);
 	// Resizable left rail (mirrors PanelContainer's right-rail drag, but the
@@ -209,6 +202,9 @@ export function Sidebar() {
 	const SIDEBAR_MIN = 180;
 	const SIDEBAR_MAX = 420;
 	const [sidebarWidth, setSidebarWidth] = useState(236);
+	const viewportWidth = useViewportWidth();
+	const sidebarLimit = Math.round(Math.max(152, Math.min(SIDEBAR_MAX, viewportWidth * 0.22)));
+	const visibleSidebarWidth = Math.min(sidebarWidth, sidebarLimit);
 	const sidebarWidthRef = useRef(236);
 	// Layout widths persist like every other chrome pref; restored on mount.
 	useEffect(() => {
@@ -227,16 +223,18 @@ export function Sidebar() {
 		sidebarDragging.current = true;
 		e.currentTarget.setPointerCapture(e.pointerId);
 	}, []);
-	const onSidebarDrag = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-		if (!sidebarDragging.current) return;
-		// Sidebar is left-anchored: dragging right grows it.
-		const host = e.currentTarget.parentElement;
-		if (!host) return;
-		const hostRect = host.getBoundingClientRect();
-		const clamped = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, e.clientX - hostRect.left));
-		sidebarWidthRef.current = clamped;
-		setSidebarWidth(clamped);
-	}, []);
+	const onSidebarDrag = useCallback(
+		(e: ReactPointerEvent<HTMLDivElement>) => {
+			if (!sidebarDragging.current) return;
+			const host = e.currentTarget.parentElement;
+			if (!host) return;
+			const hostRect = host.getBoundingClientRect();
+			const clamped = Math.min(sidebarLimit, Math.max(SIDEBAR_MIN, e.clientX - hostRect.left));
+			sidebarWidthRef.current = clamped;
+			setSidebarWidth(clamped);
+		},
+		[sidebarLimit],
+	);
 	const endSidebarDrag = useCallback(() => {
 		sidebarDragging.current = false;
 		void window.omp.prefs.set("sidebarWidth", sidebarWidthRef.current).catch(() => {});
@@ -261,16 +259,13 @@ export function Sidebar() {
 	// consequence before anything is removed.
 	const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 	const [renamingSessionPath, setRenamingSessionPath] = useState<string | null>(null);
-	const [workspaceOpen, setWorkspaceOpen] = useState(false);
 	const [renameDraft, setRenameDraft] = useState("");
-	// Mode selector, workspace group context menu, session row context menu.
+	// App, project and session menus.
 	const [moreMenu, setMoreMenu] = useState<ContextMenuAnchor | null>(null);
 	const [groupMenu, setGroupMenu] = useState<{ anchor: ContextMenuAnchor; group: WorkspaceGroup } | null>(null);
 	const [sessionMenu, setSessionMenu] = useState<{ anchor: ContextMenuAnchor; session: SessionInfo } | null>(null);
 	// Workspace display alias rename (group header inline input).
-	const [renamingGroupCwd, setRenamingGroupCwd] = useState<string | null>(null);
-	const [groupRenameDraft, setGroupRenameDraft] = useState("");
-	const groupRenameRef = useRef<HTMLInputElement>(null);
+	const [projectSettings, setProjectSettings] = useState<WorkspaceGroup | null>(null);
 	const openTab = useTabsStore(s => s.openTab);
 	const tabs = useTabsStore(s => s.tabs);
 	const activeTabId = useTabsStore(s => s.activeTabId);
@@ -292,7 +287,7 @@ export function Sidebar() {
 		return pairs;
 	}, [tabGroups, tabs, shownPair]);
 	const [hoveredPair, setHoveredPair] = useState<string | null>(null);
-	const activeTabKind = activeTab?.kind;
+	const registeredWorkspaces = useSidebarPrefs(s => s.registeredWorkspaces);
 	const pinnedGroups = useSidebarPrefs(s => s.pinnedGroups);
 	const pinnedSessions = useSidebarPrefs(s => s.pinnedSessions);
 	const archivedPaths = useSidebarPrefs(s => s.archivedSessions);
@@ -340,27 +335,16 @@ export function Sidebar() {
 	useEffect(() => {
 		void window.omp.sidecar
 			.defaultWorkspace()
-			.then(workspace => {
-				setDefaultWorkspace(workspace);
-				const tabState = useTabsStore.getState();
-				const activeKind = tabState.tabs.find(tab => tab.id === tabState.activeTabId)?.kind;
-				if (activeKind !== "chat" && useSessionStore.getState().cwd === workspace) setMode("work");
-			})
+			.then(setDefaultWorkspace)
 			.catch(() => {});
 	}, []);
-
-	// Opening a session from the global search keeps the lane label honest.
-	useEffect(() => {
-		if (!defaultWorkspace || !cwd) return;
-		setMode(activeTabKind === "chat" ? "code" : cwd === defaultWorkspace ? "work" : "code");
-	}, [activeTabKind, cwd, defaultWorkspace]);
 
 	const recencyForSession = useCallback(
 		(session: SessionInfo) => sessionLastUsed[session.path] ?? modifiedAt(session),
 		[sessionLastUsed],
 	);
-	// A child session goes where its family goes: its root's lane and project,
-	// and into Archived with an archived ancestor. Archiving a session takes its
+	// A child session follows its root's project or projectless group and
+	// goes into Archived with an archived ancestor. Archiving a session takes its
 	// family along instead of leaving the children behind as top-level rows.
 	const parentOf = useMemo(() => sessionParents(sessions), [sessions]);
 	const familyRoot = useCallback(
@@ -390,61 +374,37 @@ export function Sidebar() {
 	useEffect(() => {
 		setOpenFamilies(prev => Object.fromEntries(Object.entries(prev).filter(([, open]) => open)));
 	}, [sessionId]);
-	const agentSessions = useMemo(
-		() => sessions.filter(session => familyRoot(session).kind !== "chat" && !isArchived(session)),
-		[sessions, familyRoot, isArchived],
-	);
-	const codeSessions = useMemo(
-		() => agentSessions.filter(session => !defaultWorkspace || familyRoot(session).cwd !== defaultWorkspace),
-		[agentSessions, defaultWorkspace, familyRoot],
-	);
-	const workSessions = useMemo(
-		() =>
-			agentSessions
-				.filter(session => defaultWorkspace !== null && familyRoot(session).cwd === defaultWorkspace)
-				.toSorted((a, b) => {
-					const aPinned = pinnedSessions.includes(a.path) ? 0 : 1;
-					const bPinned = pinnedSessions.includes(b.path) ? 0 : 1;
-					if (aPinned !== bPinned) return aPinned - bPinned;
-					return recencyForSession(b) - recencyForSession(a);
-				}),
-		[agentSessions, defaultWorkspace, familyRoot, pinnedSessions, recencyForSession],
-	);
-	const chatSessions = useMemo(
-		() =>
-			sessions
-				.filter(session => familyRoot(session).kind === "chat" && !isArchived(session))
-				.toSorted((a, b) => {
-					const aPinned = pinnedSessions.includes(a.path) ? 0 : 1;
-					const bPinned = pinnedSessions.includes(b.path) ? 0 : 1;
-					if (aPinned !== bPinned) return aPinned - bPinned;
-					return recencyForSession(b) - recencyForSession(a);
-				}),
-		[sessions, familyRoot, isArchived, pinnedSessions, recencyForSession],
-	);
-	// Archived sessions of the lane on screen, newest first.
-	const archivedSessions = useMemo(
-		() =>
-			sessions
-				.filter(session => {
-					if (!isArchived(session)) return false;
-					const root = familyRoot(session);
-					const inWork = root.kind !== "chat" && defaultWorkspace !== null && root.cwd === defaultWorkspace;
-					return mode === "work" ? inWork : !inWork;
-				})
-				.toSorted((a, b) => recencyForSession(b) - recencyForSession(a)),
-		[sessions, defaultWorkspace, familyRoot, isArchived, mode, recencyForSession],
-	);
+	const { projectSessions, projectlessSessions, archivedSessions } = useMemo(() => {
+		const projectSessions: SessionInfo[] = [];
+		const projectlessSessions: SessionInfo[] = [];
+		const archivedSessions: SessionInfo[] = [];
+		for (const session of sessions) {
+			if (isArchived(session)) {
+				archivedSessions.push(session);
+				continue;
+			}
+			const root = familyRoot(session);
+			if (root.kind === "chat" || !root.cwd || root.cwd === defaultWorkspace) projectlessSessions.push(session);
+			else projectSessions.push(session);
+		}
+		return {
+			projectSessions,
+			projectlessSessions,
+			archivedSessions: archivedSessions.sort((a, b) => recencyForSession(b) - recencyForSession(a)),
+		};
+	}, [sessions, defaultWorkspace, familyRoot, isArchived, recencyForSession]);
 
-	// Code sessions stay grouped by project. Pins remain a priority partition,
-	// with MRU inside it.
+	// Pins remain a priority partition, with project recency inside it.
 	const groups = useMemo<WorkspaceGroup[]>(() => {
 		const byCwd = new Map<string, SessionInfo[]>();
-		for (const session of codeSessions) {
+		for (const session of projectSessions) {
 			const groupCwd = familyRoot(session).cwd;
 			const list = byCwd.get(groupCwd) ?? [];
 			list.push(session);
 			byCwd.set(groupCwd, list);
+		}
+		for (const project of registeredWorkspaces) {
+			if (project !== defaultWorkspace && !byCwd.has(project)) byCwd.set(project, []);
 		}
 		const result: WorkspaceGroup[] = [...byCwd.entries()].map(([groupCwd, groupSessions]) => ({
 			cwd: groupCwd,
@@ -471,11 +431,13 @@ export function Sidebar() {
 		});
 		return result;
 	}, [
-		codeSessions,
+		defaultWorkspace,
 		familyRoot,
 		groupAliases,
 		pinnedGroups,
+		projectSessions,
 		pinnedSessions,
+		registeredWorkspaces,
 		recencyForSession,
 		workspaceLastUsed,
 		workspaceSort,
@@ -485,11 +447,9 @@ export function Sidebar() {
 		// Default: current workspace expanded, others collapsed (Codex-style).
 		return groupCwd !== cwd;
 	}
-	const totalCount = mode === "work" ? workSessions.length : codeSessions.length + chatSessions.length;
 	// Counts name the sessions you started; subagent transcripts sit inside them.
 	const listedCount = (list: readonly SessionInfo[]) => list.filter(session => !isSubagentSession(session)).length;
-	const visibleGroups = mode === "code" ? groups : [];
-	const chatsCollapsed = collapsed.__chats__ ?? false;
+	const projectlessCollapsed = collapsed.__projectless__ ?? false;
 	const archivedCollapsed = collapsed.__archived__ ?? true;
 	// A tab knows its session file from the start; the id comes later, from the sidecar.
 	const tabForSession = (session: SessionInfo) =>
@@ -590,9 +550,8 @@ export function Sidebar() {
 	// Rows in the order they are drawn: what "select all" and a ⇧-click range cover.
 	// Within a section a pair's rows are drawn together, and a ⇧-click range follows that.
 	const visibleSessions = [
-		...(mode === "work" ? rowsOf(workSessions) : []),
-		...visibleGroups.flatMap(group => (isCollapsedGroup(group.cwd) ? [] : rowsOf(group.sessions))),
-		...(mode === "code" && !chatsCollapsed ? rowsOf(chatSessions) : []),
+		...groups.flatMap(group => (isCollapsedGroup(group.cwd) ? [] : rowsOf(group.sessions))),
+		...(projectlessCollapsed ? [] : rowsOf(projectlessSessions)),
 		...(archivedCollapsed ? [] : rowsOf(archivedSessions)),
 	].map(spec => spec.session);
 	const selectedSessions = selection ? sessions.filter(session => selection.has(session.path)) : [];
@@ -618,6 +577,7 @@ export function Sidebar() {
 	};
 
 	const openSession = (session: SessionInfo) => {
+		useUiStore.getState().returnToConversation();
 		// A session open in a tab may be showing one of its agent pages: its row
 		// is the way back to the conversation.
 		const tab = tabForSession(session);
@@ -629,11 +589,12 @@ export function Sidebar() {
 		void openSessionFromSidebar(session);
 	};
 	const startNew = () => {
-		if (mode === "work") {
-			void openTab({ kind: "agent", work: true });
-			return;
-		}
-		setWorkspaceOpen(true);
+		useUiStore.getState().returnToConversation();
+		void openTab({ kind: "agent", work: true });
+	};
+	const startProjectSession = (projectCwd: string) => {
+		useUiStore.getState().returnToConversation();
+		void openTab({ cwd: projectCwd });
 	};
 
 	// Explicit parallel action: open this session in a NEW window with its own
@@ -1144,7 +1105,7 @@ export function Sidebar() {
 		);
 	};
 
-	/** One collapsible group header: icon (chevron on hover), name, count, hover actions. */
+	/** One collapsible group header with optional project actions. */
 	const renderGroupHeader = ({
 		id,
 		name,
@@ -1154,7 +1115,6 @@ export function Sidebar() {
 		onToggle,
 		pinned,
 		actions,
-		renameInput,
 		onContextMenu,
 		current,
 	}: {
@@ -1166,13 +1126,11 @@ export function Sidebar() {
 		onToggle: () => void;
 		pinned?: boolean;
 		actions?: ReactNode;
-		renameInput?: ReactNode;
 		onContextMenu?: (event: ReactMouseEvent) => void;
 		current?: boolean;
 	}) => (
 		<div
 			data-workspace-group={id.startsWith("__") ? undefined : id}
-			data-actions-open={renameInput ? true : undefined}
 			onContextMenu={onContextMenu}
 			className={cx(
 				"omp-sidebar-workspace-row omp-color-fade group/header flex h-[30px] w-full items-center rounded-lg px-2 text-omp-md",
@@ -1184,7 +1142,6 @@ export function Sidebar() {
 				type="button"
 				onClick={onToggle}
 				aria-expanded={!collapsedState}
-				aria-label={renameInput ? name : undefined}
 				className="flex min-w-0 flex-1 items-center text-left"
 			>
 				<span className="omp-sidebar-group-icon relative mr-2 flex size-4 shrink-0 items-center justify-center">
@@ -1203,18 +1160,13 @@ export function Sidebar() {
 				{pinned && (
 					<Pin size={11} className="mr-1.5 shrink-0 text-[var(--omp-dim)]" aria-label={t("sidebar.pinned")} />
 				)}
-				{renameInput ?? <SidebarRowTitle className="text-left font-medium" title={name} />}
+				<SidebarRowTitle className="text-left font-medium" title={name} />
 			</button>
-			{!renameInput && (
-				<span className="omp-sidebar-group-count ml-2 shrink-0 text-omp-xs tabular-nums text-[var(--omp-dim)]">
-					{count}
-				</span>
-			)}
+			<span className="omp-sidebar-group-count ml-2 shrink-0 text-omp-xs tabular-nums text-[var(--omp-dim)]">
+				{count}
+			</span>
 			{actions && (
-				<span
-					className="omp-sidebar-workspace-actions flex shrink-0 items-center justify-end gap-0.5"
-					onClick={event => event.stopPropagation()}
-				>
+				<span className="ml-1 flex shrink-0 items-center gap-0.5" onClick={event => event.stopPropagation()}>
 					{actions}
 				</span>
 			)}
@@ -1223,6 +1175,7 @@ export function Sidebar() {
 
 	interface NavigationItem {
 		id: string;
+		page?: WorkspacePageId;
 		icon: LucideIcon;
 		label: string;
 		title?: string;
@@ -1254,6 +1207,7 @@ export function Sidebar() {
 		},
 		{
 			id: "agents",
+			page: "agentHubOpen",
 			icon: Bot,
 			label: t("titlebar.agentHub"),
 			shortcut: actionChords.get("agents.hub")?.[0],
@@ -1261,6 +1215,7 @@ export function Sidebar() {
 		},
 		{
 			id: "memory",
+			page: "memoryOpen",
 			icon: Brain,
 			label: t("titlebar.memory"),
 			title:
@@ -1276,12 +1231,14 @@ export function Sidebar() {
 		},
 		{
 			id: "plugins",
+			page: "pluginsOpen",
 			icon: Puzzle,
 			label: t("titlebar.plugins"),
 			onClick: () => useUiStore.getState().openPlugins(),
 		},
 		{
 			id: "pull-requests",
+			page: "prCenterOpen",
 			icon: GitPullRequest,
 			label: t("titlebar.prCenter"),
 			shortcut: actionChords.get("pr.center")?.[0],
@@ -1289,6 +1246,7 @@ export function Sidebar() {
 		},
 		{
 			id: "scheduled-tasks",
+			page: "tasks",
 			icon: CalendarClock,
 			label: t("tasks.title"),
 			title: pendingTaskReviews > 0 ? t("tasks.sidebar.review", { count: pendingTaskReviews }) : undefined,
@@ -1337,14 +1295,16 @@ export function Sidebar() {
 		"omp-pressable group/nav flex h-8 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-omp-md text-[var(--omp-text-secondary)] hover:bg-[var(--omp-sidebar-item-hover)] hover:text-[var(--omp-text)]";
 	const renderNavigationItem = (item: NavigationItem) => {
 		const Icon = item.icon;
+		const selected = item.page !== undefined && item.page === workspacePage;
 		return (
 			<button
+				aria-current={selected ? "page" : undefined}
 				key={item.id}
 				type="button"
 				onClick={item.onClick}
 				data-command-center-entry={item.id === "commands" ? true : undefined}
 				title={item.title}
-				className={navigationRow}
+				className={cx(navigationRow, selected && "bg-(--omp-sidebar-item-hover) font-medium")}
 			>
 				<Icon aria-hidden="true" className="shrink-0 text-[var(--omp-muted)]" size={16} strokeWidth={1.75} />
 				<span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -1372,51 +1332,13 @@ export function Sidebar() {
 
 	const utilityButton =
 		"omp-pressable flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]";
-	const newShortcut = actionChords.get("tab.new")?.[0];
-
 	return (
 		<>
 			<aside
 				className="omp-session-sidebar relative flex h-full shrink-0 flex-col border-r border-[var(--omp-border-muted)] bg-[var(--omp-sidebar-bg)]"
-				style={{ width: sidebarWidth }}
+				style={{ width: visibleSidebarWidth }}
 			>
 				<div aria-hidden className="omp-window-caption drag-region" />
-				{/* Header: the lane switch and session search. */}
-				<div className="drag-region flex h-12 shrink-0 items-center gap-1 px-2.5">
-					<div role="group" aria-label={t("sidebar.mode.aria")} className="omp-segmented no-drag">
-						<Glide activeKey={mode} selector='[aria-pressed="true"]' variant="thumb" />
-						{(["code", "work"] as const).map(value => {
-							const Icon = value === "code" ? Code2 : BriefcaseBusiness;
-							return (
-								<button
-									key={value}
-									type="button"
-									aria-pressed={mode === value}
-									title={t(value === "code" ? "sidebar.mode.codeDescription" : "sidebar.mode.workDescription")}
-									onClick={() => {
-										setMode(value);
-										endSelection();
-									}}
-									className="flex h-6 items-center gap-1.5 px-2.5 text-omp-sm font-medium"
-								>
-									<Icon aria-hidden="true" size={13} />
-									{t(`sidebar.mode.${value}`)}
-								</button>
-							);
-						})}
-					</div>
-					<div className="flex-1" />
-					<button
-						type="button"
-						onClick={openSessionPicker}
-						title={t("sidebar.search")}
-						aria-label={t("sidebar.search")}
-						className="no-drag omp-pressable flex h-7 w-7 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
-					>
-						<Search size={15} />
-					</button>
-				</div>
-
 				{/* Primary action + navigation. */}
 				<div className="shrink-0 px-2 pt-1 pb-3" data-sidebar-navigation>
 					<div className="mb-1 flex items-center gap-1">
@@ -1427,27 +1349,17 @@ export function Sidebar() {
 							className="omp-pressable group/nav flex h-8 min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-left text-omp-md font-medium text-[var(--omp-text)] hover:bg-[var(--omp-sidebar-item-hover)]"
 						>
 							<SquarePen aria-hidden="true" size={16} strokeWidth={1.75} className="shrink-0" />
-							<span className="min-w-0 flex-1 truncate">
-								{mode === "code" ? t("sidebar.newCode") : t("sidebar.newWork")}
-							</span>
-							{newShortcut && (
-								<span className="shrink-0 text-omp-xs font-normal tracking-wide text-[var(--omp-dim)] opacity-0 transition-opacity group-hover/nav:opacity-100 group-focus-visible/nav:opacity-100">
-									{newShortcut}
-								</span>
-							)}
+							<span className="min-w-0 flex-1 truncate">{t("sidebar.newSession")}</span>
 						</button>
-						{mode === "code" && (
-							<button
-								type="button"
-								data-sidebar-new-chat
-								onClick={() => void openTab({ kind: "chat" })}
-								title={t("sidebar.quickChat")}
-								aria-label={t("sidebar.quickChat")}
-								className="omp-pressable flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-sidebar-item-hover)] hover:text-[var(--omp-text)]"
-							>
-								<MessageSquarePlus size={16} strokeWidth={1.75} />
-							</button>
-						)}
+						<button
+							type="button"
+							onClick={openSessionPicker}
+							title={t("sidebar.search")}
+							aria-label={t("sidebar.search")}
+							className="omp-pressable flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+						>
+							<Search aria-hidden="true" size={15} />
+						</button>
 					</div>
 					<div className="space-y-px">{primaryNavigation.map(renderNavigationItem)}</div>
 					<button
@@ -1481,24 +1393,41 @@ export function Sidebar() {
 
 				<div className="flex h-7 shrink-0 items-center ps-4 pe-2.5">
 					<span className="min-w-0 flex-1 truncate text-omp-xs font-medium text-[var(--omp-dim)]">
-						{t("sidebar.recent")}
+						{t("sidebar.projects")}
 					</span>
-					{mode === "code" && (
-						<button
-							type="button"
-							onClick={() => void setWorkspaceSort(workspaceSort === "name" ? "recent" : "name")}
-							title={t(workspaceSort === "name" ? "sidebar.sort.byNameHint" : "sidebar.sort.byRecentHint")}
-							aria-label={t(workspaceSort === "name" ? "sidebar.sort.byNameHint" : "sidebar.sort.byRecentHint")}
-							data-workspace-sort={workspaceSort}
-							className="omp-pressable flex h-6 w-6 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
-						>
-							{workspaceSort === "name" ? (
-								<ArrowDownAZ aria-hidden="true" size={13} />
-							) : (
-								<ClockArrowDown aria-hidden="true" size={13} />
-							)}
-						</button>
-					)}
+					<button
+						type="button"
+						aria-label={t("workspaces.add")}
+						title={t("workspaces.add")}
+						onClick={() =>
+							void pickWorkspaceDirectory()
+								.then(path => (path ? useSidebarPrefs.getState().addWorkspace(path) : undefined))
+								.catch(error =>
+									toast({
+										variant: "error",
+										title: t("titlebar.openProjectFailed"),
+										message: String(error),
+									}),
+								)
+						}
+						className={rowActionButton}
+					>
+						<FolderPlus aria-hidden="true" size={14} />
+					</button>
+					<button
+						type="button"
+						onClick={() => void setWorkspaceSort(workspaceSort === "name" ? "recent" : "name")}
+						title={t(workspaceSort === "name" ? "sidebar.sort.byNameHint" : "sidebar.sort.byRecentHint")}
+						aria-label={t(workspaceSort === "name" ? "sidebar.sort.byNameHint" : "sidebar.sort.byRecentHint")}
+						data-workspace-sort={workspaceSort}
+						className="omp-pressable flex h-6 w-6 items-center justify-center rounded-md text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+					>
+						{workspaceSort === "name" ? (
+							<ArrowDownAZ aria-hidden="true" size={13} />
+						) : (
+							<ClockArrowDown aria-hidden="true" size={13} />
+						)}
+					</button>
 					<button
 						type="button"
 						data-sidebar-select
@@ -1540,19 +1469,15 @@ export function Sidebar() {
 							</Button>
 						</div>
 					)}
-					{!isLoading && !listError && totalCount === 0 && (
+					{!isLoading && !listError && groups.length === 0 && projectlessSessions.length === 0 && (
 						<div className="omp-sidebar-empty px-2 py-2 text-omp-sm leading-relaxed text-[var(--omp-dim)]">
-							{mode === "code" ? t("sidebar.emptyCode") : t("sidebar.emptyWork")}
+							{t("sidebar.emptySessions")}
 						</div>
 					)}
-					{mode === "work" && workSessions.length > 0 && (
-						<div className="space-y-px" data-work-section>
-							{renderSessionRows(workSessions)}
-						</div>
-					)}
-					{visibleGroups.map(group => {
+					{groups.map(group => {
 						const groupCollapsed = isCollapsedGroup(group.cwd);
-						const renaming = renamingGroupCwd === group.cwd;
+						const menuOpen = groupMenu?.group.cwd === group.cwd;
+						const newSessionLabel = t("sidebar.newSessionInProject", { name: group.name });
 						return (
 							<div key={group.cwd} className="mb-1">
 								{renderGroupHeader({
@@ -1561,57 +1486,39 @@ export function Sidebar() {
 									count: listedCount(group.sessions),
 									icon: Folder,
 									collapsedState: groupCollapsed,
-									onToggle: () => toggleGroup(group.cwd),
+									onToggle: () => {
+										if (group.sessions.length > 0) toggleGroup(group.cwd);
+										else startProjectSession(group.cwd);
+									},
 									pinned: pinnedGroups.includes(group.cwd),
 									current: group.cwd === cwd,
 									onContextMenu: event => setGroupMenu({ anchor: anchorFromEvent(event), group }),
-									renameInput: renaming ? (
-										<input
-											ref={groupRenameRef}
-											value={groupRenameDraft}
-											onChange={event => setGroupRenameDraft(event.target.value)}
-											onClick={event => event.stopPropagation()}
-											onBlur={() => {
-												useSidebarPrefs.getState().setGroupAlias(group.cwd, groupRenameDraft);
-												setRenamingGroupCwd(null);
-											}}
-											onKeyDown={event => {
-												if (isImeKeyEvent(event)) return;
-												if (event.key === "Enter") {
-													useSidebarPrefs.getState().setGroupAlias(group.cwd, groupRenameDraft);
-													setRenamingGroupCwd(null);
-												}
-												onEscape(event, () => setRenamingGroupCwd(null));
-											}}
-											className="min-w-0 flex-1 rounded-md border border-[var(--omp-input-focus-border)] bg-[var(--omp-input-bg)] px-1.5 py-0.5 text-omp-md text-[var(--omp-text)] outline-none"
-										/>
-									) : undefined,
 									actions: (
 										<>
 											<button
 												type="button"
-												title={t("sidebar.menu.newAgentHere")}
-												aria-label={t("sidebar.menu.newAgentHere")}
+												title={newSessionLabel}
+												aria-label={newSessionLabel}
 												className={rowActionButton}
-												onClick={event => {
-													event.stopPropagation();
-													void openTab({ cwd: group.cwd });
-												}}
+												onClick={() => startProjectSession(group.cwd)}
 											>
-												<SquarePen size={12} />
+												<Plus aria-hidden="true" size={14} />
 											</button>
 											<button
 												type="button"
 												title={t("sidebar.groupMenu")}
 												aria-label={t("sidebar.groupMenu")}
+												aria-haspopup="menu"
+												aria-expanded={menuOpen}
 												className={rowActionButton}
 												onClick={event => {
-													event.stopPropagation();
 													const rect = event.currentTarget.getBoundingClientRect();
-													setGroupMenu({ anchor: { x: rect.left, y: rect.bottom + 4 }, group });
+													setGroupMenu(
+														menuOpen ? null : { anchor: { x: rect.left, y: rect.bottom + 4 }, group },
+													);
 												}}
 											>
-												<MoreHorizontal size={13} />
+												<MoreHorizontal aria-hidden="true" size={13} />
 											</button>
 										</>
 									),
@@ -1629,19 +1536,21 @@ export function Sidebar() {
 							</div>
 						);
 					})}
-					{mode === "code" && chatSessions.length > 0 && (
-						<div className="mb-1" data-chat-section>
+					{projectlessSessions.length > 0 && (
+						<div className="mb-1" data-projectless-section>
 							{renderGroupHeader({
-								id: "__chats__",
-								name: t("sidebar.chats"),
-								count: chatSessions.length,
+								id: "__projectless__",
+								name: t("sidebar.recent"),
+								count: listedCount(projectlessSessions),
 								icon: MessageCircle,
-								collapsedState: chatsCollapsed,
-								onToggle: () => setCollapsed(prev => ({ ...prev, __chats__: !chatsCollapsed })),
+								collapsedState: projectlessCollapsed,
+								onToggle: () => setCollapsed(prev => ({ ...prev, __projectless__: !projectlessCollapsed })),
 							})}
-							{!chatsCollapsed && (
-								<div className="omp-sidebar-group" data-session-group="__chats__" data-state="expanded">
-									<div className="omp-sidebar-group-content space-y-px">{renderSessionRows(chatSessions)}</div>
+							{!projectlessCollapsed && (
+								<div className="omp-sidebar-group" data-session-group="__projectless__" data-state="expanded">
+									<div className="omp-sidebar-group-content space-y-px">
+										{renderSessionRows(projectlessSessions)}
+									</div>
 								</div>
 							)}
 						</div>
@@ -1676,7 +1585,7 @@ export function Sidebar() {
 						className="flex h-10 shrink-0 items-center gap-0.5 border-t border-[var(--omp-border-muted)] px-2"
 					>
 						{/* A narrow rail keeps the number and leaves the words to the tooltip. */}
-						{sidebarWidth < 220 ? (
+						{visibleSidebarWidth < 220 ? (
 							<span aria-live="polite" aria-label={bulkLabel} title={bulkLabel} className="min-w-0 flex-1 px-1">
 								<span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-(--omp-accent-dim) px-1.5 text-omp-xs font-medium tabular-nums text-(--omp-accent)">
 									{selectedSessions.length}
@@ -1778,8 +1687,6 @@ export function Sidebar() {
 					className="absolute inset-y-0 right-0 z-10 w-1 translate-x-1/2 cursor-col-resize transition-colors hover:bg-[var(--omp-accent)]/40 active:bg-[var(--omp-accent)] max-[1000px]:hidden"
 				/>
 			</aside>
-			<WorkspaceDialog open={workspaceOpen} onClose={() => setWorkspaceOpen(false)} intent="new-session" />
-
 			{/* App-wide tools: one menu instead of a second list competing with tasks. */}
 			{moreMenu && (
 				<ContextMenu
@@ -1799,7 +1706,16 @@ export function Sidebar() {
 				/>
 			)}
 
-			{/* Workspace group menu: new sessions, rename (alias), pin, delete. */}
+			{projectSettings && (
+				<ProjectSettingsDialog
+					key={projectSettings.cwd}
+					cwd={projectSettings.cwd}
+					name={projectSettings.name}
+					onClose={() => setProjectSettings(null)}
+				/>
+			)}
+
+			{/* Workspace group menu: project settings, new sessions, pin, delete. */}
 			{groupMenu &&
 				(() => {
 					const groupHasBusySession = groupMenu.group.sessions.some(isSessionBusy);
@@ -1810,12 +1726,21 @@ export function Sidebar() {
 							onClose={() => setGroupMenu(null)}
 							items={[
 								{
+									id: "group-settings",
+									label: t("sidebar.menu.rename"),
+									icon: Pencil,
+									onSelect: () => {
+										setProjectSettings(groupMenu.group);
+										setGroupMenu(null);
+									},
+								},
+								{
 									id: "group-new-agent",
 									label: t("sidebar.menu.newAgentHere"),
 									icon: SquareTerminal,
 									onSelect: () => {
 										setGroupMenu(null);
-										void openTab({ cwd: groupMenu.group.cwd });
+										startProjectSession(groupMenu.group.cwd);
 									},
 								},
 								{
@@ -1825,17 +1750,6 @@ export function Sidebar() {
 									onSelect: () => {
 										setGroupMenu(null);
 										useUiStore.getState().openWorktreeDialog({ baseCwd: groupMenu.group.cwd });
-									},
-								},
-								{
-									id: "group-rename",
-									label: t("sidebar.menu.rename"),
-									icon: Pencil,
-									onSelect: () => {
-										setGroupRenameDraft(groupMenu.group.name);
-										setRenamingGroupCwd(groupMenu.group.cwd);
-										setGroupMenu(null);
-										requestAnimationFrame(() => groupRenameRef.current?.select());
 									},
 								},
 								{
@@ -1864,7 +1778,7 @@ export function Sidebar() {
 									label: t("common.delete"),
 									icon: Trash2,
 									danger: true,
-									disabled: groupHasBusySession,
+									disabled: groupHasBusySession || groupMenu.group.sessions.length === 0,
 									disabledReason: t("sidebar.deleteGroupStreaming"),
 									onSelect: () => {
 										setPendingDelete({ kind: "group", group: groupMenu.group });

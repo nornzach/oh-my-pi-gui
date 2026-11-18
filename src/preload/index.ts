@@ -5,6 +5,7 @@
  */
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import type { DocumentPreviewResult } from "../shared/document-preview";
 import type {
 	ConversationSearchResponse,
 	CustomProviderInput,
@@ -20,11 +21,15 @@ import type {
 	IpcConversationSearchPayload,
 	IpcCustomThemes,
 	IpcDeleteCustomThemeResult,
+	IpcFsEditPayload,
+	IpcFsEditResult,
+	IpcFsExplorePayload,
 	IpcFsListResult,
 	IpcFsReadImageResult,
 	IpcFsReadPlanPayload,
 	IpcFsReadPlanResult,
 	IpcFsReadResult,
+	IpcFsSaveEditPayload,
 	IpcMemoryChange,
 	IpcOpenPathResult,
 	IpcPluginInspection,
@@ -150,6 +155,9 @@ const api: OmpApi = {
 	// to learn from the outcome.
 	app: {
 		quit: () => ipcRenderer.send(IPC_COMMANDS.APP_QUIT),
+		setUnsavedFiles: (dirty: boolean) => {
+			ipcRenderer.sendSync(IPC_COMMANDS.APP_FILE_DRAFTS, dirty);
+		},
 		pathForFile: (file: File) => webUtils.getPathForFile(file),
 	},
 
@@ -382,6 +390,8 @@ const api: OmpApi = {
 	system: {
 		info: () => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_INFO) as Promise<SystemInfo>,
 		openExternal: (url: string) => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_OPEN_EXTERNAL, url),
+		fetchRemoteImage: (url: string) =>
+			ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_FETCH_REMOTE_IMAGE, url) as Promise<string | null>,
 		openPath: (path: string) => ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_OPEN_PATH, path) as Promise<IpcOpenPathResult>,
 		resolvePaths: (paths: string[], tabId?: string) =>
 			ipcRenderer.invoke(IPC_COMMANDS.SYSTEM_RESOLVE_PATHS, { paths, tabId }) as Promise<
@@ -457,6 +467,12 @@ const api: OmpApi = {
 	},
 
 	fs: {
+		explore: (payload: IpcFsExplorePayload) =>
+			ipcRenderer.invoke(IPC_COMMANDS.FS_EXPLORE, payload) as Promise<IpcFsListResult>,
+		openEdit: (payload: IpcFsEditPayload) =>
+			ipcRenderer.invoke(IPC_COMMANDS.FS_OPEN_EDIT, payload) as Promise<IpcFsEditResult>,
+		saveEdit: (payload: IpcFsSaveEditPayload) =>
+			ipcRenderer.invoke(IPC_COMMANDS.FS_SAVE_EDIT, payload) as Promise<IpcFsEditResult>,
 		list: (path?: string, maxDepth?: number, maxEntries?: number, tabId?: string) =>
 			ipcRenderer.invoke(IPC_COMMANDS.FS_LIST, { path, maxDepth, maxEntries, tabId }) as Promise<IpcFsListResult>,
 		read: (path: string, maxBytes?: number, tabId?: string) =>
@@ -465,6 +481,12 @@ const api: OmpApi = {
 			ipcRenderer.invoke(IPC_COMMANDS.FS_READ_PLAN, payload) as Promise<IpcFsReadPlanResult>,
 		readImage: (path: string, tabId?: string) =>
 			ipcRenderer.invoke(IPC_COMMANDS.FS_READ_IMAGE, { path, tabId }) as Promise<IpcFsReadImageResult>,
+		documentPreview: (path: string, thumbnail: boolean, tabId?: string) =>
+			ipcRenderer.invoke(IPC_COMMANDS.FS_DOCUMENT_PREVIEW, {
+				path,
+				thumbnail,
+				tabId,
+			}) as Promise<DocumentPreviewResult>,
 	},
 
 	pluginCatalog: {

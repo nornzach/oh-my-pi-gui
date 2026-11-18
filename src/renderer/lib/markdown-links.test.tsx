@@ -49,14 +49,14 @@ async function settle(): Promise<void> {
 	});
 }
 
-async function render(content: string): Promise<void> {
+async function render(content: string, sourcePath?: string): Promise<void> {
 	host = document.createElement("div") as unknown as globalThis.Element;
 	document.body.appendChild(host as never);
 	root = createRoot(host);
 	await act(async () => {
 		root.render(
 			<I18nProvider>
-				<MarkdownRenderer content={content} />
+				<MarkdownRenderer content={content} sourcePath={sourcePath} />
 			</I18nProvider>,
 		);
 	});
@@ -94,6 +94,22 @@ afterEach(async () => {
 });
 
 describe("inline code paths", () => {
+	it("resolves a relative path beside the markdown file being previewed", async () => {
+		await render("See `app.ts:12`.", "src/README.md");
+		const link = host.querySelector('[role="link"]');
+		expect(link?.textContent).toBe("app.ts:12");
+		await act(async () => click(link));
+		expect(useUiStore.getState()).toMatchObject({ filePreviewPath: "/work/src/app.ts", filePreviewLine: 12 });
+	});
+
+	it("opens a bare path in a reply at its line number", async () => {
+		await render("请看 src/app.ts:12，修改这里。");
+		const link = host.querySelector('[role="link"]');
+		expect(link?.textContent).toBe("src/app.ts:12");
+		await act(async () => click(link));
+		expect(useUiStore.getState()).toMatchObject({ filePreviewPath: "/work/src/app.ts", filePreviewLine: 12 });
+	});
+
 	it("links a path that exists and leaves one that does not as code, in one lookup", async () => {
 		await render("Edit `src/app.ts:12` and `src/gone.ts`, then run `bun run build`.");
 

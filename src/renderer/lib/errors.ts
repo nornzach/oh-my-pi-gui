@@ -246,6 +246,17 @@ function rawText(cause: unknown): string {
 	return typeof message === "string" ? message : String(cause);
 }
 
+/** Match the provider's policy code before formatting strips diagnostic tags. */
+export function isCyberPolicyError(cause: unknown): boolean {
+	if (typeof cause === "object" && cause !== null && (cause as { code?: unknown }).code === "cyber_policy") {
+		return true;
+	}
+	const text = rawText(cause).split(STACK_FRAME)[0] ?? "";
+	return /\bcode=cyber_policy\b|"code"\s*:\s*"cyber_policy"|^\s*(?:Codex (?:error event|response failed):\s*)?This content was flagged for possible cybersecurity risk\b/i.test(
+		text,
+	);
+}
+
 function withoutMachinery(raw: string): string {
 	let text = raw.split(STACK_FRAME)[0]?.trim() ?? "";
 	for (let previous = ""; previous !== text; ) {
@@ -257,6 +268,7 @@ function withoutMachinery(raw: string): string {
 }
 
 function sentenceFor(cause: unknown, source: HttpSource): string {
+	if (isCyberPolicyError(cause)) return translate("errors.cyberPolicy");
 	const text = withoutMachinery(rawText(cause));
 	if (!text) return translate("errors.unknown");
 	if (quotesServer(text)) return text;

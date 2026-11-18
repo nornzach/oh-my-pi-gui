@@ -13,6 +13,8 @@ import { translate } from "../lib/i18n";
 import { activeTabCommand, createScopedStoreHook, type TabCommand } from "./session-runtime-context";
 import { toast } from "./toast";
 
+export type ModelSpeed = "standard" | "fast" | "ultrafast";
+
 export interface ModelStore {
 	model: ModelInfo | null;
 	thinkingLevel: ThinkingLevel | undefined;
@@ -22,6 +24,8 @@ export interface ModelStore {
 	availableThinkingLevels: ThinkingLevel[];
 	fastModeEnabled: boolean;
 	fastModeActive: boolean;
+	fastModeUltrafast: boolean;
+	fastModeUltrafastSupported: boolean;
 	/** `/slow` applies to the active model (flex tier on OpenAI/Google, low priority on Claude subscriptions). */
 	slowModeSupported: boolean;
 	slowModeEnabled: boolean;
@@ -49,6 +53,7 @@ export interface ModelStore {
 	/** Toggle fast mode via RPC and apply the returned {enabled, active} (fixes
 	 * call sites that fired setFastMode and ignored the response, desyncing the store). */
 	toggleFastMode: () => Promise<void>;
+	setModelSpeed: (speed: ModelSpeed) => Promise<void>;
 	reset: () => void;
 }
 
@@ -69,6 +74,8 @@ const initialState = {
 	availableThinkingLevels: [] as ThinkingLevel[],
 	fastModeEnabled: false,
 	fastModeActive: false,
+	fastModeUltrafast: false,
+	fastModeUltrafastSupported: false,
 	slowModeSupported: false,
 	slowModeEnabled: false,
 	slowModeScope: null as "session" | "global" | null,
@@ -123,6 +130,8 @@ export const createModelStore = (command: TabCommand = activeTabCommand) =>
 					availableThinkingLevels: state.availableThinkingLevels ?? [],
 					fastModeEnabled: state.fastModeEnabled,
 					fastModeActive: state.fastModeActive,
+					fastModeUltrafast: state.fastModeUltrafast === true,
+					fastModeUltrafastSupported: typeof state.fastModeUltrafast === "boolean",
 					slowModeSupported: state.slowModeSupported ?? false,
 					slowModeEnabled: state.slowModeEnabled ?? false,
 					slowModeScope: state.slowModeScope ?? null,
@@ -160,11 +169,23 @@ export const createModelStore = (command: TabCommand = activeTabCommand) =>
 					refreshPending: update.refreshPending,
 					generation: update.generation,
 				}),
-			toggleFastMode: async () => {
-				const res = await command({ type: "set_fast_mode", enabled: !get().fastModeEnabled });
+			toggleFastMode: async () => get().setModelSpeed(get().fastModeEnabled ? "standard" : "fast"),
+			setModelSpeed: async speed => {
+				if (speed === "ultrafast" && !get().fastModeUltrafastSupported) return;
+				const model = get().model;
+				const res = await command({
+					type: "set_fast_mode",
+					enabled: speed !== "standard",
+					...(speed === "ultrafast" ? { ultrafast: true } : {}),
+				});
 				if (res.success) {
-					const data = res.data as { enabled?: boolean; active?: boolean } | undefined;
-					set({ fastModeEnabled: data?.enabled ?? false, fastModeActive: data?.active ?? false });
+					if (get().model?.id !== model?.id || get().model?.provider !== model?.provider) return;
+					const data = res.data as { enabled?: boolean; active?: boolean; ultrafast?: boolean } | undefined;
+					set({
+						fastModeEnabled: data?.enabled ?? false,
+						fastModeActive: data?.active ?? false,
+						fastModeUltrafast: data?.ultrafast === true,
+					});
 				} else {
 					toast({ variant: "error", title: translate("model.fastMode"), message: res.error });
 				}

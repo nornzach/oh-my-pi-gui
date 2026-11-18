@@ -31,7 +31,13 @@ import { basename } from "../lib/format";
 import { translate } from "../lib/i18n";
 import { sessionDisplayTitle } from "../lib/session-title";
 import { beginTabRoute, reconcileTabRoute, resetTabRoute, settleTabRoute } from "../lib/tab-routing";
-import { type ComposerImage, type ComposerStore, useComposerStore } from "./composer";
+import {
+	type ComposerFile,
+	type ComposerImage,
+	type ComposerStore,
+	mergeComposerFiles,
+	useComposerStore,
+} from "./composer";
 import type { ExtensionUiStore } from "./extension-ui";
 import { useForkHandoffStore } from "./fork-handoff";
 import {
@@ -921,24 +927,23 @@ export function restoreTabComposer(
 	draft: string,
 	images: ComposerImage[],
 	originComposer?: StoreApi<ComposerStore>,
+	files: ComposerFile[] = [],
 ): void {
 	if (!tabId) return;
-	const prependDraft = (current: string): string => (current ? `${draft}\n${current}` : draft);
+	const restore = (current: ComposerStore) => ({
+		draft: draft && current.draft ? `${draft}\n${current.draft}` : draft || current.draft,
+		images: [...images, ...current.images],
+		files: mergeComposerFiles(files, current.files),
+	});
 	const session = sessionRuntimeStore<SessionStore>(tabId, "session");
 	const composer = sessionRuntimeStore<ComposerStore>(tabId, "composer");
 	if (!session || !composer) {
 		if (useTabsStore.getState().activeTabId !== tabId || useSessionStore.getState().sessionId !== sessionId) return;
-		useComposerStore.setState(current => ({
-			draft: prependDraft(current.draft),
-			images: [...images, ...current.images],
-		}));
+		useComposerStore.setState(restore);
 		return;
 	}
 	if (originComposer ? composer !== originComposer : session.getState().sessionId !== sessionId) return;
-	composer.setState(current => ({
-		draft: prependDraft(current.draft),
-		images: [...images, ...current.images],
-	}));
+	composer.setState(restore);
 }
 
 /** Finish a plan-approval request in the tab that issued it. The response may

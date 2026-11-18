@@ -7,14 +7,17 @@ import { useTabRpc } from "../../lib/tab-rpc";
 
 import { Check, ChevronRight, Cpu, Plus, Search, TriangleAlert } from "lucide-react";
 import {
+	type CSSProperties,
 	type KeyboardEvent as ReactKeyboardEvent,
 	useCallback,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type { LoginProvider, ModelInfo } from "../../../shared/rpc-types";
 import { applyModelInfo, hydrateSession } from "../../hooks/use-rpc-events";
 import { describeProviderError } from "../../lib/errors";
@@ -26,7 +29,13 @@ import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { Badge, Kbd, Modal, Spinner } from "../common";
+import { Badge, Spinner } from "../common";
+
+function modelTrigger(tabId: string | null | undefined): HTMLButtonElement | undefined {
+	return Array.from(document.querySelectorAll<HTMLButtonElement>("[data-model-picker-trigger]")).find(
+		button => button.dataset.modelPickerTrigger === (tabId ?? "") && button.getClientRects().length > 0,
+	);
+}
 
 export function ModelPicker() {
 	const tabRpc = useTabRpc();
@@ -51,6 +60,9 @@ export function ModelPicker() {
 	const [activeIndex, setActiveIndex] = useState(0);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
+	const panelRef = useRef<HTMLDivElement>(null);
+	const restoreFocus = useRef<HTMLElement | null>(null);
+	const [position, setPosition] = useState<CSSProperties>();
 	const listboxId = useId();
 	/** Providers the user opened; persists across picker opens. */
 	const [expandedProviders, setExpandedProviders] = useState<ReadonlySet<string>>(() => new Set());
@@ -58,6 +70,60 @@ export function ModelPicker() {
 	const [searchCollapsed, setSearchCollapsed] = useState<ReadonlySet<string>>(() => new Set());
 
 	const requestVersion = useRef(0);
+
+	const dismiss = useCallback(() => {
+		if (!useUiStore.getState().modelPickerOpen) return;
+		close();
+		restoreFocus.current?.focus({ preventScroll: true });
+	}, [close]);
+
+	useLayoutEffect(() => {
+		if (!open) return;
+		const anchor = modelTrigger(tabId);
+		const fallback = document.querySelector<HTMLElement>(".omp-workspace-main");
+		const composer = anchor?.closest(".omp-composer-box");
+		restoreFocus.current = anchor ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+		const place = () => {
+			const rect = anchor?.getBoundingClientRect();
+			const workspace = fallback?.getBoundingClientRect();
+			const width = Math.min(420, Math.max(0, window.innerWidth - 24));
+			const left = Math.max(12, Math.min(rect?.left ?? (workspace?.left ?? 0) + 16, window.innerWidth - width - 12));
+			const above = (composer?.getBoundingClientRect().top ?? rect?.top ?? window.innerHeight - 60) - 8;
+			const below = (rect?.bottom ?? 0) + 8;
+			const spaceAbove = above - 12;
+			const spaceBelow = window.innerHeight - below - 12;
+			setPosition(
+				spaceAbove >= 200 || spaceAbove >= spaceBelow
+					? { left, width, bottom: window.innerHeight - above, maxHeight: Math.min(400, spaceAbove) }
+					: { left, width, top: below, maxHeight: Math.min(400, spaceBelow) },
+			);
+		};
+		const closeOutside = (event: PointerEvent | FocusEvent) => {
+			const target = event.target;
+			if (target instanceof Node && (panelRef.current?.contains(target) || anchor?.contains(target))) return;
+			close();
+		};
+		const onEscape = (event: KeyboardEvent) => {
+			if (event.key !== "Escape" || event.defaultPrevented || isImeKeyEvent(event)) return;
+			event.preventDefault();
+			dismiss();
+		};
+		const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(place);
+		if (fallback) observer?.observe(fallback);
+		if (composer) observer?.observe(composer);
+		place();
+		window.addEventListener("resize", place);
+		document.addEventListener("pointerdown", closeOutside);
+		document.addEventListener("focusin", closeOutside);
+		document.addEventListener("keydown", onEscape);
+		return () => {
+			observer?.disconnect();
+			window.removeEventListener("resize", place);
+			document.removeEventListener("pointerdown", closeOutside);
+			document.removeEventListener("focusin", closeOutside);
+			document.removeEventListener("keydown", onEscape);
+		};
+	}, [close, dismiss, open, tabId]);
 
 	/** Login flows are the picker's own concern, but the model list is shared
 	 * catalog state: it commits through the store's generation guard, so a
@@ -191,7 +257,7 @@ export function ModelPicker() {
 	};
 
 	const select = async (provider: string, modelId: string) => {
-		if (!sidecarReady) return;
+		if (!sidecarReady || switching !== null) return;
 		const key = `${provider}/${modelId}`;
 		setSwitching(key);
 		try {
@@ -221,7 +287,7 @@ export function ModelPicker() {
 			// Compaction rewrote the transcript — rehydrate so the chat and the
 			// context bar reflect the compacted session, not just the new model.
 			if (overContext) await hydrateSession();
-			close();
+			dismiss();
 		} catch (cause) {
 			toast({ variant: "error", title: t("modelPicker.failed"), message: String(cause) });
 		} finally {
@@ -234,7 +300,7 @@ export function ModelPicker() {
 		switch (event.key) {
 			case "ArrowDown":
 				event.preventDefault();
-				setActiveIndex(index => Math.min(index + 1, flatOptions.length - 1));
+				setActiveIndex(index => Math.min(index + 1, Math.max(0, flatOptions.length - 1)));
 				break;
 			case "ArrowUp":
 				event.preventDefault();
@@ -261,17 +327,17 @@ export function ModelPicker() {
 	// empty states are plain status blocks, not listbox children).
 	const showOptions = !error && !loading && groups.length > 0;
 
-	return (
-		<Modal
-			ariaLabel={t("modelPicker.searchLabel")}
-			bodyClassName="p-0"
-			chromeless
-			onClose={close}
-			open={open}
-			placement="top"
-			size="picker"
+	if (!open) return null;
+	return createPortal(
+		<div
+			aria-label={t("modelPicker.searchLabel")}
+			className="omp-pop-in fixed z-[100] flex flex-col overflow-hidden rounded-xl border border-(--omp-border) bg-(--omp-bg-elevated) shadow-(--omp-shadow-md)"
+			id="omp-model-picker"
+			ref={panelRef}
+			role="region"
+			style={position ?? { visibility: "hidden" }}
 		>
-			<div className="flex h-full flex-col">
+			<div className="flex min-h-0 flex-col">
 				<div className="flex items-center gap-2.5 border-b border-(--omp-border-muted) px-3.5 py-2.5">
 					<Search className="shrink-0 text-(--omp-dim)" size={14} />
 					<input
@@ -288,7 +354,6 @@ export function ModelPicker() {
 						ref={inputRef}
 						value={query}
 					/>
-					<Kbd>esc</Kbd>
 				</div>
 				<div
 					className="min-h-0 flex-1 overflow-y-auto p-1.5"
@@ -427,7 +492,10 @@ export function ModelPicker() {
 																)}
 															</div>
 															{((model.name && model.name !== model.id) || model.description) && (
-																<span className="truncate text-omp-xxs text-(--omp-dim)" title={model.description}>
+																<span
+																	className="truncate text-omp-xxs text-(--omp-dim)"
+																	title={model.description}
+																>
 																	{/* Only the id is code; the description is prose and stays
 																	    in the interface face, which carries CJK text. */}
 																	{model.name && model.name !== model.id && (
@@ -492,6 +560,7 @@ export function ModelPicker() {
 					</button>
 				</div>
 			</div>
-		</Modal>
+		</div>,
+		document.body,
 	);
 }

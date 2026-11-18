@@ -92,12 +92,14 @@ describe("ThinkingBlock", () => {
 		expect(container.querySelector(".omp-thinking-body")).toBeNull();
 	});
 
-	it("uses only the streaming caret as motion while visible reasoning grows", async () => {
+	it("formats live reasoning markdown and keeps the caret on the unfinished text", async () => {
 		useUiStore.getState().setThinkingExpanded(true);
-		useMessagesStore.setState({ streamingThinking: HEADLINED_THINKING });
+		useMessagesStore.setState({ streamingThinking: `${HEADLINED_THINKING}\n\n**核对族实例数量` });
 		await mount(<ThinkingBlock live />);
 
-		expect(container.querySelector(".omp-caret")).not.toBeNull();
+		expect(container.querySelectorAll("strong")).toHaveLength(3);
+		expect(container.querySelector("strong[data-omp-caret]")?.textContent).toBe("核对族实例数量");
+		expect(container.textContent).not.toContain("**");
 		expect(container.querySelector(".omp-thinking-pulse")).toBeNull();
 	});
 });

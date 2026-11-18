@@ -105,6 +105,7 @@ export function StatsDashboard({ open, onClose }: { open: boolean; onClose: () =
 
 	return (
 		<Modal
+			dockable
 			bodyClassName="p-0"
 			onClose={onClose}
 			open={open}

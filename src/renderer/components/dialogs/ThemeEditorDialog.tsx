@@ -178,7 +178,7 @@ function ThemePreview({ theme }: { theme: GeneratedTheme }) {
 		<div
 			data-theme-preview={theme.scheme}
 			style={style}
-			className="flex h-[26rem] flex-col overflow-hidden rounded-xl border border-(--omp-border) bg-(--omp-bg-primary) text-omp-md text-(--omp-text) shadow-(--omp-shadow-md) select-none"
+			className="flex h-[26rem] flex-col overflow-hidden rounded-xl border border-(--omp-border) bg-(--omp-bg-primary) text-omp-md text-(--omp-text) shadow-(--omp-shadow-md) select-none" // surface-ok: the sample canvas displays the prospective theme.
 		>
 			<div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-(--omp-border-muted) bg-(--omp-titlebar-bg) px-3">
 				<span className="h-2.5 w-2.5 rounded-full bg-(--omp-error)" />
@@ -536,7 +536,7 @@ export function ThemeEditorDialog() {
 							</div>
 						</div>
 					</div>
-					<div className="bg-(--omp-bg-secondary) px-5 py-4">
+					<div className="px-5 py-4">
 						{/* Stays in view while the color list scrolls past. */}
 						<div className="flex flex-col gap-2 min-[860px]:sticky min-[860px]:top-4">
 							<div className="text-omp-md font-medium text-(--omp-text-secondary)">

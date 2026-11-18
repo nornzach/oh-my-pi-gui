@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, Notification, net, shell } from "electron";
 import Store from "electron-store";
+import { CONFIG_EDITOR_PREF, readConfigEditor } from "../shared/config-editor";
 import { KEYMAP_DISABLED_PREF, KEYMAP_OVERRIDES_PREF } from "../shared/hotkeys";
 import type {
 	ConversationSearchResponse,
@@ -19,12 +20,15 @@ import type {
 	IpcConversationSearchPayload,
 	IpcDeleteCustomThemeResult,
 	IpcExtensionUiRespondPayload,
+	IpcFsEditPayload,
+	IpcFsExplorePayload,
 	IpcFsListPayload,
 	IpcFsReadImagePayload,
 	IpcFsReadImageResult,
 	IpcFsReadPayload,
 	IpcFsReadPlanPayload,
 	IpcFsReadPlanResult,
+	IpcFsSaveEditPayload,
 	IpcGetSessionOwnerPayload,
 	IpcHostToolResultPayload,
 	IpcHostToolUpdatePayload,
@@ -70,7 +74,9 @@ import type { BrowserHost } from "./browser-host";
 import type { ConversationIndex } from "./conversation-index";
 import { type CustomThemesWatcher, deleteCustomTheme, readCustomThemes, saveCustomTheme } from "./custom-themes";
 import { ensureDefaultWorkspace } from "./default-workspace";
-import { openInExternalEditor } from "./editor";
+import { readDocumentPreview } from "./document-preview";
+import { openInExternalEditor, openMacConfigEditor } from "./editor";
+import { setWindowFileDrafts } from "./file-draft-guard";
 import { readImageFile } from "./fs-image";
 import { mainT } from "./i18n";
 import type { LogWatcher } from "./log-watcher";
@@ -78,6 +84,7 @@ import type { MemoryWatcher } from "./memory-watcher";
 import { createMenu } from "./menu";
 import { deleteModelsProvider, listModelsProviders, modelsPath, upsertModelsProvider } from "./models-config";
 import { PluginCatalog } from "./plugin-catalog";
+import { fetchRemoteImage } from "./remote-image";
 import { runtimeLogPath, writeRuntimeLog } from "./runtime-log";
 import type { SchedulerHost } from "./scheduler/host";
 import type { SessionIndex } from "./session-index";
@@ -92,6 +99,8 @@ import { setTrayState } from "./tray";
 import { aggregateTrayStatus } from "./tray-labels";
 import { appVersion } from "./updater";
 import type { SpawnWindow, WindowManager } from "./window";
+import { browseWorkspace, searchWorkspace } from "./workspace-explorer";
+import { openWorkspaceEdit, saveWorkspaceEdit } from "./workspace-file-editor";
 import { resolveExistingPath, resolveWithin, toAbsolutePath } from "./workspace-paths";
 
 export interface IpcDeps {
@@ -268,9 +277,9 @@ function isIgnored(rules: IgnoreRule[], relPath: string, isDir: boolean): boolea
 	return ignored;
 }
 
-async function loadIgnoreRules(rootAbs: string): Promise<IgnoreRule[]> {
+async function loadIgnoreRules(rootAbs: string, defaults = FS_IGNORED_DEFAULTS): Promise<IgnoreRule[]> {
 	const rules: IgnoreRule[] = [];
-	for (const pattern of FS_IGNORED_DEFAULTS) {
+	for (const pattern of defaults) {
 		const rule = compileIgnoreRule(pattern);
 		if (rule) rules.push(rule);
 	}
@@ -389,6 +398,7 @@ function aggregateProgress(states: RunProgressState[]): RunProgressState {
 
 export function registerIpcHandlers(deps: IpcDeps): void {
 	const benchmarkRunners = new Map<number, BenchmarkRunner>();
+	const fileSearches = new Map<number, AbortController>();
 	const { sidecarPool, sessionIndex, statsClient, logWatcher, memoryWatcher, customThemesWatcher, windowManager } =
 		deps;
 	const prefsStore = new Store<PrefsSchema>({ name: "prefs" });
@@ -952,6 +962,13 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	);
 	ipcMain.handle(IPC_COMMANDS.BENCH_ABORT, event => benchmarkRunners.get(event.sender.id)?.abort() ?? false);
 
+	ipcMain.on(IPC_COMMANDS.APP_FILE_DRAFTS, (event, dirty: unknown) => {
+		const owner = BrowserWindow.fromWebContents(event.sender);
+		if (owner && event.senderFrame === event.sender.mainFrame && typeof dirty === "boolean")
+			setWindowFileDrafts(owner.webContents.id, dirty);
+		event.returnValue = null;
+	});
+
 	// Renderer-initiated quit (the `quit` command). Straight to the guard, never
 	// `window.close()`: closing the focused window only hides the rest of the
 	// session behind it.
@@ -974,6 +991,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			await shell.openExternal(url);
 		}
 	});
+	ipcMain.handle(IPC_COMMANDS.SYSTEM_FETCH_REMOTE_IMAGE, (_event, url: unknown) => fetchRemoteImage(url));
 
 	// Tool-card path links — open a file in the system editor. "~" expands,
 	// relative paths resolve inside the calling window's workspace (escapes
@@ -1206,7 +1224,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		deleteModelsProvider(id);
 	});
 
-	// "Edit config" — open the agent's models.yml in the system editor. The
+	// "Edit config" — open the agent's models.yml in the configured editor. The
 	// file is created with a minimal skeleton when missing so there is always
 	// something to edit; when no editor association exists, reveal it in the
 	// file manager instead.
@@ -1216,9 +1234,13 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			await fsp.mkdir(path.dirname(file), { recursive: true });
 			await fsp.writeFile(file, "# Custom model providers.\nproviders: {}\n", "utf8");
 		}
-		const openError = await shell.openPath(file);
-		if (openError) shell.showItemInFolder(file);
-		return { path: file, opened: !openError };
+		const editor = readConfigEditor(prefsStore.get(CONFIG_EDITOR_PREF));
+		const opened =
+			process.platform === "darwin" && editor !== "system"
+				? await openMacConfigEditor(file, editor)
+				: (await shell.openPath(file)) === "";
+		if (!opened) shell.showItemInFolder(file);
+		return { path: file, opened };
 	});
 
 	// Workspace filesystem — node:fs against the calling window's cwd; works
@@ -1257,6 +1279,49 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			};
 		}
 	});
+
+	ipcMain.handle(IPC_COMMANDS.FS_EXPLORE, async (event, payload: IpcFsExplorePayload) => {
+		const senderId = event.sender.id;
+		const query = typeof payload?.query === "string" ? payload.query.trim() : undefined;
+		if (query !== undefined) fileSearches.get(senderId)?.abort();
+		if (query === "") return { ok: true, entries: [], truncated: false };
+		const root = cwdFor(deps, event, payload?.tabId);
+		if (!root) return { ok: false, entries: [], truncated: false, error: "No workspace" };
+		const search = query ? new AbortController() : undefined;
+		const cancel = () => search?.abort();
+		if (search) {
+			fileSearches.set(senderId, search);
+			event.sender.once("destroyed", cancel);
+		}
+		try {
+			const defaults = FS_IGNORED_DEFAULTS.filter(name => !["build", "dist", "out", "target"].includes(name));
+			const rules = payload?.showIgnored === true ? [] : await loadIgnoreRules(root, defaults);
+			const ignored = (relative: string, directory: boolean) => isIgnored(rules, relative, directory);
+			const entries = query
+				? await searchWorkspace(root, query, ignored, search?.signal)
+				: await browseWorkspace(root, typeof payload?.path === "string" ? payload.path : "", ignored);
+			return { ok: true, entries, truncated: false };
+		} catch (error) {
+			return {
+				ok: false,
+				entries: [],
+				truncated: false,
+				error: error instanceof Error ? error.message : String(error),
+			};
+		} finally {
+			if (search) {
+				event.sender.removeListener("destroyed", cancel);
+				if (fileSearches.get(senderId) === search) fileSearches.delete(senderId);
+			}
+		}
+	});
+
+	ipcMain.handle(IPC_COMMANDS.FS_OPEN_EDIT, (event, payload: IpcFsEditPayload) =>
+		openWorkspaceEdit(cwdFor(deps, event, payload?.tabId), payload?.path),
+	);
+	ipcMain.handle(IPC_COMMANDS.FS_SAVE_EDIT, (event, payload: IpcFsSaveEditPayload) =>
+		saveWorkspaceEdit(cwdFor(deps, event, payload?.tabId), payload?.path, payload?.revision, payload?.content),
+	);
 
 	ipcMain.handle(IPC_COMMANDS.FS_READ, async (event, payload: IpcFsReadPayload) => {
 		const fail = (error: string) => ({ ok: false, content: "", truncated: false, binary: false, size: 0, error });
@@ -1311,6 +1376,17 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 			return fail(err instanceof Error ? err.message : String(err));
 		}
 	});
+
+	ipcMain.handle(
+		IPC_COMMANDS.FS_DOCUMENT_PREVIEW,
+		async (event, payload: { path: string; thumbnail: boolean; tabId?: string }) => {
+			if (typeof payload?.path !== "string" || !payload.path || typeof payload.thumbnail !== "boolean")
+				return { kind: "unavailable" };
+			const absolute = toAbsolutePath(payload.path, cwdFor(deps, event, payload.tabId));
+			if ("error" in absolute) return { kind: "unavailable" };
+			return readDocumentPreview(absolute.path, payload.thumbnail);
+		},
+	);
 
 	const pluginCatalog = new PluginCatalog({
 		fetch: (url, init) => net.fetch(url, init),

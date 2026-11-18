@@ -382,6 +382,25 @@ describe("SchemaTabContent zh translations", () => {
 });
 
 describe("SettingsWindow", () => {
+	it("routes the appearance and interaction pages to the General destination", () => {
+		expect(resolveSettingsTarget("appearance")).toEqual({ tab: "gui" });
+		expect(resolveSettingsTarget("interaction")).toEqual({ tab: "gui" });
+		const schema = {
+			tabs: [
+				{ id: "appearance", label: "Appearance" },
+				{ id: "interaction", label: "Interaction" },
+			],
+			entries: [
+				entry({ path: "display.pinnedAgents", tab: "appearance" }),
+				entry({ path: "autoResume", tab: "interaction" }),
+			],
+		};
+		const ids = buildSettingsNavGroups(schema).flatMap(group => group.items.map(item => item.id));
+		expect(ids).toContain("gui");
+		expect(ids).not.toContain("appearance");
+		expect(ids).not.toContain("interaction");
+	});
+
 	it("normalizes resource deep links to one stable left-nav destination", () => {
 		expect(resolveSettingsTarget("resources:marketplaces")).toEqual({
 			tab: "resources",

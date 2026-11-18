@@ -165,9 +165,8 @@ describe("Windows package config", () => {
 });
 
 /**
- * The shipped CSP is the only thing between model output and an outbound
- * request, and nothing in the renderer enforces it — so it is read back off the
- * HTML head that actually ships.
+ * The shipped renderer cannot initiate a network request from an image tag.
+ * Explicit image loads use the main-process image handler instead.
  */
 describe("renderer content security policy", () => {
 	function sources(directive: string): string[] {

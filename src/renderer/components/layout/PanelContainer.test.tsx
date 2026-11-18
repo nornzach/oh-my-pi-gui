@@ -14,6 +14,7 @@ import { MarkdownRenderer } from "../../lib/markdown";
 import { useSessionStore } from "../../stores/session";
 import { useTabsStore } from "../../stores/tabs";
 import { useUiStore } from "../../stores/ui";
+import { useFileTabs } from "../panels/file-tabs";
 import { PanelContainer } from "./PanelContainer";
 
 // xterm's bundle (the Terminal view) reads `self` when it loads, before any test code runs.
@@ -69,6 +70,7 @@ afterEach(async () => {
 	container?.remove();
 	useSessionStore.getState().reset();
 	useTabsStore.getState().reset();
+	useFileTabs.setState({ workspaces: new Map() });
 	useUiStore.setState({ panelTab: "files", panelVisible: true, filePreviewPath: null, filePreviewLine: null });
 	if (initialOmp === undefined) delete ompWindow.omp;
 	else ompWindow.omp = initialOmp;
@@ -173,6 +175,13 @@ describe("PanelContainer chat tab filter", () => {
 		await mount(<PanelContainer />);
 
 		expect((document.querySelector("aside") as HTMLElement | null)?.style.width).toBe("672px");
+
+		await act(async () => {
+			Object.defineProperty(window, "innerWidth", { configurable: true, value: 900 });
+			window.dispatchEvent(new Event("resize"));
+		});
+		expect((document.querySelector("aside") as HTMLElement).style.width).toBe("360px");
+		expect(document.querySelector("aside")?.classList.contains("absolute")).toBe(true);
 	});
 
 	it("resizes from the window edge in both directions without snapping closed", async () => {
@@ -212,7 +221,7 @@ describe("PanelContainer chat tab filter", () => {
 		}));
 		ompWindow.omp = {
 			fs: {
-				list: vi.fn(async () => ({ ok: true, entries: [], truncated: false })),
+				explore: vi.fn(async () => ({ ok: true, entries: [], truncated: false })),
 				read,
 			},
 			system: {
@@ -251,7 +260,7 @@ describe("PanelContainer chat tab filter", () => {
 		}));
 		ompWindow.omp = {
 			fs: {
-				list: vi.fn(async () => ({ ok: true, entries: [], truncated: false })),
+				explore: vi.fn(async () => ({ ok: true, entries: [], truncated: false })),
 				read,
 			},
 			system: {
@@ -277,7 +286,7 @@ describe("PanelContainer chat tab filter", () => {
 		useUiStore.setState({ panelVisible: false, filePreviewPath: null });
 		ompWindow.omp = {
 			fs: {
-				list: vi.fn(async () => ({ ok: true, entries: [], truncated: false })),
+				explore: vi.fn(async () => ({ ok: true, entries: [], truncated: false })),
 				read: vi.fn(async () => ({
 					ok: true,
 					content: "# Title\n\nIntro.\n\n## Usage\n",

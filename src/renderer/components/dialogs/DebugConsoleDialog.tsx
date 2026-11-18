@@ -593,7 +593,7 @@ export function DebugConsoleDialog() {
 	const activeSession = sessions?.find(session => session.id === activeSessionId);
 
 	return (
-		<Modal onClose={close} open={open} size="lg" title={t("debug.title")}>
+		<Modal dockable onClose={close} open={open} size="lg" title={t("debug.title")}>
 			<div className="flex flex-col gap-4">
 				<section>
 					<div className="mb-1 flex items-center justify-between">

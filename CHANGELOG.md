@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+
+- Preview and open attachments from the composer or sent messages, including macOS Quick Look previews for supported Office documents.
+- Open and edit multiple workspace files in tabs alongside the directory tree, with Markdown source and preview views.
+- Create conversations within projects or without a project, and rename projects in the sidebar.
+- Choose response speed on ChatGPT sign-in models, with Ultrafast available when both the sidecar and model support it.
+
+### Changed
+
+- Task, plan and agent cards use the conversation's scroll area and expand with their contents.
+- Consecutive thinking summaries appear together in one expandable block.
+- Utility pages and settings use the main work area, and the composer adapts its controls to the window width.
+
+### Fixed
+
+- Codex cybersecurity blocks explain the reason, link to OpenAI guidance, and keep the original event under Technical details.
+- The Memory page opens across projects, and its scope selector responds to clicks in the window header.
+- Sent attachments appear as file cards without exposing their full paths in the message body.
+
 ## [0.9.45] - 2026-11-18
 
 ### Added

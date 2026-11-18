@@ -139,7 +139,7 @@ describe("buildModelRows", () => {
 			usage,
 		});
 		expect(rows[0].quota?.limit.id).toBe("hourly");
-		expect(rows[0].quota?.fraction).toBe(0.9);
+		expect(rows[0].quota?.fraction).toBeCloseTo(0.1);
 		expect(rows[1].quota?.limit.id).toBe("req");
 		expect(rows[1].quota?.fraction).toBe(0.5);
 	});
