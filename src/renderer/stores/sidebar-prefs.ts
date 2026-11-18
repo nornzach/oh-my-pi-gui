@@ -15,6 +15,7 @@ import { toast } from "./toast";
 const PREFS_KEY = "sidebar";
 
 interface SidebarPrefsBlob {
+	registeredWorkspaces?: string[];
 	pinnedGroups?: string[];
 	pinnedSessions?: string[];
 	archivedSessions?: string[];
@@ -28,6 +29,7 @@ interface SidebarPrefsBlob {
 export type WorkspaceSort = "recent" | "name";
 
 interface SidebarPrefsStore {
+	registeredWorkspaces: string[];
 	pinnedGroups: string[];
 	pinnedSessions: string[];
 	/** Session files hidden from the lanes and listed under "Archived". */
@@ -38,6 +40,7 @@ interface SidebarPrefsStore {
 	workspaceSort: WorkspaceSort;
 	hydrated: boolean;
 	hydrate: () => Promise<void>;
+	addWorkspace: (cwd: string) => Promise<void>;
 	toggleGroupPin: (cwd: string) => Promise<void>;
 	toggleSessionPin: (path: string) => Promise<void>;
 	setSessionsArchived: (paths: readonly string[], archived: boolean) => Promise<void>;
@@ -86,6 +89,7 @@ function touchedMap(
 
 function prefsBlob(state: SidebarPrefsStore): SidebarPrefsBlob {
 	return {
+		registeredWorkspaces: state.registeredWorkspaces,
 		pinnedGroups: state.pinnedGroups,
 		pinnedSessions: state.pinnedSessions,
 		archivedSessions: state.archivedSessions,
@@ -112,6 +116,7 @@ async function writePrefs(get: () => SidebarPrefsStore): Promise<{ success: bool
 }
 
 export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
+	registeredWorkspaces: [],
 	pinnedGroups: [],
 	pinnedSessions: [],
 	archivedSessions: [],
@@ -126,6 +131,9 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 		try {
 			const blob = (await window.omp.prefs.get(PREFS_KEY)) as SidebarPrefsBlob | null | undefined;
 			set({
+				registeredWorkspaces: Array.isArray(blob?.registeredWorkspaces)
+					? [...new Set(blob.registeredWorkspaces.filter(path => typeof path === "string" && path.length > 0))]
+					: [],
 				pinnedGroups: Array.isArray(blob?.pinnedGroups) ? blob.pinnedGroups : [],
 				pinnedSessions: Array.isArray(blob?.pinnedSessions) ? blob.pinnedSessions : [],
 				archivedSessions: Array.isArray(blob?.archivedSessions) ? blob.archivedSessions : [],
@@ -138,6 +146,16 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 		} catch {
 			set({ hydrated: true });
 		}
+	},
+
+	addWorkspace: async cwd => {
+		if (!cwd || get().registeredWorkspaces.includes(cwd)) return;
+		await optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: state => ({ registeredWorkspaces: [...state.registeredWorkspaces, cwd] }),
+			persist: () => writePrefs(get),
+			onFailure: message => toast({ variant: "error", title: translate("titlebar.openProjectFailed"), message }),
+		});
 	},
 
 	toggleGroupPin: cwd =>
@@ -249,6 +267,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 
 	reset: () =>
 		set({
+			registeredWorkspaces: [],
 			pinnedGroups: [],
 			pinnedSessions: [],
 			archivedSessions: [],

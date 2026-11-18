@@ -18,7 +18,9 @@ import {
 	type CatalogFilter,
 	type CatalogPlugin,
 	catalogCategories,
+	dedupeCatalog,
 	filterCatalog,
+	OPENAI_MARKETPLACE,
 	type PluginAction,
 } from "./plugins/catalog-model";
 import { PluginCard } from "./plugins/PluginCard";
@@ -55,7 +57,10 @@ export function PluginsWindow() {
 	// A catalog removed in Settings while it was selected falls back to all of them.
 	const activeCatalog = marketplaces.some(entry => entry.name === catalogFilter) ? catalogFilter : null;
 	const inCatalog = useMemo(
-		() => (activeCatalog === null ? plugins : plugins.filter(plugin => plugin.marketplace === activeCatalog)),
+		() =>
+			activeCatalog === null
+				? dedupeCatalog(plugins)
+				: plugins.filter(plugin => plugin.marketplace === activeCatalog),
 		[activeCatalog, plugins],
 	);
 	const categories = useMemo(() => catalogCategories(inCatalog), [inCatalog]);
@@ -225,7 +230,7 @@ export function PluginsWindow() {
 	const showFilters = plugins.length > 0;
 
 	return (
-		<Modal bodyClassName="p-0" onClose={close} open={open} size="full" title={t("plugins.title")}>
+		<Modal dockable bodyClassName="p-0" onClose={close} open={open} size="full" title={t("plugins.title")}>
 			<div className="flex h-full min-h-0 flex-col">
 				{/* The list stays mounted behind a plugin's page, so Back returns to the same scroll and filters. */}
 				<div className={cx("flex min-h-0 flex-1 flex-col", selected && "hidden")}>
@@ -255,7 +260,7 @@ export function PluginsWindow() {
 								</button>
 							)}
 						</div>
-						{marketplaces.length > 1 && (
+						{marketplaces.length > 0 && (
 							<select
 								aria-label={t("plugins.catalogFilter")}
 								className="max-w-[16rem] truncate rounded-md border border-(--omp-input-border) bg-(--omp-input-bg) px-2 py-1.5 text-omp-sm text-(--omp-text) focus:border-(--omp-input-focus-border) focus:outline-none"
@@ -268,7 +273,8 @@ export function PluginsWindow() {
 								<option value="">{t("plugins.catalogFilter.all")}</option>
 								{marketplaces.map(entry => (
 									<option key={entry.name} value={entry.name}>
-										{entry.name} ({catalogCounts.get(entry.name) ?? 0})
+										{entry.name === OPENAI_MARKETPLACE ? t("plugins.openAiMarketplace") : entry.name} (
+										{catalogCounts.get(entry.name) ?? 0})
 									</option>
 								))}
 							</select>

@@ -720,7 +720,7 @@ export function SessionTreeDialog() {
 	const isHead = (entry: SessionTreeEntry) => entry.isLeaf || entry.entryId === model?.activeLeafId;
 
 	return (
-		<Modal open={open} onClose={handleClose} title={t("sessionTree.title")} size="full" bodyClassName="p-0">
+		<Modal dockable open={open} onClose={handleClose} title={t("sessionTree.title")} size="full" bodyClassName="p-0">
 			<div className="flex h-full min-h-0 flex-col">
 				<div className="flex shrink-0 items-center gap-2 border-b border-(--omp-border-muted) px-4 py-2 text-omp-sm text-(--omp-muted)">
 					<span className="truncate">{sessionName ?? t("sessionTree.untitled")}</span>

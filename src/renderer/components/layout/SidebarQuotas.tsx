@@ -10,7 +10,7 @@
 import { EyeOff, Gauge, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { TrayQuota, TrayQuotaWindow } from "../../../shared/ipc-types";
-import { quotaLevel, quotaPercentText, splitQuotaRows } from "../../../shared/quotas";
+import { quotaLevel, quotaPercentText, remainingQuotaFraction, splitQuotaRows } from "../../../shared/quotas";
 import { saveGuiPreference } from "../../lib/display-preferences";
 import { formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -35,12 +35,20 @@ const RING_COLOR = {
 const RING_RADIUS = 6;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 
-/** A window's used share as an arc, sized in em so it scales with the font size setting. */
+/** A window's remaining share as an arc, sized in em so it scales with the font size setting. */
 function QuotaRing({ window }: { window: TrayQuotaWindow }) {
-	const shown = window.exhausted ? 1 : window.fraction;
+	const shown = remainingQuotaFraction(window.fraction, window.exhausted);
 	return (
 		<svg viewBox="0 0 16 16" aria-hidden="true" className="size-[1.3em] shrink-0 -rotate-90">
-			<circle cx="8" cy="8" r={RING_RADIUS} fill="none" stroke="var(--omp-border)" strokeWidth="2.5" />
+			<circle
+				cx="8"
+				cy="8"
+				r={RING_RADIUS}
+				fill="none"
+				stroke={window.exhausted ? RING_COLOR.critical : "var(--omp-border)"}
+				opacity={window.exhausted ? 0.5 : 1}
+				strokeWidth="2.5"
+			/>
 			{shown > 0 && (
 				<circle
 					cx="8"
@@ -62,7 +70,12 @@ export function quotaRowSummary(quota: TrayQuota, fetchedAt: number, t: Translat
 	const lines = [quota.account ? `${quota.name} · ${quota.account}` : quota.name];
 	for (const window of quota.windows) {
 		for (const limit of window.limits) {
-			const parts = [t("sidebar.quotas.limit", { label: limit.label, percent: quotaPercentText(limit.fraction) })];
+			const parts = [
+				t("sidebar.quotas.limit", {
+					label: limit.label,
+					percent: quotaPercentText(remainingQuotaFraction(limit.fraction, limit.exhausted)),
+				}),
+			];
 			if (limit.exhausted) parts.push(t("sidebar.quotas.reached"));
 			if (limit.resetsAt && limit.resetsAt > Date.now())
 				parts.push(t("sidebar.quotas.resets", { time: formatClock(limit.resetsAt) }));

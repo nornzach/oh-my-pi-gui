@@ -21,13 +21,22 @@ import { clearSessionContext } from "../../lib/messages";
 import { dropReferencedPastes, expandPasteMarkers } from "../../lib/paste-blobs";
 import { parseQueueShorthand, splitQueuedMessages } from "../../lib/queue-input";
 import { useTabRpc } from "../../lib/tab-rpc";
-import { type ComposerImage, type ComposerStore, useComposerStore } from "../../stores/composer";
+import { type ComposerFile, type ComposerImage, type ComposerStore, useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
 import { type MessagesStore, useMessagesStore } from "../../stores/messages";
 import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { restoreTabComposer, useTabsStore } from "../../stores/tabs";
 import { toast, useToastStore } from "../../stores/toast";
+import { appendMentions } from "./input-area-utils";
+
+/** The agent reads file mentions on the wire. The editable draft keeps text and cards separate. */
+function withFileMentions(message: string, files: ComposerFile[]): string {
+	return appendMentions(
+		message,
+		files.map(file => file.mention),
+	);
+}
 
 export function useComposerSubmit({
 	text,
@@ -76,16 +85,16 @@ export function useComposerSubmit({
 		// it (⌘Enter); an idle session starts a turn either way.
 		(overrideText?: string, mode: ComposerSendMode = "steer") => {
 			const message = (overrideText ?? text).trim();
-			if ((!message && images.length === 0) || sending) return;
-			if (!routeReady || !runtimeTabId) return;
+			if (sending || !routeReady || !runtimeTabId) return;
+			const originTabId = runtimeTabId;
+			const originSession = sessionRuntimeStore<SessionStore>(originTabId, "session");
+			const originComposer = sessionRuntimeStore<ComposerStore>(originTabId, "composer") ?? useComposerStore;
+			const { files, sending: inFlight, submissionUncertain } = originComposer.getState();
+			if (inFlight || submissionUncertain || (!message && images.length === 0 && files.length === 0)) return;
 			if (status !== "ready") {
 				connectingToast.current = toast({ variant: "warning", message: t("input.agentConnecting") });
 				return;
 			}
-			const originTabId = runtimeTabId;
-			const originSession = sessionRuntimeStore<SessionStore>(originTabId, "session");
-			const originComposer = sessionRuntimeStore<ComposerStore>(originTabId, "composer") ?? useComposerStore;
-			if (originComposer.getState().sending || originComposer.getState().submissionUncertain) return;
 			if ((originSession?.getState() ?? useSessionStore.getState()).collab?.readOnly) {
 				toast({ variant: "warning", message: t("collab.readOnlyInput") });
 				return;
@@ -99,13 +108,14 @@ export function useComposerSubmit({
 					? sessionRuntimeStore<ComposerStore>(originTabId, "composer") === originComposer
 					: useTabsStore.getState().activeTabId === originTabId &&
 						useSessionStore.getState().sessionId === originSessionId;
-			const restoreDraft = (draft: string, attachments: ComposerImage[]) =>
+			const restoreDraft = (draft: string, attachments: ComposerImage[], localFiles?: ComposerFile[]) =>
 				restoreTabComposer(
 					originTabId,
 					originSessionId,
 					draft,
 					attachments,
 					originSession ? originComposer : undefined,
+					localFiles,
 				);
 
 			let uncertain = false;
@@ -238,23 +248,21 @@ export function useComposerSubmit({
 			if (queueBody !== undefined) {
 				const payload = images.map(image => image.content);
 				const items = splitQueuedMessages(queueBody);
-				// Bare prefix + no images hits the usage warning, it does NOT enqueue
-				// (input-controller.ts:1186-1190). Images alone queue a single empty item.
-				if (items.length === 0 && payload.length === 0) {
+				// With no text, a queued attachment still gets a single item.
+				if (items.length === 0 && payload.length === 0 && files.length === 0) {
 					toast({ variant: "warning", message: t("input.queue.usage") });
 					return;
 				}
 				const previousImages = images;
-				setText("");
-				setImages([]);
-				setMenu(null);
 				const dispatchItems = items.length > 0 ? items : [""];
 				if (dispatchItems.some(item => isGuiOnlyBuiltinCommand(item, commands))) {
-					setText(message);
-					setImages(previousImages);
 					toast({ variant: "warning", message: t("input.queue.guiCommand") });
 					return;
 				}
+				setText("");
+				setImages([]);
+				originComposer.setState({ files: [] });
+				setMenu(null);
 				const startImmediately = !isStreaming && queuedMessageCount === 0;
 				// session.followUp throws on extension-command text (agent-session.ts:5508-5510),
 				// so those items go through prompt, whose slash chain executes them.
@@ -268,7 +276,9 @@ export function useComposerSubmit({
 					try {
 						for (let index = 0; index < dispatchItems.length; index++) {
 							if (!originStillActive()) throw new Error("Tab changed during queue dispatch");
-							const item = dispatchItems[index] ?? "";
+							const draftItem = dispatchItems[index] ?? "";
+							// File references used to be at the end of the shorthand draft.
+							const item = index === dispatchItems.length - 1 ? withFileMentions(draftItem, files) : draftItem;
 							const itemImages = index === 0 ? payload : undefined;
 							const isExtensionCommand =
 								item.startsWith("/") && extensionCommandNames.has(/^\/([a-z0-9-]+)/i.exec(item)?.[1] ?? "");
@@ -289,13 +299,12 @@ export function useComposerSubmit({
 						// Only a fully dispatched shorthand enters history. A partial run
 						// restores the unsent remainder as the draft, so recording the
 						// original would offer ↑ a list whose first items already ran.
-						useInputHistoryStore.getState().record(message, originCwd);
+						useInputHistoryStore.getState().record(withFileMentions(message, files), originCwd);
 						if (originStillActive()) dropReferencedPastes(message);
 					} catch (error) {
 						if (deliveryPending) markUncertain();
 						if (sent === 0) {
-							// Zero items sent: restore the original draft (markers) and images.
-							restoreDraft(message, previousImages);
+							restoreDraft(message, previousImages, files);
 						} else {
 							// Partial failure: restore the remainder in the exact shorthand
 							// shape the parser can consume again. Continuation indentation
@@ -307,7 +316,7 @@ export function useComposerSubmit({
 									: `=>\n${remaining
 											.map((item, index) => `${index + 1}. ${item.replaceAll("\n", "\n   ")}`)
 											.join("\n")}`;
-							restoreDraft(remainingDraft, []);
+							restoreDraft(remainingDraft, [], files);
 							if (originStillActive()) dropReferencedPastes(message);
 						}
 						toast({
@@ -330,8 +339,10 @@ export function useComposerSubmit({
 			// while streaming), session-replacing commands are blocked while
 			// busy, and local-only resolutions rehydrate the transcript.
 			const payload = images.map(image => image.content);
+			const wireMessage = withFileMentions(expandedMessage, files);
 			const submit = planComposerSubmit({
 				message: expandedMessage,
+				wireMessage,
 				images: payload,
 				isStreaming,
 				mode,
@@ -404,7 +415,7 @@ export function useComposerSubmit({
 				!isStreaming && !expandedMessage.startsWith("/")
 					? {
 							role: "user",
-							content: [{ type: "text", text: expandedMessage }, ...payload],
+							content: [{ type: "text", text: wireMessage }, ...payload],
 							timestamp: Date.now(),
 							optimistic: true,
 							optimisticAfterEntryId:
@@ -417,6 +428,7 @@ export function useComposerSubmit({
 			(originSession ?? useSessionStore).getState().pinTranscriptToBottom();
 			setText("");
 			setImages([]);
+			originComposer.setState({ files: [] });
 			setMenu(null);
 			setSending(true);
 			let accepted = false;
@@ -426,7 +438,7 @@ export function useComposerSubmit({
 			setTimeout(() => {
 				if (!originStillActive()) {
 					if (optimisticMessage) originMessages.getState().removeLiveMessage(optimisticMessage);
-					restoreDraft(message, previousImages);
+					restoreDraft(message, previousImages, files);
 					return;
 				}
 				void submit
@@ -435,12 +447,12 @@ export function useComposerSubmit({
 						if (!response.success) {
 							if (response.code === "rpc_delivery_unknown") markUncertain();
 							if (optimisticMessage) originMessages.getState().removeLiveMessage(optimisticMessage);
-							restoreDraft(message, previousImages);
+							restoreDraft(message, previousImages, files);
 							showSendError(t("input.sendFailed"), response.error);
 							return;
 						}
 						accepted = true;
-						useInputHistoryStore.getState().record(message, originCwd);
+						useInputHistoryStore.getState().record(withFileMentions(message, files), originCwd);
 						if (!originStillActive()) return;
 						dropReferencedPastes(message);
 						await settleComposerResponse(response, () => hydrateTabSession(originTabId));
@@ -452,7 +464,7 @@ export function useComposerSubmit({
 						}
 						markUncertain();
 						if (optimisticMessage) originMessages.getState().removeLiveMessage(optimisticMessage);
-						restoreDraft(message, previousImages);
+						restoreDraft(message, previousImages, files);
 						showSendError(t("input.sendFailed"), describeError(error));
 					})
 					.finally(() => {

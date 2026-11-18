@@ -13,6 +13,8 @@ export interface TreeNode {
 	label: ReactNode;
 	icon?: ReactNode;
 	children?: TreeNode[];
+	/** A directory can expand before its children have been fetched. */
+	hasChildren?: boolean;
 	/** Called when the row is activated (click / Enter). */
 	onClick?: () => void;
 	/** Called on a right-click (or the context-menu key) on the row. */
@@ -78,7 +80,7 @@ export function TreeView({
 		const out: FlatRow[] = [];
 		const walk = (list: TreeNode[], depth: number) => {
 			for (const node of list) {
-				const hasChildren = (node.children?.length ?? 0) > 0;
+				const hasChildren = node.hasChildren ?? (node.children?.length ?? 0) > 0;
 				const isExpanded = hasChildren && expandedSet.has(node.id);
 				out.push({ node, depth, hasChildren, isExpanded });
 				if (isExpanded && node.children) walk(node.children, depth + 1);
@@ -152,6 +154,7 @@ export function TreeView({
 		);
 	}
 
+	const focusId = rows.some(row => row.node.id === selectedId) ? selectedId : rows[0]?.node.id;
 	return (
 		<div className={`py-1 ${className ?? ""}`.trim()} ref={listRef} role="tree">
 			{rows.map((row, index) => {
@@ -159,6 +162,7 @@ export function TreeView({
 				return (
 					<div
 						aria-expanded={row.hasChildren ? row.isExpanded : undefined}
+						aria-level={row.depth + 1}
 						aria-selected={selected}
 						className={`omp-color-fade group flex h-7 cursor-default items-center gap-1.5 rounded-md pr-2 text-omp-sm outline-none focus-visible:bg-(--omp-selected-bg) ${
 							selected
@@ -171,8 +175,8 @@ export function TreeView({
 						onContextMenu={row.node.onContextMenu}
 						onKeyDown={event => onKeyDown(event, row, index)}
 						role="treeitem"
-						style={{ paddingLeft: 6 + row.depth * 12 }}
-						tabIndex={selectedId == null ? (index === 0 ? 0 : -1) : selected ? 0 : -1}
+						style={{ paddingInlineStart: `min(${6 + row.depth * 12}px, 26%)` }}
+						tabIndex={row.node.id === focusId ? 0 : -1}
 					>
 						{row.hasChildren ? (
 							<button
@@ -196,7 +200,12 @@ export function TreeView({
 								{row.node.icon}
 							</span>
 						)}
-						<span className="min-w-0 flex-1 truncate">{row.node.label}</span>
+						<span
+							className="min-w-0 flex-1 truncate"
+							title={typeof row.node.label === "string" ? row.node.label : undefined}
+						>
+							{row.node.label}
+						</span>
 					</div>
 				);
 			})}

@@ -782,8 +782,12 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 			get: () => ctx.fastModeEnabled,
 			set: e =>
 				runSessionCommand(ctx.rpc.setFastMode(e), "Fast mode", data => {
-					const d = data as { enabled?: boolean; active?: boolean } | undefined;
-					useModelStore.setState({ fastModeEnabled: d?.enabled ?? e, fastModeActive: d?.active ?? false });
+					const d = data as { enabled?: boolean; active?: boolean; ultrafast?: boolean } | undefined;
+					useModelStore.setState({
+						fastModeEnabled: d?.enabled ?? e,
+						fastModeActive: d?.active ?? false,
+						fastModeUltrafast: d?.ultrafast === true,
+					});
 				}),
 		},
 	});

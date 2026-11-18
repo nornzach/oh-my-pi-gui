@@ -16,7 +16,8 @@ import type { ReactNode } from "react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
 import type { AgentMessage, ImageContent, MessageContent, ToolCallContent } from "../../../shared/rpc-types";
 import { OutputText } from "../../lib/ansi";
-import { describeProviderError } from "../../lib/errors";
+import { splitAttachmentMentions } from "../../lib/attachment-mentions";
+import { describeProviderError, isCyberPolicyError } from "../../lib/errors";
 import { copyText, cx, formatClock, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
@@ -29,6 +30,8 @@ import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { toolEntryKey } from "../../stores/tools";
+import { useUiStore } from "../../stores/ui";
+import { FileAttachmentCard } from "../common/FileAttachmentCard";
 import { ZoomableImage } from "../common/ImageViewer";
 import { TechnicalDetails } from "../common/TechnicalDetails";
 import { type RunningIndicator, ToolCard } from "../tools/ToolCard";
@@ -64,6 +67,7 @@ function InlineImage({ image }: { image: ImageContent }) {
 		<ZoomableImage
 			src={src}
 			alt={t("chat.attachedImage")}
+			onOpen={() => useUiStore.getState().openImagePreview(src, t("chat.attachedImage"))}
 			className="my-1 max-h-48 max-w-64 rounded-md border border-[var(--omp-border-muted)] object-contain"
 		/>
 	);
@@ -99,7 +103,8 @@ function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats
 			setRetrying(false);
 		}
 	};
-	const retryButton = !readOnly && isLatest && idle && (
+	const policyBlocked = isCyberPolicyError(message.errorMessage);
+	const retryButton = !policyBlocked && !readOnly && isLatest && idle && (
 		<button
 			type="button"
 			disabled={retrying}
@@ -141,7 +146,11 @@ function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats
 			/>
 			<div className="min-w-0 flex-1">
 				<p className="text-omp-md font-medium text-[var(--omp-text)]">
-					{stillTrying ? t("chat.error.retryingTitle") : t("chat.error.title")}
+					{policyBlocked
+						? t("chat.error.cyberPolicyTitle")
+						: stillTrying
+							? t("chat.error.retryingTitle")
+							: t("chat.error.title")}
 					{repeats > 1 && (
 						<span className="ml-2 text-omp-sm font-normal tabular-nums text-[var(--omp-dim)]">
 							{t("chat.error.repeats", { count: repeats })}
@@ -149,6 +158,16 @@ function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats
 					)}
 				</p>
 				<p className="mt-0.5 break-words text-omp-sm text-[var(--omp-muted)]">{described}</p>
+				{policyBlocked && (
+					<a
+						className="mt-1 inline-block text-omp-sm text-(--omp-link) hover:underline"
+						href="https://learn.chatgpt.com/docs/cyber-safety#false-positives"
+						rel="noreferrer"
+						target="_blank"
+					>
+						{t("chat.error.cyberPolicyHelp")}
+					</a>
+				)}
 				<TechnicalDetails className="mt-1" raw={message.errorMessage} shown={described} />
 			</div>
 			{retryButton}
@@ -420,15 +439,18 @@ export const MessageBubble = memo(function MessageBubble({
 	// as atomic chips; the raw tags/selectors are stripped from the body text.
 	// Computed inline (no hook) because this component early-returns above.
 	const userMentions = (() => {
-		if (!isUser) return { chips: [] as ModelMentionChip[], blocks: content };
+		if (!isUser) return { chips: [] as ModelMentionChip[], files: [] as string[], blocks: content };
 		const chips: ModelMentionChip[] = [];
+		const files = new Set<string>();
 		const blocks = content.map(block => {
 			if (block.type !== "text") return block;
 			const extracted = extractModelMentions(block.text);
+			const attachments = splitAttachmentMentions(extracted.body);
 			chips.push(...extracted.chips);
-			return { ...block, text: extracted.body };
+			for (const path of attachments.paths) files.add(path);
+			return { ...block, text: attachments.body };
 		});
-		return { chips, blocks };
+		return { chips, files: [...files], blocks };
 	})();
 	const customLabel =
 		message.role === "custom" || message.role === "hookMessage"
@@ -474,16 +496,14 @@ export const MessageBubble = memo(function MessageBubble({
 	};
 
 	if (isUser) {
+		const userImages = userMentions.blocks.filter((block): block is ImageContent => block.type === "image");
 		const userBlocks = userMentions.blocks.map((block, i) => {
-			if (block.type === "text") {
+			if (block.type === "text" && isRenderableMessageText(block.text)) {
 				return (
 					<div key={i} className="text-omp-xl leading-[1.6] text-[var(--omp-text)]">
 						<MarkdownRenderer content={block.text} singleDollarTextMath={false} />
 					</div>
 				);
-			}
-			if (block.type === "image") {
-				return <InlineImage key={i} image={block} />;
 			}
 			return null;
 		});
@@ -533,6 +553,16 @@ export const MessageBubble = memo(function MessageBubble({
 									))}
 								</div>
 							)}
+							{(userMentions.files.length > 0 || userImages.length > 0) && (
+								<div className="mb-1.5 flex flex-wrap items-start gap-2" data-message-attachments>
+									{userMentions.files.map(path => (
+										<FileAttachmentCard key={path} path={path} />
+									))}
+									{userImages.map((image, index) => (
+										<InlineImage key={index} image={image} />
+									))}
+								</div>
+							)}
 							{readOnly ? <ClampedAssignment>{userBlocks}</ClampedAssignment> : userBlocks}
 						</div>
 					</div>
@@ -579,20 +609,24 @@ export const MessageBubble = memo(function MessageBubble({
 	// Assistant / system: render block by block.
 	const blocks: ReactNode[] = [];
 	let sawNonToolBlock = false;
+	let thinking: string[] = [];
+	const flushThinking = () => {
+		if (thinking.length === 0) return;
+		blocks.push(<ThinkingBlock key={blocks.length} text={thinking.join("\n\n")} />);
+		thinking = [];
+		sawNonToolBlock = true;
+	};
 	for (const block of content) {
+		if (block.type === "thinking") {
+			if (isRenderableMessageText(block.thinking)) thinking.push(block.thinking);
+			continue;
+		}
+		if (block.type === "text" && !isRenderableMessageText(block.text)) continue;
+		flushThinking();
 		switch (block.type) {
 			case "text": {
-				if (isRenderableMessageText(block.text)) {
-					blocks.push(<MarkdownRenderer key={blocks.length} content={block.text} />);
-					sawNonToolBlock = true;
-				}
-				break;
-			}
-			case "thinking": {
-				if (isRenderableMessageText(block.thinking)) {
-					blocks.push(<ThinkingBlock key={blocks.length} text={block.thinking} />);
-					sawNonToolBlock = true;
-				}
+				blocks.push(<MarkdownRenderer key={blocks.length} content={block.text} />);
+				sawNonToolBlock = true;
 				break;
 			}
 			case "toolCall": {
@@ -608,6 +642,7 @@ export const MessageBubble = memo(function MessageBubble({
 			}
 		}
 	}
+	flushThinking();
 
 	if (blocks.length === 0 && !message.errorMessage && !customLabel && !isSteering) return null;
 

@@ -5,6 +5,7 @@ import {
 	type KeyboardEvent,
 	type PointerEvent,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -22,9 +23,11 @@ import { AgentPage } from "../agents/AgentPage";
 import { ChatStream } from "../chat/ChatStream";
 import { WorkspaceDock } from "../chat/dock/WorkspaceDock";
 import { InputArea } from "./InputArea";
+import { useComposerFiles } from "./use-composer-files";
 
 const DIVIDER_SIZE = 5;
 const RATIO_STEP = 0.05;
+const MIN_COLUMN_SPLIT_WIDTH = 680;
 
 function placementFromPointer(event: DragEvent<HTMLDivElement>): SplitPlacement {
 	const bounds = event.currentTarget.getBoundingClientRect();
@@ -169,19 +172,7 @@ function SessionPaneBody({ tabId, label }: { tabId: string; label: string }) {
 	}, [sessionId, tabId]);
 
 	if (shownPage) return <AgentPage agentId={shownPage} key={shownPage} tabId={tabId} />;
-	const conversation = (
-		<>
-			<div className="relative flex min-h-0 flex-1 flex-col">
-				<ChatStream />
-				<div className="omp-composer-region relative shrink-0 bg-transparent pt-2">
-					<div className="omp-composer-shell relative w-full">
-						<WorkspaceDock />
-					</div>
-				</div>
-			</div>
-			<InputArea />
-		</>
-	);
+	const conversation = <SessionConversation />;
 	if (!besidePage) return conversation;
 	return (
 		<AgentBeside
@@ -198,10 +189,51 @@ function SessionPaneBody({ tabId, label }: { tabId: string; label: string }) {
 	);
 }
 
+function SessionConversation() {
+	const { attachFiles, readOnly } = useComposerFiles();
+	const [draggingFiles, setDraggingFiles] = useState(false);
+	return (
+		<div
+			className={cx(
+				"relative flex min-h-0 min-w-0 flex-1 flex-col",
+				draggingFiles &&
+					!readOnly &&
+					"after:pointer-events-none after:absolute after:inset-0 after:z-10 after:rounded-lg after:border-2 after:border-(--omp-accent)",
+			)}
+			onDragOver={event => {
+				if (!event.dataTransfer.types.includes("Files")) return;
+				event.preventDefault();
+				event.stopPropagation();
+				event.dataTransfer.dropEffect = readOnly ? "none" : "copy";
+				setDraggingFiles(!readOnly);
+			}}
+			onDragLeave={event => {
+				const next = event.relatedTarget;
+				if (next instanceof Node && event.currentTarget.contains(next)) return;
+				setDraggingFiles(false);
+			}}
+			onDrop={event => {
+				setDraggingFiles(false);
+				if (event.dataTransfer.files.length === 0) return;
+				event.preventDefault();
+				event.stopPropagation();
+				if (readOnly) return;
+				attachFiles(Array.from(event.dataTransfer.files));
+				const composer = event.currentTarget.querySelector<HTMLTextAreaElement>(".omp-composer-box textarea");
+				requestAnimationFrame(() => composer?.focus());
+			}}
+		>
+			<ChatStream footer={<WorkspaceDock />} />
+			<InputArea />
+		</div>
+	);
+}
+
 function splitGrid(axis: SplitAxis, ratio: number): CSSProperties {
+	const tracks = `minmax(0, ${ratio}fr) ${DIVIDER_SIZE}px minmax(0, ${1 - ratio}fr)`;
 	return axis === "columns"
-		? { gridTemplateColumns: `${ratio}fr ${DIVIDER_SIZE}px ${1 - ratio}fr`, gridTemplateRows: "minmax(0, 1fr)" }
-		: { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: `${ratio}fr ${DIVIDER_SIZE}px ${1 - ratio}fr` };
+		? { gridTemplateColumns: tracks, gridTemplateRows: "minmax(0, 1fr)" }
+		: { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: tracks };
 }
 
 export function SplitWorkspace() {
@@ -214,6 +246,8 @@ export function SplitWorkspace() {
 	const replacePane = useTabsStore(state => state.replacePane);
 	const setSplitRatio = useTabsStore(state => state.setSplitRatio);
 	const rootRef = useRef<HTMLDivElement>(null);
+	const [narrow, setNarrow] = useState(false);
+	const axis = split?.axis === "rows" || narrow ? "rows" : "columns";
 	const draggingRef = useRef(false);
 	const pendingRatioRef = useRef<number | null>(null);
 	const frameRef = useRef<number | null>(null);
@@ -245,6 +279,19 @@ export function SplitWorkspace() {
 		},
 		[],
 	);
+	useLayoutEffect(() => {
+		if (!activeTabId) return;
+		const root = rootRef.current;
+		if (!root || typeof ResizeObserver === "undefined") return;
+		const update = () => {
+			const width = root.getBoundingClientRect().width;
+			if (width > 0) setNarrow(width < MIN_COLUMN_SPLIT_WIDTH);
+		};
+		update();
+		const observer = new ResizeObserver(update);
+		observer.observe(root);
+		return () => observer.disconnect();
+	}, [activeTabId]);
 	useEffect(() => {
 		const onTabDrag = (event: Event) => {
 			const tabId = (event as CustomEvent<{ tabId: string | null }>).detail.tabId;
@@ -269,7 +316,7 @@ export function SplitWorkspace() {
 		if (!split) return null;
 		const bounds = event.currentTarget.getBoundingClientRect();
 		const along =
-			split.axis === "columns"
+			axis === "columns"
 				? (event.clientX - bounds.left) / bounds.width
 				: (event.clientY - bounds.top) / bounds.height;
 		return along < split.ratio ? split.firstTabId : split.secondTabId;
@@ -312,14 +359,14 @@ export function SplitWorkspace() {
 		frameRef.current = requestAnimationFrame(() => {
 			frameRef.current = null;
 			if (!rootRef.current || pendingRatioRef.current === null) return;
-			Object.assign(rootRef.current.style, splitGrid(split.axis, pendingRatioRef.current));
+			Object.assign(rootRef.current.style, splitGrid(axis, pendingRatioRef.current));
 		});
 	};
 	const ratioFromPointer = (event: PointerEvent<HTMLDivElement>) => {
 		const bounds = rootRef.current?.getBoundingClientRect();
 		if (!bounds) return split.ratio;
 		const raw =
-			split.axis === "columns"
+			axis === "columns"
 				? (event.clientX - bounds.left) / bounds.width
 				: (event.clientY - bounds.top) / bounds.height;
 		return Math.min(0.8, Math.max(0.2, raw));
@@ -333,8 +380,8 @@ export function SplitWorkspace() {
 		setSplitRatio(ratio);
 	};
 	const adjustFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
-		const decrement = split.axis === "columns" ? event.key === "ArrowLeft" : event.key === "ArrowUp";
-		const increment = split.axis === "columns" ? event.key === "ArrowRight" : event.key === "ArrowDown";
+		const decrement = axis === "columns" ? event.key === "ArrowLeft" : event.key === "ArrowUp";
+		const increment = axis === "columns" ? event.key === "ArrowRight" : event.key === "ArrowDown";
 		if (!decrement && !increment) return;
 		event.preventDefault();
 		setSplitRatio(split.ratio + (increment ? RATIO_STEP : -RATIO_STEP));
@@ -344,7 +391,7 @@ export function SplitWorkspace() {
 		<div
 			ref={rootRef}
 			className="omp-split-workspace relative grid min-h-0 flex-1"
-			style={splitGrid(split.axis, split.ratio)}
+			style={splitGrid(axis, split.ratio)}
 			{...dropProps}
 		>
 			{pane(split.firstTabId, true)}
@@ -352,7 +399,7 @@ export function SplitWorkspace() {
 				role="separator"
 				tabIndex={0}
 				aria-label={t("split.resize")}
-				aria-orientation={split.axis === "columns" ? "vertical" : "horizontal"}
+				aria-orientation={axis === "columns" ? "vertical" : "horizontal"}
 				aria-valuemin={20}
 				aria-valuemax={80}
 				aria-valuenow={Math.round(split.ratio * 100)}
@@ -369,16 +416,16 @@ export function SplitWorkspace() {
 				onPointerCancel={finishDrag}
 				className={cx(
 					"omp-split-divider group relative z-20 touch-none bg-[var(--omp-border-muted)] focus-visible:bg-[var(--omp-accent)]",
-					split.axis === "columns" ? "cursor-col-resize" : "cursor-row-resize",
+					axis === "columns" ? "cursor-col-resize" : "cursor-row-resize",
 				)}
 			>
 				<span className="pointer-events-none absolute inset-0 m-auto flex h-5 w-5 items-center justify-center rounded-full bg-[var(--omp-bg-elevated)] text-[var(--omp-dim)] opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-					{split.axis === "columns" ? <Columns2 size={12} /> : <Rows2 size={12} />}
+					{axis === "columns" ? <Columns2 size={12} /> : <Rows2 size={12} />}
 				</span>
 			</div>
 			{pane(split.secondTabId, true)}
 			{showDrop && dropPane && (
-				<PaneDropOverlay axis={split.axis} ratio={split.ratio} firstPane={dropPane === split.firstTabId} />
+				<PaneDropOverlay axis={axis} ratio={split.ratio} firstPane={dropPane === split.firstTabId} />
 			)}
 		</div>
 	);

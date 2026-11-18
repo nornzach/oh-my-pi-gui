@@ -309,12 +309,22 @@ function TaskDetail({ task, runs }: { task: ScheduledTask; runs: TaskRun[] }) {
 						</Button>
 					)}
 					{task.state === "active" && (
-						<Button icon={<Pause size={12} />} onClick={() => void store.setEnabled(task.id, false)} size="sm" variant="ghost">
+						<Button
+							icon={<Pause size={12} />}
+							onClick={() => void store.setEnabled(task.id, false)}
+							size="sm"
+							variant="ghost"
+						>
 							{t("tasks.detail.pause")}
 						</Button>
 					)}
 					{(task.state === "paused" || task.state === "disabled") && (
-						<Button icon={<Play size={12} />} onClick={() => void store.setEnabled(task.id, true)} size="sm" variant="ghost">
+						<Button
+							icon={<Play size={12} />}
+							onClick={() => void store.setEnabled(task.id, true)}
+							size="sm"
+							variant="ghost"
+						>
 							{t("tasks.detail.resume")}
 						</Button>
 					)}
@@ -528,7 +538,7 @@ export function TasksView({ onNew }: { onNew: () => void }) {
 	}
 
 	return (
-		<div className="flex h-full min-h-0">
+		<div className="omp-docked-master-detail flex h-full min-h-0">
 			<aside className="flex w-80 shrink-0 flex-col border-r border-(--omp-border-muted)">
 				<div className="min-h-0 flex-1 overflow-y-auto p-2">
 					{visible.map(task => (

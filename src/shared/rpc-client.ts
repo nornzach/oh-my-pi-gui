@@ -203,7 +203,7 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 			rpcCommand({ type: "discover_provider_models", ...params }, 30_000),
 		setThinkingLevel: (level: ThinkingLevel | "auto") => rpcCommand({ type: "set_thinking_level", level }),
 		cycleThinkingLevel: () => rpcCommand({ type: "cycle_thinking_level" }),
-		setFastMode: (enabled: boolean) => rpcCommand({ type: "set_fast_mode", enabled }),
+		setFastMode: (enabled: boolean, ultrafast?: boolean) => rpcCommand({ type: "set_fast_mode", enabled, ultrafast }),
 		setSlowMode: (enabled: boolean) => rpcCommand({ type: "set_slow_mode", enabled }),
 		setSteeringMode: (mode: "all" | "one-at-a-time") => rpcCommand({ type: "set_steering_mode", mode }),
 		setFollowUpMode: (mode: "all" | "one-at-a-time") => rpcCommand({ type: "set_follow_up_mode", mode }),

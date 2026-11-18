@@ -956,8 +956,8 @@ export function ExtensionsPanel({ open, onClose, initialTab = "hooks" }: Extensi
 	}, []);
 
 	return (
-		<Modal bodyClassName="p-0" onClose={onClose} open={open} size="lg" title={t("extPanel.title")}>
-			<div className="flex h-[70vh] min-h-0 flex-col">
+		<Modal dockable bodyClassName="p-0" onClose={onClose} open={open} size="lg" title={t("extPanel.title")}>
+			<div className="omp-docked-fill flex h-[70vh] min-h-0 flex-col">
 				<Tabs
 					activeId={tab}
 					ariaLabel={t("extPanel.title")}

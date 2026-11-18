@@ -21,6 +21,17 @@ afterEach(() => {
 });
 
 describe("sidebar-prefs store", () => {
+	it("keeps projects without sessions and saves aliases under the original directory", async () => {
+		await useSidebarPrefs.getState().addWorkspace("/work/drawings");
+		await useSidebarPrefs.getState().addWorkspace("/work/drawings");
+		await useSidebarPrefs.getState().setGroupAlias("/work/drawings", "Delivery drawings");
+		const persisted = set.mock.lastCall?.[1];
+		useSidebarPrefs.getState().reset();
+		get.mockResolvedValueOnce(persisted);
+		await useSidebarPrefs.getState().hydrate();
+		expect(useSidebarPrefs.getState().registeredWorkspaces).toEqual(["/work/drawings"]);
+		expect(useSidebarPrefs.getState().groupAliases).toEqual({ "/work/drawings": "Delivery drawings" });
+	});
 	it("toggles group and session pins, persisting each change", () => {
 		useSidebarPrefs.getState().toggleGroupPin("/work/a");
 		expect(useSidebarPrefs.getState().pinnedGroups).toEqual(["/work/a"]);

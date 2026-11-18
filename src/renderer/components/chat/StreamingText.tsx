@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { STREAM_FORMAT_FLUSH_MS, useThrottledText } from "../../hooks/use-throttled-text";
 import { MarkdownRenderer } from "../../lib/markdown";
 import { presentStreamingTail, segmentStreamingMarkdown } from "../../lib/streaming-markdown";
@@ -26,20 +26,21 @@ function lastTextElement(root: Element): Element | null {
 }
 
 /**
- * Live tail of the assistant's in-flight reply. The store accumulates
- * text_delta events into `streamingText`; presentation is aligned to browser
- * frames and split into immutable Markdown blocks plus the block still being
- * written. That last block also renders as Markdown — with unfinished syntax
- * closed or held back — so the reply grows in its final shape instead of
- * showing raw markers that reflow into formatting when the paragraph ends.
+ * Shared presentation for streaming replies and reasoning. Finished Markdown
+ * blocks are reused while unfinished syntax in the growing tail is closed or
+ * held back. Reasoning supplies text that was throttled before formatting.
  */
-export function StreamingText() {
-	const streamingText = useMessagesStore(s => s.streamingText);
+export const StreamingMarkdown = memo(function StreamingMarkdown({
+	content,
+	throttle = true,
+}: {
+	content: string;
+	throttle?: boolean;
+}) {
 	const tailLength = useRef(0);
-	const text = useThrottledText(
-		streamingText,
-		tailLength.current > LARGE_TAIL_CHARS ? LARGE_TAIL_FLUSH_MS : STREAM_FORMAT_FLUSH_MS,
-	);
+	const interval = tailLength.current > LARGE_TAIL_CHARS ? LARGE_TAIL_FLUSH_MS : STREAM_FORMAT_FLUSH_MS;
+	const throttled = useThrottledText(content, throttle ? interval : 0);
+	const text = throttle ? throttled : content;
 	const segments = useMemo(() => segmentStreamingMarkdown(text), [text]);
 	const tail = useMemo(() => presentStreamingTail(segments.tail), [segments.tail]);
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -57,7 +58,7 @@ export function StreamingText() {
 		target?.setAttribute("data-omp-caret", "");
 	});
 
-	if (!streamingText) return null;
+	if (!content) return null;
 
 	return (
 		<div className="omp-streaming" ref={rootRef}>
@@ -72,4 +73,9 @@ export function StreamingText() {
 			</div>
 		</div>
 	);
+});
+
+export function StreamingText() {
+	const content = useMessagesStore(s => s.streamingText);
+	return <StreamingMarkdown content={content} />;
 }

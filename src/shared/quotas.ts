@@ -20,14 +20,19 @@ export function fullestWindow(quota: TrayQuota): TrayQuotaWindow | undefined {
 	return fullest;
 }
 
-/** A used share as a percent: whole, except where rounding would claim full or empty. */
+/** A quota share as a percent: whole, except near full or empty. */
 export function quotaPercentText(fraction: number): string {
 	const pct = fraction * 100;
 	return (pct > 99 && pct < 100) || (pct > 0 && pct < 1) ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
 }
 
+/** Reports and ranking use consumed share; quota displays use the available share. */
+export function remainingQuotaFraction(used: number, exhausted = false): number {
+	return exhausted ? 0 : Math.min(1, Math.max(0, 1 - used));
+}
+
 /** A ring's color band, on the Usage window's bar thresholds. */
-export function quotaLevel(window: TrayQuotaWindow): "ok" | "warning" | "critical" {
+export function quotaLevel(window: Pick<TrayQuotaWindow, "fraction" | "exhausted">): "ok" | "warning" | "critical" {
 	if (window.exhausted || window.fraction >= 0.9) return "critical";
 	if (window.fraction >= 0.75) return "warning";
 	return "ok";

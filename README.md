@@ -25,7 +25,7 @@ Keep the conversation, code changes, and agent activity in one place. Review a d
 Built on [omp](https://github.com/can1357/oh-my-pi), this Electron desktop app bundles its own agent: **users of the DMG, NSIS, and portable packages do not need to install omp, Bun, or Node separately.** It complements the TUI and shares the usual `~/.omp` configuration and sessions.
 
 [Features](#en-features) · [What's new in 0.9.45](#en-recent) · [Gallery](#en-gallery) · [Install](#en-install) · [Shortcuts](#en-shortcuts) · [Themes](#en-themes) · [Development](#en-development) · [Help](#en-help) · [Releasing](#en-release)
-> **v0.9.45 release.** The improvements below are included in v0.9.45, with the bundled agent built from monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` (upstream omp 18.22.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
+> **v0.9.45 release.** The v0.9.45 release includes a bundled agent built from monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` (upstream omp 18.22.0). The gallery screenshots are captured from v0.9.37; [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) is authoritative for available downloads and release contents.
 
 <img src="docs/screenshots/en/01-conversation.png" alt="English omp GUI conversation in the synthetic aurora-web project" width="100%">
 
@@ -40,7 +40,8 @@ The distinctive part is not just a chat window: it is being able to **separate p
 |---|---|---|
 | **Independent sessions** | Run as many tabs as you like, each with its own sidecar, session, and message queue (restored tabs start only when you open them); keep background work running and create fresh Git worktree tabs. | Separate session runtimes are not an OS security boundary. Git must be available for worktrees. |
 | **Split views & windows** | Place two sessions side by side or stacked, resize the divider, and use multiple windows. Restore the open/active tab layout across restarts. | A split contains **two panes**, not an unlimited pane grid. |
-| **Chat vs. Agent** | Use global, tool-free **Chat** for conversation and workspace **Agent** sessions for coding tasks. | Chat history stays separate from project groups and workspace operations. |
+| **Projects & conversations** | Start a session from a project in the sidebar, or open a standalone conversation under Recent. Add folders as projects and give them display names. | Project names are stored in the GUI. |
+| **Workspace files** | Browse the directory tree alongside file tabs, edit text with `⌘S` to save, and switch Markdown between source and preview. | Supported Office files use macOS Quick Look. |
 | **Readable execution** | Inspect diffs and Bash, read, grep, and task calls in dedicated renderers; follow streaming Markdown, highlighted code, collapsible thinking, math, Mermaid, and images. | Tool output remains inspectable alongside the conversation rather than being flattened into plain chat text. |
 | **Terminal & browser** | The side panel's **Terminal** view opens shells in the project folder; agent commands that wait for input (`pty: true`) run there so you can answer them, the agent can read what your terminals show, and dev servers it starts get their own terminal you can watch or close. The **Browser** view is a full browser — address bar, several pages, DevTools — where the agent's `browser` tool opens and drives its pages (or works on the page you have open) so you can watch or take over; links in replies open there too (⌘-click for your default browser). | Terminals and pages belong to their tab and close with it. Browser sign-ins persist and are shared by all tabs, so the agent's pages act as you. The agent still uses another browser when a call names one (`app: "relay"`, a CDP URL or executable, or `"own"`/`"webkit"`/`"chromium"`) or the relay or `browser.cdpUrl` is set. |
 | **Background coordination** | Follow `wait` jobs, inspect `proc://` task and service state, and review `agent://` messages and process controls in compact structured cards. | Coordination details stay bounded and expandable; legacy `hub` transcripts remain readable. |
@@ -397,7 +398,7 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 
 [功能全览](#zh-features) · [0.9.45 更新内容](#zh-recent) · [界面导览](#zh-gallery) · [安装](#zh-install) · [快捷键](#zh-shortcuts) · [主题](#zh-themes) · [开发](#zh-development) · [常见问题](#zh-help) · [发布](#zh-release)
 
-> **v0.9.45 功能展示。** 下文改进均纳入 v0.9.45，内置 Agent 基于 monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` 构建（上游 omp 18.22.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
+> **v0.9.45 功能展示。** v0.9.45 的内置 Agent 基于 monorepo `4fc68288a903768b4eb2876d46f597f3d7fca2a0` 构建（上游 omp 18.22.0）。界面导览截图取自 v0.9.37；可用下载及实际发布内容以 [GitHub Releases](https://github.com/nornzach/oh-my-pi-gui/releases) 为准。
 
 <img src="docs/screenshots/zh/01-conversation.png" alt="中文 omp GUI 中的合成 aurora-web 项目对话" width="100%">
 
@@ -412,7 +413,8 @@ Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh
 |---|---|---|
 | **独立会话** | 标签页数量不限，各自拥有 sidecar、会话和消息队列（恢复的标签页在打开时才启动）；后台任务可继续运行，也可新建 Git worktree 标签页。 | 独立会话运行时不是操作系统安全边界；worktree 需要可用的 Git。 |
 | **分屏与多窗口** | 两段会话可左右或上下排列，分隔条可调整，也可使用多个窗口；重启后恢复已打开及选中的标签布局。 | 每个分屏为**双面板**，不是无限面板网格。 |
-| **Chat 与 Agent** | 全局、无工具的 **Chat** 用于交流；项目工作区中的 **Agent** 会话用于编码任务。 | Chat 历史与项目分组、工作区操作保持分离。 |
+| **项目与会话** | 从侧边栏的项目新建会话，或开启独立会话并从「最近」找到它。可添加项目文件夹并设置显示名称。 | 项目名称保存在 GUI 中。 |
+| **工作区文件** | 同时浏览目录树和文件标签页，编辑文本后按 `⌘S` 保存，并可在 Markdown 原文和预览间切换。 | 部分 Office 格式使用 macOS 快速查看。 |
 | **可读的执行过程** | 专用视图呈现 diff、Bash、read、grep、task；支持流式 Markdown、代码高亮、可折叠思考块、公式、Mermaid 与图片。 | 工具输出可在对话旁直接检查，而不是全部压成普通聊天文本。 |
 | **终端与浏览器** | 侧边面板的 **终端** 视图在项目目录中打开 shell；需要输入的 Agent 命令（`pty: true`）也在这里运行，由你直接作答；Agent 能读取你终端里显示的内容，它启动的开发服务器会有独立的终端，你可以旁观或关闭。**浏览器** 视图是完整的浏览器——地址栏、多个页面、DevTools——Agent 的 `browser` 工具在这里打开并操作页面（也可以直接使用你已打开的页面），你可以旁观或随时接手；回复中的链接也在这里打开（⌘ 点击则用默认浏览器打开）。 | 终端与页面属于各自的标签页，随标签页关闭。浏览器登录状态会保留并由所有标签页共享，因此 Agent 的页面以你的身份操作。调用明确指定其他浏览器（`app: "relay"`、CDP 地址或可执行文件路径，或 `"own"`/`"webkit"`/`"chromium"`），或启用了 relay、设置了 `browser.cdpUrl` 时，Agent 仍使用对应的浏览器。 |
 | **后台协作状态** | `wait` 任务、`proc://` 进程与服务状态、`agent://` 消息及进程控制操作均以紧凑结构化卡片呈现。 | 详情保持有边界并可展开；历史 `hub` 记录仍可正常阅读。 |

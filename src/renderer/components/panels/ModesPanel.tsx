@@ -753,8 +753,8 @@ export function ModesPanel({ open, onClose, initialTab = "vibe" }: ModesPanelPro
 	}, []);
 
 	return (
-		<Modal onClose={onClose} open={open} size="lg" title={t("modesPanel.title")} bodyClassName="p-0">
-			<div className="flex h-[70vh] min-h-0 flex-col">
+		<Modal dockable onClose={onClose} open={open} size="lg" title={t("modesPanel.title")} bodyClassName="p-0">
+			<div className="omp-docked-fill flex h-[70vh] min-h-0 flex-col">
 				<Tabs
 					activeId={tab}
 					ariaLabel={t("modesPanel.title")}

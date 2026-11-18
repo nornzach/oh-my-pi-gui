@@ -1,17 +1,10 @@
-/**
- * Memory window: what omp remembers about a project, where it learned it, and
- * the skills it taught itself — visible, correctable, erasable.
- *
- * Knowledge and Sources show one project's local memory (memory_summary.md,
- * the user's notes, captured lessons, and the sessions they came from).
- * Skills reviews the auto-learned skills, which are shared by all projects.
- */
 import {
 	AlertTriangle,
 	Brain,
 	CheckCircle2,
 	ChevronDown,
 	FolderOpen,
+	Layers,
 	MoreHorizontal,
 	PowerOff,
 	RefreshCw,
@@ -32,8 +25,9 @@ import { type MemoryTabId, useUiStore } from "../../stores/ui";
 import { Button, ConfirmDialog, Modal, Spinner, type TabItem, Tabs } from "../common";
 import { ContextMenu, type ContextMenuItem } from "../common/ContextMenu";
 import { KnowledgeView } from "./KnowledgeView";
+import { MemoryAcrossProjects } from "./MemoryAcrossProjects";
 import { MemoryIntro, OtherBackend } from "./MemoryIntro";
-import { type MemoryStatus, memoryProjects, memoryStatus } from "./memory-model";
+import { type MemoryProjectOption, type MemoryStatus, memoryProjects, memoryStatus } from "./memory-model";
 import { SkillsView } from "./SkillsView";
 import { SourcesView } from "./SourcesView";
 import { type MemoryProject, useMemoryProject } from "./use-memory-project";
@@ -106,52 +100,51 @@ function StatusLine({ status }: { status: MemoryStatus }) {
 	}
 }
 
-function ProjectPicker({ cwd, onChange }: { cwd: string | null; onChange: (cwd: string) => void }) {
+function ProjectPicker({
+	cwd,
+	onChange,
+	projects,
+}: {
+	cwd: string | null;
+	onChange: (cwd: string | null) => void;
+	projects: readonly MemoryProjectOption[];
+}) {
 	const t = useT();
-	const { sessions } = useSessionList("global");
-	const aliases = useSidebarPrefs(state => state.groupAliases);
-	const [workCwd, setWorkCwd] = useState<string | null>(null);
 	const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-
-	useEffect(() => {
-		void window.omp.sidecar
-			.defaultWorkspace()
-			.then(setWorkCwd)
-			.catch(() => {});
-	}, []);
-
-	const projects = useMemo(
-		() =>
-			memoryProjects(
-				sessions.filter(session => !isSubagentSession(session)),
-				{ current: cwd, aliases, workCwd, workLabel: t("sidebar.mode.work") },
-			),
-		[aliases, cwd, sessions, t, workCwd],
-	);
 	const current = projects.find(project => project.cwd === cwd);
-	const items: ContextMenuItem[] = projects.map(project => ({
-		id: project.cwd,
-		label: project.label,
-		description: project.cwd,
-		icon: project.cwd === cwd ? CheckCircle2 : undefined,
-		onSelect: () => onChange(project.cwd),
-	}));
+	const scopeLabel = current?.label ?? cwd ?? t("memory.project.all");
+	const ScopeIcon = cwd ? FolderOpen : Layers;
+	const items: ContextMenuItem[] = [
+		{
+			id: "all",
+			label: t("memory.project.all"),
+			icon: cwd === null ? CheckCircle2 : Layers,
+			onSelect: () => onChange(null),
+		},
+		...projects.map(project => ({
+			id: project.cwd,
+			label: project.label,
+			description: project.cwd,
+			icon: project.cwd === cwd ? CheckCircle2 : FolderOpen,
+			onSelect: () => onChange(project.cwd),
+		})),
+	];
 
 	return (
 		<>
 			<button
+				aria-expanded={menu !== null}
 				aria-haspopup="menu"
-				className="omp-pressable inline-flex h-7 min-w-0 max-w-72 items-center gap-1.5 rounded-lg border border-(--omp-border-muted) px-2 text-omp-sm font-normal tracking-normal text-(--omp-text-secondary) hover:border-(--omp-border-strong) hover:text-(--omp-text)"
-				disabled={projects.length === 0}
+				className="no-drag omp-pressable inline-flex h-7 min-w-0 max-w-72 items-center gap-1.5 rounded-lg border border-(--omp-border-muted) px-2 text-omp-sm font-normal tracking-normal text-(--omp-text-secondary) hover:border-(--omp-border-strong) hover:text-(--omp-text)"
 				onClick={event => {
 					const box = event.currentTarget.getBoundingClientRect();
-					setMenu({ x: box.left, y: box.bottom + 4 });
+					setMenu(current => (current ? null : { x: box.left, y: box.bottom + 4 }));
 				}}
 				title={cwd ?? undefined}
 				type="button"
 			>
-				<FolderOpen aria-hidden="true" className="shrink-0 text-(--omp-muted)" size={13} />
-				<span className="truncate">{current?.label ?? t("memory.project.none")}</span>
+				<ScopeIcon aria-hidden="true" className="shrink-0 text-(--omp-muted)" size={13} />
+				<span className="truncate">{scopeLabel}</span>
 				<ChevronDown aria-hidden="true" className="shrink-0 text-(--omp-dim)" size={12} />
 			</button>
 			{menu && (
@@ -249,13 +242,40 @@ export function MemoryWindow() {
 	const [erasing, setErasing] = useState(false);
 	const [updating, setUpdating] = useState(false);
 
-	// Each opening starts on the project being worked in.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: follow the session only when the window opens
-	useEffect(() => {
-		if (open) setCwd(sessionCwd || null);
-	}, [open]);
+	const { sessions, isLoading, error: projectsError, refresh: refreshProjects } = useSessionList("global");
+	const aliases = useSidebarPrefs(state => state.groupAliases);
+	const registered = useSidebarPrefs(state => state.registeredWorkspaces);
+	const [workCwd, setWorkCwd] = useState<string | null>(null);
 
-	const project = useMemoryProject(open, cwd);
+	useEffect(() => {
+		let cancelled = false;
+		void window.omp.sidecar
+			.defaultWorkspace()
+			.then(path => {
+				if (!cancelled) setWorkCwd(path);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	const projects = useMemo(
+		() =>
+			memoryProjects(
+				sessions.filter(session => !isSubagentSession(session)),
+				{
+					current: sessionCwd || null,
+					aliases,
+					registered,
+					workCwd,
+					workLabel: t("memory.project.recent"),
+				},
+			),
+		[aliases, registered, sessionCwd, sessions, t, workCwd],
+	);
+
+	const project = useMemoryProject(open && tab !== "skills", cwd);
 	const overview = project.overview;
 	const status = overview ? memoryStatus(overview) : null;
 	const running = overview?.activity !== undefined;
@@ -299,11 +319,16 @@ export function MemoryWindow() {
 				</div>
 			);
 		}
-		if (!cwd) {
+		if (cwd === null) {
 			return (
-				<div className="flex h-full items-center justify-center text-omp-sm text-(--omp-dim)">
-					{t("memory.project.pick")}
-				</div>
+				<MemoryAcrossProjects
+					error={projectsError}
+					loading={isLoading}
+					onOpen={setCwd}
+					onRetry={() => refreshProjects(true)}
+					projects={projects}
+					showSources={tab === "sources"}
+				/>
 			);
 		}
 		if (project.error && !overview) {
@@ -339,6 +364,7 @@ export function MemoryWindow() {
 
 	return (
 		<Modal
+			dockable
 			bodyClassName="p-0"
 			onClose={close}
 			open={open}
@@ -347,11 +373,11 @@ export function MemoryWindow() {
 				<span className="flex min-w-0 items-center gap-2.5">
 					<Brain aria-hidden="true" className="shrink-0 text-(--omp-accent)" size={17} strokeWidth={1.75} />
 					<span className="shrink-0">{t("memory.title")}</span>
-					{tab !== "skills" && <ProjectPicker cwd={cwd} onChange={setCwd} />}
+					{tab !== "skills" && <ProjectPicker cwd={cwd} onChange={setCwd} projects={projects} />}
 				</span>
 			}
 		>
-			<div className="flex h-[min(78dvh,52rem)] min-h-0 flex-col">
+			<div className="omp-docked-fill flex h-[min(78dvh,52rem)] min-h-0 flex-col">
 				<div className="flex shrink-0 items-center gap-3 border-b border-(--omp-border-muted) pr-3 pl-4">
 					<Tabs
 						activeId={tab}
@@ -361,7 +387,7 @@ export function MemoryWindow() {
 						tabs={tabs}
 					/>
 					<div className="min-w-0 flex-1" />
-					{tab !== "skills" && status && (
+					{tab !== "skills" && cwd !== null && status && (
 						<div className="flex min-w-0 items-center gap-2 text-omp-sm">
 							<StatusLine status={status} />
 							{overview?.enabled && local && (
@@ -379,7 +405,19 @@ export function MemoryWindow() {
 							)}
 						</div>
 					)}
-					{tab !== "skills" && <ProjectActions onErase={() => setEraseOpen(true)} project={project} />}
+					{tab !== "skills" &&
+						(cwd !== null ? (
+							<ProjectActions onErase={() => setEraseOpen(true)} project={project} />
+						) : (
+							<Button
+								aria-label={t("memory.menu.settings")}
+								icon={<Settings2 size={15} />}
+								onClick={() => useUiStore.getState().openSettings("memory")}
+								size="sm"
+								title={t("memory.menu.settings")}
+								variant="ghost"
+							/>
+						))}
 				</div>
 				<div className="min-h-0 flex-1 overflow-y-auto">
 					{tab === "skills" ? <SkillsView open={open} /> : projectBody()}

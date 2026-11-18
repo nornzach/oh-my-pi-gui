@@ -23,6 +23,7 @@ import {
 } from "../../../lib/plugin-activation";
 import { Badge, Button, Spinner } from "../../common";
 import { shortenSource } from "../inventory-utils";
+import { OPENAI_MARKETPLACE } from "../plugins/catalog-model";
 import { CopyableError } from "./ErrorNote";
 import {
 	availablePluginActions,
@@ -413,7 +414,9 @@ export function MarketplaceCard({
 				</button>
 				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 					<div className="flex flex-wrap items-center gap-1.5">
-						<span className="text-omp-lg font-medium text-(--omp-text)">{marketplace.name}</span>
+						<span className="text-omp-lg font-medium text-(--omp-text)">
+							{marketplace.name === OPENAI_MARKETPLACE ? t("plugins.openAiMarketplace") : marketplace.name}
+						</span>
 						{marketplace.pluginCount !== undefined ? (
 							<Badge variant="default">
 								{t("invPanel.marketplaces.pluginCount", { count: marketplace.pluginCount })}

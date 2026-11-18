@@ -2,8 +2,9 @@ import { lazy, Suspense, useEffect, useMemo } from "react";
 import type { MenuAction, MenuActionPayload, RunProgressState } from "../shared/ipc-types";
 import { nextLanguage } from "../shared/languages";
 import { AgentHoverCardLayer } from "./components/agents/AgentHoverCard";
-import { ToastStack } from "./components/common";
+import { PanelErrorBoundary, Spinner, ToastStack } from "./components/common";
 import { LinkMenuHost } from "./components/common/LinkMenu";
+import { WorkspacePageContext } from "./components/common/Modal";
 import { ActiveToolsDialog } from "./components/dialogs/ActiveToolsDialog";
 import { BranchPickerDialog } from "./components/dialogs/BranchPickerDialog";
 import { BtwDialog } from "./components/dialogs/BtwDialog";
@@ -45,6 +46,7 @@ import { SplitWorkspace } from "./components/layout/SplitWorkspace";
 import { TabBar } from "./components/layout/TabBar";
 import { TitleBar } from "./components/layout/TitleBar";
 import { UpdateBanner } from "./components/layout/UpdateBanner";
+import { connectFileDraftGuard } from "./components/panels/WorkspaceFileEditor";
 import { useAwaitingConfirmation } from "./hooks/use-awaiting-confirmation";
 import { useExtensionUi } from "./hooks/use-extension-ui";
 import { useLearnedSkillsSync } from "./hooks/use-learned-skills";
@@ -91,7 +93,7 @@ import { useSettingsStore } from "./stores/settings";
 import { useTabRuntime } from "./stores/tab-runtime";
 import { cycleTab, moveActiveTab, selectTabAt, useSessionTabs, useTabsStore } from "./stores/tabs";
 import { toast } from "./stores/toast";
-import { type PanelTab, useEffectiveKeymapOverrides, useUiStore } from "./stores/ui";
+import { activeWorkspacePage, type PanelTab, useEffectiveKeymapOverrides, useUiStore } from "./stores/ui";
 import { subscribeUpdaterStatus } from "./stores/updater";
 
 // Heavy overlays code-split: they render null while closed, so they download
@@ -186,6 +188,7 @@ function FocusedSessionEffects() {
  * useRpcEvents() wires the IPC event stream into the stores exactly once.
  */
 export function App() {
+	useEffect(connectFileDraftGuard, []);
 	useRpcEvents();
 	useExtensionUi();
 	// Session tabs: GET_TABS boot reconciliation + TAB_STATUS subscription.
@@ -196,6 +199,7 @@ export function App() {
 	useEffect(() => useSchedulerStore.getState().connect(), []);
 	const sidebarVisible = useUiStore(s => s.sidebarVisible);
 	const panelVisible = useUiStore(s => s.panelVisible);
+	const workspacePage = useUiStore(activeWorkspacePage);
 	const theme = useUiStore(s => s.theme);
 	const fontSize = useUiStore(s => s.fontSize);
 	const followAgentTheme = useUiStore(s => s.followAgentTheme);
@@ -369,19 +373,6 @@ export function App() {
 	// Font changes do not participate in theme resolution.
 	useEffect(() => watchSystemTheme(theme, () => applyThemeByName("system", { persist: false })), [theme]);
 	useEffect(() => applyFontSize(fontSize), [fontSize]);
-
-	// Keep the conversation usable at the minimum window size. The inspector
-	// becomes an on-demand overlay instead of permanently squeezing the chat.
-	useEffect(() => {
-		const compact = window.matchMedia("(max-width: 1000px)");
-		const hideInspector = () => {
-			const ui = useUiStore.getState();
-			if (compact.matches && ui.panelVisible) ui.togglePanel();
-		};
-		hideInspector();
-		compact.addEventListener("change", hideInspector);
-		return () => compact.removeEventListener("change", hideInspector);
-	}, []);
 
 	// Handle omp:// deep links (omp://new → new session; omp://session/<id> → switch).
 	useEffect(() => {
@@ -849,27 +840,75 @@ export function App() {
 	}, [lang, setLang, t]);
 
 	const focusedRuntime = useTabRuntime(activeTabId);
+	const workspace = workspacePage
+		? {
+				activeToolsOpen: <ActiveToolsDialog />,
+				agentHubOpen: <AgentHubWindow open={agentHubOpen} onClose={closeAgentHub} initialTab={agentHubTab} />,
+				changelogOpen: <ChangelogDialog />,
+				contextReportOpen: <ContextReportDialog />,
+				debugOpen: <DebugConsoleDialog />,
+				extensionsOpen: (
+					<ExtensionsPanel open={extensionsOpen} onClose={closeExtensions} initialTab={extensionsTab} />
+				),
+				hotkeysOpen: <HotkeysDialog open={hotkeysOpen} />,
+				inventoryOpen: <InventoryPanel open={inventoryOpen} onClose={closeInventory} initialTab={inventoryTab} />,
+				jobsOpen: <JobsDialog />,
+				logsOpen: <LogsDialog />,
+				memoryOpen: <MemoryWindow />,
+				modelCompareOpen: <ModelCompare open={modelCompareOpen} onClose={closeModelCompare} />,
+				modelRolesOpen: <ModelRolesWindow />,
+				modesOpen: <ModesPanel open={modesOpen} onClose={closeModes} initialTab={modesTab} />,
+				pluginsOpen: <PluginsWindow />,
+				prCenterOpen: <PrCenterWindow />,
+				providersOpen: <ProvidersWindow />,
+				sessionInfoOpen: <SessionInfoDialog />,
+				sessionTreeOpen: <SessionTreeDialog />,
+				statsDashboardOpen: <StatsDashboard open={statsDashboardOpen} onClose={closeStatsDashboard} />,
+				tasks: <TasksWindow />,
+				usageOpen: <UsageWindow />,
+				workspaceDirsOpen: <WorkspaceDirsDialog />,
+			}[workspacePage]
+		: null;
 	const surface = (
 		<div
 			className="flex h-screen w-screen overflow-hidden text-[var(--omp-text)]"
-			data-inspector={panelVisible ? "open" : "closed"}
+			data-inspector={panelVisible && !workspace ? "open" : "closed"}
 			data-sidebar={sidebarVisible ? "open" : "closed"}
 		>
 			{focusedRuntime && <FocusedSessionEffects />}
 			{sidebarVisible && <Sidebar />}
 
 			<main className="omp-workspace-main relative flex min-w-0 flex-1 flex-col">
-				<TitleBar />
-				<TabBar />
-				<div className="shrink-0" data-toast-clearance>
-					<SidecarBanner />
-					<ConfigWarningsBanner />
-					<UpdateBanner />
+				<div className={workspace ? "hidden" : "flex min-h-0 flex-1 flex-col"}>
+					<TitleBar />
+					<TabBar />
+					<div className="shrink-0" data-toast-clearance>
+						<SidecarBanner />
+						<ConfigWarningsBanner />
+						<UpdateBanner />
+					</div>
+					<SplitWorkspace />
 				</div>
-				<SplitWorkspace />
+				{workspace && (
+					<div className="omp-workspace-page min-h-0 min-w-0 flex-1" data-workspace-page="">
+						<WorkspacePageContext.Provider value>
+							<PanelErrorBoundary key={workspacePage}>
+								<Suspense
+									fallback={
+										<div className="flex h-full items-center justify-center">
+											<Spinner size="sm" />
+										</div>
+									}
+								>
+									{workspace}
+								</Suspense>
+							</PanelErrorBoundary>
+						</WorkspacePageContext.Provider>
+					</div>
+				)}
 			</main>
 
-			{panelVisible && <PanelContainer />}
+			{panelVisible && !workspace && <PanelContainer />}
 
 			<CommandPalette />
 			<ExtensionDialog />
@@ -885,36 +924,15 @@ export function App() {
 			<BranchPickerDialog />
 			<BtwDialog />
 			<CollabDialog />
-			<DebugConsoleDialog />
-			<LogsDialog />
 			<LiveVoiceDialog />
 			<CopySelectorDialog />
-			<ContextReportDialog />
-			<ActiveToolsDialog />
 			<ShareSessionDialog />
-			<JobsDialog />
-			<ChangelogDialog />
-			<WorkspaceDirsDialog />
 			<ForceToolDialog />
-			<SessionTreeDialog />
-			<SessionInfoDialog />
 			<HandoffDialog />
 			<Suspense fallback={null}>
 				<SettingsWindow />
-				<UsageWindow />
-				<ProvidersWindow />
-				<ModelRolesWindow />
-				<ModelCompare open={modelCompareOpen} onClose={closeModelCompare} />
 				<BenchmarkDialog open={benchmarkOpen} onClose={closeBenchmark} />
-				<ExtensionsPanel open={extensionsOpen} onClose={closeExtensions} initialTab={extensionsTab} />
-				<InventoryPanel open={inventoryOpen} onClose={closeInventory} initialTab={inventoryTab} />
-				<ModesPanel open={modesOpen} onClose={closeModes} initialTab={modesTab} />
-				<AgentHubWindow open={agentHubOpen} onClose={closeAgentHub} initialTab={agentHubTab} />
-				<PrCenterWindow />
-				<PluginsWindow />
-				<TasksWindow />
 				<TaskEditorDialog />
-				<MemoryWindow />
 				<ConversationSearchDialog />
 				<ProviderConfigDialog
 					open={providerConfigOpen}
@@ -925,13 +943,9 @@ export function App() {
 			<ThemePickerDialog />
 			<ThemeEditorDialog />
 			<PlanApprovalDialog />
-			<HotkeysDialog open={hotkeysOpen} />
 			{importDialogOpen && <ImportForeignDialog />}
 			{composerEditorOpen && <ComposerEditorDialog />}
-			<Suspense fallback={null}>
-				<StatsDashboard open={statsDashboardOpen} onClose={closeStatsDashboard} />
-				{feedbackOpen && <FeedbackDialog />}
-			</Suspense>
+			<Suspense fallback={null}>{feedbackOpen && <FeedbackDialog />}</Suspense>
 			<ToastStack />
 			<AgentHoverCardLayer />
 		</div>

@@ -3,8 +3,8 @@
  * while open and restored to the previously focused element on close.
  */
 
-import { X } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import { ArrowLeft, X } from "lucide-react";
+import { createContext, type ReactNode, useContext, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useT } from "../../lib/i18n";
@@ -29,6 +29,8 @@ const FOCUSABLE =
 
 export interface ModalProps {
 	open: boolean;
+	/** The outer surface of a management page can be embedded in the workspace. */
+	dockable?: boolean;
 	onClose: () => void;
 	title?: ReactNode;
 	size?: ModalSize;
@@ -49,7 +51,67 @@ export interface ModalProps {
 	children: ReactNode;
 }
 
-export function Modal({
+export const WorkspacePageContext = createContext(false);
+
+export function Modal(props: ModalProps) {
+	const inWorkspace = useContext(WorkspacePageContext);
+	return inWorkspace && props.dockable ? <WorkspacePage {...props} /> : <OverlayModal {...props} />;
+}
+
+function WorkspacePage({ open, onClose, title, ariaLabel, bodyClassName = "px-4 py-3", children }: ModalProps) {
+	const t = useT();
+	const titleId = useId();
+	const sectionRef = useRef<HTMLElement>(null);
+	useEffect(() => {
+		if (!open) return;
+		const section = sectionRef.current;
+		const previous = document.activeElement;
+		section?.focus({ preventScroll: true });
+		return () => {
+			if (section?.contains(document.activeElement) && previous instanceof HTMLElement && previous.isConnected) {
+				previous.focus({ preventScroll: true });
+			}
+		};
+	}, [open]);
+	if (!open) return null;
+	return (
+		<section
+			aria-label={ariaLabel}
+			aria-labelledby={title ? titleId : undefined}
+			className="flex h-full min-h-0 min-w-0 flex-col outline-none"
+			ref={sectionRef}
+			tabIndex={-1}
+			onKeyDown={event => {
+				if (event.key === "Escape" && !event.defaultPrevented && !isImeKeyEvent(event)) {
+					event.preventDefault();
+					event.stopPropagation();
+					onClose();
+				}
+			}}
+		>
+			<header className="omp-workspace-page-header drag-region flex h-12 shrink-0 items-center gap-3 border-b border-(--omp-border-muted) px-4">
+				<button
+					aria-label={t("settings.backToChat")}
+					title={t("settings.backToChat")}
+					className="no-drag flex size-8 shrink-0 items-center justify-center rounded-lg text-(--omp-muted) hover:bg-(--omp-selected-bg) hover:text-(--omp-text)"
+					onClick={onClose}
+					type="button"
+				>
+					<ArrowLeft size={16} />
+				</button>
+				<h2 id={titleId} className="min-w-0 truncate text-omp-lg font-semibold">
+					{title}
+				</h2>
+			</header>
+			<div className={`omp-docked-page-content min-h-0 min-w-0 flex-1 overflow-auto ${bodyClassName}`}>
+				{/* Confirmation and editor modals belonging to this page keep their own overlay. */}
+				<WorkspacePageContext.Provider value={false}>{children}</WorkspacePageContext.Provider>
+			</div>
+		</section>
+	);
+}
+
+function OverlayModal({
 	open,
 	onClose,
 	title,

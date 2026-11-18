@@ -28,7 +28,7 @@ export type RpcCommand =
 	| { id?: string; type: "new_session"; parentSession?: string }
 	| { id?: string; type: "drop_session" }
 	| { id?: string; type: "get_state" }
-	| { id?: string; type: "set_fast_mode"; enabled: boolean }
+	| { id?: string; type: "set_fast_mode"; enabled: boolean; ultrafast?: boolean }
 	| { id?: string; type: "set_slow_mode"; enabled: boolean }
 	| { id?: string; type: "get_available_commands" }
 	| { id?: string; type: "set_todos"; phases: TodoPhase[] }
@@ -1599,6 +1599,7 @@ export interface ModelInfo {
 	cost?: ModelCost;
 	/** Wire API the model speaks (`openai-responses`, `anthropic-messages`, …); present on `get_state`. */
 	api?: string;
+	serviceTiers?: readonly string[];
 	/** Input modalities; `image` means snapcompact can archive history for this model. */
 	input?: string[];
 	/** Catalog-resolved quirks (an opaque bag here); the context strategy reads only `supportsServerCompaction`. */
@@ -1624,6 +1625,7 @@ export interface RpcSessionState {
 	sessionName?: string | null;
 	fastModeEnabled: boolean;
 	fastModeActive: boolean;
+	fastModeUltrafast?: boolean;
 	/** `/slow` applies to the active model (flex tier on OpenAI/Google, low priority on Claude subscriptions). */
 	slowModeSupported?: boolean;
 	/** `/slow` is on for the active model; always `false` when `slowModeSupported` is `false`. */

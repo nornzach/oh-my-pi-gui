@@ -22,6 +22,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, RefreshCw, Search } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { quotaPercentText } from "../../../shared/quotas";
 import type {
 	ModelInfo,
 	ModelRoleEntry,
@@ -34,6 +35,7 @@ import type {
 } from "../../../shared/rpc-types";
 import { cx, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { limitRemainingFraction, remainingQuotaColor } from "../../lib/quota-rows";
 import { useModelStore } from "../../stores/model";
 import { useSessionStore } from "../../stores/session";
 import { toast } from "../../stores/toast";
@@ -70,20 +72,13 @@ export interface Row {
 	quota: { limit: UsageLimit; fraction: number } | null;
 }
 
-function limitFraction(limit: UsageLimit): number | null {
-	if (limit.usedFraction !== undefined) return limit.usedFraction;
-	if (limit.used !== undefined && limit.limit !== undefined && limit.limit > 0) return limit.used / limit.limit;
-	if (limit.remainingFraction !== undefined) return 1 - limit.remainingFraction;
-	return null;
-}
-
-/** The most-consumed limit in a provider report — the one that gates usage first. */
+/** The limit with the smallest remaining share gates usage first. */
 function tightestLimit(report: UsageReport): { limit: UsageLimit; fraction: number } | null {
 	let best: { limit: UsageLimit; fraction: number } | null = null;
 	for (const limit of report.limits) {
-		const fraction = limitFraction(limit);
-		if (fraction === null) continue;
-		if (!best || fraction > best.fraction) best = { limit, fraction };
+		const fraction = limitRemainingFraction(limit);
+		if (fraction === undefined) continue;
+		if (!best || fraction < best.fraction) best = { limit, fraction };
 	}
 	return best;
 }
@@ -593,7 +588,12 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 												className="block"
 												title={`${row.quota.limit.label}${row.quota.limit.windowLabel ? ` · ${row.quota.limit.windowLabel}` : ""}`}
 											>
-												<ProgressBar height={4} value={row.quota.fraction} />
+												<ProgressBar
+													height={4}
+													value={row.quota.fraction}
+													color={remainingQuotaColor(row.quota.fraction)}
+													valueText={quotaPercentText(row.quota.fraction)}
+												/>
 											</span>
 										) : (
 											<span className="text-(--omp-dim)">—</span>
@@ -653,7 +653,7 @@ export function ModelCompare({ open, onClose }: ModelCompareProps) {
 	}
 
 	return (
-		<Modal onClose={onClose} open={open} size="full" title={t("modelCompare.title")}>
+		<Modal dockable onClose={onClose} open={open} size="full" title={t("modelCompare.title")}>
 			<div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
 				<div className="flex shrink-0 flex-wrap items-center gap-2">
 					<div className="flex min-w-[200px] flex-1 items-center gap-2 rounded-md border border-(--omp-border-muted) bg-(--omp-input-bg) px-2.5 py-1.5">

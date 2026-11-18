@@ -23,7 +23,7 @@ export function ContextReportDialog() {
 	const open = useUiStore(state => state.contextReportOpen);
 	const close = useUiStore(state => state.closeContextReport);
 	return (
-		<Modal onClose={close} open={open} size="md" title={t("contextReport.title")}>
+		<Modal dockable onClose={close} open={open} size="md" title={t("contextReport.title")}>
 			<ContextReportBody />
 		</Modal>
 	);

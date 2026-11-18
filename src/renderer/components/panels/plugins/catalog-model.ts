@@ -3,6 +3,8 @@
 import { pluginLogoOwner } from "../../../../shared/plugin-source";
 import type { RpcMarketplaceInfo, RpcMarketplacePluginInfo } from "../../../../shared/rpc-types";
 
+export const OPENAI_MARKETPLACE = "openai-curated";
+
 export interface DefaultCatalog {
 	source: string;
 	/** What the catalog calls itself, which is how a copy added some other way is recognised. */
@@ -96,7 +98,15 @@ export function toCatalogPlugin(marketplace: RpcMarketplaceInfo, info: RpcMarket
 function matchesQuery(plugin: CatalogPlugin, terms: string[]): boolean {
 	if (terms.length === 0) return true;
 	const { info } = plugin;
-	const haystack = [plugin.title, info.name, info.description, info.author, info.category, ...(info.tags ?? [])]
+	const haystack = [
+		plugin.title,
+		plugin.marketplace,
+		info.name,
+		info.description,
+		info.author,
+		info.category,
+		...(info.tags ?? []),
+	]
 		.filter(Boolean)
 		.join(" ")
 		.toLowerCase();
@@ -145,15 +155,14 @@ export function dedupeCatalog(plugins: readonly CatalogPlugin[]): CatalogPlugin[
 /** Plugins matching every filter, in title order. */
 export function filterCatalog(plugins: readonly CatalogPlugin[], filter: CatalogFilter): CatalogPlugin[] {
 	const terms = filter.query.toLowerCase().split(/\s+/).filter(Boolean);
-	return plugins
-		.filter(
-			plugin =>
-				(filter.view === "all" || plugin.info.installed) &&
-				(filter.category === null || plugin.info.category === filter.category) &&
-				(filter.catalog === null || plugin.marketplace === filter.catalog) &&
-				matchesQuery(plugin, terms),
-		)
-		.sort((a, b) => a.title.localeCompare(b.title));
+	const matches = plugins.filter(
+		plugin =>
+			(filter.view === "all" || plugin.info.installed) &&
+			(filter.category === null || plugin.info.category === filter.category) &&
+			(filter.catalog === null || plugin.marketplace === filter.catalog) &&
+			matchesQuery(plugin, terms),
+	);
+	return (filter.catalog === null ? dedupeCatalog(matches) : matches).sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /** Categories present in the catalog, most plugins first. */

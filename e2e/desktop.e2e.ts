@@ -64,13 +64,14 @@ test.afterAll(async () => {
 	if (profile) await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-test("initially closed modal receives focus and Escape closes it", async () => {
+test("the Jobs panel receives focus and Escape closes it", async () => {
 	await command("/jobs");
-	const modal = page.getByRole("dialog");
-	await expect(modal).toBeVisible();
-	await expect.poll(() => modal.evaluate(node => node.contains(document.activeElement))).toBe(true);
+	const panel = page.locator("[data-workspace-page]").getByRole("region");
+	await expect(panel).toBeVisible();
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	await expect.poll(() => panel.evaluate(node => node.contains(document.activeElement))).toBe(true);
 	await page.keyboard.press("Escape");
-	await expect(modal).toHaveCount(0);
+	await expect(panel).toHaveCount(0);
 });
 
 test("opening sharing performs local preview only, upload needs a button click", async () => {
@@ -105,11 +106,13 @@ test("long approval remains complete and Enter is neutral", async () => {
 	expect(errors).toEqual([]);
 });
 
-test("settings expose eight groups, translated search and independent display preferences", async () => {
+test("settings expose direct navigation, translated search and independent display preferences", async () => {
 	await page.getByRole("button", { name: "Settings", exact: true }).click();
 	const settings = page.getByRole("dialog");
-	await expect(settings.locator(".settings-nav-group-label")).toHaveCount(8);
-	await settings.getByRole("button", { name: "GUI", exact: true }).click();
+	const nav = settings.getByRole("navigation");
+	await expect(nav.locator("[aria-expanded]")).toHaveCount(0);
+	await expect(nav.getByRole("button", { name: "Security Center", exact: true })).toBeAttached();
+	await nav.getByRole("button", { name: "General", exact: true }).click();
 	await expect(settings).toContainText("Choose GUI theme");
 	await page.screenshot({ path: "test-results/01-settings.png", scale: "css", animations: "disabled" });
 	const search = settings.getByPlaceholder("Search settings…");
@@ -366,9 +369,6 @@ test("security distinguishes unavailable, disabled, unscanned, running, failed a
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const modal = page.getByRole("dialog");
 		const security = modal.getByRole("button", { name: "Security Center", exact: true });
-		if (!(await security.isVisible())) {
-			await modal.getByRole("button", { name: "Permissions & security", exact: true }).click();
-		}
 		await security.click();
 		await expect(modal).toContainText(expected);
 		if (state !== "clear") await expect(modal).not.toContainText("No findings in this scan");
@@ -389,9 +389,10 @@ test("repeated modal and task lifecycles release sidecars and document listeners
 	const before = await listeners();
 	for (let index = 0; index < 100; index++) {
 		await command("/jobs");
-		await expect(page.getByRole("dialog")).toBeVisible();
+		const jobs = page.locator("[data-workspace-page]").getByRole("region");
+		await expect(jobs).toBeVisible();
 		await page.keyboard.press("Escape");
-		await expect(page.getByRole("dialog")).toHaveCount(0);
+		await expect(jobs).toHaveCount(0);
 		await page.keyboard.press("Meta+t");
 		await expect(page.locator('[role="tablist"] [role="tab"]')).toHaveCount(2);
 		await expect(
@@ -438,7 +439,7 @@ test("narrow windows and 200 percent zoom keep settings and primary actions reac
 		);
 		await page.getByRole("button", { name: "Settings", exact: true }).click();
 		const modal = page.getByRole("dialog");
-		await modal.getByRole("button", { name: "GUI", exact: true }).click();
+		await modal.getByRole("button", { name: "General", exact: true }).click();
 		const toggle = modal.getByRole("switch", { name: "Compact conversation spacing", exact: true });
 		await toggle.scrollIntoViewIfNeeded();
 		await toggle.click();
@@ -465,12 +466,15 @@ test("narrow windows and 200 percent zoom keep settings and primary actions reac
 test("model benchmark, collaboration, tools and debug open without external mutations", async () => {
 	for (const name of ["benchmark", "collab", "tools", "debug", "import"]) {
 		await command(`/${name}`);
-		const modal = page.getByRole("dialog");
-		await expect(modal).toBeVisible();
-		await expect.poll(() => modal.evaluate(node => node.contains(document.activeElement))).toBe(true);
+		const surface =
+			name === "tools" || name === "debug"
+				? page.locator("[data-workspace-page]").getByRole("region")
+				: page.getByRole("dialog");
+		await expect(surface).toBeVisible();
+		await expect.poll(() => surface.evaluate(node => node.contains(document.activeElement))).toBe(true);
 		await page.screenshot({ path: `test-results/03-${name}.png`, scale: "css", animations: "disabled" });
 		await page.keyboard.press("Escape");
-		await expect(modal).toHaveCount(0);
+		await expect(surface).toHaveCount(0);
 	}
 	expect(await recorded("collab_join")).toHaveLength(0);
 	expect(errors).toEqual([]);
@@ -629,7 +633,6 @@ test("failed preference writes retain edits and never allow a premature restart"
 	});
 	await page.getByRole("button", { name: "Settings", exact: true }).click();
 	const settings = page.getByRole("dialog");
-	await settings.getByRole("button", { name: "System & advanced", exact: true }).click();
 	await settings
 		.locator(".settings-nav-item")
 		.filter({ hasText: /^Advanced$/ })

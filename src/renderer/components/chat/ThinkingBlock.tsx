@@ -18,6 +18,7 @@ import { useMessagesStore } from "../../stores/messages";
 import { useModelStore } from "../../stores/model";
 import { useUiStore } from "../../stores/ui";
 import { Collapse } from "../common/Collapse";
+import { StreamingMarkdown } from "./StreamingText";
 
 export interface ThinkingBlockProps {
 	/** Finalized thinking text (from a completed message). */
@@ -224,10 +225,7 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 			<Collapse open={open}>
 				<div className="omp-thinking-body max-h-64 overflow-y-auto px-3 pb-2 font-mono text-omp-sm leading-[1.45] text-[var(--omp-muted)]">
 					{isLive ? (
-						<div className="omp-streaming-tail">
-							{formatted}
-							<span aria-hidden className="omp-caret" />
-						</div>
+						<StreamingMarkdown content={formatted} throttle={false} />
 					) : (
 						<MarkdownRenderer content={formatted} />
 					)}

@@ -35,7 +35,12 @@ import { describeError } from "../../lib/errors";
 import { formatClock, formatCost, formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useNowTick } from "../../lib/now-tick";
-import { nextQuotaReset, QUOTA_RESET_GRACE_MS } from "../../lib/quota-rows";
+import {
+	limitRemainingFraction,
+	nextQuotaReset,
+	QUOTA_RESET_GRACE_MS,
+	remainingQuotaColor,
+} from "../../lib/quota-rows";
 import { useMessagesStore } from "../../stores/messages";
 import { useModelStore } from "../../stores/model";
 import { publishQuotaReports } from "../../stores/quotas";
@@ -46,14 +51,21 @@ import { useUiStore } from "../../stores/ui";
 import { Badge, Button, ConfirmDialog, Modal, ProgressBar, Spinner } from "../common";
 
 /**
- * Whether the row's value text adds anything to its bar. A plain percentage
- * ("87.0% / 100%", "81% used") repeats the bar's own label; counts
- * ("212 / 300 requests") and values the bar cannot draw do not.
+ * Whether the row needs a value beside its title: known counts, or the
+ * unknown state when there is no percentage to display.
  */
 export function limitHasDetail(limit: UsageLimit): boolean {
-	const hasUnit = Boolean(limit.unit && limit.unit !== "unknown");
-	if (!hasUnit) return limit.usedFraction === undefined;
-	return !(limit.unit === "percent" && limit.limit === 100 && limit.used !== undefined);
+	return limitRemainingFraction(limit) === undefined || hasRemainingCount(limit);
+}
+
+function hasRemainingCount(limit: UsageLimit): boolean {
+	return (
+		limit.unit !== "percent" &&
+		Number.isFinite(limit.used) &&
+		Number.isFinite(limit.limit) &&
+		(Boolean(limit.unit && limit.unit !== "unknown") ||
+			(limit.usedFraction === undefined && limit.remainingFraction === undefined))
+	);
 }
 
 const STATUS_KEYS: Record<string, string> = {
@@ -76,17 +88,16 @@ export function limitValueText(
 	limit: UsageLimit,
 	t: (k: string, p?: Record<string, string | number>) => string,
 ): string {
-	const hasUnit = Boolean(limit.unit && limit.unit !== "unknown");
-	if (!hasUnit && limit.usedFraction !== undefined) {
-		return t("usage.valueUsed", { value: `${Number((limit.usedFraction * 100).toFixed(1))}%` });
+	if (hasRemainingCount(limit) && limit.used !== undefined && limit.limit !== undefined) {
+		const unit = limit.unit && limit.unit !== "unknown" ? ` ${limit.unit}` : "";
+		const left = limit.status === "exhausted" ? 0 : Math.max(0, limit.limit - limit.used);
+		const fmt = (value: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+		return t("usage.valueRemaining", { value: `${fmt(left)} / ${fmt(limit.limit)}${unit}` });
 	}
-	const unit = limit.unit === "percent" ? "%" : hasUnit ? ` ${limit.unit}` : "";
-	if (limit.used !== undefined && limit.limit !== undefined) {
-		return `${limit.used.toFixed(limit.unit === "percent" ? 1 : 0)}${unit} / ${limit.limit.toFixed(0)}${unit}`;
-	}
-	if (limit.used !== undefined) return t("usage.valueUsed", { value: `${limit.used.toFixed(1)}${unit}` });
-	if (limit.usedFraction !== undefined) return `${(limit.usedFraction * 100).toFixed(1)}%`;
-	return t("usage.valueUnknown");
+	const remaining = limitRemainingFraction(limit);
+	return remaining === undefined
+		? t("usage.valueUnknown")
+		: t("usage.valueRemaining", { value: quotaPercentText(remaining) });
 }
 
 function LimitRow({
@@ -98,7 +109,8 @@ function LimitRow({
 	t: (k: string, p?: Record<string, string | number>) => string;
 	now: number;
 }) {
-	const fraction = limit.usedFraction ?? (limit.used !== undefined && limit.limit ? limit.used / limit.limit : 0);
+	const remaining = limitRemainingFraction(limit);
+	const countdown = resetCountdown(limit.resetsAt, t, now);
 	return (
 		<div className="flex flex-col gap-1 py-1.5">
 			<div className="flex items-center justify-between gap-2">
@@ -116,10 +128,15 @@ function LimitRow({
 					)}
 				</div>
 			</div>
-			<ProgressBar value={fraction} height={5} valueText={quotaPercentText(fraction)} />
-			{resetCountdown(limit.resetsAt, t, now) && (
-				<span className="text-omp-xs text-[var(--omp-dim)]">{resetCountdown(limit.resetsAt, t, now)}</span>
+			{remaining !== undefined && (
+				<ProgressBar
+					value={remaining}
+					height={5}
+					valueText={t("usage.valueRemaining", { value: quotaPercentText(remaining) })}
+					color={remainingQuotaColor(remaining)}
+				/>
 			)}
+			{countdown && <span className="text-omp-xs text-[var(--omp-dim)]">{countdown}</span>}
 			{limit.notes && limit.notes.length > 0 && (
 				<div className="flex flex-col gap-0.5">
 					{limit.notes.map(note => (
@@ -443,7 +460,7 @@ export function UsageWindow() {
 
 	return (
 		<>
-			<Modal open={open} onClose={close} title={t("usage.title")} size="lg">
+			<Modal dockable open={open} onClose={close} title={t("usage.title")} size="lg">
 				<div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto">
 					<div className="flex items-center justify-between">
 						<span className="text-omp-sm font-semibold text-[var(--omp-muted)]">

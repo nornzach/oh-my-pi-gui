@@ -14,6 +14,7 @@ import ReactMarkdown, { type Components, defaultUrlTransform, type Options } fro
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
+import remarkCjkFriendly from "remark-cjk-friendly/parseOnly";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
@@ -22,7 +23,9 @@ import { MermaidBlock } from "../components/chat/MermaidBlock";
 import { ZoomableImage } from "../components/common/ImageViewer";
 import { FileLink, PathCode, WebLink } from "../components/common/Links";
 import { useRuntimeTabId } from "../stores/session-runtime-context";
+import { useUiStore } from "../stores/ui";
 import { saveGuiPreference } from "./display-preferences";
+import { previewFile } from "./file-actions";
 import { useT } from "./i18n";
 import { type FileTarget, isWebUrl, looksLikeFilePath, parseFileTarget } from "./link-targets";
 import { useResolvedPath } from "./path-resolver";
@@ -30,10 +33,13 @@ import { PREVIEW_HEIGHT_LG, PREVIEW_SCROLL_CODE } from "./preview";
 import { rehypeDrivePaths } from "./rehype-drive-paths";
 import { remarkAutolinkBoundary } from "./remark-autolink-boundary";
 import { remarkDollarGuard } from "./remark-dollar-guard";
+import { remarkFilePaths } from "./remark-file-paths";
 import { remarkLatexMath } from "./remark-latex-math";
 
 interface MarkdownRendererProps {
 	content: string;
+	/** Local markdown files resolve relative image and link targets beside the file. */
+	sourcePath?: string;
 	/**
 	 * Parse single-dollar inline math. User-authored prompts disable this so SQL
 	 * JSONPath expressions such as `$.field ... $.other` remain literal text.
@@ -63,16 +69,21 @@ interface MarkdownRendererProps {
 // it keep prices like `$15 … $25` literal instead of letting them eat the
 // markup between them. The autolink boundary follows remark-gfm: its mdast
 // transform trims the links GFM's own transform adds.
+// CJK-aware emphasis accepts labels like `**数量：**16` at the parser level.
 const REMARK_PLUGINS: Options["remarkPlugins"] = [
+	remarkCjkFriendly,
 	remarkGfm,
 	remarkAutolinkBoundary,
+	remarkFilePaths,
 	remarkMath,
 	remarkDollarGuard,
 	remarkLatexMath,
 ];
 const REMARK_PLUGINS_LITERAL_SINGLE_DOLLAR: Options["remarkPlugins"] = [
+	remarkCjkFriendly,
 	remarkGfm,
 	remarkAutolinkBoundary,
+	remarkFilePaths,
 	[remarkMath, { singleDollarTextMath: false }],
 	[remarkDollarGuard, { singleDollarTextMath: false }],
 	remarkLatexMath,
@@ -220,12 +231,21 @@ const LINK_CLASS =
 
 /** Set inside a link so its inline code does not become a second, nested link. */
 const InsideLink = createContext(false);
+const MarkdownSourcePath = createContext<string | undefined>(undefined);
+
+function useMarkdownFilePath(path: string): string {
+	const source = useContext(MarkdownSourcePath);
+	if (!source || /^(?:[\\/]|~[\\/]|[A-Za-z]:)/.test(path)) return path;
+	const normalized = source.replace(/\\/g, "/");
+	return normalized.slice(0, normalized.lastIndexOf("/") + 1) + path;
+}
 
 function MarkdownFileLink({ target, children }: { target: FileTarget; children: ReactNode }) {
 	const tabId = useRuntimeTabId();
-	const resolved = useResolvedPath(target.path, tabId);
+	const path = useMarkdownFilePath(target.path);
+	const resolved = useResolvedPath(path, tabId);
 	return (
-		<FileLink target={target} resolved={resolved} className={LINK_CLASS}>
+		<FileLink target={{ ...target, path }} resolved={resolved} className={LINK_CLASS}>
 			{children}
 		</FileLink>
 	);
@@ -255,7 +275,7 @@ function ExternalLink({ href, children }: ComponentPropsWithoutRef<"a">) {
 
 function StyledTable({ children, ...props }: ComponentPropsWithoutRef<"table">) {
 	return (
-		<div className="overflow-x-auto my-2">
+		<div className="omp-markdown-table my-2 overflow-x-auto">
 			<table {...props} className="w-full border-collapse text-omp-md">
 				{children}
 			</table>
@@ -370,6 +390,7 @@ const LINKED_CODE_CLASS =
 function InlineCode({ children, ...props }: ComponentPropsWithoutRef<"code">) {
 	const insideLink = useContext(InsideLink);
 	const text = textOf(children);
+	const pathText = useMarkdownFilePath(text);
 	if (!insideLink && isWebUrl(text)) {
 		return (
 			<WebLink url={text}>
@@ -381,7 +402,7 @@ function InlineCode({ children, ...props }: ComponentPropsWithoutRef<"code">) {
 	}
 	if (!insideLink && looksLikeFilePath(text)) {
 		return (
-			<PathCode text={text} plainClassName={INLINE_CODE_CLASS} linkClassName={LINKED_CODE_CLASS}>
+			<PathCode text={pathText} plainClassName={INLINE_CODE_CLASS} linkClassName={LINKED_CODE_CLASS}>
 				{children}
 			</PathCode>
 		);
@@ -536,12 +557,36 @@ function MarkdownImageFallback({ alt, path }: { alt: string; path?: string }) {
 	);
 }
 
-/**
- * A remote image is never fetched: the request would leak this viewer's IP and
- * reading to the host the model named. The source stays one explicit click away.
- */
+/** Markdown is inert until the viewer explicitly requests the image. */
 function RemoteMarkdownImage({ src, alt }: { src: string; alt: string }) {
 	const t = useT();
+	const [state, setState] = useState<"idle" | "loading" | "failed">("idle");
+	const [dataUrl, setDataUrl] = useState<string | null>(null);
+	const label = alt || t("chat.attachedImage");
+	const load = async () => {
+		setState("loading");
+		try {
+			const result = await window.omp.system.fetchRemoteImage(src);
+			setDataUrl(result);
+			setState(result ? "idle" : "failed");
+		} catch {
+			setState("failed");
+		}
+	};
+	if (dataUrl) {
+		return (
+			<ZoomableImage
+				src={dataUrl}
+				alt={label}
+				className={MARKDOWN_IMAGE_CLASS}
+				onError={() => {
+					setDataUrl(null);
+					setState("failed");
+				}}
+				onOpen={() => useUiStore.getState().openImagePreview(dataUrl, label)}
+			/>
+		);
+	}
 	return (
 		<span
 			title={src}
@@ -549,19 +594,27 @@ function RemoteMarkdownImage({ src, alt }: { src: string; alt: string }) {
 		>
 			<ImageOff size={13} className="shrink-0" aria-hidden />
 			<span className="truncate">{alt || t("markdown.remoteImage")}</span>
-			<WebLink
-				url={src}
-				className="shrink-0 truncate font-mono text-omp-xs text-[var(--omp-md-link)] underline decoration-[var(--omp-md-link-url)] hover:decoration-[var(--omp-md-link)]"
+			{state === "failed" && <span role="status">{t("markdown.imageFailed")}</span>}
+			<button
+				type="button"
+				className="shrink-0 text-omp-xs text-(--omp-md-link) underline underline-offset-2 disabled:no-underline"
+				disabled={state === "loading"}
+				onClick={event => {
+					event.preventDefault();
+					event.stopPropagation();
+					void load();
+				}}
 			>
-				{t("markdown.remoteImageOpen")}
-			</WebLink>
+				{t(state === "loading" ? "common.loading" : "markdown.remoteImageOpen")}
+			</button>
 		</span>
 	);
 }
 
-function LocalMarkdownImage({ path, alt, title }: { path: string; alt: string; title?: string }) {
+function LocalMarkdownImage({ path: imagePath, alt, title }: { path: string; alt: string; title?: string }) {
 	const t = useT();
 	const tabId = useRuntimeTabId();
+	const path = useMarkdownFilePath(imagePath);
 	const [resolved, setResolved] = useState<{ url: string } | { error: true } | null>(null);
 	useEffect(() => {
 		let cancelled = false;
@@ -585,10 +638,19 @@ function LocalMarkdownImage({ path, alt, title }: { path: string; alt: string; t
 			</span>
 		);
 	}
-	return <ZoomableImage src={resolved.url} alt={alt} title={title ?? alt} className={MARKDOWN_IMAGE_CLASS} />;
+	return (
+		<ZoomableImage
+			src={resolved.url}
+			alt={alt}
+			title={title ?? alt}
+			className={MARKDOWN_IMAGE_CLASS}
+			onOpen={() => previewFile(path)}
+		/>
+	);
 }
 
 function MarkdownImage({ src, alt, title, ...props }: ComponentPropsWithoutRef<"img">) {
+	const t = useT();
 	const classified = classifyImageSrc(typeof src === "string" ? src : undefined);
 	const altText = typeof alt === "string" ? alt : "";
 	if (classified.kind === "none") return <MarkdownImageFallback alt={altText} />;
@@ -601,9 +663,17 @@ function MarkdownImage({ src, alt, title, ...props }: ComponentPropsWithoutRef<"
 			/>
 		);
 	}
-	if (classified.kind === "remote") return <RemoteMarkdownImage src={classified.src} alt={altText} />;
+	if (classified.kind === "remote")
+		return <RemoteMarkdownImage key={classified.src} src={classified.src} alt={altText} />;
 	return (
-		<ZoomableImage {...props} src={classified.src} alt={altText} title={title} className={MARKDOWN_IMAGE_CLASS} />
+		<ZoomableImage
+			{...props}
+			src={classified.src}
+			alt={altText}
+			title={title}
+			className={MARKDOWN_IMAGE_CLASS}
+			onOpen={() => useUiStore.getState().openImagePreview(classified.src, altText || t("chat.attachedImage"))}
+		/>
 	);
 }
 
@@ -628,6 +698,7 @@ const COMPONENTS: Components = {
  */
 export const MarkdownRenderer = memo(function MarkdownRenderer({
 	content,
+	sourcePath,
 	codeLineNumbers,
 	singleDollarTextMath = true,
 	streaming = false,
@@ -636,14 +707,16 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
 		<div className="markdown-body text-[1em] leading-[1.5]">
 			<StreamingContent.Provider value={streaming}>
 				<CodeLineNumbersOverride.Provider value={codeLineNumbers}>
-					<ReactMarkdown
-						remarkPlugins={singleDollarTextMath ? REMARK_PLUGINS : REMARK_PLUGINS_LITERAL_SINGLE_DOLLAR}
-						rehypePlugins={REHYPE_PLUGINS}
-						components={COMPONENTS}
-						urlTransform={URL_TRANSFORM}
-					>
-						{content}
-					</ReactMarkdown>
+					<MarkdownSourcePath.Provider value={sourcePath}>
+						<ReactMarkdown
+							remarkPlugins={singleDollarTextMath ? REMARK_PLUGINS : REMARK_PLUGINS_LITERAL_SINGLE_DOLLAR}
+							rehypePlugins={REHYPE_PLUGINS}
+							components={COMPONENTS}
+							urlTransform={URL_TRANSFORM}
+						>
+							{content}
+						</ReactMarkdown>
+					</MarkdownSourcePath.Provider>
 				</CodeLineNumbersOverride.Provider>
 			</StreamingContent.Provider>
 		</div>

@@ -2,6 +2,7 @@ import { Bot, Diff, FolderTree, Globe, LayoutDashboard, MessageCircleQuestion, S
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
+import { useViewportWidth } from "../../hooks/use-viewport-width";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { scrollStripOnWheel, useActiveChipInView } from "../../lib/strip-scroll";
@@ -18,19 +19,11 @@ import { OverviewPanel } from "../panels/OverviewPanel";
 import { TerminalPanel } from "../panels/TerminalPanel";
 
 const MIN_WIDTH = 360;
-const MAX_WIDTH = 840;
-/** Web pages need room: the Browser view may take most of the window. */
-const BROWSER_MAX_WIDTH = 1600;
-/** Share of the window the drawer may cover while dragging (Browser / everything else). */
-const BROWSER_HOST_SHARE = 0.75;
-const HOST_SHARE = 0.55;
 const PANEL_WIDTH_PREF = "gui.panelWidth";
-/** Below this the inspector overlays instead of docking (see PanelContainer). */
-const COMPACT_QUERY = "(max-width: 1000px)";
+const COMPACT_WIDTH = 1000;
 
-function defaultPanelWidth(): number {
-	const viewportWidth = Number.isFinite(window.innerWidth) && window.innerWidth > 0 ? window.innerWidth : 1440;
-	return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(viewportWidth * 0.28)));
+function defaultPanelWidth(viewportWidth: number): number {
+	return Math.max(MIN_WIDTH, Math.round(viewportWidth * 0.28));
 }
 
 const TABS: { id: PanelTab; labelKey: string; icon: typeof Diff }[] = [
@@ -96,74 +89,48 @@ export function PanelContainer() {
 	const activeTabId = useTabsStore(s => s.activeTabId);
 	const split = useTabsStore(s => s.split);
 	const routeReady = useActiveTabRouteReady();
-	// ≤1000px: the inspector would squeeze the conversation below usability as
-	// a flex sibling — render it as a right-anchored overlay instead (same
-	// breakpoint App uses to auto-hide on shrink).
-	const [compact, setCompactState] = useState(() =>
-		typeof window.matchMedia === "function" ? window.matchMedia(COMPACT_QUERY).matches : false,
-	);
-	useEffect(() => {
-		if (typeof window.matchMedia !== "function") return;
-		const media = window.matchMedia(COMPACT_QUERY);
-		const onChange = () => setCompactState(media.matches);
-		media.addEventListener("change", onChange);
-		return () => media.removeEventListener("change", onChange);
-	}, []);
 	/** Chat tabs expose only Overview, btw and Files — diffs, shells and agent browsing need tools. */
 	const isChat = useActiveTabKind() === "chat";
 	const visibleTabs = isChat ? TABS.filter(tab => CHAT_PANEL_TABS.has(tab.id)) : TABS;
 	const visiblePanelTab = isChat && !CHAT_PANEL_TABS.has(panelTab) ? "files" : panelTab;
-	const browsing = visiblePanelTab === "browser";
-	const maxWidth = browsing ? BROWSER_MAX_WIDTH : MAX_WIDTH;
-	const hostShare = browsing ? BROWSER_HOST_SHARE : HOST_SHARE;
 	const agentsSignal = useAgentsTabSignal();
 
-	const [width, setWidth] = useState(defaultPanelWidth);
-	const [widthHydrated, setWidthHydrated] = useState(false);
+	const viewportWidth = useViewportWidth();
+	const [width, setWidth] = useState<number | "full" | null>(null);
 	const dragging = useRef(false);
+	const minWidth = Math.min(MIN_WIDTH, viewportWidth);
+	const panelWidth =
+		width === "full" ? viewportWidth : Math.min(width ?? defaultPanelWidth(viewportWidth), viewportWidth);
+	const atLeftEdge = panelWidth === viewportWidth;
+	// Switch to an overlay once a docked pane would crowd the conversation.
+	const overlay = viewportWidth <= COMPACT_WIDTH || split || panelWidth > viewportWidth * 0.55;
 
 	useEffect(() => {
 		let cancelled = false;
 		const prefs = window.omp?.prefs;
-		if (typeof prefs?.get !== "function") {
-			setWidthHydrated(true);
-			return;
-		}
+		if (typeof prefs?.get !== "function") return;
 		void prefs
 			.get(PANEL_WIDTH_PREF)
 			.then(value => {
 				if (cancelled) return;
-				const saved = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
-				if (saved !== null) {
-					const viewportLimit = Math.max(MIN_WIDTH, Math.min(BROWSER_MAX_WIDTH, window.innerWidth - 56));
-					setWidth(Math.min(viewportLimit, Math.max(MIN_WIDTH, saved)));
+				if (value === "full") setWidth(current => current ?? "full");
+				else if (typeof value === "number" && Number.isFinite(value)) {
+					setWidth(current => current ?? Math.max(MIN_WIDTH, Math.round(value)));
 				}
-				setWidthHydrated(true);
 			})
-			.catch(() => {
-				if (!cancelled) setWidthHydrated(true);
-			});
+			.catch(() => {});
 		return () => {
 			cancelled = true;
 		};
 	}, []);
 
 	useEffect(() => {
-		if (!widthHydrated || typeof window.omp?.prefs?.set !== "function") return;
+		if (width === null || typeof window.omp?.prefs?.set !== "function") return;
 		const timer = window.setTimeout(() => {
-			void window.omp.prefs.set(PANEL_WIDTH_PREF, Math.round(width)).catch(() => {});
+			void window.omp.prefs.set(PANEL_WIDTH_PREF, width).catch(() => {});
 		}, 150);
 		return () => window.clearTimeout(timer);
-	}, [width, widthHydrated]);
-
-	useEffect(() => {
-		const clampToViewport = () => {
-			const viewportLimit = Math.max(MIN_WIDTH, Math.min(BROWSER_MAX_WIDTH, window.innerWidth - 56));
-			setWidth(current => Math.min(current, viewportLimit));
-		};
-		window.addEventListener("resize", clampToViewport);
-		return () => window.removeEventListener("resize", clampToViewport);
-	}, []);
+	}, [width]);
 
 	const startDrag = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
 		dragging.current = true;
@@ -173,12 +140,9 @@ export function PanelContainer() {
 	const onDrag = useCallback(
 		(e: ReactPointerEvent<HTMLDivElement>) => {
 			if (!dragging.current) return;
-			// Panel is right-anchored: dragging left grows it.
-			const hostLimit = Math.min(maxWidth, Math.round(window.innerWidth * hostShare));
-			const next = Math.min(hostLimit, Math.max(MIN_WIDTH, window.innerWidth - e.clientX));
-			setWidth(next);
+			setWidth(e.clientX <= 0 ? "full" : Math.max(minWidth, viewportWidth - e.clientX));
 		},
-		[maxWidth, hostShare],
+		[minWidth, viewportWidth],
 	);
 
 	const endDrag = useCallback(() => {
@@ -188,16 +152,16 @@ export function PanelContainer() {
 	return (
 		<aside
 			aria-busy={!routeReady}
+			data-inspector-left-edge={viewportWidth - panelWidth < 78 ? "" : undefined}
 			className={cx(
-				"omp-inspector relative flex h-full flex-col border-l border-[var(--omp-border-muted)]",
-				compact || split ? "absolute inset-y-0 right-0 z-30 shadow-[var(--omp-shadow-lg)]" : "shrink-0",
+				"omp-inspector flex h-full flex-col border-l border-[var(--omp-border-muted)]",
+				overlay ? "absolute inset-y-0 right-0 z-30 shadow-[var(--omp-shadow-lg)]" : "relative shrink-0",
 				!routeReady && "pointer-events-none",
 			)}
-			// One saved width; views other than Browser cap it at their own maximum.
-			style={{ width: Math.min(width, maxWidth) }}
+			style={{ width: panelWidth }}
 		>
 			{/* One header row: the view switcher and the close control. The panel's
-			    name is announced, not printed — the tabs already say what it holds. */}
+	    name is announced, not printed — the tabs already say what it holds. */}
 			<div className="omp-inspector-header drag-region flex h-12 shrink-0 items-center gap-2 border-b border-[var(--omp-border-muted)] pl-3">
 				<h2 className="sr-only">
 					{t("panel.title")} — {t("panel.subtitle")}
@@ -251,28 +215,34 @@ export function PanelContainer() {
 			</div>
 			<div
 				role="separator"
+				aria-label={t("panel.resize")}
 				aria-orientation="vertical"
-				aria-valuemin={MIN_WIDTH}
-				aria-valuemax={maxWidth}
-				aria-valuenow={Math.round(Math.min(width, maxWidth))}
+				aria-valuemin={minWidth}
+				aria-valuemax={viewportWidth}
+				aria-valuenow={Math.round(panelWidth)}
 				tabIndex={0}
 				onPointerDown={startDrag}
 				onPointerMove={onDrag}
 				onPointerUp={endDrag}
+				onLostPointerCapture={endDrag}
 				onKeyDown={event => {
 					if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 					event.preventDefault();
-					const viewportLimit = Math.max(MIN_WIDTH, Math.min(maxWidth, window.innerWidth - 56));
-					const max = Math.min(maxWidth, viewportLimit);
-					setWidth(current =>
+					setWidth(
 						event.key === "Home"
-							? MIN_WIDTH
+							? minWidth
 							: event.key === "End"
-								? max
-								: Math.min(max, Math.max(MIN_WIDTH, current + (event.key === "ArrowLeft" ? 24 : -24))),
+								? "full"
+								: Math.min(
+										viewportWidth,
+										Math.max(minWidth, panelWidth + (event.key === "ArrowLeft" ? 24 : -24)),
+									),
 					);
 				}}
-				className="absolute inset-y-0 left-0 z-10 w-1 -translate-x-1/2 cursor-col-resize transition-colors hover:bg-[var(--omp-accent)]/40 active:bg-[var(--omp-accent)] max-[1000px]:hidden"
+				className={cx(
+					"no-drag absolute inset-y-0 left-0 z-10 w-2 cursor-col-resize touch-none transition-colors hover:bg-(--omp-accent)/40 focus-visible:bg-(--omp-accent)/40 active:bg-(--omp-accent)",
+					!atLeftEdge && "-translate-x-1/2",
+				)}
 			/>
 		</aside>
 	);

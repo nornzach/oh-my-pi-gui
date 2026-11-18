@@ -7,7 +7,7 @@
  * here now that the workspace drawer no longer carries these surfaces.
  */
 
-import { ArrowLeft, ChevronRight, type LucideIcon } from "lucide-react";
+import { ArrowLeft, ChevronRight, type LucideIcon, Maximize2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
@@ -22,6 +22,7 @@ interface DockCardProps {
 	badge?: ReactNode;
 	/** Right-side header controls (view toggles, refresh buttons). */
 	actions?: ReactNode;
+	expandable?: boolean;
 	/** Body content; WorkspaceDock owns vertical scrolling for every card. */
 	children: ReactNode;
 }
@@ -29,11 +30,11 @@ interface DockCardProps {
 /** How long the accent ring lingers after a focusDockCard deep link. */
 const FOCUS_FLASH_MS = 1200;
 
-export function DockCard({ id, icon: Icon, title, badge, actions, children }: DockCardProps) {
+export function DockCard({ id, icon: Icon, title, badge, actions, expandable, children }: DockCardProps) {
 	const t = useT();
 	const collapsed = useUiStore(s => s.dockCollapsed[id] ?? false);
 	const toggleDockCard = useUiStore(s => s.toggleDockCard);
-	const { managed, focusedCard, clearFocus } = useWorkspaceDockFocus();
+	const { managed, focusedCard, focusCard, clearFocus } = useWorkspaceDockFocus();
 	const focused = managed && focusedCard === id;
 	const hiddenForFocus = managed && focusedCard !== null && !focused;
 	const expanded = focused || (!hiddenForFocus && !collapsed);
@@ -41,16 +42,18 @@ export function DockCard({ id, icon: Icon, title, badge, actions, children }: Do
 	const [flash, setFlash] = useState(false);
 	const flashTimer = useRef<number | undefined>(undefined);
 	const seenSeq = useRef(focusSeq);
+	const detailLabel = t("dock.viewDetails", { title });
 
 	useEffect(() => {
 		if (focusSeq === seenSeq.current) return;
 		seenSeq.current = focusSeq;
-		clearFocus();
+		if (managed && expandable) focusCard(id);
+		else clearFocus();
 		setFlash(true);
 		clearTimeout(flashTimer.current);
 		flashTimer.current = window.setTimeout(() => setFlash(false), FOCUS_FLASH_MS);
 		return () => clearTimeout(flashTimer.current);
-	}, [clearFocus, focusSeq]);
+	}, [clearFocus, expandable, focusCard, focusSeq, id, managed]);
 
 	const toggle = () => {
 		if (hiddenForFocus) {
@@ -70,26 +73,27 @@ export function DockCard({ id, icon: Icon, title, badge, actions, children }: Do
 		<section
 			aria-label={title}
 			className={cx(
-				"shrink-0 overflow-clip rounded-[18px] border bg-[color-mix(in_srgb,var(--omp-bg-secondary)_72%,transparent)] transition-shadow duration-300",
+				"shrink-0 overflow-clip rounded-xl border transition-shadow duration-300",
 				flash
 					? "border-[var(--omp-accent)] shadow-[0_0_0_2px_color-mix(in_srgb,var(--omp-accent)_35%,transparent)]"
 					: "border-[var(--omp-border)]",
 				hiddenForFocus && "opacity-75",
+				focused && "order-first",
 			)}
 			data-dock-focused={focused || undefined}
 		>
 			<div
-				className="sticky top-0 z-10 flex min-h-10 items-center gap-2 bg-[var(--omp-bg-secondary)] px-3 py-2" // surface-ok: dock-card sticky navigation chrome
+				className="sticky top-0 z-20 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 bg-[var(--omp-bg-secondary)] px-3 py-1.5" // surface-ok: dock-card sticky navigation chrome
 			>
 				<button
 					aria-expanded={expanded}
 					aria-label={expanded ? t("dock.collapse") : t("dock.expand")}
-					className="omp-pressable flex min-w-0 flex-1 items-center gap-2 rounded-md text-left"
+					className="omp-pressable flex min-w-0 flex-[1_1_9rem] items-center gap-2 rounded-md text-left"
 					onClick={toggle}
 					type="button"
 				>
 					<Icon className="shrink-0 text-[var(--omp-muted)]" size={15} />
-					<span className="truncate text-omp-lg font-semibold text-[var(--omp-text)]">{title}</span>
+					<span className="shrink-0 text-omp-md font-semibold text-[var(--omp-text)]">{title}</span>
 					{badge}
 					<span className="min-w-1 flex-1" />
 					<ChevronRight
@@ -106,6 +110,17 @@ export function DockCard({ id, icon: Icon, title, badge, actions, children }: Do
 					>
 						<ArrowLeft size={11} />
 						{t("dock.backToSummary")}
+					</button>
+				)}
+				{managed && expandable && !focused && !hiddenForFocus && (
+					<button
+						type="button"
+						aria-label={detailLabel}
+						title={detailLabel}
+						className="omp-pressable grid size-7 shrink-0 place-items-center rounded-md text-(--omp-muted) hover:bg-(--omp-bg-tertiary) hover:text-(--omp-text)"
+						onClick={() => focusCard(id)}
+					>
+						<Maximize2 aria-hidden size={14} />
 					</button>
 				)}
 				{!hiddenForFocus && actions}

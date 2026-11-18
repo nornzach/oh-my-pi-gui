@@ -330,7 +330,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 	const tabWidth = useUiStore(s => s.tabWidth);
 	const tabRows = useUiStore(s => s.tabRows);
 	const liveDraft = useComposerStore(s => s.draft);
-	const liveImageCount = useComposerStore(s => s.images.length);
+	const liveAttachmentCount = useComposerStore(s => s.images.length + s.files.length);
 	const liveMessageCount = useSessionStore(s => s.messageCount);
 	const liveStreaming = useSessionStore(s => s.isStreaming);
 	const liveCompacting = useSessionStore(s => s.isCompacting);
@@ -466,7 +466,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 					liveRenderedMessages === 0 &&
 					liveQueuedMessages === 0 &&
 					liveDraft.trim().length === 0 &&
-					liveImageCount === 0
+					liveAttachmentCount === 0
 				);
 			}
 
@@ -483,7 +483,8 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 				queue.steering.length === 0 &&
 				queue.followUp.length === 0 &&
 				composer.draft.trim().length === 0 &&
-				composer.images.length === 0
+				composer.images.length === 0 &&
+				composer.files.length === 0
 			);
 		});
 		if (!candidate) return;
@@ -496,7 +497,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 		closeTab,
 		liveCompacting,
 		liveDraft,
-		liveImageCount,
+		liveAttachmentCount,
 		liveMessageCount,
 		liveQueuedMessages,
 		liveRenderedMessages,

@@ -83,6 +83,7 @@ export function TasksWindow() {
 
 	return (
 		<Modal
+			dockable
 			bodyClassName="p-0"
 			onClose={close}
 			open={open}
@@ -96,7 +97,7 @@ export function TasksWindow() {
 			ariaLabel={t("tasks.title")}
 		>
 			<div className="flex h-full min-h-0 flex-col">
-				<div className="flex shrink-0 items-center gap-4 border-b border-(--omp-border-muted) px-4 pt-1.5">
+				<div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-(--omp-border-muted) px-4 pt-1.5">
 					<Tabs
 						activeId={view}
 						ariaLabel={t("tasks.title")}

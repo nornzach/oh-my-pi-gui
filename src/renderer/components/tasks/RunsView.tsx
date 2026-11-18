@@ -51,7 +51,7 @@ function SplitPane({
 }) {
 	const titles = useTitles();
 	return (
-		<div className="flex h-full min-h-0">
+		<div className="omp-docked-master-detail flex h-full min-h-0">
 			<aside className="flex w-80 shrink-0 flex-col border-r border-(--omp-border-muted)">
 				{header}
 				<div className="min-h-0 flex-1 overflow-y-auto p-2">

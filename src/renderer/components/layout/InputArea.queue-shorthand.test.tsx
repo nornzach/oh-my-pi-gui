@@ -264,6 +264,7 @@ afterEach(async () => {
 	useSettingsStore.getState().reset();
 	useTabsStore.getState().reset();
 	useUiStore.getState().closeComposerEditor();
+	useUiStore.getState().closeFilePreview();
 	setWindowWidth(1200);
 	vi.restoreAllMocks();
 });
@@ -271,12 +272,15 @@ afterEach(async () => {
 describe("InputArea queue shorthand submit", () => {
 	it("restores an unacknowledged send after process recovery and blocks duplicate submission", async () => {
 		await mount(true);
+		const file = { name: "drawing 1.dwg", mention: '@"drawing 1.dwg"' };
+		await act(async () => useComposerStore.getState().addFiles([file]));
 		const pending = Promise.withResolvers<RpcResponse>();
 		prompt.mockReturnValueOnce(pending.promise);
 		await typeInto(findTextarea(), "preserve in-flight input");
 		await pressEnter(findTextarea());
 		await flush();
 		expect(prompt).toHaveBeenCalledTimes(1);
+		expect(prompt).toHaveBeenCalledWith('preserve in-flight input @"drawing 1.dwg"', []);
 		await typeInto(findTextarea(), "next draft");
 		const recovering = withSessionRuntime("t0", () => useComposerStore.getState());
 		expect(recovering.sending).toBe(true);
@@ -305,6 +309,7 @@ describe("InputArea queue shorthand submit", () => {
 		});
 		await flush();
 		expect(useComposerStore.getState().draft).toBe("preserve in-flight input\nnext draft");
+		expect(useComposerStore.getState().files).toEqual([file]);
 		expect(useComposerStore.getState().submissionUncertain).toBe(true);
 		expect(useComposerStore.getState().sending).toBe(false);
 		await pressEnter(findTextarea());
@@ -799,8 +804,43 @@ describe("InputArea run settings", () => {
 	});
 });
 
+describe("InputArea file attachments", () => {
+	it("sends a file without text and clears its card after delivery", async () => {
+		await mount();
+		const file = { name: "测试原型 V2.5.html", mention: '@"/tmp/测试原型 V2.5.html"' };
+		await act(async () => useComposerStore.getState().addFiles([file, file]));
+		expect(document.querySelectorAll('button[aria-label="Remove 测试原型 V2.5.html"]')).toHaveLength(1);
+		expect(useComposerStore.getState().draft).toBe("");
+		await pressEnter(findTextarea());
+		await flush();
+		expect(steer).toHaveBeenCalledExactlyOnceWith(file.mention, []);
+		expect(document.querySelector('button[aria-label="Remove 测试原型 V2.5.html"]')).toBeNull();
+	});
+
+	it("restores the card with the last queue item if that item fails after an earlier delivery", async () => {
+		await mount();
+		const file = { name: "details.ifc", mention: "@details.ifc" };
+		await act(async () => useComposerStore.getState().addFiles([file]));
+		followUp.mockResolvedValueOnce(ok()).mockResolvedValueOnce({
+			type: "response",
+			command: "follow_up",
+			success: false,
+			error: "Queue refused the item",
+		});
+		await typeInto(findTextarea(), "->\n1. First\n2. Last");
+		await pressEnter(findTextarea());
+		await flush();
+		expect(followUp.mock.calls).toEqual([
+			["First", []],
+			["Last @details.ifc", undefined],
+		]);
+		expect(useComposerStore.getState().draft).toBe("=> Last");
+		expect(useComposerStore.getState().files).toEqual([file]);
+	});
+});
+
 describe("InputArea pasted images", () => {
-	it("opens a pasted image in the viewer without removing it", async () => {
+	it("opens a pasted image in the right preview without removing it", async () => {
 		useComposerStore.getState().setImages([
 			{
 				content: { type: "image", data: "abc", mimeType: "image/png" },
@@ -816,8 +856,42 @@ describe("InputArea pasted images", () => {
 		await click(image);
 		await flush();
 
-		expect(document.querySelector("[data-image-viewer]")).not.toBeNull();
+		expect(useUiStore.getState().filePreviewImage?.src).toBe("data:image/png;base64,abc");
 		expect(document.querySelector('img[alt="attachment 1"]')).not.toBeNull();
 		expect(document.querySelector('button[title="Remove"]')).not.toBeNull();
+	});
+});
+
+describe("InputArea GPT sign-in speed", () => {
+	it.each([false, true])("only offers Ultrafast when the sidecar supports it (%s)", async supported => {
+		await mount();
+		const setFastMode = vi.fn(async () => ok({ enabled: true, active: true, ultrafast: true }));
+		window.omp.rpc.setFastMode = setFastMode;
+		await act(async () =>
+			useModelStore.setState({
+				model: {
+					id: "gpt-6.2-sol",
+					provider: "openai-codex",
+					api: "openai-codex-responses",
+					serviceTiers: ["priority", "ultrafast"],
+				},
+				fastModeUltrafastSupported: supported,
+			}),
+		);
+		const speed = document.querySelector('button[title="Response speed"]') as unknown as TestElement | null;
+		if (!speed) throw new Error("speed menu missing");
+		await click(speed);
+		const option = buttonWithText("Ultrafast");
+		if (!supported) {
+			expect(option).toBeUndefined();
+			await useModelStore.getState().setModelSpeed("ultrafast");
+			expect(setFastMode).not.toHaveBeenCalled();
+			return;
+		}
+		if (!option) throw new Error("Ultrafast unavailable in fixture");
+		await click(option);
+		await flush();
+		expect(setFastMode).toHaveBeenCalledExactlyOnceWith(true, true);
+		expect(speed.textContent).toContain("Ultrafast");
 	});
 });

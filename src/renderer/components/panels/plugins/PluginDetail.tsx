@@ -71,7 +71,7 @@ function NameList({ label, names }: { label: string; names: readonly string[] })
 			<div className="flex flex-wrap gap-1">
 				{names.map(name => (
 					<code
-						className="rounded bg-(--omp-bg-tertiary) px-1.5 py-0.5 font-mono text-omp-xs text-(--omp-muted)"
+						className="rounded bg-(--omp-code-bg) px-1.5 py-0.5 font-mono text-omp-xs text-(--omp-muted)"
 						key={name}
 					>
 						{name}

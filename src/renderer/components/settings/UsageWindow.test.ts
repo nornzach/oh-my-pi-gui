@@ -11,25 +11,28 @@ function valueText(amount: Omit<UsageLimit, "id" | "label">): string {
 }
 
 describe("provider quota values", () => {
-	it("shows the used percentage when Core supplies an unknown quota unit", () => {
-		expect(valueText({ unit: "unknown", used: 81, limit: 100, usedFraction: 0.81 })).toBe("已用 81%");
+	it("shows the remaining percentage when Core supplies an unknown quota unit", () => {
+		expect(valueText({ unit: "unknown", used: 47, limit: 100, usedFraction: 0.47 })).toBe("剩余 53%");
 	});
 
 	it("preserves an explicit zero fraction when a legacy report omits its unit", () => {
-		expect(valueText({ used: 5, limit: 100, usedFraction: 0 })).toBe("已用 0%");
+		expect(valueText({ used: 5, limit: 100, usedFraction: 0 })).toBe("剩余 100%");
 	});
 
-	it("retains named units and percent precision when the unit is known", () => {
-		expect(valueText({ unit: "percent", used: 12.2, limit: 100, usedFraction: 0.122 })).toBe("12.2% / 100%");
-		expect(valueText({ unit: "requests", used: 12, limit: 100, usedFraction: 0.12 })).toBe(
-			"12 requests / 100 requests",
-		);
+	it("shows available counts for named units", () => {
+		expect(valueText({ unit: "requests", used: 12, limit: 100, usedFraction: 0.12 })).toBe("剩余 88 / 100 requests");
 	});
 
-	it("keeps raw counts without a unit and does not invent a percentage for missing data", () => {
-		expect(valueText({ unit: "unknown", used: 5, limit: 100 })).toBe("5 / 100");
-		expect(valueText({ unit: "unknown", used: 5 })).toBe("已用 5.0");
-		expect(valueText({ unit: "unknown" })).toBe("未知");
+	it("uses the provider's remaining share and honors an exhausted status", () => {
+		expect(valueText({ usedFraction: 0.2, remainingFraction: 0.35 })).toBe("剩余 35%");
+		expect(valueText({ status: "exhausted" })).toBe("剩余 0%");
+		expect(valueText({ usedFraction: 1.2 })).toBe("剩余 0%");
+	});
+
+	it("handles counts without a unit and missing quota data", () => {
+		expect(valueText({ unit: "unknown", used: 5, limit: 100 })).toBe("剩余 95 / 100");
+		expect(valueText({ unit: "unknown", used: 5 })).toBe("剩余额度未知");
+		expect(valueText({ unit: "unknown" })).toBe("剩余额度未知");
 	});
 });
 

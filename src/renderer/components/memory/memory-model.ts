@@ -98,6 +98,7 @@ export function memoryProjects(
 	options: {
 		current: string | null;
 		aliases: Readonly<Record<string, string>>;
+		registered?: readonly string[];
 		workCwd: string | null;
 		workLabel: string;
 	},
@@ -107,6 +108,9 @@ export function memoryProjects(
 		if (session.kind === "chat" || !session.cwd) continue;
 		const modified = Date.parse(session.modified) || 0;
 		byCwd.set(session.cwd, Math.max(byCwd.get(session.cwd) ?? 0, modified));
+	}
+	for (const cwd of options.registered ?? []) {
+		if (cwd && !byCwd.has(cwd)) byCwd.set(cwd, 0);
 	}
 	if (options.current && !byCwd.has(options.current)) byCwd.set(options.current, Date.now());
 	const label = (cwd: string) =>

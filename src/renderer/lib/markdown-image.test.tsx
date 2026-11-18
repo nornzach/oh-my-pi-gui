@@ -69,13 +69,14 @@ describe("markdown images", () => {
 		expect(html).toContain('alt="pixel"');
 	});
 
-	it("renders a remote URL as an opt-in link, never as a loadable image", () => {
+	it("renders a remote URL as an explicit load action without initiating the request", () => {
 		const html = render("![shot](https://example.com/shot.png)");
 		// An <img> here is an outbound GET the user never asked for: it names this
 		// machine (IP, timing) to whoever the model pointed at.
 		expect(html).not.toContain("<img");
 		expect(html).toContain("shot");
-		expect(html).toContain('href="https://example.com/shot.png"');
+		expect(html).toContain("Load image");
+		expect(html).not.toContain("href=");
 	});
 
 	it("renders local paths as a resolving placeholder carrying the path", () => {

@@ -3,6 +3,7 @@
  */
 import { app, Menu, type MenuItemConstructorOptions, shell } from "electron";
 import { IPC_EVENTS, type MenuAction } from "../shared/ipc-types";
+import { confirmDiscardFileDrafts } from "./app-quit";
 import type { BrowserHost } from "./browser-host";
 import { getMainLanguage, mainT } from "./i18n";
 import { nativeShortcut } from "./shortcuts";
@@ -178,8 +179,22 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 					click: () => sendMenuAction(windowManager, spawnWindow, "toggle-panel"),
 				},
 				{ type: "separator" },
-				{ role: "reload" },
-				{ role: "forceReload" },
+				{
+					label: mainT("browser.reload", language),
+					accelerator: "CmdOrCtrl+R",
+					click: () => {
+						const win = windowManager.getTargetWindow();
+						if (win && confirmDiscardFileDrafts(win)) win.webContents.reload();
+					},
+				},
+				{
+					label: mainT("menu.forceReload", language),
+					accelerator: "CmdOrCtrl+Shift+R",
+					click: () => {
+						const win = windowManager.getTargetWindow();
+						if (win && confirmDiscardFileDrafts(win)) win.webContents.reloadIgnoringCache();
+					},
+				},
 				{ role: "toggleDevTools" },
 				{ type: "separator" },
 				{ role: "resetZoom" },

@@ -3,7 +3,8 @@
  * and `before-quit` refuses unless the run is already approved. Without this,
  * ⌘Q SIGTERMs every in-flight agent run with no word to the user.
  */
-import { app, BrowserWindow, dialog, type MessageBoxOptions } from "electron";
+import { app, BrowserWindow, dialog, type MessageBoxOptions, type MessageBoxSyncOptions } from "electron";
+import { hasUnsavedFileDrafts } from "./file-draft-guard";
 import { getMainLanguage, mainT } from "./i18n";
 import { assessQuitRisk, type QuitRisk, quitNeedsConfirmation, type WindowTabFact } from "./quit-guard";
 
@@ -18,8 +19,25 @@ export function isQuitting(): boolean {
 	return approved;
 }
 
-export function requestQuit(): void {
+/** Confirm before closing a window, or every window when quitting the app. */
+export function confirmDiscardFileDrafts(owner?: BrowserWindow): boolean {
+	if (!hasUnsavedFileDrafts(owner?.webContents.id)) return true;
+	const language = getMainLanguage();
+	const options: MessageBoxSyncOptions = {
+		type: "warning",
+		buttons: [mainT("quit.discardFiles", language), mainT("quit.keepWorking", language)],
+		defaultId: 1,
+		cancelId: 1,
+		message: mainT("quit.unsavedFiles", language),
+		detail: mainT("quit.unsavedFilesBody", language),
+	};
+	return (owner ? dialog.showMessageBoxSync(owner, options) : dialog.showMessageBoxSync(options)) === 0;
+}
+
+export function requestQuit(beforeQuit?: () => void): void {
+	if (!confirmDiscardFileDrafts()) return;
 	approved = true;
+	beforeQuit?.();
 	app.quit();
 }
 

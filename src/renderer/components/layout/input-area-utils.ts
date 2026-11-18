@@ -7,6 +7,7 @@ import type { ComposerImage } from "../../stores/composer";
 
 const MENTION_FS_DEPTH = 8;
 const MENTION_FS_MAX_ENTRIES = 2000;
+const INLINE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
 /** Cap on completion menu items. */
 export const MAX_MENU_ITEMS = 8;
@@ -80,6 +81,10 @@ export function listMentionFiles(cwd: string, tabId?: string | null): Promise<st
 	return task;
 }
 
+export function isInlineImage(file: File): boolean {
+	return INLINE_IMAGE_TYPES.has(file.type);
+}
+
 export function fileToImage(file: File): Promise<ComposerImage> {
 	const { promise, resolve, reject } = Promise.withResolvers<ComposerImage>();
 	const reader = new FileReader();
@@ -98,19 +103,24 @@ export function fileToImage(file: File): Promise<ComposerImage> {
 
 /**
  * Composer mention for a dropped file: workspace-relative when the file sits
- * under `cwd`, absolute otherwise, quoted when it contains whitespace (the
- * agent's mention grammar accepts `@"…"`).
+ * under `cwd`, absolute otherwise. Quote paths that the agent's mention
+ * parser would split or trim.
  */
 export function droppedFileMention(filePath: string, cwd: string): string {
 	const normalized = filePath.replace(/\\/g, "/");
 	const root = cwd.replace(/\\/g, "/").replace(/\/+$/, "");
 	const relative = root && normalized.startsWith(`${root}/`) ? normalized.slice(root.length + 1) : filePath;
-	return /\s/.test(relative) ? `@"${relative}"` : `@${relative}`;
+	if (!/[\s@"']|^[\x60([{<]|[)\]}>.,;:!?\x60]$/.test(relative) && /[./\\]/.test(relative)) return `@${relative}`;
+	const quote = relative.includes('"') ? "'" : '"';
+	return `@${quote}${relative}${quote}`;
 }
 
-/** Append mentions to a draft, keeping one space between the draft and each mention. */
+/** Serialize file mentions alongside user text without repeating manually typed mentions. */
 export function appendMentions(draft: string, mentions: string[]): string {
 	if (mentions.length === 0) return draft;
+	const existing = new Set(Array.from(draft.matchAll(/(?:^|\s)(@(?:"[^"]+"|'[^']+'|[^\s@]+))/g), match => match[1]));
+	const additions = mentions.filter(mention => !existing.has(mention));
+	if (additions.length === 0) return draft;
 	const separator = draft && !/\s$/.test(draft) ? " " : "";
-	return `${draft}${separator}${mentions.join(" ")} `;
+	return `${draft}${separator}${additions.join(" ")}`;
 }

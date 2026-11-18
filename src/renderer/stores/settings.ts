@@ -64,8 +64,8 @@ export interface SettingsStore {
 
 const initialState = {
 	approvalMode: "yolo" as ApprovalMode,
-	steeringMode: "all" as const,
-	followUpMode: "all" as const,
+	steeringMode: "one-at-a-time" as const,
+	followUpMode: "one-at-a-time" as const,
 	interruptMode: "immediate" as const,
 	autoCompaction: true,
 	autoRetry: true,

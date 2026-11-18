@@ -4,6 +4,7 @@
  */
 
 import type { KeyEventLike } from "./chord";
+import type { DocumentPreviewResult } from "./document-preview";
 import type { Language } from "./languages";
 import type { LaunchProfile } from "./launch-profile";
 import type { SessionModelOverride } from "./model-restore";
@@ -161,6 +162,7 @@ export const IPC_COMMANDS = {
 	LOG_SNAPSHOT: "log:snapshot",
 	/** Quit the app through the main-process guard, which confirms while sessions work. */
 	APP_QUIT: "app:quit",
+	APP_FILE_DRAFTS: "app:file-drafts",
 	/** Send an RPC command, get response */
 	RPC_COMMAND: "rpc:command",
 	/** Send an RPC command to a specific tab's sidecar (IpcRpcCommandForTabPayload). */
@@ -213,6 +215,7 @@ export const IPC_COMMANDS = {
 	/** Open external URL */
 	SYSTEM_INFO: "system:info",
 	SYSTEM_OPEN_EXTERNAL: "system:open-external",
+	SYSTEM_FETCH_REMOTE_IMAGE: "system:fetch-remote-image",
 	/** Open a file path in the system editor (relative resolves against the workspace) */
 	SYSTEM_OPEN_PATH: "system:open-path",
 	/** Resolve paths named in replies and tool output: absolute form, file or folder, existence */
@@ -265,12 +268,16 @@ export const IPC_COMMANDS = {
 	MODELS_CONFIG_OPEN: "models:config-open",
 	/** List workspace files as a tree (main-process readdir, no sidecar needed) */
 	FS_LIST: "fs:list",
+	FS_EXPLORE: "fs:explore",
+	FS_OPEN_EDIT: "fs:open-edit",
+	FS_SAVE_EDIT: "fs:save-edit",
 	/** Read a workspace file with a byte cap */
 	FS_READ: "fs:read",
 	/** Read the plan-mode document off the RPC bus (with session-local fallback) */
 	FS_READ_PLAN: "fs:read-plan",
 	/** Read an image file as a data URL for markdown <img> rendering (sniffed mime, size cap) */
 	FS_READ_IMAGE: "fs:read-image",
+	FS_DOCUMENT_PREVIEW: "fs:document-preview",
 	/** A plugin's logo (its GitHub owner's avatar) as a data URL */
 	PLUGIN_LOGO: "plugin-catalog:logo",
 	/** Preview what installing a plugin would add, from its GitHub repository */
@@ -786,6 +793,8 @@ export interface FsTreeEntry {
 	/** Workspace-relative path using POSIX separators. */
 	path: string;
 	kind: "file" | "dir";
+	/** Internal symlink; global search does not recurse through directory links. */
+	symlink?: boolean;
 	/** Directories only; omitted or empty beyond the depth cap. */
 	children?: FsTreeEntry[];
 }
@@ -797,6 +806,29 @@ export interface IpcFsListResult {
 	truncated: boolean;
 	error?: string;
 }
+
+export interface IpcFsExplorePayload {
+	tabId?: string;
+	path?: string;
+	showIgnored?: boolean;
+	/** Present for project-wide search. An empty query cancels the current search. */
+	query?: string;
+}
+
+export interface IpcFsEditPayload {
+	tabId?: string;
+	path: string;
+}
+
+export interface IpcFsSaveEditPayload extends IpcFsEditPayload {
+	revision: string;
+	content: string;
+}
+
+export type FileEditFailure = "outside" | "readOnly" | "notText" | "tooLarge" | "changed" | "io";
+export type IpcFsEditResult =
+	| { ok: true; content: string; revision: string }
+	| { ok: false; reason: FileEditFailure; detail?: string };
 
 export interface IpcFsReadPayload {
 	/** Visible tab whose workspace resolves relative paths. */
@@ -1292,6 +1324,8 @@ export interface OmpApi {
 		 * shuts the focused window and leaves the rest of the session behind.
 		 */
 		quit(): void;
+		/** Synchronously acknowledge dirty-state changes before a native close can run. */
+		setUnsavedFiles(dirty: boolean): void;
 		/** Filesystem path of a dropped or picked `File`; empty for in-memory files (e.g. pasted images). */
 		pathForFile(file: File): string;
 	};
@@ -1389,7 +1423,7 @@ export interface OmpApi {
 		discoverProviderModels(params: DiscoverProviderModelsParams): Promise<RpcResponse>;
 		setThinkingLevel(level: ThinkingLevel | "auto"): Promise<RpcResponse>;
 		cycleThinkingLevel(): Promise<RpcResponse>;
-		setFastMode(enabled: boolean): Promise<RpcResponse>;
+		setFastMode(enabled: boolean, ultrafast?: boolean): Promise<RpcResponse>;
 		setSlowMode(enabled: boolean): Promise<RpcResponse>;
 		setSteeringMode(mode: "all" | "one-at-a-time"): Promise<RpcResponse>;
 		setFollowUpMode(mode: "all" | "one-at-a-time"): Promise<RpcResponse>;
@@ -1658,6 +1692,7 @@ export interface OmpApi {
 	system: {
 		info(): Promise<SystemInfo>;
 		openExternal(url: string): Promise<void>;
+		fetchRemoteImage(url: string): Promise<string | null>;
 		/** Open a file in the system editor; relative paths resolve against the workspace. */
 		openPath(path: string): Promise<IpcOpenPathResult>;
 		/** Resolve paths like fs reads do (tab workspace for relative ones); null for paths that do not exist. */
@@ -1715,9 +1750,13 @@ export interface OmpApi {
 	};
 	fs: {
 		list(path?: string, maxDepth?: number, maxEntries?: number, tabId?: string): Promise<IpcFsListResult>;
+		explore(payload: IpcFsExplorePayload): Promise<IpcFsListResult>;
+		openEdit(payload: IpcFsEditPayload): Promise<IpcFsEditResult>;
+		saveEdit(payload: IpcFsSaveEditPayload): Promise<IpcFsEditResult>;
 		read(path: string, maxBytes?: number, tabId?: string): Promise<IpcFsReadResult>;
 		readPlan(payload: IpcFsReadPlanPayload): Promise<IpcFsReadPlanResult>;
 		readImage(path: string, tabId?: string): Promise<IpcFsReadImageResult>;
+		documentPreview(path: string, thumbnail: boolean, tabId?: string): Promise<DocumentPreviewResult>;
 	};
 	pluginCatalog: {
 		logo(owner: string): Promise<string | null>;

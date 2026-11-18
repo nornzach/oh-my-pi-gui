@@ -52,6 +52,19 @@ describe("dedupeCatalog", () => {
 		toCatalogPlugin(marketplace, { name: "apollo", installed: false, ...info });
 	const ids = (...plugins: ReturnType<typeof from>[]) => dedupeCatalog(plugins).map(entry => entry.id);
 
+	it("keeps the OpenAI copy when browsing or searching that marketplace", () => {
+		const openAi = { name: "openai-curated", source: "/fixture/openai-curated" };
+		const rows = [from(FIRST, { description: "Search contacts" }), from(openAi, { description: "Search contacts" })];
+		const filters = { query: "", category: null, view: "all" } as const;
+		expect(filterCatalog(rows, { ...filters, catalog: null }).map(row => row.id)).toEqual(["apollo@first"]);
+		expect(filterCatalog(rows, { ...filters, catalog: openAi.name }).map(row => row.id)).toEqual([
+			"apollo@openai-curated",
+		]);
+		expect(filterCatalog(rows, { ...filters, catalog: null, query: "openai" }).map(row => row.id)).toEqual([
+			"apollo@openai-curated",
+		]);
+	});
+
 	it("shows the earlier catalog's copy of a plugin hosted in the same place, whatever commit each pins", () => {
 		const url = "https://github.com/apolloio/plugin";
 		expect(

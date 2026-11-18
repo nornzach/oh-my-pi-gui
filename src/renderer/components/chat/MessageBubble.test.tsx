@@ -161,6 +161,43 @@ describe("MessageBubble tool messages", () => {
 });
 
 describe("MessageBubble user content", () => {
+	it("shows old paths as filename cards instead of raw text", () => {
+		const { document } = parseHTML(
+			renderToStaticMarkup(
+				<I18nProvider>
+					<MessageBubble
+						message={{ role: "user", content: 'Compare these @"/tmp/计划 V2.docx" @workspace/view.html' }}
+					/>
+				</I18nProvider>,
+			),
+		);
+		expect(document.body.textContent).not.toContain("@/tmp/");
+		expect(
+			[...document.querySelectorAll("[data-message-attachments] button")].map(button => button.textContent),
+		).toEqual(["计划 V2.docx", "view.html"]);
+		expect(document.querySelector(".markdown-body")?.textContent).toBe("Compare these");
+	});
+
+	it("consolidates consecutive thinking snippets without swallowing a subsequent reply", () => {
+		const html = renderToStaticMarkup(
+			<I18nProvider>
+				<MessageBubble
+					message={{
+						role: "assistant",
+						content: [
+							{ type: "thinking", thinking: "Checking the source." },
+							{ type: "thinking", thinking: "Checking the output." },
+							{ type: "text", text: "Ready to ship." },
+						],
+					}}
+				/>
+			</I18nProvider>,
+		);
+		const { document } = parseHTML(html);
+		expect(document.querySelectorAll(".omp-thinking-block")).toHaveLength(1);
+		expect(document.querySelector(".markdown-body")?.textContent).toBe("Ready to ship.");
+	});
+
 	it("shows an assistant reaction on the user bubble", () => {
 		const html = renderToStaticMarkup(
 			<I18nProvider>
@@ -481,6 +518,39 @@ describe("MessageBubble ended replies", () => {
 
 	it("leaves out Technical details when the sentence is already the whole text", () => {
 		expect(ended("error", "Workspace is read-only")).not.toContain("<details");
+	});
+
+	it("shows official guidance and the policy code without offering to resend the blocked reply", async () => {
+		const message: AgentMessage = {
+			role: "assistant",
+			content: [],
+			stopReason: "error",
+			errorMessage:
+				"Codex error event: This content was flagged for possible cybersecurity risk. (code=cyber_policy)",
+			timestamp: "2026-08-06T00:00:00.000Z",
+		};
+		useMessagesStore.setState({ messages: [message], liveMessages: [] });
+		useSessionStore.setState({ isStreaming: false, retryInfo: null, status: "ready" });
+		const host = document.createElement("div");
+		const root = createRoot(host as never);
+		try {
+			await act(async () => {
+				root.render(
+					<I18nProvider>
+						<MessageBubble message={message} />
+					</I18nProvider>,
+				);
+			});
+			expect(host.textContent).toContain("OpenAI blocked the request");
+			expect(host.querySelector("a")?.getAttribute("href")).toBe(
+				"https://learn.chatgpt.com/docs/cyber-safety#false-positives",
+			);
+			expect(host.querySelector("details")?.textContent).toContain("code=cyber_policy");
+			expect(host.textContent).not.toContain("Retry");
+		} finally {
+			await act(async () => root.unmount());
+			useMessagesStore.setState({ messages: [], liveMessages: [] });
+		}
 	});
 
 	it("reads as a step along the way while the agent is still trying", async () => {

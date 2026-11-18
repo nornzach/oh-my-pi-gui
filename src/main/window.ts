@@ -18,8 +18,9 @@ import {
 } from "electron";
 import Store from "electron-store";
 import { type CaptionColors, IPC_EVENTS, type RunProgressState, type SessionKind } from "../shared/ipc-types";
-import { quitRisk, requestQuit } from "./app-quit";
+import { confirmDiscardFileDrafts, isQuitting, quitRisk, requestQuit } from "./app-quit";
 import { editableContextMenuTemplate } from "./editable-context-menu";
+import { setWindowFileDrafts } from "./file-draft-guard";
 import { getMainLanguage, mainT } from "./i18n";
 import {
 	type ApplicationResourceIdentity,
@@ -185,11 +186,16 @@ export class WindowManager {
 		win.webContents.on("will-navigate", event => event.preventDefault());
 
 		// Persist state on close
-		win.on("close", () => {
+		win.on("close", event => {
+			if (!isQuitting() && !confirmDiscardFileDrafts(win)) {
+				event.preventDefault();
+				return;
+			}
 			this.#persistState(win);
 		});
 
 		win.on("closed", () => {
+			setWindowFileDrafts(record.id, false);
 			this.#records.delete(record.id);
 			for (const listener of this.#windowClosedListeners) listener(record);
 		});
@@ -392,8 +398,7 @@ export class WindowManager {
 		if (answer.response !== 0) return;
 		// `requestQuit` carries the approval, so the guard below the restart
 		// prompt never asks a second time about the same running sessions.
-		app.relaunch();
-		requestQuit();
+		requestQuit(() => app.relaunch());
 	}
 
 	#crashRecoveryOffered = new Set<number>();
@@ -416,8 +421,7 @@ export class WindowManager {
 			? await dialog.showMessageBox(options)
 			: await dialog.showMessageBox(win, options);
 		if (answer.response !== 0) return;
-		app.relaunch();
-		requestQuit();
+		requestQuit(() => app.relaunch());
 	}
 
 	recordFor(win: BrowserWindow): WindowRecord | undefined {

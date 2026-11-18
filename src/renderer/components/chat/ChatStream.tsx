@@ -17,7 +17,7 @@ import {
 	Sparkles,
 	X,
 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useDisplayPreference } from "../../lib/display-preferences";
 import { describeError, describeProviderError } from "../../lib/errors";
@@ -91,13 +91,13 @@ const REVEAL_STILL_FRAMES = 3;
  * unpinned. The in-flight assistant turn renders as live rows (thinking,
  * tool cards, streaming text) that unmount once message_end finalizes.
  */
-export function ChatStream() {
+export function ChatStream({ footer }: { footer?: ReactNode }) {
 	const tabId = useRuntimeTabId();
 	const sessionId = useSessionStore(s => s.sessionId);
-	return <SessionTranscript key={`${tabId ?? ""}:${sessionId}`} />;
+	return <SessionTranscript key={`${tabId ?? ""}:${sessionId}`} footer={footer} />;
 }
 
-function SessionTranscript() {
+function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	const t = useT();
 	const tabId = useRuntimeTabId();
 	// A subagent page: someone else's history, with nothing to start or review.
@@ -258,6 +258,7 @@ function SessionTranscript() {
 
 	const parentRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLDivElement>(null);
+	const footerRef = useRef<HTMLDivElement>(null);
 	const conversationAnchors = useMemo(() => buildConversationAnchors(rows, rowKeys), [rows, rowKeys]);
 	const tailRowKey = rowKeys.at(-1);
 	const activeConversationIndex = useMemo(
@@ -326,6 +327,11 @@ function SessionTranscript() {
 		onChange: handleVirtualizerChange,
 	});
 	const totalSize = virtualizer.getTotalSize();
+	const scrollToTail = useCallback(() => {
+		const el = parentRef.current;
+		if (el && footerRef.current?.offsetHeight) el.scrollTop = el.scrollHeight;
+		else virtualizer.scrollToEnd();
+	}, [virtualizer]);
 	const viewRef = useRef({ pinned, preCompactionOpen, expandedProcessKeys });
 	viewRef.current = { pinned, preCompactionOpen, expandedProcessKeys };
 	useLayoutEffect(
@@ -362,7 +368,8 @@ function SessionTranscript() {
 	// fell outside the edge slack and the tail was abandoned for the rest of the run.
 	const followsTail = useCallback(
 		(el: HTMLElement) =>
-			viewRef.current.pinned || (isTranscriptAtLiveEdge(el) && gestureTowardTailRef.current !== false),
+			!footerRef.current?.querySelector("[data-focused-card]") &&
+			(viewRef.current.pinned || (isTranscriptAtLiveEdge(el) && gestureTowardTailRef.current !== false)),
 		[],
 	);
 
@@ -378,10 +385,10 @@ function SessionTranscript() {
 			if (!followsTail(el)) return;
 			// A wheel gesture can arrive before React cleans up this queued frame.
 			if (userScrollIntentRef.current) return;
-			virtualizer.scrollToEnd();
+			scrollToTail();
 		});
 		return () => cancelAnimationFrame(frame);
-	}, [virtualizer, followsTail, rows.length, tailRowKey, sessionId, totalSize]);
+	}, [scrollToTail, followsTail, rows.length, tailRowKey, sessionId, totalSize]);
 
 	// Row measurements, fonts and images move the live edge after React has
 	// committed the new rows: observe the canvas sizer. The viewport moves it
@@ -394,12 +401,13 @@ function SessionTranscript() {
 		if (!el || !canvas || typeof ResizeObserver === "undefined") return;
 		const observer = new ResizeObserver(() => {
 			if (userScrollIntentRef.current) return;
-			if (followsTail(el)) virtualizer.scrollToEnd();
+			if (followsTail(el)) scrollToTail();
 		});
 		observer.observe(canvas);
 		observer.observe(el);
+		if (footerRef.current) observer.observe(footerRef.current);
 		return () => observer.disconnect();
-	}, [virtualizer, followsTail]);
+	}, [scrollToTail, followsTail]);
 
 	// Entrance motion for content that genuinely arrives. Marking is imperative and
 	// one-shot per row key so it never replays when the virtualizer recycles a row
@@ -540,8 +548,8 @@ function SessionTranscript() {
 		gestureAnchorRef.current = null;
 		gestureTowardTailRef.current = true;
 		setPinned(true);
-		virtualizer.scrollToEnd();
-	}, [virtualizer]);
+		scrollToTail();
+	}, [scrollToTail]);
 
 	// A send reclaims the live edge even when the user had scrolled up. Mounted
 	// keyed per tab+session, so seeding from the mount-time value keeps a
@@ -901,6 +909,11 @@ function SessionTranscript() {
 							);
 						})}
 					</div>
+					{footer && (
+						<div className="omp-composer-shell" ref={footerRef}>
+							{footer}
+						</div>
+					)}
 				</div>
 				<button
 					type="button"
