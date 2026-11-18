@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.46] - 2026-11-18
+
 ### Added
 
 - View or change the current task’s workspace beside the model picker, keeping the conversation in the destination project ([#62](https://github.com/nornzach/oh-my-pi-gui/issues/62)).
@@ -11,6 +13,8 @@
 - Choose response speed on ChatGPT sign-in models, with Ultrafast available when both the sidecar and model support it ([#61](https://github.com/nornzach/oh-my-pi-gui/pull/61) by [@y26s4824k264](https://github.com/y26s4824k264)).
 
 ### Changed
+
+- The bundled agent uses stable omp 18.22.2 and its matching native addon ([#59](https://github.com/nornzach/oh-my-pi-gui/issues/59)).
 
 - Task, plan and agent cards use the conversation's scroll area and expand with their contents ([#61](https://github.com/nornzach/oh-my-pi-gui/pull/61) by [@y26s4824k264](https://github.com/y26s4824k264)).
 - Consecutive thinking summaries appear together in one expandable block ([#61](https://github.com/nornzach/oh-my-pi-gui/pull/61) by [@y26s4824k264](https://github.com/y26s4824k264)).
