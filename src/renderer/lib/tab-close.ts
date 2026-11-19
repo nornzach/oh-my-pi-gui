@@ -63,7 +63,7 @@ export function closeActiveTab(): TabCloseOutcome {
 	const live: LiveTabRuntime = {
 		activeTabId,
 		streaming: session.isStreaming,
-		compacting: session.isCompacting,
+		compacting: session.isCompacting || session.isBackgroundCompacting,
 	};
 	const ui = useUiStore.getState();
 	if (tabNeedsCloseConfirm(target, live) && ui.armedCloseTab?.tabId !== target.id) {

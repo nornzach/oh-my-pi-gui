@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { IpcResolvedPath } from "../../../shared/ipc-types";
 import { I18nProvider } from "../../lib/i18n";
 import { clearPathResolutionCache } from "../../lib/path-resolver";
+import { useSessionStore } from "../../stores/session";
 import { setFocusedSessionRuntime } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { LinkMenuHost } from "../common/LinkMenu";
@@ -146,6 +147,20 @@ describe("FilesPanel preview", () => {
 
 	const shownImage = () => document.querySelector("[data-file-preview] img");
 	const shownText = () => document.querySelector("[data-file-preview]")?.textContent ?? "";
+
+	it("previews session output read-only and clears it when the session changes", async () => {
+		const read = vi.fn(async () => text("session output"));
+		const openEdit = vi.fn();
+		await open("local://0.log", { read, openEdit });
+		expect(shownText()).toContain("session output");
+		expect(openEdit).not.toHaveBeenCalled();
+		await act(async () => {
+			useSessionStore.setState({ sessionFile: "/sessions/other.jsonl" });
+		});
+		await flush();
+		expect(useUiStore.getState().filePreviewPath).toBeNull();
+		expect(shownText()).not.toContain("session output");
+	});
 
 	it("keeps the directory tree and selected file visible beside the preview", async () => {
 		await open("notes/a.txt", {

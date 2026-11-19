@@ -101,6 +101,36 @@ const guiOnly = (name: string): AvailableCommand => ({
 	textModeExecutable: false,
 });
 describe("planComposerSubmit", () => {
+	it.each([false, true])("routes a ? shortcut to BTW while streaming=%s", isStreaming => {
+		const omp = installMockOmp();
+		const result = planComposerSubmit({
+			message: "  ?why did this fail?",
+			wireMessage: '?why did this fail? @"source file.ts"',
+			images: [],
+			isStreaming,
+			mode: "followUp",
+			commands: [],
+		});
+
+		expect(result).toEqual({ kind: "btw", question: 'why did this fail? @"source file.ts"' });
+		expect(omp.rpc.prompt).not.toHaveBeenCalled();
+		expect(omp.rpc.steer).not.toHaveBeenCalled();
+		expect(omp.rpc.followUp).not.toHaveBeenCalled();
+	});
+
+	it("keeps a bare ? draft out of the main conversation", () => {
+		installMockOmp();
+		expect(
+			planComposerSubmit({
+				message: "?",
+				images: [],
+				isStreaming: true,
+				mode: "steer",
+				commands: [],
+			}),
+		).toEqual({ kind: "blocked" });
+	});
+
 	it("typed share still requires a desktop preview when Core can upload directly or discovery is pending", () => {
 		const omp = installMockOmp();
 		for (const commands of [[{ ...guiOnly("share"), textModeExecutable: true }], []]) {

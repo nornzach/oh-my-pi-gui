@@ -164,7 +164,7 @@ const SANITIZE_SCHEMA: SanitizeSchema = {
 		th: ["align"],
 	},
 	protocols: {
-		href: ["http", "https", "mailto", "file"],
+		href: ["http", "https", "mailto", "file", "local", "artifact"],
 		// data: keeps inline base64 images; file: is resolved to a workspace /
 		// absolute read by the MarkdownImage component (protocol stripped).
 		src: ["http", "https", "data", "file"],
@@ -195,18 +195,19 @@ const REHYPE_PLUGINS: Options["rehypePlugins"] = [
 // defer to the default everywhere else.
 const URL_TRANSFORM: NonNullable<Options["urlTransform"]> = (url, key, node) => {
 	if (key === "src" && node?.tagName === "img" && /^(data|blob|file):/i.test(url)) return url;
-	if (key === "href" && node?.tagName === "a" && /^file:/i.test(url)) return url;
+	if (key === "href" && node?.tagName === "a" && /^(?:file:|(?:local|artifact):\/\/)/i.test(url)) return url;
 	return defaultUrlTransform(url);
 };
 
 function filePathFromHref(href: string): string | null {
+	if (/^(?:local|artifact):\/\//i.test(href)) return href.replace(/#L\d+(?:-L?\d+)?$/, "");
 	if (/^(?:https?:|mailto:|#|\/\/)/i.test(href)) return null;
 	if (/^file:\/\//i.test(href)) {
 		const classified = classifyImageSrc(href);
 		return classified.kind === "local" ? classified.path : null;
 	}
-	// Preserve non-file schemes such as local:// and artifact:// for their own
-	// handlers; a Windows drive prefix is a path, not a URL scheme.
+	// Other schemes belong to their own handlers; a Windows drive prefix is
+	// a path, not a URL scheme.
 	if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !/^[a-z]:[\\/]/i.test(href)) return null;
 	const raw = href.replace(/[?#].*$/, "");
 	if (!raw) return null;
@@ -235,7 +236,7 @@ const MarkdownSourcePath = createContext<string | undefined>(undefined);
 
 function useMarkdownFilePath(path: string): string {
 	const source = useContext(MarkdownSourcePath);
-	if (!source || /^(?:[\\/]|~[\\/]|[A-Za-z]:)/.test(path)) return path;
+	if (!source || /^(?:[\\/]|~[\\/]|[A-Za-z]:|(?:local|artifact):\/\/)/i.test(path)) return path;
 	const normalized = source.replace(/\\/g, "/");
 	return normalized.slice(0, normalized.lastIndexOf("/") + 1) + path;
 }

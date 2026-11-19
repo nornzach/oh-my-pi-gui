@@ -126,6 +126,7 @@ export function parseFileTarget(text: string): FileTarget {
  */
 export function looksLikeFilePath(text: string): boolean {
 	if (text.length < 2 || text.length > 400) return false;
+	if (/^(?:local|artifact):\/\/[^\s]+$/i.test(text)) return true;
 	if (text.includes("://") || text.startsWith("-") || text.startsWith("@")) return false;
 	const { path } = parseFileTarget(text);
 	if (!path || /^\.+$/.test(path) || NOT_A_PATH.test(path)) return false;

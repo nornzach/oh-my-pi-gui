@@ -9,6 +9,7 @@ import { Copy, ExternalLink, Eye, FolderOpen, Link, PanelRight } from "lucide-re
 import { useEffect } from "react";
 import { create } from "zustand";
 import type { IpcResolvedPath } from "../../../shared/ipc-types";
+import { isSessionOutputPath } from "../../../shared/session-output";
 import { openPathExternally, previewFile, revealPath } from "../../lib/file-actions";
 import { copyText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -112,10 +113,11 @@ export function linkMenuItems(menu: Pick<LinkMenu, "target" | "selection">, t: T
 		});
 	} else if (target?.kind === "path") {
 		const { resolved } = target;
-		const path = resolved?.absolutePath ?? target.target.path;
+		const internal = isSessionOutputPath(target.target.path);
+		const path = internal ? target.target.path : (resolved?.absolutePath ?? target.target.path);
 		const folder = resolved?.kind === "directory";
 		// null: nothing on disk (a deleted file), so there is nothing to open or reveal.
-		const onDisk = resolved !== null;
+		const onDisk = internal ? !!resolved : resolved !== null;
 		if (onDisk && !folder) {
 			items.push({
 				id: "preview",
@@ -124,7 +126,7 @@ export function linkMenuItems(menu: Pick<LinkMenu, "target" | "selection">, t: T
 				onSelect: () => previewFile(path, target.target.line),
 			});
 		}
-		if (onDisk) {
+		if (onDisk && !internal) {
 			items.push(
 				{
 					id: "open-default",

@@ -63,6 +63,7 @@ describe("tabNeedsCloseConfirm", () => {
 	it("arms any tab whose run, compaction, or boot is still in flight", () => {
 		expect(tabNeedsCloseConfirm(tab("a", { status: "running" }), idle)).toBe(true);
 		expect(tabNeedsCloseConfirm(tab("a", { status: "ready", compacting: true }), idle)).toBe(true);
+		expect(tabNeedsCloseConfirm(tab("b", { status: "ready", backgroundCompacting: true }), idle)).toBe(true);
 		expect(tabNeedsCloseConfirm(tab("a", { status: "starting" }), idle)).toBe(true);
 	});
 

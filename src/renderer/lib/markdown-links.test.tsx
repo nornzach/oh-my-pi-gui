@@ -212,3 +212,34 @@ describe("inline code web addresses", () => {
 		expect(resolvePaths).not.toHaveBeenCalled();
 	});
 });
+
+describe("session output links", () => {
+	it.each([
+		"[output](local://0.log)",
+		"`local://0.log`",
+		"See local://0.log.",
+		"[old output](artifact://42)",
+		"See artifact://42.",
+	])("previews %s through the native read-only route", async content => {
+		const uri = content.includes("artifact://") ? "artifact://42" : "local://0.log";
+		resolvePaths.mockImplementation(async (paths: string[]) =>
+			paths.map(path => (path === uri ? { absolutePath: "/sessions/active/local/0.log", kind: "file" } : null)),
+		);
+		await render(content, "/work/README.md");
+		const link = host.querySelector('[role="link"]');
+		expect(link).not.toBeNull();
+		await act(async () => click(link, { metaKey: true }));
+		expect(useUiStore.getState().filePreviewPath).toBe(uri);
+		expect(openPath).not.toHaveBeenCalled();
+		expect(browserOpen).not.toHaveBeenCalled();
+	});
+	it.each(["local://missing.log", "local:/missing.log", "artifact:42"])(
+		"does not dispatch an unresolved %s reference to an OS handler",
+		async uri => {
+			await render(`[missing](${uri})`);
+			await act(async () => click(host.querySelector('[role="link"]'), { metaKey: true }));
+			expect(useUiStore.getState().filePreviewPath).toBeNull();
+			expect(openPath).not.toHaveBeenCalled();
+		},
+	);
+});

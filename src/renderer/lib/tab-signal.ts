@@ -8,7 +8,8 @@ export interface TabSignalPresentation {
 }
 
 export function tabSignalPresentation(tab: SessionTab, activeRuntime = false): TabSignalPresentation {
-	const running = tab.status === "running" || tab.compacting === true || activeRuntime;
+	const running =
+		tab.status === "running" || tab.compacting === true || tab.backgroundCompacting === true || activeRuntime;
 	if (running && tab.attention === "retrying") {
 		return { active: true, color: "var(--omp-warning)", labelKey: "tabs.retrying", running: true };
 	}

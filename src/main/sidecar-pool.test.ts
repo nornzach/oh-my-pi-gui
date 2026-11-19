@@ -1150,6 +1150,23 @@ describe("SidecarPool request-origin routing (F-UI-ORIGIN)", () => {
 });
 
 describe("SidecarPool quit inventory", () => {
+	it("reports a background handoff without marking the tab as streaming or blocking compaction", () => {
+		const { pool, sidecars } = fakePool();
+		const window = fakeWindow(1);
+		pool.acquire("/a", window.win, "tab-a");
+		const sidecar = sidecars[0];
+		sidecar?.emit("events", [{ type: "manual_compaction_start", mode: "handoff" }]);
+		expect(pool.tabInventory()).toEqual([{ windowId: 1, tabId: "tab-a", inFlight: true }]);
+		expect(pool.tabsForWindow(window.win)).toEqual([
+			expect.objectContaining({ backgroundCompacting: true, compacting: false }),
+		]);
+		sidecar?.emit("events", [{ type: "manual_compaction_end", aborted: true }]);
+		expect(pool.tabInventory()).toEqual([{ windowId: 1, tabId: "tab-a", inFlight: false }]);
+		expect(pool.tabsForWindow(window.win)).toEqual([
+			expect.objectContaining({ backgroundCompacting: false, compacting: false }),
+		]);
+	});
+
 	it("reports every live tab's in-flight run across windows and drops released tabs", () => {
 		const { pool, sidecars } = fakePool();
 		const first = fakeWindow(1);

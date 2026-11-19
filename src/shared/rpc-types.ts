@@ -24,6 +24,7 @@ export type RpcCommand =
 	| { id?: string; type: "steer"; message: string; images?: ImageContent[] }
 	| { id?: string; type: "follow_up"; message: string; images?: ImageContent[] }
 	| { id?: string; type: "abort" }
+	| { id?: string; type: "abort_compaction" }
 	| { id?: string; type: "abort_and_prompt"; message: string; images?: ImageContent[] }
 	| { id?: string; type: "new_session"; parentSession?: string }
 	| { id?: string; type: "drop_session" }
@@ -1616,6 +1617,7 @@ export interface RpcSessionState {
 	availableThinkingLevels?: ThinkingLevel[];
 	isStreaming: boolean;
 	isCompacting: boolean;
+	isBackgroundCompacting?: boolean;
 	steeringMode: "all" | "one-at-a-time";
 	followUpMode: "all" | "one-at-a-time";
 	interruptMode: "immediate" | "wait";
@@ -2296,6 +2298,7 @@ export interface UsageReport {
 	notes?: string[];
 	account?: string;
 	resetCreditsAvailable?: number;
+	metadata?: Record<string, unknown>;
 }
 
 export interface UsageSessionStats {
@@ -2648,6 +2651,13 @@ export interface ExtensionErrorFrame {
 // AgentSessionEvent (24 types)
 // ============================================================================
 
+export interface CacheWarmingContext {
+	phase: "streaming" | "idle";
+	method: "prewarm" | "replay";
+	provider: string;
+	model: string;
+}
+
 export type AgentSessionEvent =
 	| { type: "collab_state"; state: RpcCollabState; restored?: boolean }
 	| { type: "agent_start"; sessionId?: string }
@@ -2678,6 +2688,15 @@ export type AgentSessionEvent =
 			partialResult: unknown;
 	  }
 	| { type: "tool_execution_end"; toolCallId: string; toolName: string; result: unknown; isError?: boolean }
+	| { type: "manual_compaction_start"; mode?: string }
+	| { type: "manual_compaction_end"; result?: unknown; aborted: boolean; skipped?: boolean; errorMessage?: string }
+	| ({ type: "cache_warming_start" } & CacheWarmingContext)
+	| ({
+			type: "cache_warming_end";
+			outcome: "hit" | "miss" | "error" | "aborted";
+			usage?: { cost?: { total?: number } };
+			warmingStopReason?: string;
+	  } & CacheWarmingContext)
 	| { type: "auto_compaction_start"; reason: "threshold" | "overflow" | "idle" | "incomplete"; action: string }
 	| {
 			type: "auto_compaction_end";

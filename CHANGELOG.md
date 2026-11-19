@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- Ask a side question from the composer by starting the draft with `?`.
+- Preview Core 19 session-local output files and open legacy artifact links from conversation history.
+- Show cache warming outcomes, Claude subscription plans, and the new daemon service states.
+
+### Changed
+
+- Upgrade the bundled agent and its native addon to OMP Core 19.0.0.
+- Run handoff in the current conversation and keep its cancellation separate from the active reply.
+
 ## [0.9.46] - 2026-11-18
 
 ### Added

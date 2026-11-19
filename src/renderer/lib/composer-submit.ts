@@ -13,6 +13,7 @@ import { hydrateSession } from "../hooks/use-rpc-events";
 import { toast } from "../stores/toast";
 import { buildCurrentCommandMenu, type CommandAffordance } from "./command-registry";
 import { translate } from "./i18n";
+import { parseComposerMode } from "./input-modes";
 import type { TabRpc } from "./tab-rpc";
 
 export type ComposerSendMode = "prompt" | "steer" | "followUp";
@@ -27,6 +28,8 @@ const GUI_CONFIRMATION_COMMANDS = new Set(["share", "live", "btw", "delete", "dr
 export type ComposerSubmit =
 	/** Session-replacing command while busy — draft stays, warning toasted. */
 	| { kind: "blocked" }
+	/** A nonempty `?` draft goes to the session's side-question history. */
+	| { kind: "btw"; question: string }
 	/** Exact `/clear` — native clear_context RPC path (lib/messages.clearSessionContext). */
 	| { kind: "clear" }
 	/** A GUI-native command opened/executed its affordance synchronously. */
@@ -106,6 +109,12 @@ export function planComposerSubmit(input: {
 	rpc?: Pick<TabRpc, "compact" | "followUp" | "prompt" | "steer">;
 }): ComposerSubmit {
 	const { message, wireMessage = message, images, isStreaming, mode, commands, rpc = window.omp.rpc } = input;
+	const shortcut = parseComposerMode(message);
+	if (shortcut?.mode === "btw") {
+		return shortcut.body
+			? { kind: "btw", question: parseComposerMode(wireMessage)?.body ?? shortcut.body }
+			: { kind: "blocked" };
+	}
 	const isSlashCommand = message.startsWith("/");
 	if (isSlashCommand && isStreaming) {
 		const commandName = /^\/([a-z-]+)/i.exec(message)?.[1]?.toLowerCase();

@@ -32,3 +32,20 @@ it("remembers each file's view and keeps open tabs scoped to their project", () 
 	});
 	expect(useFileTabs.getState().workspaces.get("/beta")).toBe(beta);
 });
+
+it("drops session output tabs on session switches without discarding project file tabs", () => {
+	const tabs = useFileTabs.getState();
+	expect(tabs.scopeSession("/alpha", "tab-one/session-one")).toBe(false);
+	tabs.open("/alpha", "README.md", null, 1);
+	tabs.open("/alpha", "local://0.log", null, 2);
+	tabs.open("/alpha", "artifact://42", null, 3);
+	expect(tabs.scopeSession("/alpha", "tab-one/session-one")).toBe(false);
+	expect(useFileTabs.getState().workspaces.get("/alpha")?.tabs).toHaveLength(3);
+	expect(tabs.scopeSession("/alpha", "tab-two/session-two")).toBe(true);
+	expect(
+		useFileTabs
+			.getState()
+			.workspaces.get("/alpha")
+			?.tabs.map(tab => tab.path),
+	).toEqual(["README.md"]);
+});

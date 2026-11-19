@@ -2,6 +2,7 @@ import type { VirtualItem } from "@tanstack/react-virtual";
 import { createStore } from "zustand/vanilla";
 import type { DroppedProxy } from "../../shared/proxy";
 import type {
+	CacheWarmingContext,
 	ContextUsage,
 	RpcAdvisorStatus,
 	RpcCollabState,
@@ -22,7 +23,7 @@ export interface TranscriptView {
 	measurements: VirtualItem[];
 }
 
-/** A compaction or handoff this window asked for; the agent announces neither with an event. */
+/** A manual compaction requested by the window or announced by Core. */
 export interface ManualMaintenance {
 	kind: "compact" | "handoff";
 	/** Client clock when the request went out, for the elapsed time. */
@@ -47,6 +48,7 @@ export interface SessionStore {
 	cwd: string;
 	isStreaming: boolean;
 	isCompacting: boolean;
+	isBackgroundCompacting: boolean;
 	/** Client clock (Date.now()) of the current turn_start while no assistant
 	 * message has begun streaming — drives the chat's pending-model indicator
 	 * so a stalled provider request is visibly alive instead of dead air. */
@@ -60,6 +62,7 @@ export interface SessionStore {
 	compactionInfo: { reason: "threshold" | "overflow" | "idle" | "incomplete"; action: string } | null;
 	/** In flight from request to response, whichever surface started it. */
 	manualMaintenance: ManualMaintenance | null;
+	cacheWarming: (CacheWarmingContext & { outcome?: "hit" | "miss" | "error" | "aborted"; cost?: number }) | null;
 	status: SidecarStatus;
 	contextUsage: ContextUsage | null;
 	/** Bumped every time a get_state snapshot actually carries fresh context
@@ -107,10 +110,12 @@ const initialState = {
 	cwd: "",
 	isStreaming: false,
 	isCompacting: false,
+	isBackgroundCompacting: false,
 	awaitingModelSince: null,
 	retryInfo: null,
 	compactionInfo: null,
 	manualMaintenance: null,
+	cacheWarming: null,
 	status: "starting" as SidecarStatus,
 	contextUsage: null,
 	statsPulse: 0,
@@ -137,7 +142,7 @@ export const createSessionStore = () =>
 		saveTranscriptView: transcriptView => set({ transcriptView }),
 		pinTranscriptToBottom: () => set(state => ({ transcriptPinNonce: state.transcriptPinNonce + 1 })),
 		setFromState: state =>
-			set({
+			set(current => ({
 				sessionId: state.sessionId,
 				collab: state.collab ?? null,
 				// Sessions whose auto-title never ran carry an empty title slot on
@@ -148,6 +153,12 @@ export const createSessionStore = () =>
 				cwd: state.cwd,
 				isStreaming: state.isStreaming,
 				isCompacting: state.isCompacting,
+				isBackgroundCompacting: state.isBackgroundCompacting === true,
+				...(state.isBackgroundCompacting && !current.manualMaintenance
+					? { manualMaintenance: { kind: "handoff", startedAt: Date.now() } }
+					: current.isBackgroundCompacting && !state.isBackgroundCompacting
+						? { manualMaintenance: null }
+						: {}),
 				// The status row keys off compactionInfo alone; a missed
 				// auto_compaction_end must not leave it up once the agent reports idle.
 				...(state.isCompacting ? {} : { compactionInfo: null }),
@@ -158,7 +169,7 @@ export const createSessionStore = () =>
 				prewalkArmed: state.prewalkArmed ?? false,
 				agentsPaused: state.agentsPaused ?? false,
 				agentsPausedAt: state.agentsPausedAt ?? null,
-			}),
+			})),
 		setStatus: (status, cwd) => set({ status, cwd }),
 		reset: () => set(initialState),
 	}));

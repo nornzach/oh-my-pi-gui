@@ -23,6 +23,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type DocumentPage, HTML_DOCUMENT, OFFICE_DOCUMENT, TABLE_DOCUMENT } from "../../../shared/document-preview";
 import type { FileEditFailure, FsTreeEntry } from "../../../shared/ipc-types";
+import { isSessionOutputPath } from "../../../shared/session-output";
 import { describeError } from "../../lib/errors";
 import { basename, copyText, formatBytes } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -127,6 +128,8 @@ export function FilesPanel() {
 	const t = useT();
 	const tabId = useRuntimeTabId();
 	const cwd = useSessionStore(state => state.cwd);
+	const sessionFile = useSessionStore(state => state.sessionFile);
+	const sessionScope = `${tabId ?? ""}\0${sessionFile ?? ""}`;
 	const requestedPath = useUiStore(s => s.filePreviewPath);
 	const requestedLine = useUiStore(s => s.filePreviewLine);
 	const requestId = useUiStore(s => s.filePreviewRequestId);
@@ -134,12 +137,23 @@ export function FilesPanel() {
 	const openFilePreview = useUiStore(s => s.openFilePreview);
 	const closeFilePreview = useUiStore(s => s.closeFilePreview);
 	const workspace = useFileTabs(state => state.workspaces.get(cwd) ?? EMPTY_FILE_TABS);
-	const activeTab = filePreviewImage ? undefined : workspace.tabs.find(tab => tab.id === workspace.activeId);
+	const activeTab = filePreviewImage
+		? undefined
+		: workspace.tabs.find(
+				tab =>
+					tab.id === workspace.activeId &&
+					(!isSessionOutputPath(tab.path) || workspace.sessionScope === sessionScope),
+			);
 	const filePreviewPath = activeTab?.path ?? null;
 	const filePreviewLine = activeTab?.line ?? null;
 	useLayoutEffect(() => {
+		const changed = useFileTabs.getState().scopeSession(cwd, sessionScope);
+		if (changed && requestedPath && isSessionOutputPath(requestedPath)) {
+			closeFilePreview();
+			return;
+		}
 		if (requestedPath) useFileTabs.getState().open(cwd, requestedPath, requestedLine, requestId);
-	}, [cwd, requestedPath, requestedLine, requestId]);
+	}, [cwd, sessionScope, requestedPath, requestedLine, requestId, closeFilePreview]);
 	const previewVersion = useRef(0);
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 	const { directories, query, term, setQuery, showIgnored, setShowIgnored, search, refresh } = useWorkspaceExplorer(
@@ -338,6 +352,7 @@ export function FilesPanel() {
 	const previewImage = filePreviewLine === null || !activePreview?.content ? (activePreview?.image ?? null) : null;
 	const editing = hasDraft && !formattedPreview && !previewImage;
 	const wantsEditor =
+		!isSessionOutputPath(filePreviewPath ?? "") &&
 		!formattedPreview &&
 		!previewImage &&
 		typeof activePreview?.content === "string" &&

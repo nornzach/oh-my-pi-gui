@@ -165,8 +165,8 @@ export function SessionPickerDialog() {
 		if (switching !== null) return;
 		// Busy sessions route to the switch dialog (new window vs abort) — close
 		// the picker first so it doesn't sit behind the modal.
-		const { isStreaming, isCompacting } = useSessionStore.getState();
-		if (isStreaming || isCompacting) {
+		const { isStreaming, isCompacting, isBackgroundCompacting } = useSessionStore.getState();
+		if (isStreaming || isCompacting || isBackgroundCompacting) {
 			close();
 			requestSessionSwitch(session);
 			return;

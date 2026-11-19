@@ -71,7 +71,13 @@ export async function pickAndMoveSession(tabId = focusedRuntimeTabId()): Promise
 			(tabId ? sessionRuntime(tabId) !== runtime : focusedRuntimeTabId() !== null)
 		)
 			return false;
-		if (state.collab?.readOnly || state.status !== "ready" || state.isStreaming || state.isCompacting) {
+		if (
+			state.collab?.readOnly ||
+			state.status !== "ready" ||
+			state.isStreaming ||
+			state.isCompacting ||
+			state.isBackgroundCompacting
+		) {
 			toast({
 				variant: "warning",
 				message: translate(

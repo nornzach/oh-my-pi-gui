@@ -30,7 +30,7 @@ export function WorkspaceDirsDialog() {
 	const t = useT();
 	const open = useUiStore(state => state.workspaceDirsOpen);
 	const close = useUiStore(state => state.closeWorkspaceDirs);
-	const busy = useSessionStore(state => state.isStreaming || state.isCompacting);
+	const busy = useSessionStore(state => state.isStreaming || state.isCompacting || state.isBackgroundCompacting);
 	const sidecarReady = useSessionStore(state => state.status) === "ready";
 	const [directories, setDirectories] = useState<RpcWorkspaceDirectory[]>([]);
 	const [loading, setLoading] = useState(false);

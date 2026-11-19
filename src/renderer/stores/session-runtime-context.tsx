@@ -25,6 +25,8 @@ export function activeTabCommand(command: RpcCommand, timeoutMs?: number): Promi
 	const rpc = window.omp.rpc;
 	if (typeof rpc.command === "function") return rpc.command(command, timeoutMs);
 	switch (command.type) {
+		case "abort_compaction":
+			return rpc.abortCompaction();
 		case "get_state":
 			return rpc.getState();
 		case "get_transcript":

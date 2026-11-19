@@ -136,7 +136,9 @@ function TabChip({
 	const switchTab = useTabsStore(s => s.switchTab);
 	const closable = useTabsStore(s => s.tabs.length > 1);
 	// The active tab's live stream state sharpens the signal between status pushes.
-	const activeRuntime = useSessionStore(s => (active ? s.isStreaming || s.isCompacting : false));
+	const activeRuntime = useSessionStore(s =>
+		active ? s.isStreaming || s.isCompacting || s.isBackgroundCompacting : false,
+	);
 	const signal = tabSignalPresentation(tab, activeRuntime);
 	const signalLabel = t(signal.labelKey);
 	// A shown subagent page takes the selection; its session keeps the visible ring.
@@ -333,7 +335,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 	const liveAttachmentCount = useComposerStore(s => s.images.length + s.files.length);
 	const liveMessageCount = useSessionStore(s => s.messageCount);
 	const liveStreaming = useSessionStore(s => s.isStreaming);
-	const liveCompacting = useSessionStore(s => s.isCompacting);
+	const liveCompacting = useSessionStore(s => s.isCompacting || s.isBackgroundCompacting);
 	const liveRenderedMessages = useMessagesStore(s => s.messages.length);
 	const liveQueuedMessages = useQueueStore(s => s.steering.length + s.followUp.length);
 	const pruningPlaceholderRef = useRef<string | null>(null);
@@ -455,7 +457,14 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 				!sessionHasContent(indexedSession);
 			if (tab.placeholder !== true && !legacyEmptyStartupChat) return false;
 			if (indexedSession && sessionHasContent(indexedSession)) return false;
-			if (tab.worktree || tab.pendingSessionPath || tab.status === "running" || tab.compacting) return false;
+			if (
+				tab.worktree ||
+				tab.pendingSessionPath ||
+				tab.status === "running" ||
+				tab.compacting ||
+				tab.backgroundCompacting
+			)
+				return false;
 			if (!tabs.some(other => other.id !== tab.id && other.placeholder !== true)) return false;
 
 			if (tab.id === activeTabId) {
@@ -478,6 +487,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 			return (
 				!session.isStreaming &&
 				!session.isCompacting &&
+				!session.isBackgroundCompacting &&
 				session.messageCount === 0 &&
 				messages.messages.length === 0 &&
 				queue.steering.length === 0 &&

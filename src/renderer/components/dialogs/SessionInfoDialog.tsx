@@ -58,6 +58,7 @@ export function SessionInfoDialog() {
 	const tabRpc = useTabRpc();
 	const t = useT();
 	const sidecarReady = useSessionStore(state => state.status) === "ready";
+	const cacheWarming = useSessionStore(state => state.cacheWarming);
 	const open = useUiStore(state => state.sessionInfoOpen);
 	const close = useUiStore(state => state.closeSessionInfo);
 
@@ -91,6 +92,13 @@ export function SessionInfoDialog() {
 	}, [open, reload]);
 
 	const contextView = stats?.contextUsage ? contextUsageView(stats.contextUsage) : null;
+	const cacheRows: Row[] = stats?.promptCache ? promptCacheRows(stats.promptCache, t) : [];
+	if (cacheWarming) {
+		const status = t(`sessionInfo.cache.warming.${cacheWarming.outcome ?? "active"}`);
+		const method = t(`sessionInfo.cache.warming.${cacheWarming.method}`);
+		const cost = typeof cacheWarming.cost === "number" ? formatCost(cacheWarming.cost) : null;
+		cacheRows.push({ label: method, value: cost ? `${status} · ${cost}` : status });
+	}
 
 	return (
 		<Modal dockable open={open} onClose={close} title={t("sessionInfo.title")} size="md">
@@ -154,12 +162,7 @@ export function SessionInfoDialog() {
 								{ label: t("sessionInfo.total"), value: formatTokens(stats.tokens.total) },
 							]}
 						/>
-						{stats.promptCache && (
-							<Section
-								title={t("sessionInfo.section.promptCache")}
-								rows={promptCacheRows(stats.promptCache, t)}
-							/>
-						)}
+						{cacheRows.length > 0 && <Section title={t("sessionInfo.section.promptCache")} rows={cacheRows} />}
 						<Section
 							title={t("sessionInfo.section.usage")}
 							rows={[
