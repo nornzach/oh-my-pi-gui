@@ -97,6 +97,7 @@ interface PoolEntry {
 	awaitingSessionSettled: boolean;
 	/** Automatic transcript compaction state once observed — true blocks session mutation. */
 	compacting?: boolean;
+	manualCompaction?: "foreground" | "background" | null;
 	/**
 	 * Outcome a background tab's chip must show without full events: an
 	 * auto-retry in flight, or a last run that ended in a provider error.
@@ -129,6 +130,10 @@ interface PoolEntry {
 	 * listeners without duplicating them.
 	 */
 	detachFull: (() => void) | null;
+}
+
+function entryHasWork(entry: PoolEntry): boolean {
+	return entry.running || entry.compacting === true || entry.manualCompaction != null;
 }
 
 /** An idle sidecar booted ahead of the next tab in `cwd` (gui#29). */
@@ -402,6 +407,7 @@ export class SidecarPool {
 				entry.running = false;
 				entry.awaitingSessionSettled = false;
 				entry.compacting = undefined;
+				if (entry.manualCompaction !== undefined) entry.manualCompaction = null;
 				entry.retry = undefined;
 				if (entry.attention === "retrying") entry.attention = undefined;
 				// Pending request-id routes belong to the dead process — the
@@ -440,9 +446,9 @@ export class SidecarPool {
 			forwardToWindow(win, IPC_EVENTS.TAB_STATUS, tabStatusPayload(entry));
 		});
 		const setRunning = (running: boolean): void => {
-			const wasBusy = entry.running || entry.compacting === true;
+			const wasBusy = entryHasWork(entry);
 			entry.running = running;
-			const busy = entry.running || entry.compacting === true;
+			const busy = entryHasWork(entry);
 			if (busy !== wasBusy) forwardToWindow(win, IPC_EVENTS.TAB_STATUS, tabStatusPayload(entry));
 		};
 		sidecar.on("promptResult", (frame: PromptResultFrame) => {
@@ -457,10 +463,11 @@ export class SidecarPool {
 		// Agent-end means one run yielded; upstream prompt/session-settled frames
 		// keep background async work represented as running until it is quiet.
 		sidecar.on("events", (events: AgentSessionEvent[]) => {
-			const wasBusy = entry.running || entry.compacting === true;
+			const wasBusy = entryHasWork(entry);
 			const wasPlaceholder = entry.placeholder;
 			const wasAttention = entry.attention;
 			const wasRetry = entry.retry;
+			const wasManualCompaction = entry.manualCompaction;
 			// plan_proposal blocks the agent on a host decision — it must reach
 			// the renderer even while this tab's full stream is parked, or the
 			// dialog can never appear and the turn waits forever. Visible tabs
@@ -497,17 +504,24 @@ export class SidecarPool {
 					entry.retry = undefined;
 				} else if (event.type === "auto_compaction_start") entry.compacting = true;
 				else if (event.type === "auto_compaction_end") entry.compacting = false;
+				else if (event.type === "manual_compaction_start") {
+					entry.manualCompaction = event.mode === "handoff" ? "background" : "foreground";
+				} else if (event.type === "manual_compaction_end") {
+					entry.manualCompaction = null;
+					entry.compacting ??= false;
+				}
 				if (event.type === "plan_proposal" && !entry.detachFull) parkedProposals.push(event);
 			}
 			if (parkedProposals.length > 0) {
 				forwardToWindow(win, IPC_EVENTS.EVENTS_BATCH, { tabId: entry.tabId, payload: parkedProposals });
 			}
-			const busy = entry.running || entry.compacting === true;
+			const busy = entryHasWork(entry);
 			if (
 				busy !== wasBusy ||
 				entry.placeholder !== wasPlaceholder ||
 				entry.attention !== wasAttention ||
-				entry.retry !== wasRetry
+				entry.retry !== wasRetry ||
+				entry.manualCompaction !== wasManualCompaction
 			) {
 				forwardToWindow(win, IPC_EVENTS.TAB_STATUS, tabStatusPayload(entry));
 			}
@@ -690,7 +704,7 @@ export class SidecarPool {
 	async commandForIdleSession(sessionPath: string, command: RpcCommand): Promise<RpcResponse | null> {
 		const owner = this.#sessionOwners.get(sessionPath);
 		const entry = owner ? this.#byTabId.get(owner.tabId) : undefined;
-		if (!entry || entry.running || entry.compacting === true || entry.status !== "ready") return null;
+		if (!entry || entryHasWork(entry) || entry.status !== "ready") return null;
 		const client = entry.sidecar.rpcClient;
 		return client ? await client.command(command) : null;
 	}
@@ -935,7 +949,7 @@ export class SidecarPool {
 		return [...this.#entries].map(entry => ({
 			windowId: entry.winId,
 			tabId: entry.tabId,
-			inFlight: entry.running || entry.compacting === true,
+			inFlight: entryHasWork(entry),
 		}));
 	}
 
@@ -1080,7 +1094,10 @@ function tabStatusPayload(entry: PoolEntry): IpcTabStatusPayload {
 		// reports its connection state even with a dead in-flight run.
 		status: entry.running && entry.status === "ready" ? "running" : entry.status,
 	};
-	if (entry.compacting !== undefined) payload.compacting = entry.compacting;
+	if (entry.manualCompaction !== undefined) payload.backgroundCompacting = entry.manualCompaction === "background";
+	if (entry.compacting !== undefined || entry.manualCompaction !== undefined) {
+		payload.compacting = entry.compacting === true || entry.manualCompaction === "foreground";
+	}
 	if (entry.sessionId !== undefined) payload.sessionId = entry.sessionId;
 	if (entry.title !== undefined) payload.title = entry.title;
 	if (entry.worktree !== undefined) payload.worktree = entry.worktree;

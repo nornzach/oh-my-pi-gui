@@ -65,6 +65,7 @@ export interface SessionTab {
 	status: TabStatus;
 	/** Automatic transcript compaction is in flight in this tab's sidecar. */
 	compacting?: boolean;
+	backgroundCompacting?: boolean;
 	/** Immutable session kind, fixed when this tab's sidecar was spawned. */
 	kind: SessionKind;
 	/** Untargeted startup tab that may be replaced while still truly empty. */
@@ -482,6 +483,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 						cwd: info.cwd || existing?.cwd || "",
 						status: info.status,
 						compacting: info.compacting ?? existing?.compacting ?? false,
+						backgroundCompacting: info.backgroundCompacting ?? existing?.backgroundCompacting ?? false,
 						kind: info.kind ?? existing?.kind ?? "agent",
 						placeholder: info.placeholder ?? existing?.placeholder,
 						worktree: info.worktree ?? existing?.worktree,
@@ -792,6 +794,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					cwd: payload.cwd || previous?.cwd || "",
 					status: payload.status,
 					compacting: payload.compacting ?? previous?.compacting ?? false,
+					backgroundCompacting: payload.backgroundCompacting ?? previous?.backgroundCompacting ?? false,
 					kind: payload.kind ?? previous?.kind ?? "agent",
 					placeholder: payload.placeholder ?? previous?.placeholder,
 					worktree: payload.worktree ?? previous?.worktree,

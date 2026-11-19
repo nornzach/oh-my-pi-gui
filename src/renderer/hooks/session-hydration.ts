@@ -358,7 +358,8 @@ export function repairStaleRunState(
 	const streamingAgrees = session.isStreaming === (state.isStreaming === true);
 	// A lost auto_compaction_end leaves the maintenance row up on an idle tab.
 	const compactingAgrees = state.isCompacting === true || (!session.isCompacting && session.compactionInfo == null);
-	if (streamingAgrees && compactingAgrees) return;
+	const backgroundCompactionAgrees = session.isBackgroundCompacting === (state.isBackgroundCompacting === true);
+	if (streamingAgrees && compactingAgrees && backgroundCompactionAgrees) return;
 	void hydrateTabSession(tabId);
 }
 

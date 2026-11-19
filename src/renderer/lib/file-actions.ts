@@ -3,7 +3,9 @@
  * preview (at its line, when the reference names one); outside it opens with
  * the system's default app or is revealed in the file manager.
  */
+
 import type { IpcResolvedPath } from "../../shared/ipc-types";
+import { isSessionOutputPath } from "../../shared/session-output";
 import { toast } from "../stores/toast";
 import { useUiStore } from "../stores/ui";
 import { describeError } from "./errors";
@@ -45,6 +47,10 @@ export function previewFile(path: string, line?: number): void {
  * open with the default app.
  */
 export function activateFileLink(target: FileTarget, resolved: IpcResolvedPath | null | undefined, modifier: boolean) {
+	if (isSessionOutputPath(target.path)) {
+		if (resolved) previewFile(target.path, target.line);
+		return;
+	}
 	const path = resolved?.absolutePath ?? target.path;
 	if (modifier || resolved?.kind === "directory") {
 		void openPathExternally(path);

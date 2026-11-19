@@ -22,7 +22,11 @@ export function remarkFilePaths() {
 				let offset = 0;
 				for (const match of node.value.matchAll(PATH_TOKEN)) {
 					const token = trimAddress(match[0]);
-					if (!PATH_SHAPE.test(parseFileTarget(token).path) || !looksLikeFilePath(token)) continue;
+					if (
+						(!/^(?:local|artifact):\/\//i.test(token) && !PATH_SHAPE.test(parseFileTarget(token).path)) ||
+						!looksLikeFilePath(token)
+					)
+						continue;
 					if (match.index > offset) children.push({ type: "text", value: node.value.slice(offset, match.index) });
 					children.push({ type: "inlineCode", value: token });
 					offset = match.index + token.length;

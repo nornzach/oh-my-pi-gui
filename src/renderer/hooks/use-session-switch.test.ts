@@ -26,7 +26,13 @@ import { useToastStore } from "../stores/toast";
 import { useTodoStore } from "../stores/todo";
 import { useToolsStore } from "../stores/tools";
 import { useUiStore } from "../stores/ui";
-import { dropSessionNow, newSessionNow, openSessionFromSidebar, switchSessionNow } from "./use-session-switch";
+import {
+	dropSessionNow,
+	newSessionNow,
+	openSessionFromSidebar,
+	requestSessionSwitch,
+	switchSessionNow,
+} from "./use-session-switch";
 
 const { document, window, Event, HTMLElement, Node } = parseHTML("<html><body></body></html>");
 const globals = globalThis as Record<string, unknown>;
@@ -360,6 +366,20 @@ describe("switchSessionNow F-OWN owner guard", () => {
 
 		expect(result).toBe(true);
 		expect(omp.rpc.switchSession).toHaveBeenCalledWith("/sessions/x.jsonl");
+	});
+
+	it("requires confirmation before replacing a session with an active background handoff", () => {
+		seedTabs();
+		useSessionStore.setState({ isBackgroundCompacting: true, isStreaming: false, isCompacting: false });
+		const target = session("/sessions/history.jsonl");
+		const request = vi.spyOn(useUiStore.getState(), "requestSessionSwitch");
+		try {
+			requestSessionSwitch(target);
+			expect(request).toHaveBeenCalledWith(target);
+			expect(omp.rpc.switchSession).not.toHaveBeenCalled();
+		} finally {
+			request.mockRestore();
+		}
 	});
 
 	it("keeps ordinary switch failures as error toasts", async () => {

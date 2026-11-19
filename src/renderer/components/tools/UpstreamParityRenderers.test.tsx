@@ -236,3 +236,113 @@ describe("omp 18.3.0 coordination protocol renderers", () => {
 		expect(container.textContent).toContain("cancelled");
 	});
 });
+
+describe("omp 19.0.0 coordination protocol renderers", () => {
+	it("renders current daemon units together with persisted legacy services", async () => {
+		await mount(
+			<ReadRenderer
+				args={{ path: "proc://" }}
+				result={{
+					content: [{ type: "text", text: "service roster" }],
+					details: {
+						proc: {
+							daemons: [
+								{
+									id: "unit-1",
+									key: "web",
+									label: "Frontend preview",
+									state: "ready",
+									pids: [1201, 1202],
+									policy: { hold: "persist" },
+									startedAt: 1_000,
+								},
+								{ id: "old", name: "legacy", state: "exited", pid: 99, exitCode: 2, detached: true },
+							],
+						},
+					},
+				}}
+			/>,
+		);
+
+		expect(container.textContent).toContain("Frontend preview");
+		expect(container.textContent).toContain("web");
+		expect(container.textContent).toContain("pid 1201");
+		expect(container.textContent).toContain("persistent");
+		expect(container.textContent).toContain("legacy");
+		expect(container.textContent).toContain("pid 99");
+		expect(container.textContent).toContain("exit 2");
+		expect(container.textContent).toContain("detached");
+		expect(container.textContent).not.toContain("service roster");
+	});
+
+	it("shows a current daemon unit and terminal rows in a service read", async () => {
+		await mount(
+			<ReadRenderer
+				args={{ path: "proc://worker" }}
+				result={{
+					content: [{ type: "text", text: "raw service status" }],
+					details: {
+						proc: {
+							daemon: { id: "unit-2", key: "worker", state: "running", pids: [42], policy: { hold: "leases" } },
+							terminalRows: ["Processing batch", "6 items remaining"],
+						},
+					},
+				}}
+			/>,
+		);
+
+		expect(container.textContent).toContain("pid 42");
+		expect(container.textContent).toContain("Processing batch\n6 items remaining");
+		expect(container.textContent).not.toContain("raw service status");
+	});
+
+	it("keeps queued work visible with a waiting icon", async () => {
+		await mount(
+			<WaitRenderer
+				args={{}}
+				result={{
+					details: {
+						jobs: [
+							{ id: "queue-1", type: "task", status: "running", queued: true, label: "Review parser" },
+							{ id: "queue-2", type: "task", status: "queued", label: "Review renderer" },
+						],
+					},
+				}}
+			/>,
+		);
+
+		expect(container.textContent).toContain("queue-1");
+		expect(container.textContent).toContain("queue-2");
+		expect(container.textContent?.match(/Queued/g)).toHaveLength(2);
+		expect(container.querySelector(".animate-spin")).toBeNull();
+		expect(container.textContent).not.toContain("done");
+	});
+
+	it("shows updated daemon state after a proc control write", async () => {
+		await mount(
+			<WriteRenderer
+				args={{ path: "proc://web/kill", content: "" }}
+				result={{
+					content: [{ type: "text", text: "Stopped web" }],
+					details: {
+						proc: {
+							daemon: {
+								id: "unit-1",
+								key: "web",
+								state: "exited",
+								pids: [],
+								exitCode: 0,
+								policy: { hold: "leases" },
+							},
+						},
+					},
+				}}
+			/>,
+		);
+
+		expect(container.textContent).toContain("Process kill");
+		expect(container.textContent).toContain("exited");
+		expect(container.textContent).toContain("exit 0");
+		expect(container.textContent).not.toContain("Stopped web");
+	});
+});

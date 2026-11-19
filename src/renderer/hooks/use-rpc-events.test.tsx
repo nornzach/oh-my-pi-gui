@@ -651,6 +651,72 @@ describe("useRpcEvents stale run repair", () => {
 	});
 });
 
+describe("Core 19 session maintenance events", () => {
+	it("tracks a background handoff without interrupting the active response", async () => {
+		const { emitTabBatch } = installTabRoutedMockOmp();
+		const session = seedReadyTab("handoff-tab");
+		await mount(<RpcEventsProbe />);
+		await act(async () => {
+			emitTabBatch([{ type: "agent_start" }, { type: "manual_compaction_start", mode: "handoff" }], "handoff-tab");
+		});
+		expect(session.getState()).toMatchObject({
+			isStreaming: true,
+			isCompacting: false,
+			isBackgroundCompacting: true,
+			manualMaintenance: { kind: "handoff" },
+		});
+
+		await act(async () => {
+			emitTabBatch([{ type: "manual_compaction_end", aborted: true }], "handoff-tab");
+		});
+		expect(session.getState()).toMatchObject({
+			isStreaming: true,
+			isCompacting: false,
+			isBackgroundCompacting: false,
+			manualMaintenance: null,
+		});
+	});
+
+	it("preserves an overlapping automatic compaction when a handoff ends", async () => {
+		const { emitTabBatch } = installTabRoutedMockOmp();
+		const session = seedReadyTab("handoff-tab");
+		await mount(<RpcEventsProbe />);
+		await act(async () => {
+			emitTabBatch(
+				[
+					{ type: "manual_compaction_start", mode: "handoff" },
+					{ type: "auto_compaction_start", reason: "overflow", action: "context-full" },
+					{ type: "manual_compaction_end", aborted: true },
+				],
+				"handoff-tab",
+			);
+		});
+		expect(session.getState()).toMatchObject({
+			isCompacting: true,
+			isBackgroundCompacting: false,
+			manualMaintenance: null,
+		});
+	});
+
+	it("records the cache refresh outcome and cost in the owning tab", async () => {
+		const { emitTabBatch } = installTabRoutedMockOmp();
+		const session = seedReadyTab("cache-tab");
+		await mount(<RpcEventsProbe />);
+		const cache = { phase: "idle", method: "prewarm", provider: "anthropic", model: "claude" } as const;
+		await act(async () => {
+			emitTabBatch([{ type: "cache_warming_start", ...cache }], "cache-tab");
+		});
+		expect(session.getState().cacheWarming).toEqual(cache);
+		await act(async () => {
+			emitTabBatch(
+				[{ type: "cache_warming_end", ...cache, outcome: "hit", usage: { cost: { total: 0.004 } } }],
+				"cache-tab",
+			);
+		});
+		expect(session.getState().cacheWarming).toEqual({ ...cache, outcome: "hit", cost: 0.004 });
+	});
+});
+
 describe("useRpcEvents awaiting-model marker", () => {
 	it("arms on agent/turn start and clears when the assistant message finalizes", async () => {
 		const { emitBatch } = installMockOmp();

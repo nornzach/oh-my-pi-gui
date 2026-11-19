@@ -61,6 +61,9 @@ export function resetSessionSurface(closeOverlays = true): void {
 		sessionFile: null,
 		isStreaming: false,
 		isCompacting: false,
+		isBackgroundCompacting: false,
+		manualMaintenance: null,
+		cacheWarming: null,
 		awaitingModelSince: null,
 		retryInfo: null,
 		compactionInfo: null,
@@ -247,7 +250,15 @@ function canBrowseInPlace(tab: SessionTab, session: SessionInfo): boolean {
 	if (tab.kind !== (session.kind === "chat" ? "chat" : "agent") || tab.worktree || tab.pendingSessionPath)
 		return false;
 	const state = useSessionStore.getState();
-	if (tab.status !== "ready" || state.isStreaming || state.isCompacting || state.switchPending) return false;
+	if (
+		tab.status !== "ready" ||
+		tab.backgroundCompacting ||
+		state.isStreaming ||
+		state.isCompacting ||
+		state.isBackgroundCompacting ||
+		state.switchPending
+	)
+		return false;
 	if (session.cwd !== state.cwd && session.cwd !== tab.cwd) return false;
 	const composer = useComposerStore.getState();
 	if (composer.sending || composer.draft.trim() !== "" || composer.images.length > 0 || composer.files.length > 0)
@@ -283,9 +294,9 @@ export async function openSessionFromSidebar(session: SessionInfo): Promise<void
  * Idle sessions switch straight through.
  */
 export function requestSessionSwitch(session: SessionInfo): void {
-	const { isStreaming, isCompacting, sessionId } = useSessionStore.getState();
+	const { isStreaming, isCompacting, isBackgroundCompacting, sessionId } = useSessionStore.getState();
 	if (session.id === sessionId) return;
-	if (isStreaming || isCompacting) {
+	if (isStreaming || isCompacting || isBackgroundCompacting) {
 		useUiStore.getState().requestSessionSwitch(session);
 		return;
 	}

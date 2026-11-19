@@ -1024,6 +1024,8 @@ export interface IpcTabInfo {
 	group?: { axis: "columns" | "rows"; index: 0 | 1; ratio: number; partnerTabId: string };
 	/** True while automatic transcript compaction is mutating this session. */
 	compacting?: boolean;
+	/** In-place handoff that can coexist with a live response. */
+	backgroundCompacting?: boolean;
 	/** Immutable session kind, fixed when the tab's sidecar was spawned. */
 	kind: SessionKind;
 	/** Disposable untargeted startup tab. Cleared permanently when its first run starts. */
@@ -1337,6 +1339,7 @@ export interface OmpApi {
 		steer(message: string, images?: ImageContent[]): Promise<RpcResponse>;
 		followUp(message: string, images?: ImageContent[]): Promise<RpcResponse>;
 		abort(): Promise<RpcResponse>;
+		abortCompaction(): Promise<RpcResponse>;
 		abortAndPrompt(message: string): Promise<RpcResponse>;
 		newSession(parentSession?: string): Promise<RpcResponse>;
 		dropSession(): Promise<RpcResponse>;

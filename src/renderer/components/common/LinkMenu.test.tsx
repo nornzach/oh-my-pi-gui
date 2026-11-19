@@ -216,3 +216,21 @@ describe("selected text", () => {
 		expect(labels).toEqual(["Copy"]);
 	});
 });
+
+it("keeps session output preview and copy inside the app without external actions", () => {
+	const items = linkMenuItems(
+		{
+			target: {
+				kind: "path",
+				target: { path: "local://0.log" },
+				resolved: { absolutePath: "/sessions/active/local/0.log", kind: "file" },
+			},
+			selection: "",
+		},
+		t,
+	);
+	expect(items.map(item => item.id)).toEqual(["preview", "copy-path"]);
+	select(items, "preview");
+	expect(useUiStore.getState().filePreviewPath).toBe("local://0.log");
+	expect(openPath).not.toHaveBeenCalled();
+});

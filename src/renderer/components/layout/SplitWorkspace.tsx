@@ -103,7 +103,7 @@ function SessionPane({ tabId, split, label }: { tabId: string; split: boolean; l
 		state.split ? (state.split.firstTabId === tabId ? state.split.secondTabId : state.split.firstTabId) : null,
 	);
 	if (!tab) return null;
-	const running = tab.status === "running" || tab.compacting === true;
+	const running = tab.status === "running" || tab.compacting === true || tab.backgroundCompacting === true;
 	const signalActive = running || tab.status === "starting" || tab.status === "restarting";
 	const signalColor = running
 		? "var(--omp-accent)"

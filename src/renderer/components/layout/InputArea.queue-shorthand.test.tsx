@@ -11,6 +11,7 @@ import type { AgentMessage, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../lib/i18n";
 import { IS_MAC } from "../../lib/keymap";
 import { pasteMarkerText, storePaste } from "../../lib/paste-blobs";
+import { useBtwStore } from "../../stores/btw";
 import { useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
 import { useMessagesStore } from "../../stores/messages";
@@ -259,6 +260,7 @@ afterEach(async () => {
 	useMessagesStore.getState().reset();
 	useModelStore.getState().reset();
 	useComposerStore.getState().reset();
+	useBtwStore.getState().reset();
 	useInputHistoryStore.setState({ entries: [], navIndex: -1, navDraft: "", navContext: undefined });
 	useQueueStore.getState().setFromFrame({ steering: [], followUp: [] });
 	useSettingsStore.getState().reset();
@@ -267,6 +269,79 @@ afterEach(async () => {
 	useUiStore.getState().closeFilePreview();
 	setWindowWidth(1200);
 	vi.restoreAllMocks();
+});
+
+describe("InputArea side-question shortcut", () => {
+	it("shows the BTW badge and sends through the originating tab's side-question store", async () => {
+		await mount(true);
+		const command = vi.mocked(window.omp.rpc.commandForTab);
+		command.mockImplementation(async (_tabId, request) => {
+			if (request.type === "btw")
+				return ok({
+					record: {
+						id: "topic-1",
+						question: request.question,
+						answer: "",
+						createdAt: 1,
+						updatedAt: 1,
+						status: "running",
+					},
+				});
+			return ok({});
+		});
+		await typeInto(findTextarea(), "? Why did this fail?");
+		expect(
+			document.querySelector(`[title="Ask a side question, or browse this session's side questions"]`)?.textContent,
+		).toContain("Side Question");
+		await pressEnter(findTextarea());
+		await flush();
+
+		expect(command).toHaveBeenCalledWith("t0", { type: "btw", question: "Why did this fail?" }, 120_000);
+		expect(useUiStore.getState().panelTab).toBe("btw");
+		expect(useComposerStore.getState().draft).toBe("");
+		expect(useBtwStore.getState().selectedId).toBe("topic-1");
+		expect(prompt).not.toHaveBeenCalled();
+		expect(steer).not.toHaveBeenCalled();
+		expect(followUp).not.toHaveBeenCalled();
+	});
+
+	it("restores a rejected side question and retains attachments", async () => {
+		await mount(true);
+		const file = { name: "source.ts", mention: "@source.ts" };
+		const image = {
+			content: { type: "image" as const, data: "abc", mimeType: "image/png" },
+			preview: "data:image/png;base64,abc",
+		};
+		await act(async () => {
+			useComposerStore.getState().addFiles([file]);
+			useComposerStore.getState().setImages([image]);
+		});
+		const command = vi.mocked(window.omp.rpc.commandForTab);
+		command.mockResolvedValue({ type: "response", command: "btw", success: false, error: "Already running" });
+		await typeInto(findTextarea(), "? Check this");
+		await pressEnter(findTextarea());
+		await flush();
+
+		expect(command).toHaveBeenCalledWith("t0", { type: "btw", question: "Check this @source.ts" }, 120_000);
+		expect(useComposerStore.getState().draft).toBe("? Check this");
+		expect(useComposerStore.getState().files).toEqual([file]);
+		expect(useComposerStore.getState().images).toEqual([image]);
+		expect(useComposerStore.getState().sending).toBe(false);
+		expect(useInputHistoryStore.getState().entries).toEqual([]);
+	});
+
+	it("leaves a bare ? in the composer and preserves queued question text", async () => {
+		await mount();
+		await typeInto(findTextarea(), "?");
+		await pressEnter(findTextarea());
+		expect(useComposerStore.getState().draft).toBe("?");
+		expect(steer).not.toHaveBeenCalled();
+
+		await typeInto(findTextarea(), "=> ? queued question");
+		await pressEnter(findTextarea());
+		await flush();
+		expect(followUp).toHaveBeenCalledWith("? queued question", []);
+	});
 });
 
 describe("InputArea queue shorthand submit", () => {

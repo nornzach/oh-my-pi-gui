@@ -1,10 +1,11 @@
 /**
- * Composer `!` / `$` input-mode detection, mirroring the TUI editor
+ * Composer `!` / `$` / `?` input-mode detection, mirroring the TUI editor
  * (`packages/coding-agent/src/modes/controllers/input-controller.ts`):
  *
  * - `!cmd`  → bash mode (runs locally via `window.omp.rpc.bash`)
  * - `!!cmd` → bash mode, excluded from model context in the TUI (no RPC flag yet)
  * - `$ code`  → python mode (runs via `window.omp.rpc.eval`; `$$ code` = excluded variant)
+ * - `? question` → BTW side-question mode
  * - `${...}` template literals and `$HOME`-style variables are NOT python mode
  *
  * Mode is detected from the prefix alone (even with an empty body) so the
@@ -12,7 +13,7 @@
  * path additionally requires a non-empty body.
  */
 
-export type ComposerInputMode = "bash" | "python";
+export type ComposerInputMode = "bash" | "python" | "btw";
 
 export interface ComposerModeParse {
 	mode: ComposerInputMode;
@@ -25,6 +26,7 @@ export interface ComposerModeParse {
 const CHAR_DOLLAR = 36; /* $ */
 const CHAR_OPEN_BRACE = 123; /* { */
 const CHAR_BANG = 33; /* ! */
+const CHAR_QUESTION = 63; /* ? */
 
 // Pasted shell transcripts must not flip into python mode — ported from the TUI.
 const SHELL_PROMPT_COMMAND_RE =
@@ -47,6 +49,10 @@ function looksLikePastedShellPrompt(code: string): boolean {
  */
 export function parseComposerMode(text: string): ComposerModeParse | null {
 	const trimmed = text.trimStart();
+
+	if (trimmed.charCodeAt(0) === CHAR_QUESTION) {
+		return { mode: "btw", body: trimmed.slice(1).trim(), excluded: false };
+	}
 
 	if (trimmed.charCodeAt(0) === CHAR_BANG) {
 		const prefixLength = trimmed.charCodeAt(1) === CHAR_BANG ? 2 : 1;

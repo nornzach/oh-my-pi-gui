@@ -101,6 +101,7 @@ export function createSessionRpcClient(transport: RpcTransport): SessionRpcClien
 		steer: (message: string, images?: ImageContent[]) => rpcCommand({ type: "steer", message, images }),
 		followUp: (message: string, images?: ImageContent[]) => rpcCommand({ type: "follow_up", message, images }),
 		abort: () => rpcCommand({ type: "abort" }),
+		abortCompaction: () => rpcCommand({ type: "abort_compaction" }),
 		abortAndPrompt: (message: string) => rpcCommand({ type: "abort_and_prompt", message }),
 		newSession: (parentSession?: string) => rpcCommand({ type: "new_session", parentSession }),
 		dropSession: () => rpcCommand({ type: "drop_session" }),

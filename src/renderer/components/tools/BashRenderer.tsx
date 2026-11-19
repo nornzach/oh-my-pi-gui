@@ -4,6 +4,7 @@ import { OutputText } from "../../lib/ansi";
 import { cx, extractImageDataUrls, formatBytes, resultText, sanitizeToolText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_MD } from "../../lib/preview";
+import { PathLink } from "./PathLink";
 import { ResultImages } from "./ResultImages";
 import { resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
@@ -25,6 +26,7 @@ interface BashParsed {
 	exitCode: number | null;
 	stats: string[];
 	truncation: string | null;
+	artifactPath: string | null;
 }
 
 function asNumber(value: unknown): number | undefined {
@@ -56,7 +58,7 @@ function formatMinimized(minimized: Record<string, unknown> | undefined): string
  * + enforceInlineByteCap + wrappedExecute): wall time first, then
  * intermediate notices (timeout clamp, pty, truncation), then the exit-code
  * line, then — when the inline byte cap spills — the
- * `[raw output: artifact://N]` footer, and finally wrappedExecute's
+ * `[raw output: local://N.log]` (or legacy artifact://N) footer, and finally wrappedExecute's
  * `[Showing …]` limit line OUTERMOST. Strip in reverse wire order so each
  * end-anchored match sees the real end of the text.
  */
@@ -77,7 +79,7 @@ function stripLastOccurrence(text: string, re: RegExp): string {
 	return (text.slice(0, index) + text.slice(index + last[0].length)).trimEnd();
 }
 
-const RAW_ARTIFACT_RE = /\n?\[raw output: artifact:\/\/(\d+)\]\s*$/;
+const RAW_ARTIFACT_RE = /\n?\[raw output: ((?:artifact:\/\/\d+)|(?:local:\/\/\d+\.log))\]\s*$/;
 /** Trailing `[Showing …]` / limits notice line appended by wrappedExecute. */
 const GENERATED_NOTICE_RE =
 	/^\[(?:Showing .+|\d+ (?:matches|results) limit reached\. .+|Some lines truncated to .+)\]$/;
@@ -132,15 +134,16 @@ function parseBashResult(result: unknown, isError: boolean | undefined): BashPar
 	// wrappedExecute's notice, then the artifact footer, then the inner
 	// background/exit/wall lines.
 	if (meta) text = stripGeneratedOutputNotice(text);
-	let artifactId =
+	const artifactId =
 		typeof details?.artifactId === "string"
 			? details.artifactId
 			: typeof truncation?.artifactId === "string"
 				? truncation.artifactId
 				: undefined;
-	const artifactMatch = artifactId ? text.match(RAW_ARTIFACT_RE) : null;
+	const candidateArtifact = artifactId ? text.match(RAW_ARTIFACT_RE) : null;
+	const artifactMatch =
+		candidateArtifact && artifactIdFromPath(candidateArtifact[1]) === artifactId ? candidateArtifact : null;
 	if (artifactMatch) {
-		artifactId = artifactMatch[1];
 		text = text.slice(0, artifactMatch.index).trimEnd();
 	}
 	if (asyncInfo?.state === "running" && backgroundJobId) {
@@ -150,6 +153,7 @@ function parseBashResult(result: unknown, isError: boolean | undefined): BashPar
 	if (wallTimeMs != null) text = stripLastOccurrence(text, WALL_TIME_NOTICE_RE);
 
 	const stats: string[] = [];
+	if (artifactId && !artifactMatch) stats.push(`Artifact: ${artifactId}`);
 	if (asyncInfo?.state === "running" && backgroundJobId) stats.push(`Backgrounded: ${backgroundJobId}`);
 	if (wallTimeMs != null) stats.push(`Wall: ${(wallTimeMs / 1000).toFixed(2)}s`);
 	if (timeoutDisabled) stats.push("Timeout: disabled");
@@ -160,7 +164,7 @@ function parseBashResult(result: unknown, isError: boolean | undefined): BashPar
 				: `Timeout: ${timeoutSeconds}s`,
 		);
 	}
-	if (artifactId) stats.push(`Artifact: ${artifactId}`);
+
 	const minimized = formatMinimized(
 		meta?.minimized != null && typeof meta.minimized === "object"
 			? (meta.minimized as Record<string, unknown>)
@@ -171,10 +175,15 @@ function parseBashResult(result: unknown, isError: boolean | undefined): BashPar
 
 	return {
 		output: text.trimEnd(),
+		artifactPath: artifactMatch?.[1] ?? null,
 		exitCode,
 		stats,
 		truncation: truncation ? formatTruncation(truncation) : null,
 	};
+}
+
+function artifactIdFromPath(path: string): string {
+	return path.replace(/^(?:artifact|local):\/\//, "").replace(/\.log$/, "");
 }
 
 /** Bash: command line, terminal-style output, exit-code badge, stats footer. */
@@ -222,6 +231,12 @@ export function BashRenderer({ args, result, isError, isPartial, partialResult }
 			<ResultImages images={images} />
 			{parsed.stats.length > 0 && (
 				<div className="font-mono text-omp-xs text-[var(--omp-dim)]">[{parsed.stats.join(" | ")}]</div>
+			)}
+			{parsed.artifactPath && (
+				<PathLink
+					path={parsed.artifactPath}
+					className="font-mono text-omp-xs text-[var(--omp-dim)]"
+				>{`Artifact: ${artifactIdFromPath(parsed.artifactPath)}`}</PathLink>
 			)}
 			{parsed.truncation && (
 				<div className="font-mono text-omp-xs text-[var(--omp-warning)]">[{parsed.truncation}]</div>

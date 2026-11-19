@@ -127,6 +127,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	const retryInfo = useSessionStore(s => s.retryInfo);
 	const compactionInfo = useSessionStore(s => s.compactionInfo);
 	const manualMaintenance = useSessionStore(s => s.manualMaintenance);
+	const warmingCache = useSessionStore(s => s.cacheWarming !== null && s.cacheWarming.outcome === undefined);
 	const status = useSessionStore(s => s.status);
 	const sessionId = useSessionStore(s => s.sessionId);
 	// Shared agent compaction preference and GUI-local transcript detail.
@@ -208,6 +209,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		retryInfo != null ||
 		compactionInfo != null ||
 		manualMaintenance != null ||
+		warmingCache ||
 		(isStreaming && awaitingModelSince != null && !hasStreamedContent);
 
 	// Pending queue bubbles tail the stream in delivery order (steering
@@ -1153,8 +1155,7 @@ const STALLED_RESPONSE_HINT_SECONDS = 90;
  *   the failure (unless the failed reply above already shows it), and Stop.
  * - compaction: `{reason}{action}…` for auto-maintenance, same reason/action
  *   vocabulary as the TUI loader.
- * - manual maintenance: a `/compact` or handoff this window asked for — the
- *   agent sends no event for it — with its elapsed time and Stop.
+ * - manual maintenance: a compaction or handoff, with its elapsed time and Stop.
  * - waiting: between turn_start and the first streamed event. Elapsed time
  *   appears only once the wait is noticeable; past 30s a slow-response hint,
  *   past 90s a stalled hint with Stop.
@@ -1166,6 +1167,7 @@ export function TurnStatusRow() {
 	const retryInfo = useSessionStore(s => s.retryInfo);
 	const compactionInfo = useSessionStore(s => s.compactionInfo);
 	const manualMaintenance = useSessionStore(s => s.manualMaintenance);
+	const warmingCache = useSessionStore(s => s.cacheWarming !== null && s.cacheWarming.outcome === undefined);
 	const awaitingModelSince = useSessionStore(s => s.awaitingModelSince);
 	// The failed reply already in the transcript, so the retry row never prints its error twice.
 	const shownError = useMessagesStore(s => {
@@ -1231,7 +1233,7 @@ export function TurnStatusRow() {
 						detail: t(`chat.maintenance.detail.${manualMaintenance.kind}`),
 					}}
 					label={t(`chat.maintenance.${manualMaintenance.kind}`)}
-					onStop={stop}
+					onStop={() => void rpc.abortCompaction()}
 					slowHint={t("chat.maintenance.slow")}
 					startedAt={manualMaintenance.startedAt}
 				/>
@@ -1265,6 +1267,9 @@ export function TurnStatusRow() {
 		} else if (elapsedSeconds >= SLOW_RESPONSE_HINT_SECONDS) {
 			hint = { text: t("chat.awaitingModel.slow"), tone: "dim", stop: false };
 		}
+	} else if (warmingCache) {
+		label = t("sessionInfo.cache.warming.active");
+		announcement = label;
 	} else {
 		return null;
 	}

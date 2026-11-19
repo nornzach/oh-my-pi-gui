@@ -122,26 +122,30 @@ describe("BashRenderer", () => {
 		expect(container.textContent).toContain("Exit: 2");
 	});
 
-	it("strips the exit-code trailer when the structured artifact id confirms the footer", async () => {
-		// The byte-cap appends the footer after every notice and mirrors its id
-		// in details, so printed lookalikes remain ordinary command output.
-		await mount(
-			<BashRenderer
-				args={{ command: "huge-output" }}
-				result={bashResult("tail of output\nCommand exited with code 1\n[raw output: artifact://42]", {
-					exitCode: 1,
-					artifactId: "42",
-					meta: { truncation: { direction: "tail" } },
-				})}
-				isError
-			/>,
-		);
-		expect(container.textContent).toContain("tail of output");
-		expect(container.textContent).not.toContain("Command exited with code");
-		expect(container.textContent).not.toContain("[raw output: artifact://42]");
-		expect(container.textContent).toContain("Artifact: 42");
-		expect(container.textContent).toContain("Exit: 1");
-	});
+	it.each(["artifact://42", "local://42.log"])(
+		"strips a confirmed %s trailer and provides a preview link",
+		async uri => {
+			// The byte-cap appends the footer after every notice and mirrors its id
+			// in details, so printed lookalikes remain ordinary command output.
+			await mount(
+				<BashRenderer
+					args={{ command: "huge-output" }}
+					result={bashResult(`tail of output\nCommand exited with code 1\n[raw output: ${uri}]`, {
+						exitCode: 1,
+						artifactId: "42",
+						meta: { truncation: { direction: "tail" } },
+					})}
+					isError
+				/>,
+			);
+			expect(container.textContent).toContain("tail of output");
+			expect(container.textContent).not.toContain("Command exited with code");
+			expect(container.textContent).not.toContain(`[raw output: ${uri}]`);
+			expect(container.querySelector("button")?.getAttribute("title")).toContain(uri);
+			expect(container.textContent).toContain("Artifact: 42");
+			expect(container.textContent).toContain("Exit: 1");
+		},
+	);
 
 	it("keeps plain output as a single text node (no span explosion)", async () => {
 		await mount(<BashRenderer args={{ command: "ls" }} result={bashResult("a\nb\nc")} />);

@@ -161,11 +161,14 @@ function ProviderReportCard({
 	t: (k: string, p?: Record<string, string | number>) => string;
 	now: number;
 }) {
+	const plan = report.metadata?.subscriptionPlan;
+	const subscriptionPlan = typeof plan === "string" ? plan.trim() : "";
 	return (
 		<div className="rounded-lg border border-[var(--omp-border-muted)] p-3">
 			<div className="mb-2 flex items-center justify-between">
-				<div className="flex items-center gap-2">
+				<div className="flex min-w-0 flex-wrap items-center gap-2">
 					<span className="text-omp-lg font-semibold text-[var(--omp-text)]">{providerName}</span>
+					{subscriptionPlan && <Badge variant="muted">{subscriptionPlan}</Badge>}
 					{report.account && <span className="text-omp-sm text-[var(--omp-muted)]">{report.account}</span>}
 				</div>
 				{report.resetCreditsAvailable !== undefined && report.resetCreditsAvailable > 0 && (

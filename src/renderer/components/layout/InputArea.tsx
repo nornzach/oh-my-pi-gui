@@ -226,7 +226,7 @@ export function InputArea() {
 		void useInputHistoryStore.getState().hydrate();
 	}, []);
 
-	// `!` → bash / `$` → python composer mode (TUI parity): drives the border badge
+	// `!` → bash / `$` → python / `?` → side-question composer mode (TUI parity): drives the border badge
 	// and reroutes sending. Detected from the prefix alone so the badge appears
 	// while the user is still typing.
 	const composerMode = useMemo(() => parseComposerMode(text), [text]);
@@ -235,7 +235,9 @@ export function InputArea() {
 			? "var(--omp-info)"
 			: composerMode?.mode === "python"
 				? "var(--omp-warning)"
-				: undefined;
+				: composerMode?.mode === "btw"
+					? "var(--omp-accent)"
+					: undefined;
 
 	// `->` / `=>` yield-queue shorthand (TUI queue-input.ts parity). The badge
 	// preview and the send-path dispatch share this one parser so the "splits
@@ -789,10 +791,12 @@ export function InputArea() {
 					<div
 						className="absolute -top-2 left-5 z-10 flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-omp-xs font-semibold"
 						style={{ borderColor: modeColor, color: modeColor, backgroundColor: "var(--omp-bg-primary)" }}
-						title={composerMode.mode === "bash" ? t("input.mode.bash.title") : t("input.mode.python.title")}
+						title={composerMode.mode === "btw" ? t("cmd.btw.desc") : t(`input.mode.${composerMode.mode}.title`)}
 					>
-						<span className="font-mono text-omp-sm leading-none">{composerMode.mode === "bash" ? "!" : "$"}</span>
-						{composerMode.mode}
+						<span className="font-mono text-omp-sm leading-none">
+							{{ bash: "!", python: "$", btw: "?" }[composerMode.mode]}
+						</span>
+						{composerMode.mode === "btw" ? t("btw.title") : composerMode.mode}
 					</div>
 				)}
 

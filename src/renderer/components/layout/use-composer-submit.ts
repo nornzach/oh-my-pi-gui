@@ -21,6 +21,7 @@ import { clearSessionContext } from "../../lib/messages";
 import { dropReferencedPastes, expandPasteMarkers } from "../../lib/paste-blobs";
 import { parseQueueShorthand, splitQueuedMessages } from "../../lib/queue-input";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { type BtwStore, useBtwStore } from "../../stores/btw";
 import { type ComposerFile, type ComposerImage, type ComposerStore, useComposerStore } from "../../stores/composer";
 import { useInputHistoryStore } from "../../stores/input-history";
 import { type MessagesStore, useMessagesStore } from "../../stores/messages";
@@ -28,6 +29,7 @@ import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { restoreTabComposer, useTabsStore } from "../../stores/tabs";
 import { toast, useToastStore } from "../../stores/toast";
+import { useUiStore } from "../../stores/ui";
 import { appendMentions, droppedFileMention } from "./input-area-utils";
 
 /** The agent reads file mentions on the wire. The editable draft keeps text and cards separate. */
@@ -351,6 +353,30 @@ export function useComposerSubmit({
 				rpc,
 			});
 			if (submit.kind === "blocked") return;
+			if (submit.kind === "btw") {
+				const originBtw = sessionRuntimeStore<BtwStore>(originTabId, "btw") ?? useBtwStore;
+				setText("");
+				// The BTW RPC accepts text; preserve images for the next main-conversation send.
+				originComposer.setState({ files: [] });
+				setMenu(null);
+				setSending(true);
+				useUiStore.getState().setPanelTab("btw");
+				void originBtw
+					.getState()
+					.ask(submit.question)
+					.then(() => {
+						useInputHistoryStore.getState().record(withFileMentions(message, files, originCwd), originCwd);
+						if (originStillActive()) dropReferencedPastes(message);
+					})
+					.catch(error => {
+						restoreDraft(message, [], files);
+						toast({ variant: "error", title: t("btw.title"), message: describeError(error) });
+					})
+					.finally(() => {
+						if (originStillActive()) setSending(false);
+					});
+				return;
+			}
 			if (submit.kind === "handled") {
 				useInputHistoryStore.getState().record(message, originCwd);
 				setText("");

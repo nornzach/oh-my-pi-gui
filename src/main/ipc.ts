@@ -68,6 +68,7 @@ import { isLanguage } from "../shared/languages";
 import { parseLaunchProfile } from "../shared/launch-profile";
 import type { DroppedProxy } from "../shared/proxy";
 import type { RpcCommand, RpcSessionState } from "../shared/rpc-types";
+import { isSessionOutputPath } from "../shared/session-output";
 import { requestQuit } from "./app-quit";
 import { BenchmarkRunner } from "./benchmark-runner";
 import type { BrowserHost } from "./browser-host";
@@ -88,6 +89,7 @@ import { fetchRemoteImage } from "./remote-image";
 import { runtimeLogPath, writeRuntimeLog } from "./runtime-log";
 import type { SchedulerHost } from "./scheduler/host";
 import type { SessionIndex } from "./session-index";
+import { resolveSessionOutputPath } from "./session-output-paths";
 import { resolveEditorCommand } from "./shell-env";
 import { applyWindowToggle, updateKeyboardLayout, windowToggleStatus } from "./shortcuts";
 import type { SidecarManager } from "./sidecar";
@@ -150,6 +152,25 @@ function cwdFor(deps: IpcDeps, event: Electron.IpcMainInvokeEvent, tabId?: strin
 	if (!win) return null;
 	if (tabId) return deps.sidecarPool.sidecarForTab(win, tabId)?.cwd ?? null;
 	return deps.sidecarPool.sidecarForWindow(win)?.cwd ?? deps.windowManager.recordFor(win)?.cwd ?? null;
+}
+
+/** A session URL is scoped to a tab owned by the calling window. */
+function sessionFileFor(deps: IpcDeps, event: Electron.IpcMainInvokeEvent, tabId?: string): string | null {
+	const win = BrowserWindow.fromWebContents(event.sender);
+	if (!win) return null;
+	const sidecar = tabId ? deps.sidecarPool.sidecarForTab(win, tabId) : deps.sidecarPool.sidecarForWindow(win);
+	return sidecar ? (deps.sidecarPool.tabForSidecar(sidecar)?.sessionFile ?? null) : null;
+}
+
+async function previewPathFor(
+	deps: IpcDeps,
+	event: Electron.IpcMainInvokeEvent,
+	target: string,
+	tabId?: string,
+): Promise<{ path: string } | { error: string }> {
+	if (!isSessionOutputPath(target)) return toAbsolutePath(target, cwdFor(deps, event, tabId));
+	const resolved = await resolveSessionOutputPath(target, sessionFileFor(deps, event, tabId));
+	return resolved ? { path: resolved.absolutePath } : { error: "Session output not found" };
 }
 
 const BROWSER_ACTIONS: ReadonlySet<string> = new Set<IpcBrowserActionPayload["action"]>([
@@ -1028,7 +1049,13 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		async (event, payload: { paths?: unknown; tabId?: string }): Promise<Array<IpcResolvedPath | null>> => {
 			const paths = Array.isArray(payload?.paths) ? payload.paths.slice(0, 500) : [];
 			const cwd = cwdFor(deps, event, payload?.tabId);
-			return Promise.all(paths.map(target => resolveExistingPath(target, cwd)));
+			return Promise.all(
+				paths.map(target =>
+					typeof target === "string" && isSessionOutputPath(target)
+						? resolveSessionOutputPath(target, sessionFileFor(deps, event, payload?.tabId))
+						: resolveExistingPath(target, cwd),
+				),
+			);
 		},
 	);
 
@@ -1321,10 +1348,14 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	});
 
 	ipcMain.handle(IPC_COMMANDS.FS_OPEN_EDIT, (event, payload: IpcFsEditPayload) =>
-		openWorkspaceEdit(cwdFor(deps, event, payload?.tabId), payload?.path),
+		isSessionOutputPath(payload?.path ?? "")
+			? { ok: false, reason: "readOnly" }
+			: openWorkspaceEdit(cwdFor(deps, event, payload?.tabId), payload?.path),
 	);
 	ipcMain.handle(IPC_COMMANDS.FS_SAVE_EDIT, (event, payload: IpcFsSaveEditPayload) =>
-		saveWorkspaceEdit(cwdFor(deps, event, payload?.tabId), payload?.path, payload?.revision, payload?.content),
+		isSessionOutputPath(payload?.path ?? "")
+			? { ok: false, reason: "readOnly" }
+			: saveWorkspaceEdit(cwdFor(deps, event, payload?.tabId), payload?.path, payload?.revision, payload?.content),
 	);
 
 	ipcMain.handle(IPC_COMMANDS.FS_READ, async (event, payload: IpcFsReadPayload) => {
@@ -1332,7 +1363,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		if (typeof payload.path !== "string" || payload.path.length === 0) {
 			return fail("Invalid path");
 		}
-		const absolute = toAbsolutePath(payload.path, cwdFor(deps, event, payload.tabId));
+		const absolute = await previewPathFor(deps, event, payload.path, payload.tabId);
 		if ("error" in absolute) return fail(absolute.error);
 		const abs = absolute.path;
 		const maxBytes = clampInt(payload.maxBytes, 1, FS_READ_MAX_BYTES_CAP, FS_READ_DEFAULT_MAX_BYTES);
@@ -1372,7 +1403,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	ipcMain.handle(IPC_COMMANDS.FS_READ_IMAGE, async (event, payload: IpcFsReadImagePayload) => {
 		const fail = (error: string): IpcFsReadImageResult => ({ ok: false, dataUrl: null, mime: null, size: 0, error });
 		if (typeof payload?.path !== "string" || payload.path.length === 0) return fail("Invalid path");
-		const absolute = toAbsolutePath(payload.path, cwdFor(deps, event, payload.tabId));
+		const absolute = await previewPathFor(deps, event, payload.path, payload.tabId);
 		if ("error" in absolute) return fail(absolute.error);
 		try {
 			return await readImageFile(absolute.path);
@@ -1386,7 +1417,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		async (event, payload: { path: string; thumbnail: boolean; tabId?: string }) => {
 			if (typeof payload?.path !== "string" || !payload.path || typeof payload.thumbnail !== "boolean")
 				return { kind: "unavailable" };
-			const absolute = toAbsolutePath(payload.path, cwdFor(deps, event, payload.tabId));
+			const absolute = await previewPathFor(deps, event, payload.path, payload.tabId);
 			if ("error" in absolute) return { kind: "unavailable" };
 			return readDocumentPreview(absolute.path, payload.thumbnail);
 		},

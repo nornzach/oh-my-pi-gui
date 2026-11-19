@@ -16,7 +16,7 @@ import { useT } from "../../lib/i18n";
 import { PREVIEW_SCROLL_SM } from "../../lib/preview";
 import type { ToolRendererProps } from "./ToolCard";
 
-type JobStatus = "running" | "completed" | "failed" | "cancelled";
+type JobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 interface JobRow {
 	id: string;
@@ -37,11 +37,14 @@ interface AgentRow {
 }
 
 interface DaemonRow {
+	id: string;
 	name: string;
+	label?: string;
 	state?: string;
 	pid?: number;
 	startedAt?: number;
 	exitedAt?: number;
+	exitCode?: number;
 	detached?: boolean;
 	persist?: boolean;
 }
@@ -69,8 +72,14 @@ function asString(value: unknown): string | undefined {
 function asJob(value: unknown): JobRow | undefined {
 	const row = asRecord(value);
 	if (!row || typeof row.id !== "string") return undefined;
-	const status = row.status;
-	if (status !== "running" && status !== "completed" && status !== "failed" && status !== "cancelled")
+	const status = row.status === "running" && row.queued === true ? "queued" : row.status;
+	if (
+		status !== "queued" &&
+		status !== "running" &&
+		status !== "completed" &&
+		status !== "failed" &&
+		status !== "cancelled"
+	)
 		return undefined;
 	return {
 		id: row.id,
@@ -109,15 +118,23 @@ function asAgents(value: unknown): AgentRow[] {
 
 function asDaemon(value: unknown): DaemonRow | undefined {
 	const row = asRecord(value);
-	if (!row || typeof row.name !== "string") return undefined;
+	if (!row) return undefined;
+	// Older sessions retain BrokerSnapshot.name/pid and boolean lifetime flags.
+	const name = asString(row.key) ?? asString(row.name);
+	if (!name) return undefined;
+	const pid = asArray(row.pids)[0] ?? row.pid;
+	const hold = asRecord(row.policy)?.hold;
 	return {
-		name: row.name,
+		id: asString(row.id) ?? name,
+		name,
+		label: asString(row.label),
 		state: asString(row.state),
-		pid: typeof row.pid === "number" ? row.pid : undefined,
+		pid: typeof pid === "number" ? pid : undefined,
 		startedAt: typeof row.startedAt === "number" ? row.startedAt : undefined,
 		exitedAt: typeof row.exitedAt === "number" ? row.exitedAt : undefined,
-		detached: row.detached === true,
-		persist: row.persist === true,
+		exitCode: typeof row.exitCode === "number" ? row.exitCode : undefined,
+		detached: hold === "detached" || row.detached === true,
+		persist: hold === "persist" || row.persist === true,
 	};
 }
 
@@ -141,12 +158,15 @@ function statusColor(status: JobStatus): string {
 			return "var(--omp-error)";
 		case "cancelled":
 			return "var(--omp-warning)";
+		case "queued":
+			return "var(--omp-muted)";
 		case "running":
 			return "var(--omp-accent)";
 	}
 }
 
 function StatusIcon({ status }: { status: JobStatus }) {
+	if (status === "queued") return <Clock3 aria-hidden className="shrink-0" size={12} />;
 	if (status === "running") return <Loader2 aria-hidden className="shrink-0 animate-spin" size={12} />;
 	if (status === "completed") return <CheckCircle2 aria-hidden className="shrink-0" size={12} />;
 	if (status === "failed") return <CircleX aria-hidden className="shrink-0" size={12} />;
@@ -154,6 +174,7 @@ function StatusIcon({ status }: { status: JobStatus }) {
 }
 
 function statusLabel(t: (key: string) => string, status: string): string {
+	if (status === "queued") return t("tasks.run.state.queued");
 	const key = `tools.coordination.status.${status}`;
 	const translated = t(key);
 	return translated === key ? shortText(status, 80) : translated;
@@ -253,15 +274,30 @@ function DaemonRowView({
 	const elapsed =
 		daemon.startedAt !== undefined ? Math.max(0, (daemon.exitedAt ?? Date.now()) - daemon.startedAt) : undefined;
 	return (
-		<div className="flex min-w-0 items-center gap-2 py-1 font-mono text-omp-sm">
+		<div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-1 font-mono text-omp-sm">
 			<SquareTerminal aria-hidden className="shrink-0 text-[var(--omp-dim)]" size={12} />
 			<span className="shrink-0 font-semibold text-[var(--omp-text)]">{shortText(daemon.name, 120)}</span>
+			{daemon.label && daemon.label !== daemon.name && (
+				<span className="min-w-0 truncate text-[var(--omp-muted)]" title={shortText(daemon.label)}>
+					{shortText(daemon.label)}
+				</span>
+			)}
 			{daemon.state && (
 				<span className="shrink-0 text-omp-xs text-[var(--omp-muted)]">{shortText(daemon.state, 80)}</span>
 			)}
 			{daemon.pid !== undefined && (
 				<span className="shrink-0 text-omp-xs text-[var(--omp-dim)]">
 					{t("tools.coordination.pid", { pid: daemon.pid })}
+				</span>
+			)}
+			{daemon.exitCode !== undefined && (
+				<span className="shrink-0 text-omp-xs text-[var(--omp-dim)]">
+					{t("tools.coordination.exit", { code: daemon.exitCode })}
+				</span>
+			)}
+			{(daemon.detached || daemon.persist) && (
+				<span className="shrink-0 text-omp-xs text-[var(--omp-dim)]">
+					{t(daemon.detached ? "tools.coordination.detached" : "tools.coordination.persistent")}
 				</span>
 			)}
 			{elapsed !== undefined && (
@@ -289,7 +325,7 @@ export function WaitRenderer({ result, isPartial, partialResult }: ToolRendererP
 		.map(value => asRecord(value))
 		.filter((value): value is Record<string, unknown> => value !== undefined && typeof value.id === "string");
 	const text = shortText(resultText(effective));
-	const running = jobs.filter(job => job.status === "running").length;
+	const running = jobs.filter(job => job.status === "running" || job.status === "queued").length;
 	const failed = jobs.filter(job => job.status === "failed").length;
 	const Icon = waited ? MessageCircle : running > 0 ? Clock3 : failed > 0 ? CircleAlert : CheckCircle2;
 
@@ -443,7 +479,7 @@ export function ProcReadRenderer({
 			{daemons.length > 0 && (
 				<Section>
 					{daemons.map(item => (
-						<DaemonRowView daemon={item} key={item.name} t={t} />
+						<DaemonRowView daemon={item} key={item.id} t={t} />
 					))}
 				</Section>
 			)}

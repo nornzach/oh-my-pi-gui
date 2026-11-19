@@ -67,6 +67,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		OMP_PROFILE: "",
 		PI_PROFILE: "",
 		OMP_BUNDLED_OMP: path.resolve("resources/omp"),
+		OMP_DAEMON_DIR: path.join(profile, "daemon"),
 	};
 	Reflect.deleteProperty(env, "ELECTRON_RUN_AS_NODE");
 	Reflect.deleteProperty(env, "OMP_SIDECAR");
@@ -111,6 +112,12 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			expect(runtime.isPackaged).toBe(true);
 			expect(runtime.sidecarOverride).toBeNull();
 		}
+		const coreState = await page.evaluate(() => window.omp.rpc.getState());
+		expect(coreState).toMatchObject({
+			success: true,
+			data: { isBackgroundCompacting: false, fastModeUltrafast: false },
+		});
+		await expect(page.evaluate(() => window.omp.rpc.abortCompaction())).resolves.toMatchObject({ success: true });
 		await closeWelcome("Welcome to omp", "Close");
 		// The file input creates a real Electron File with a local path.
 		await page.evaluate(() => {
