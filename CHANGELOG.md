@@ -2,9 +2,11 @@
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-19
+
 ### Added
 
-- Ask a side question from the composer by starting the draft with `?`.
+- Ask a side question from the composer by starting the draft with `?` ([#63](https://github.com/nornzach/oh-my-pi-gui/pull/63) by [@y26s4824k264](https://github.com/y26s4824k264)).
 - Preview Core 19 session-local output files and open legacy artifact links from conversation history.
 - Show cache warming outcomes, Claude subscription plans, and the new daemon service states.
 - After a reply, the empty composer suggests your likely next message; Tab inserts it without sending (turn it off in Settings → Interaction → Composer Predictions).

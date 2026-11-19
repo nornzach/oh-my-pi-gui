@@ -724,6 +724,8 @@ describe("InputArea composer prediction (omp 19)", () => {
 
 		const textarea = findTextarea();
 		expect(textarea.getAttribute("placeholder")).toBe("run the tests");
+		const setSelectionRange = vi.fn();
+		Object.assign(textarea, { setSelectionRange });
 		expect(command).toHaveBeenCalledWith({ type: "composer_prediction_feedback", action: "shown" });
 
 		const propsKey = Object.getOwnPropertyNames(textarea).find(key => key.startsWith("__reactProps$"));
@@ -739,6 +741,8 @@ describe("InputArea composer prediction (omp 19)", () => {
 				preventDefault: () => {},
 			}),
 		);
+		await flush();
+		expect(setSelectionRange).toHaveBeenCalledWith("run the tests".length, "run the tests".length);
 		expect(useComposerStore.getState().draft).toBe("run the tests");
 		expect(command).toHaveBeenCalledWith({ type: "composer_prediction_feedback", action: "accepted", rank: 0 });
 		expect(prompt).not.toHaveBeenCalled();
