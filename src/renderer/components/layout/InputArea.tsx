@@ -103,6 +103,7 @@ export function InputArea() {
 	const sttEnabled = useSettingsStore(s => s.sttEnabled);
 	/** Agent `paste.largeMenuThreshold` setting: line count that triggers the paste menu. */
 	const pasteMenuThreshold = useDisplayPreference("pasteMenuThreshold");
+	const collapseLargePastes = useUiStore(s => s.collapseLargePastes);
 	/** Agent `emojiAutocomplete` setting: emoji popup/inline/submit expansion. */
 	const emojiAutocomplete = useDisplayPreference("emojiAutocomplete");
 
@@ -473,26 +474,32 @@ export function InputArea() {
 		[text, menu, setText],
 	);
 
+	const insertTextAtCaret = useCallback(
+		(insertion: string) => {
+			const el = textareaRef.current;
+			const start = el?.selectionStart ?? text.length;
+			const end = el?.selectionEnd ?? start;
+			setText(current => `${current.slice(0, start)}${insertion}${current.slice(end)}`);
+			requestAnimationFrame(() => {
+				const target = textareaRef.current;
+				if (!target) return;
+				target.focus();
+				const caret = start + insertion.length;
+				target.setSelectionRange(caret, caret);
+			});
+		},
+		[text, setText],
+	);
+
 	// Collapse a large paste into a `[Paste #N]` marker with the blob held in
 	// memory; the marker expands back to full content at submit time (TUI
 	// editor.ts parity). Inserted at the caret, replacing any selection.
 	const insertPasteBlob = useCallback(
 		(content: string) => {
 			const blob = storePaste(content);
-			const marker = pasteMarkerText(blob.id, blob.content);
-			const el = textareaRef.current;
-			const start = el?.selectionStart ?? text.length;
-			const end = el?.selectionEnd ?? start;
-			setText(current => `${current.slice(0, start)}${marker}${current.slice(end)}`);
-			requestAnimationFrame(() => {
-				const target = textareaRef.current;
-				if (!target) return;
-				target.focus();
-				const caret = start + marker.length;
-				target.setSelectionRange(caret, caret);
-			});
+			insertTextAtCaret(pasteMarkerText(blob.id, blob.content));
 		},
-		[text, setText],
+		[insertTextAtCaret],
 	);
 
 	// Paste menu actions — the paste always inserts something; the menu only
@@ -500,15 +507,18 @@ export function InputArea() {
 	// updater functions, which must never duplicate a paste or an RPC write.
 	const choosePasteInline = useCallback(() => {
 		if (!pasteMenu) return;
-		insertPasteBlob(pasteMenu.content);
+		if (collapseLargePastes) insertPasteBlob(pasteMenu.content);
+		else insertTextAtCaret(pasteMenu.content);
 		setPasteMenu(null);
-	}, [insertPasteBlob, pasteMenu]);
+	}, [collapseLargePastes, insertPasteBlob, insertTextAtCaret, pasteMenu]);
 
 	const choosePasteWrapped = useCallback(() => {
 		if (!pasteMenu) return;
-		insertPasteBlob(wrapPasteInAttachmentBlock(pasteMenu.content));
+		const wrapped = wrapPasteInAttachmentBlock(pasteMenu.content);
+		if (collapseLargePastes) insertPasteBlob(wrapped);
+		else insertTextAtCaret(wrapped);
 		setPasteMenu(null);
-	}, [insertPasteBlob, pasteMenu]);
+	}, [collapseLargePastes, insertPasteBlob, insertTextAtCaret, pasteMenu]);
 
 	// Save-as-file: the agent writes the blob into the session's local:// store
 	// (counter allocated agent-side so two windows can never collide) and the
@@ -730,13 +740,14 @@ export function InputArea() {
 			.normalize("NFC")
 			.replace(/\t/g, "   ")
 			.replace(/[\x00-\x08\x0B-\x1F]/g, "");
-		if (!isMarkerSized(content)) return; // small paste: default textarea behavior
-		e.preventDefault();
 		const lineCount = content.split("\n").length;
 		if (shouldOfferPasteMenu(lineCount, pasteMenuThreshold)) {
+			e.preventDefault();
 			setPasteMenu({ content, lineCount });
 			return;
 		}
+		if (!collapseLargePastes || !isMarkerSized(content)) return; // verbatim paste: default textarea behavior
+		e.preventDefault();
 		insertPasteBlob(content);
 	};
 

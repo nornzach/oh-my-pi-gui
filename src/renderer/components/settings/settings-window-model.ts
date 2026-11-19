@@ -148,9 +148,19 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: `${GUI_DISPLAY_LEGACY_PATHS[index]} display 显示 偏好`,
 	})),
 	{
+		id: "collapseLargePastes",
+		labelKey: "settings.gui.collapseLargePastes",
+		aliases: "collapseLargePastes paste marker fold expand 粘贴 折叠 展开 вставка",
+	},
+	{
 		id: "pasteMenuThreshold",
 		labelKey: "settings.display.pasteMenuThreshold",
 		aliases: "paste.largeMenuThreshold paste 粘贴 阈值",
+	},
+	{
+		id: "linkOpenMode",
+		labelKey: "settings.gui.linkOpenMode",
+		aliases: "linkOpenMode link browser external panel 链接 浏览器 外链 打开方式 ссылки браузер",
 	},
 	{ id: "theme", labelKey: "settings.gui.theme", aliases: "theme dark light 主题 明暗" },
 	{ id: "followAgentTheme", labelKey: "settings.gui.followAgentTheme", aliases: "theme override 主题 覆盖" },

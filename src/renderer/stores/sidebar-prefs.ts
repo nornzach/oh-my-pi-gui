@@ -18,6 +18,8 @@ interface SidebarPrefsBlob {
 	registeredWorkspaces?: string[];
 	pinnedGroups?: string[];
 	pinnedSessions?: string[];
+	/** Pinned top-left navigation item ids in display order; absent/null = built-in defaults (#67). */
+	pinnedNavIds?: string[] | null;
 	archivedSessions?: string[];
 	groupAliases?: Record<string, string>;
 	workspaceLastUsed?: Record<string, number>;
@@ -32,6 +34,8 @@ interface SidebarPrefsStore {
 	registeredWorkspaces: string[];
 	pinnedGroups: string[];
 	pinnedSessions: string[];
+	/** Pinned top-left navigation ids; null uses the built-in default split (#67). */
+	pinnedNavIds: string[] | null;
 	/** Session files hidden from the lanes and listed under "Archived". */
 	archivedSessions: string[];
 	groupAliases: Record<string, string>;
@@ -50,6 +54,7 @@ interface SidebarPrefsStore {
 	inheritSessions: (heirs: ReadonlyMap<string, string>) => void;
 	setGroupAlias: (cwd: string, alias: string | null) => Promise<void>;
 	setWorkspaceSort: (sort: WorkspaceSort) => Promise<void>;
+	setPinnedNavIds: (ids: string[] | null) => Promise<void>;
 	touchWorkspace: (cwd: string) => void;
 	touchSession: (path: string, cwd?: string) => void;
 	reset: () => void;
@@ -92,6 +97,7 @@ function prefsBlob(state: SidebarPrefsStore): SidebarPrefsBlob {
 		registeredWorkspaces: state.registeredWorkspaces,
 		pinnedGroups: state.pinnedGroups,
 		pinnedSessions: state.pinnedSessions,
+		...(state.pinnedNavIds !== null ? { pinnedNavIds: state.pinnedNavIds } : {}),
 		archivedSessions: state.archivedSessions,
 		groupAliases: state.groupAliases,
 		workspaceLastUsed: state.workspaceLastUsed,
@@ -119,6 +125,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 	registeredWorkspaces: [],
 	pinnedGroups: [],
 	pinnedSessions: [],
+	pinnedNavIds: null,
 	archivedSessions: [],
 	groupAliases: {},
 	workspaceLastUsed: {},
@@ -136,6 +143,9 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 					: [],
 				pinnedGroups: Array.isArray(blob?.pinnedGroups) ? blob.pinnedGroups : [],
 				pinnedSessions: Array.isArray(blob?.pinnedSessions) ? blob.pinnedSessions : [],
+				pinnedNavIds: Array.isArray(blob?.pinnedNavIds)
+					? [...new Set(blob.pinnedNavIds.filter((id): id is string => typeof id === "string" && id.length > 0))]
+					: null,
 				archivedSessions: Array.isArray(blob?.archivedSessions) ? blob.archivedSessions : [],
 				groupAliases: blob?.groupAliases && typeof blob.groupAliases === "object" ? blob.groupAliases : {},
 				workspaceLastUsed: validRecencyMap(blob?.workspaceLastUsed),
@@ -244,6 +254,14 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 			onFailure: message => toast({ variant: "error", title: translate("sidebar.sort.failed"), message }),
 		}),
 
+	setPinnedNavIds: ids =>
+		optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: () => ({ pinnedNavIds: ids }),
+			persist: () => writePrefs(get),
+			onFailure: message => toast({ variant: "error", title: translate("sidebar.pinFailed"), message }),
+		}),
+
 	touchWorkspace: cwd => {
 		if (!cwd) return;
 		const state = get();
@@ -270,6 +288,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 			registeredWorkspaces: [],
 			pinnedGroups: [],
 			pinnedSessions: [],
+			pinnedNavIds: null,
 			archivedSessions: [],
 			groupAliases: {},
 			workspaceLastUsed: {},

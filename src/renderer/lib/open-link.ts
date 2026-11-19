@@ -4,13 +4,18 @@
  * no browser), and anything that is not a web page go to the system browser.
  */
 import { useTabsStore } from "../stores/tabs";
-import { useUiStore } from "../stores/ui";
+import { type LinkOpenMode, useUiStore } from "../stores/ui";
 
 export type LinkDestination = "panel" | "external";
 
-export function linkDestination(href: string, options: { modifier: boolean; panel: boolean }): LinkDestination {
-	if (options.modifier || !options.panel) return "external";
-	return /^https?:\/\//i.test(href) ? "panel" : "external";
+export function linkDestination(
+	href: string,
+	options: { modifier: boolean; panel: boolean; defaultMode?: LinkOpenMode },
+): LinkDestination {
+	if (!options.panel || !/^https?:\/\//i.test(href)) return "external";
+	const defaultMode = options.defaultMode ?? "panel";
+	if (defaultMode === "external") return options.modifier ? "panel" : "external";
+	return options.modifier ? "external" : "panel";
 }
 
 /** Whether the active tab has a browser panel; chat tabs show only files. */
@@ -20,13 +25,24 @@ export function browserPanelAvailable(): boolean {
 	return tab !== undefined && tab.kind !== "chat";
 }
 
-export function openLink(href: string, event?: { metaKey: boolean; ctrlKey: boolean }): void {
+export function openLink(
+	href: string,
+	event?: { metaKey: boolean; ctrlKey: boolean },
+	options?: { destination?: LinkDestination },
+): void {
 	const { tabs, activeTabId } = useTabsStore.getState();
 	const tab = tabs.find(entry => entry.id === activeTabId);
-	const destination = linkDestination(href, {
-		modifier: event?.metaKey === true || event?.ctrlKey === true,
-		panel: browserPanelAvailable(),
-	});
+	const panel = browserPanelAvailable();
+	const destination =
+		options?.destination !== undefined
+			? options.destination === "panel" && panel && /^https?:\/\//i.test(href)
+				? "panel"
+				: "external"
+			: linkDestination(href, {
+					modifier: event?.metaKey === true || event?.ctrlKey === true,
+					panel,
+					defaultMode: useUiStore.getState().linkOpenMode,
+				});
 	if (destination === "external" || !tab) {
 		void window.omp.system.openExternal(href);
 		return;

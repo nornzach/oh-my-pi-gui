@@ -71,6 +71,8 @@ export type TranscriptDetail = "compact" | "full";
 export type TabWidth = "compact" | "default" | "wide";
 /** One scrolling row of tabs, or up to three wrapped rows. */
 export type TabRows = "single" | "multi";
+/** Where a plain left-click on an http(s) link opens (#65). */
+export type LinkOpenMode = "panel" | "external";
 
 export interface GuiDisplayPreferences {
 	hideThinkingBlock?: boolean | null;
@@ -204,6 +206,10 @@ interface UiStore {
 	transcriptDetail: TranscriptDetail;
 	tabWidth: TabWidth;
 	tabRows: TabRows;
+	/** Where plain left-clicks on http(s) links open: built-in browser panel or system browser (#65). */
+	linkOpenMode: LinkOpenMode;
+	/** Collapse long pasted text (>10 lines or >1000 chars) into `[Paste #N]` markers (#64). */
+	collapseLargePastes: boolean;
 	/** Expand/collapse-all signal for tool cards (⌃O); `seq` bumps per toggle so cards re-sync their local state. */
 	toolsExpandAll: { expanded: boolean; seq: number };
 	toggleSidebar: () => void;
@@ -339,6 +345,8 @@ interface UiStore {
 	setTranscriptDetail: (detail: TranscriptDetail) => void;
 	setTabWidth: (width: TabWidth) => void;
 	setTabRows: (rows: TabRows) => void;
+	setLinkOpenMode: (mode: LinkOpenMode) => void;
+	setCollapseLargePastes: (enabled: boolean) => void;
 	/**
 	 * User keybinding overrides (B3 remap layer): actionId → replacement chord
 	 * list, compiled with the defaults in lib/keymap.ts into the keydown
@@ -392,6 +400,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	transcriptDetail: "compact",
 	tabWidth: "default",
 	tabRows: "single",
+	linkOpenMode: "panel",
+	collapseLargePastes: true,
 	toggleSidebar: () => set({ sidebarVisible: !get().sidebarVisible }),
 	// The bare toggle (title bar, shortcut) opens on Overview; links that open the
 	// drawer for a reason (Review, a file, /btw) go through setPanelTab instead.
@@ -673,6 +683,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	setTranscriptDetail: detail => set({ transcriptDetail: detail }),
 	setTabWidth: width => set({ tabWidth: width }),
 	setTabRows: rows => set({ tabRows: rows }),
+	setLinkOpenMode: mode => set({ linkOpenMode: mode }),
+	setCollapseLargePastes: enabled => set({ collapseLargePastes: enabled }),
 	keymapOverrides: {} as KeymapOverrides,
 	keymapDisabled: [],
 	keymapHydrated: false,

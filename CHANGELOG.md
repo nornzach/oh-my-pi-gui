@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-19
+
+### Added
+
+- Choose whether plain left-clicks on web links open in the built-in browser panel or the system default browser in Settings → Appearance & Display ([#65](https://github.com/nornzach/oh-my-pi-gui/issues/65)).
+- Toggle whether long pastes (>10 lines or >1,000 characters) collapse into `[Paste #N]` markers or insert verbatim in Settings → Appearance & Display ([#64](https://github.com/nornzach/oh-my-pi-gui/issues/64)).
+- Drag or pin items between the top-left "More" menu and the primary sidebar navigation, reorder pinned entries, or reset to defaults ([#67](https://github.com/nornzach/oh-my-pi-gui/issues/67)).
+
+### Changed
+
+- Sync the GUI's built-in provider ID table with all OMP Core 19.0.0 catalog and auth providers so newly added Core 19 providers are recognized as built-ins rather than custom overrides.
+
 ## [1.0.0] - 2026-11-19
 
 ### Added

@@ -94,7 +94,7 @@ export function linkMenuItems(menu: Pick<LinkMenu, "target" | "selection">, t: T
 				id: "open-panel",
 				label: t("links.openInPanel"),
 				icon: PanelRight,
-				onSelect: () => openLink(target.url),
+				onSelect: () => openLink(target.url, undefined, { destination: "panel" }),
 			});
 		}
 		if (web) {
@@ -102,7 +102,7 @@ export function linkMenuItems(menu: Pick<LinkMenu, "target" | "selection">, t: T
 				id: "open-external",
 				label: t("links.openExternally"),
 				icon: ExternalLink,
-				onSelect: () => openLink(target.url, { metaKey: true, ctrlKey: true }),
+				onSelect: () => openLink(target.url, undefined, { destination: "external" }),
 			});
 		}
 		items.push({

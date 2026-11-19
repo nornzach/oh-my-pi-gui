@@ -252,6 +252,8 @@ export function App() {
 				"transcriptDetail",
 				"tabWidth",
 				"tabRows",
+				"linkOpenMode",
+				"collapseLargePastes",
 				"panelTab",
 			] as const) {
 				if (next[key] !== previous[key]) changedPreferences.add(key);
@@ -312,6 +314,15 @@ export function App() {
 				}
 				if ((prefs.tabRows === "single" || prefs.tabRows === "multi") && !changedPreferences.has("tabRows")) {
 					useUiStore.setState({ tabRows: prefs.tabRows });
+				}
+				if (
+					(prefs.linkOpenMode === "panel" || prefs.linkOpenMode === "external") &&
+					!changedPreferences.has("linkOpenMode")
+				) {
+					useUiStore.setState({ linkOpenMode: prefs.linkOpenMode });
+				}
+				if (typeof prefs.collapseLargePastes === "boolean" && !changedPreferences.has("collapseLargePastes")) {
+					useUiStore.setState({ collapseLargePastes: prefs.collapseLargePastes });
 				}
 				// Restore the default workspace panel tab (written by Settings → GUI).
 				if (

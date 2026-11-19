@@ -13,4 +13,19 @@ describe("linkDestination", () => {
 		expect(linkDestination("mailto:team@example.com", { modifier: false, panel: true })).toBe("external");
 		expect(linkDestination("vscode://file/src/a.ts", { modifier: false, panel: true })).toBe("external");
 	});
+
+	it("opens plain clicks in the system browser when defaultMode is external, flipping to panel on modifier (#65)", () => {
+		expect(
+			linkDestination("https://example.com/docs", { modifier: false, panel: true, defaultMode: "external" }),
+		).toBe("external");
+		expect(
+			linkDestination("https://example.com/docs", { modifier: true, panel: true, defaultMode: "external" }),
+		).toBe("panel");
+		expect(
+			linkDestination("https://example.com/docs", { modifier: true, panel: false, defaultMode: "external" }),
+		).toBe("external");
+		expect(linkDestination("mailto:team@example.com", { modifier: true, panel: true, defaultMode: "external" })).toBe(
+			"external",
+		);
+	});
 });

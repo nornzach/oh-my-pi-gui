@@ -538,6 +538,9 @@ export const ru: Record<string, string> = {
 	"notices.empty": "Здесь появятся завершённые задачи по расписанию.",
 	"contextStrategy.saveFailed": "Не удалось сохранить настройки контекста",
 	"sidebar.navigation.more": "Ещё",
+	"sidebar.navigation.pin": "Закрепить в боковой панели",
+	"sidebar.navigation.unpin": "Переместить в «Ещё»",
+	"sidebar.navigation.reset": "Сбросить навигацию по умолчанию",
 	"sidebar.navigation.capabilities": "Возможности OMP",
 	"sidebar.emptySessions": "Пока нет сессий",
 	"sidebar.delete": "Удалить сессию",
@@ -1915,6 +1918,16 @@ export const ru: Record<string, string> = {
 	"settings.display.showProgress": "Показывать ход выполнения задачи на рабочем столе",
 	"settings.display.emojiAutocomplete": "Автодополнение названий эмодзи",
 	"settings.display.pasteMenuThreshold": "Порог меню для большой вставки (строки; 0 — выключено)",
+	"settings.gui.collapseLargePastes": "Сворачивать длинные вставки в маркеры",
+	"settings.gui.collapseLargePastesDesc":
+		"Сворачивать вставленный текст длиннее 10 строк или 1000 символов в маркер [Paste #N]; отключите, чтобы вставлять текст целиком",
+	"settings.gui.linkOpenMode": "Открывать ссылки по левому клику",
+	"settings.gui.linkOpenMode.panel": "Панель браузера",
+	"settings.gui.linkOpenMode.panelDesc":
+		"Открывать веб-ссылки во встроенной панели (⌘/Ctrl+клик — в системном браузере)",
+	"settings.gui.linkOpenMode.external": "Системный браузер по умолчанию",
+	"settings.gui.linkOpenMode.externalDesc":
+		"Открывать веб-ссылки в системном браузере (⌘/Ctrl+клик — в панели браузера)",
 	"settings.gui.readability": "Удобочитаемость",
 	"settings.gui.compactDensity": "Компактные интервалы переписки",
 	"settings.gui.compactDensityDesc":

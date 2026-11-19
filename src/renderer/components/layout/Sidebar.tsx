@@ -18,6 +18,7 @@ import {
 	FolderPlus,
 	GitBranchPlus,
 	GitPullRequest,
+	GripVertical,
 	Keyboard,
 	ListChecks,
 	LoaderCircle,
@@ -46,6 +47,7 @@ import {
 	X,
 } from "lucide-react";
 import {
+	type DragEvent as ReactDragEvent,
 	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
 	type PointerEvent as ReactPointerEvent,
@@ -55,6 +57,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type { SessionInfo } from "../../../shared/ipc-types";
 import { useAwaitingConfirmation } from "../../hooks/use-awaiting-confirmation";
 import { useSessionList } from "../../hooks/use-session-list";
@@ -73,6 +76,7 @@ import {
 	type SessionNode,
 	sessionParents,
 } from "../../lib/session-tree";
+import { pinNavItemId, resolveSidebarNavigation, unpinNavItemId } from "../../lib/sidebar-nav";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { tabSignalPresentation } from "../../lib/tab-signal";
 import { pickWorkspaceDirectory } from "../../lib/workspace-dirs";
@@ -262,6 +266,10 @@ export function Sidebar() {
 	const [renameDraft, setRenameDraft] = useState("");
 	// App, project and session menus.
 	const [moreMenu, setMoreMenu] = useState<ContextMenuAnchor | null>(null);
+	const [navMenu, setNavMenu] = useState<{ itemId: string; anchor: ContextMenuAnchor } | null>(null);
+	const [draggingNavId, setDraggingNavId] = useState<string | null>(null);
+	const [navDropTarget, setNavDropTarget] = useState<string | "end" | "more" | null>(null);
+	const moreMenuRef = useRef<HTMLDivElement>(null);
 	const [groupMenu, setGroupMenu] = useState<{ anchor: ContextMenuAnchor; group: WorkspaceGroup } | null>(null);
 	const [sessionMenu, setSessionMenu] = useState<{ anchor: ContextMenuAnchor; session: SessionInfo } | null>(null);
 	// Workspace display alias rename (group header inline input).
@@ -290,6 +298,28 @@ export function Sidebar() {
 	const registeredWorkspaces = useSidebarPrefs(s => s.registeredWorkspaces);
 	const pinnedGroups = useSidebarPrefs(s => s.pinnedGroups);
 	const pinnedSessions = useSidebarPrefs(s => s.pinnedSessions);
+	const pinnedNavIds = useSidebarPrefs(s => s.pinnedNavIds);
+	const setPinnedNavIds = useSidebarPrefs(s => s.setPinnedNavIds);
+	useEffect(() => {
+		if (!moreMenu) return;
+		const onDown = (event: PointerEvent) => {
+			if (draggingNavId) return;
+			if (!moreMenuRef.current?.contains(event.target as globalThis.Node | null)) setMoreMenu(null);
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (isImeKeyEvent(event)) return;
+			if (event.key === "Escape" || event.key === "Tab") {
+				event.preventDefault();
+				setMoreMenu(null);
+			}
+		};
+		document.addEventListener("pointerdown", onDown);
+		document.addEventListener("keydown", onKey, true);
+		return () => {
+			document.removeEventListener("pointerdown", onDown);
+			document.removeEventListener("keydown", onKey, true);
+		};
+	}, [moreMenu, draggingNavId]);
 	const archivedPaths = useSidebarPrefs(s => s.archivedSessions);
 	const archived = useMemo(() => new Set(archivedPaths), [archivedPaths]);
 	const groupAliases = useSidebarPrefs(s => s.groupAliases);
@@ -1189,8 +1219,9 @@ export function Sidebar() {
 		onClick: () => void;
 	}
 	// Session work stays one click away; app-wide tools live in the More menu
-	// and remain reachable from the Command Center.
-	const primaryNavigation: NavigationItem[] = [
+	// and remain reachable from the Command Center. Users can drag or pin items
+	// between the two groups (#67).
+	const allNavigation: NavigationItem[] = [
 		{
 			id: "commands",
 			icon: Command,
@@ -1256,8 +1287,6 @@ export function Sidebar() {
 			unread: unreadNotices > 0,
 			onClick: () => useSchedulerStore.getState().openTasks(pendingTaskReviews > 0 ? { view: "review" } : undefined),
 		},
-	];
-	const secondaryNavigation: NavigationItem[] = [
 		{
 			id: "capabilities",
 			icon: Sparkles,
@@ -1293,20 +1322,77 @@ export function Sidebar() {
 			onClick: () => useUiStore.getState().openFeedback(),
 		},
 	];
+	const validNavIds = new Set(allNavigation.map(item => item.id));
+	const { primary: primaryNavigation, secondary: secondaryNavigation } = resolveSidebarNavigation(
+		allNavigation,
+		pinnedNavIds,
+	);
+	const navDragMime = "application/x-omp-nav-item";
+	const startNavDrag = (id: string, event: ReactDragEvent) => {
+		setDraggingNavId(id);
+		event.dataTransfer.setData(navDragMime, id);
+		event.dataTransfer.effectAllowed = "move";
+	};
+	const readDraggedNavId = (event: ReactDragEvent): string | null =>
+		draggingNavId ?? (event.dataTransfer.getData(navDragMime) || null);
+	const finishNavDrag = () => {
+		setDraggingNavId(null);
+		setNavDropTarget(null);
+	};
+	const dropOnPrimaryNav = (event: ReactDragEvent, targetId?: string) => {
+		const id = readDraggedNavId(event);
+		if (!id || !validNavIds.has(id)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		void setPinnedNavIds(pinNavItemId(pinnedNavIds, id, validNavIds, targetId));
+		setMoreMenu(null);
+		finishNavDrag();
+	};
+	const dropOnMoreNav = (event: ReactDragEvent) => {
+		const id = readDraggedNavId(event);
+		if (!id || !validNavIds.has(id)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		void setPinnedNavIds(unpinNavItemId(pinnedNavIds, id, validNavIds));
+		finishNavDrag();
+	};
 	const navigationRow =
 		"omp-pressable group/nav flex h-8 w-full min-w-0 items-center gap-2.5 rounded-lg px-2 text-left text-omp-md text-[var(--omp-text-secondary)] hover:bg-[var(--omp-sidebar-item-hover)] hover:text-[var(--omp-text)]";
 	const renderNavigationItem = (item: NavigationItem) => {
 		const Icon = item.icon;
 		const selected = item.page !== undefined && item.page === workspacePage;
+		const isDropBefore = draggingNavId !== null && draggingNavId !== item.id && navDropTarget === item.id;
 		return (
 			<button
 				aria-current={selected ? "page" : undefined}
 				key={item.id}
 				type="button"
+				draggable
+				onDragStart={event => startNavDrag(item.id, event)}
+				onDragOver={event => {
+					if (!draggingNavId) return;
+					event.preventDefault();
+					event.stopPropagation();
+					event.dataTransfer.dropEffect = "move";
+					setNavDropTarget(item.id);
+				}}
+				onDrop={event => dropOnPrimaryNav(event, item.id)}
+				onDragEnd={finishNavDrag}
+				onContextMenu={event => {
+					event.preventDefault();
+					event.stopPropagation();
+					setNavMenu({ itemId: item.id, anchor: { x: event.clientX, y: event.clientY } });
+				}}
 				onClick={item.onClick}
+				data-nav-item={item.id}
 				data-command-center-entry={item.id === "commands" ? true : undefined}
 				title={item.title}
-				className={cx(navigationRow, selected && "bg-(--omp-sidebar-item-hover) font-medium")}
+				className={cx(
+					navigationRow,
+					selected && "bg-(--omp-sidebar-item-hover) font-medium",
+					draggingNavId === item.id && "opacity-50",
+					isDropBefore && "ring-2 ring-inset ring-(--omp-accent)",
+				)}
 			>
 				<Icon aria-hidden="true" className="shrink-0 text-[var(--omp-muted)]" size={16} strokeWidth={1.75} />
 				<span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -1363,34 +1449,66 @@ export function Sidebar() {
 							<Search aria-hidden="true" size={15} />
 						</button>
 					</div>
-					<div className="space-y-px">{primaryNavigation.map(renderNavigationItem)}</div>
-					<button
-						type="button"
-						aria-haspopup="menu"
-						aria-expanded={moreMenu !== null}
-						aria-label={t("sidebar.navigation.expand")}
-						title={t("sidebar.navigation.expand")}
-						onClick={event => {
-							const rect = event.currentTarget.getBoundingClientRect();
-							setMoreMenu({
-								x: Number.isFinite(rect.left) ? rect.left : 8,
-								y: (Number.isFinite(rect.bottom) ? rect.bottom : 200) + 4,
-							});
-						}}
+					<div
 						className={cx(
-							navigationRow,
-							"mt-px",
-							moreMenu && "bg-[var(--omp-sidebar-item-hover)] text-[var(--omp-text)]",
+							"space-y-px rounded-lg transition-colors",
+							draggingNavId !== null &&
+								navDropTarget === "end" &&
+								"bg-(--omp-accent-dim)/30 ring-1 ring-(--omp-accent)",
 						)}
+						data-sidebar-primary-nav=""
+						onDragOver={event => {
+							if (!draggingNavId) return;
+							event.preventDefault();
+							event.dataTransfer.dropEffect = "move";
+							setNavDropTarget("end");
+						}}
+						onDrop={event => dropOnPrimaryNav(event)}
 					>
-						<MoreHorizontal
-							aria-hidden="true"
-							className="shrink-0 text-[var(--omp-muted)]"
-							size={16}
-							strokeWidth={1.75}
-						/>
-						<span className="min-w-0 flex-1 truncate">{t("sidebar.navigation.more")}</span>
-					</button>
+						{primaryNavigation.map(renderNavigationItem)}
+					</div>
+					{(secondaryNavigation.length > 0 || draggingNavId !== null) && (
+						<button
+							type="button"
+							aria-haspopup="menu"
+							aria-expanded={moreMenu !== null}
+							aria-label={t("sidebar.navigation.expand")}
+							title={t("sidebar.navigation.expand")}
+							onClick={event => {
+								if (secondaryNavigation.length === 0) return;
+								const rect = event.currentTarget.getBoundingClientRect();
+								setMoreMenu(current =>
+									current
+										? null
+										: {
+												x: Number.isFinite(rect.left) ? rect.left : 8,
+												y: (Number.isFinite(rect.bottom) ? rect.bottom : 200) + 4,
+											},
+								);
+							}}
+							onDragOver={event => {
+								if (!draggingNavId) return;
+								event.preventDefault();
+								event.dataTransfer.dropEffect = "move";
+								setNavDropTarget("more");
+							}}
+							onDrop={dropOnMoreNav}
+							className={cx(
+								navigationRow,
+								"mt-px",
+								moreMenu && "bg-[var(--omp-sidebar-item-hover)] text-[var(--omp-text)]",
+								draggingNavId !== null && navDropTarget === "more" && "ring-2 ring-inset ring-(--omp-accent)",
+							)}
+						>
+							<MoreHorizontal
+								aria-hidden="true"
+								className="shrink-0 text-[var(--omp-muted)]"
+								size={16}
+								strokeWidth={1.75}
+							/>
+							<span className="min-w-0 flex-1 truncate">{t("sidebar.navigation.more")}</span>
+						</button>
+					)}
 				</div>
 
 				<div className="flex h-7 shrink-0 items-center ps-4 pe-2.5">
@@ -1689,22 +1807,127 @@ export function Sidebar() {
 					className="absolute inset-y-0 right-0 z-10 w-1 translate-x-1/2 cursor-col-resize transition-colors hover:bg-[var(--omp-accent)]/40 active:bg-[var(--omp-accent)] max-[1000px]:hidden"
 				/>
 			</aside>
-			{/* App-wide tools: one menu instead of a second list competing with tasks. */}
-			{moreMenu && (
+			{/* App-wide tools: draggable into the primary sidebar list or pinned in one click (#67). */}
+			{moreMenu &&
+				secondaryNavigation.length > 0 &&
+				createPortal(
+					<div
+						ref={moreMenuRef}
+						role="menu"
+						data-sidebar-more-menu=""
+						style={{
+							left: Math.max(
+								8,
+								Math.min(moreMenu.x, (Number.isFinite(window.innerWidth) ? window.innerWidth : 1024) - 248),
+							),
+							top: Math.max(
+								8,
+								Math.min(moreMenu.y, (Number.isFinite(window.innerHeight) ? window.innerHeight : 768) - 280),
+							),
+						}}
+						className="omp-pop-in fixed z-[100] min-w-[220px] max-w-[280px] rounded-xl border border-(--omp-modal-border) bg-(--omp-modal-bg) p-1.5 shadow-(--omp-shadow-lg)"
+					>
+						{secondaryNavigation.map(item => {
+							const Icon = item.icon;
+							return (
+								<div
+									key={item.id}
+									draggable
+									data-more-nav-item={item.id}
+									onDragStart={event => startNavDrag(item.id, event)}
+									onDragEnd={finishNavDrag}
+									className={cx(
+										"group/more flex items-center gap-1 rounded-lg pr-1 hover:bg-(--omp-sidebar-item-hover)",
+										draggingNavId === item.id && "opacity-50",
+									)}
+								>
+									<button
+										type="button"
+										role="menuitem"
+										onClick={() => {
+											setMoreMenu(null);
+											item.onClick();
+										}}
+										className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-omp-md text-(--omp-text) focus:outline-none"
+									>
+										<GripVertical
+											aria-hidden="true"
+											size={13}
+											className="shrink-0 cursor-grab text-(--omp-dim) opacity-60 group-hover/more:opacity-100"
+										/>
+										<Icon aria-hidden="true" size={14} className="shrink-0 text-(--omp-muted)" />
+										<span className="min-w-0 flex-1 truncate">{item.label}</span>
+										{item.shortcut && (
+											<span className="shrink-0 font-mono text-omp-xxs text-(--omp-dim)">
+												{item.shortcut}
+											</span>
+										)}
+									</button>
+									<button
+										type="button"
+										aria-label={t("sidebar.navigation.pin")}
+										title={t("sidebar.navigation.pin")}
+										data-pin-nav-item={item.id}
+										onClick={event => {
+											event.stopPropagation();
+											void setPinnedNavIds(pinNavItemId(pinnedNavIds, item.id, validNavIds));
+										}}
+										className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-(--omp-dim) opacity-70 hover:bg-(--omp-selected-bg) hover:text-(--omp-text) group-hover/more:opacity-100"
+									>
+										<Pin aria-hidden="true" size={12} />
+									</button>
+								</div>
+							);
+						})}
+						{pinnedNavIds !== null && (
+							<div className="mt-1 border-t border-(--omp-border-muted) pt-1">
+								<button
+									type="button"
+									role="menuitem"
+									onClick={() => {
+										void setPinnedNavIds(null);
+										setMoreMenu(null);
+									}}
+									className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-omp-sm text-(--omp-muted) hover:bg-(--omp-sidebar-item-hover) hover:text-(--omp-text)"
+								>
+									<RefreshCw aria-hidden="true" size={13} className="shrink-0" />
+									<span className="truncate">{t("sidebar.navigation.reset")}</span>
+								</button>
+							</div>
+						)}
+					</div>,
+					document.body,
+				)}
+
+			{navMenu && (
 				<ContextMenu
-					x={moreMenu.x}
-					y={moreMenu.y}
-					onClose={() => setMoreMenu(null)}
-					items={secondaryNavigation.map(item => ({
-						id: `nav-${item.id}`,
-						label: item.label,
-						icon: item.icon,
-						hint: item.shortcut,
-						onSelect: () => {
-							setMoreMenu(null);
-							item.onClick();
+					x={navMenu.anchor.x}
+					y={navMenu.anchor.y}
+					onClose={() => setNavMenu(null)}
+					items={[
+						{
+							id: "nav-unpin",
+							label: t("sidebar.navigation.unpin"),
+							icon: PinOff,
+							onSelect: () => {
+								void setPinnedNavIds(unpinNavItemId(pinnedNavIds, navMenu.itemId, validNavIds));
+								setNavMenu(null);
+							},
 						},
-					}))}
+						...(pinnedNavIds !== null
+							? [
+									{
+										id: "nav-reset",
+										label: t("sidebar.navigation.reset"),
+										icon: RefreshCw,
+										onSelect: () => {
+											void setPinnedNavIds(null);
+											setNavMenu(null);
+										},
+									},
+								]
+							: []),
+					]}
 				/>
 			)}
 
