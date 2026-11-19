@@ -179,6 +179,14 @@ export type RpcCommand =
 	| { id?: string; type: "btw_cancel"; recordId: string }
 	| { id?: string; type: "btw_inject"; recordId: string }
 	| { id?: string; type: "get_btw_history" }
+	// Composer predictions (omp 19): alternatives arrive as `composer_prediction` events
+	| { id?: string; type: "composer_prediction_request" }
+	| {
+			id?: string;
+			type: "composer_prediction_feedback";
+			action: "shown" | "accepted" | "dismissed";
+			rank?: number;
+	  }
 	| { id?: string; type: "tan"; work: string }
 	| { id?: string; type: "omfg"; complaint: string }
 	| {
@@ -2747,7 +2755,9 @@ export type AgentSessionEvent =
 	// Authoritative queue snapshot after every queue mutation (enqueue,
 	// drain/consume, remove, move, clear, dequeue restore). The queue store
 	// treats this as the update channel; get_queue is only a hydrate fallback.
-	| { type: "queue_update"; steering: RpcQueuedMessage[]; followUp: RpcQueuedMessage[] };
+	| { type: "queue_update"; steering: RpcQueuedMessage[]; followUp: RpcQueuedMessage[] }
+	/** The user's likely next message after a finished run, most likely first; empty withdraws it. */
+	| { type: "composer_prediction"; choices: string[] };
 
 /**
  * The GUI opts into delta-only `message_update` frames, so `partial` (the

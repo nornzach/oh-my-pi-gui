@@ -62,7 +62,13 @@ jobs:
           repo="nornzach/oh-my-pi"
           commit="main"
           if [ -f gui-pin/sidecar-source.json ]; then
-            repo="$(jq -er '(.repo // "nornzach/oh-my-pi") | strings | select(test("^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$"))' gui-pin/sidecar-source.json)"
+            repo="$(jq -er '(.repo // "nornzach/oh-my-pi") | strings' gui-pin/sidecar-source.json)"
+            # Release binaries are built only from the project's own Core fork: a pin
+            # that names any other repository fails the build instead of shipping it.
+            if [ "$repo" != "nornzach/oh-my-pi" ]; then
+              echo "sidecar-source.json names $repo; release sidecars build only from nornzach/oh-my-pi" >&2
+              exit 1
+            fi
             commit="$(jq -er '.commit | strings | select(test("^[a-fA-F0-9]{40}$"))' gui-pin/sidecar-source.json)"
           fi
           ref="${MONOREPO_SHA:-$commit}"

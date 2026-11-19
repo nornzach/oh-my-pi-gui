@@ -1212,4 +1212,10 @@ export const RU_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
 		"Оценивать каждый запрос и сообщать о разделении, ничего не делая",
 	"When a prompt splits into independent subtasks, tell the agent to delegate them in parallel":
 		"Если запрос делится на независимые подзадачи, велеть агенту делегировать их параллельно",
+	"Keep Alive": "Поддерживать",
+	"Never compact; refresh until it stops paying": "Никогда не сжимать; обновлять, пока это окупается",
+	"Compact at the first decision once the prompt reaches the bridge-compaction threshold":
+		"Сжимать при первом решении, как только промпт достигнет порога сжатия",
+	"Refresh while the refresh spend stays within the cheaper buy-out, then compact large prompts or let the entry expire":
+		"Обновлять, пока расходы ниже повторной записи, затем сжимать большие промпты или дать записи истечь",
 };

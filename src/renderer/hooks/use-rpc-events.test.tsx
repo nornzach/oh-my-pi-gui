@@ -28,6 +28,7 @@ import type {
 import { TurnStatusRow } from "../components/chat/ChatStream";
 import { formatClock } from "../lib/format";
 import { I18nProvider, translate } from "../lib/i18n";
+import type { ComposerStore } from "../stores/composer";
 import { type MessagesStore, useMessagesStore } from "../stores/messages";
 import { type ModelStore, useModelStore } from "../stores/model";
 import { type SessionStore, useSessionStore } from "../stores/session";
@@ -532,6 +533,62 @@ describe("useRpcEvents sidebar browsing (gui#29)", () => {
 		});
 
 		expect(useTabsStore.getState().tabs.find(tab => tab.id === "t-browse")?.browsing).toBeFalsy();
+	});
+});
+
+describe("useRpcEvents composer predictions (omp 19)", () => {
+	const predictionRequests = (commandForTab: Mock<(tabId: string, command: RpcCommand) => Promise<RpcResponse>>) =>
+		commandForTab.mock.calls.filter(([, command]) => command.type === "composer_prediction_request").length;
+
+	it("asks for a prediction after a run that ended with a reply, never after an error or a stop", async () => {
+		const { emitTabBatch, commandForTab } = installTabRoutedMockOmp();
+		seedReadyTab("t-pred");
+		await mount(<RpcEventsProbe />);
+
+		const reply = (stopReason: string) =>
+			[
+				{ type: "agent_start" },
+				{ type: "agent_end", messages: [{ role: "assistant", content: [], stopReason, timestamp: 1 }] },
+			] as AgentSessionEvent[];
+		await act(async () => emitTabBatch(reply("error"), "t-pred"));
+		await act(async () => emitTabBatch(reply("aborted"), "t-pred"));
+		expect(predictionRequests(commandForTab)).toBe(0);
+
+		await act(async () => emitTabBatch(reply("stop"), "t-pred"));
+		expect(predictionRequests(commandForTab)).toBe(1);
+
+		// The user starts the next run before the guess arrives: the request is cancelled, not left billing.
+		await act(async () => emitTabBatch([{ type: "agent_start" }] as AgentSessionEvent[], "t-pred"));
+		expect(commandForTab).toHaveBeenCalledWith(
+			"t-pred",
+			expect.objectContaining({ type: "composer_prediction_feedback", action: "dismissed" }),
+			undefined,
+		);
+
+		// A draft in progress is the user's own next message: no billed guess for it.
+		sessionRuntimeStore<ComposerStore>("t-pred", "composer")!.getState().setDraft("my own words");
+		await act(async () => emitTabBatch(reply("stop"), "t-pred"));
+		expect(predictionRequests(commandForTab)).toBe(1);
+	});
+
+	it("shows the arriving prediction and withdraws it, telling the sidecar, when the next run starts", async () => {
+		const { emitTabBatch, commandForTab } = installTabRoutedMockOmp();
+		seedReadyTab("t-pred");
+		await mount(<RpcEventsProbe />);
+		const composer = sessionRuntimeStore<ComposerStore>("t-pred", "composer")!;
+
+		await act(async () =>
+			emitTabBatch([{ type: "composer_prediction", choices: ["run the tests"] }] as AgentSessionEvent[], "t-pred"),
+		);
+		expect(composer.getState().predictions).toEqual(["run the tests"]);
+
+		await act(async () => emitTabBatch([{ type: "agent_start" }] as AgentSessionEvent[], "t-pred"));
+		expect(composer.getState().predictions).toEqual([]);
+		expect(commandForTab).toHaveBeenCalledWith(
+			"t-pred",
+			expect.objectContaining({ type: "composer_prediction_feedback", action: "dismissed" }),
+			undefined,
+		);
 	});
 });
 

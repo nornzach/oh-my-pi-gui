@@ -42,6 +42,16 @@ export interface ComposerStore {
 	setImages: (next: ComposerImage[] | ((current: ComposerImage[]) => ComposerImage[])) => void;
 	addFiles: (files: ComposerFile[]) => void;
 	removeFile: (key: string) => void;
+	/**
+	 * The agent's guess at the user's next message after a finished run (omp 19
+	 * composer predictions), most likely first; empty when there is none. Shown
+	 * over the empty composer, never sent unless the user inserts it.
+	 */
+	predictions: string[];
+	/** The composer has displayed the current prediction (reported once as `shown`). */
+	predictionShown: boolean;
+	setPredictions: (choices: string[]) => void;
+	markPredictionShown: () => void;
 	reset: () => void;
 }
 
@@ -58,7 +68,20 @@ export const createComposerStore = () =>
 		setImages: next => set(state => ({ images: typeof next === "function" ? next(state.images) : next })),
 		addFiles: files => set(state => ({ files: mergeComposerFiles(state.files, files) })),
 		removeFile: key => set(state => ({ files: state.files.filter(file => composerFileKey(file) !== key) })),
-		reset: () => set({ draft: "", images: [], files: [], sending: false, submissionUncertain: false }),
+		predictions: [],
+		predictionShown: false,
+		setPredictions: choices => set({ predictions: choices, predictionShown: false }),
+		markPredictionShown: () => set({ predictionShown: true }),
+		reset: () =>
+			set({
+				draft: "",
+				images: [],
+				files: [],
+				sending: false,
+				submissionUncertain: false,
+				predictions: [],
+				predictionShown: false,
+			}),
 	}));
 
 const defaultComposerStore = createComposerStore();

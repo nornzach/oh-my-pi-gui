@@ -381,6 +381,7 @@ export const en: Record<string, string> = {
 	"input.history.legacy": "Older history · workspace unknown",
 	"input.history.hint": "↑↓ navigate · Enter insert · Esc close",
 	"input.mode.bash.title": "Bash mode — Enter runs locally via the shell (!cmd)",
+	"input.prediction.hint": "Tab inserts the suggested next message",
 	"input.mode.python.title": "Python mode — runs via the agent's python tool ($ code)",
 	"input.agentConnecting": "The agent is still connecting.",
 	"input.bashFailed": "Shell command failed",

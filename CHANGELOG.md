@@ -7,11 +7,18 @@
 - Ask a side question from the composer by starting the draft with `?`.
 - Preview Core 19 session-local output files and open legacy artifact links from conversation history.
 - Show cache warming outcomes, Claude subscription plans, and the new daemon service states.
+- After a reply, the empty composer suggests your likely next message; Tab inserts it without sending (turn it off in Settings → Interaction → Composer Predictions).
 
 ### Changed
 
 - Upgrade the bundled agent and its native addon to OMP Core 19.0.0.
 - Run handoff in the current conversation and keep its cancellation separate from the active reply.
+- Core 19 settings (MCP built-in transforms and eval namespaces, cache warming strategy, cross-instance agent messaging, composer predictions) are translated in Chinese and Russian.
+- Release builds take the bundled agent only from the project's own Core repository.
+
+### Fixed
+
+- Plan approval works again with Core 19: approving, saving or refining a proposed plan no longer fails with "No plan is awaiting approval".
 
 ## [0.9.46] - 2026-11-18
 

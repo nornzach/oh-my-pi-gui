@@ -33,6 +33,12 @@ import {
 	type SessionInfoUpdateFrame,
 	type SubagentFrame,
 } from "../../shared/rpc-types";
+import {
+	receiveComposerPrediction,
+	requestComposerPrediction,
+	retireComposerPrediction,
+	runFinishedWithReply,
+} from "../lib/composer-prediction";
 import { describeError, describeProviderError } from "../lib/errors";
 import { formatClock } from "../lib/format";
 import { translate } from "../lib/i18n";
@@ -333,6 +339,8 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 							// so the retry row hands over to the live turn. auto_retry_end
 							// can trail by the whole first reply, or never come at all.
 							useSessionStore.setState({ isStreaming: true, awaitingModelSince: Date.now(), retryInfo: null });
+							// A new run makes the last guess at the next message moot.
+							retireComposerPrediction(tabId);
 							// A turn makes it a tab the user is working in: sidebar opens
 							// stop switching it in place (gui#29). Main's running status can
 							// miss a turn whose start and end arrive in one batch.
@@ -386,6 +394,15 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 							}
 							// Re-fetch state so agent-side todo updates mid-turn reach the panel.
 							void refreshSessionState(tabId);
+							// A run that ended with a reply: offer the user's likely next message
+							// in the empty composer (omp 19 composer predictions, TUI parity).
+							if (runFinishedWithReply(event.messages) && !useSessionStore.getState().retryInfo) {
+								requestComposerPrediction(tabId);
+							}
+							break;
+						}
+						case "composer_prediction": {
+							receiveComposerPrediction(tabId, event.choices);
 							break;
 						}
 						case "manual_compaction_start": {

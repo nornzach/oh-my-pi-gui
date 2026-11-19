@@ -117,6 +117,7 @@ const AGENT_EVENT_TYPES: Record<string, true> = {
 	plan_proposal: true,
 	queue_update: true,
 	collab_state: true,
+	composer_prediction: true,
 };
 
 export interface SidecarOptions {

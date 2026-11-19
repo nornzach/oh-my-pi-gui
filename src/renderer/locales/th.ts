@@ -366,6 +366,7 @@ export const th: Record<string, string> = {
 	"input.history.legacy": "ประวัติเก่า · ไม่ทราบพื้นที่ทำงาน",
 	"input.history.hint": "↑↓ เลื่อนเลือก · Enter แทรก · Esc ปิด",
 	"input.mode.bash.title": "โหมด Bash — Enter รันในเครื่องผ่านเชลล์ (!cmd)",
+	"input.prediction.hint": "กด Tab เพื่อใส่ข้อความถัดไปที่แนะนำ",
 	"input.mode.python.title": "โหมด Python — รันผ่านเครื่องมือ python ของ agent ($ code)",
 	"input.agentConnecting": "Agent ยังเชื่อมต่อไม่เสร็จ",
 	"input.bashFailed": "คำสั่งเชลล์ล้มเหลว",

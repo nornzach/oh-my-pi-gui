@@ -1673,7 +1673,8 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 	},
 	"providers.cacheWarming": {
 		label: "缓存保温",
-		description: "在提示词缓存条目即将过期前，以单 token 输出预算重发上一次请求",
+		description:
+			"在上一次请求的提示词缓存过期前进行续期（Anthropic 用 max_tokens 0 预热，其他提供商用单 token 重放）",
 	},
 	"claudeResets.autoRedeem": {
 		label: "Claude 重置自动兑换",
@@ -1964,5 +1965,35 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 		label: "浏览器 WebKit 路径",
 		description:
 			"omp 的 WebKit 引擎：它的宿主可执行文件，或包含它（名为 ABHost，Windows 上为 ABHost.exe）的 ABKit 引擎目录。未设置时运行已安装的引擎 ~/.o2/lib/abkit/ABHost（Windows 上为 ABHost.exe）。支持 ~。PI_BROWSER_WEBKIT_PATH 可覆盖它。",
+	},
+	"mcp.builtinTransforms": {
+		label: "MCP 内置替换",
+		description: "跳过已被 omp 自带工具取代的 MCP 服务器（例如 eval 运行 JavaScript 时的 Codex node_repl）",
+	},
+	"mcp.evalNamespaces": {
+		label: "MCP eval 命名空间",
+		description:
+			"把每个 MCP 服务器作为 eval 全局对象暴露（如 github.create_issue(...)），而不是顶层工具或 xd:// 工具",
+	},
+	"providers.cacheWarmingStrategy": {
+		label: "缓存保温策略",
+		description: "续期不再划算时如何衔接长时间工具调用：在缓存过期前压缩历史，或让缓存过期",
+	},
+	"providers.cacheWarmingCompactPercent": {
+		label: "缓存衔接压缩比例",
+		description: "提示词达到上下文窗口的这一比例后，长时间工具调用才可能用压缩来衔接；与 token 阈值取较低者",
+	},
+	"providers.cacheWarmingCompactTokens": {
+		label: "缓存衔接压缩 token 数",
+		description: "提示词达到这一 token 数后，长时间工具调用才可能用压缩来衔接；与窗口比例取较低者",
+	},
+	"task.crossInstance": {
+		label: "跨实例代理消息",
+		description: "允许同一文件夹中的其他 omp 实例读取代理输出，并发送可唤醒代理的消息",
+	},
+	"composer.predictions": {
+		label: "输入框预测",
+		description:
+			"回合完成后，让当前模型预测你的下一条消息，并以浅色文字显示在空输入框中；按 Tab 填入但不发送。额外用量：每个完成的回合会针对整个对话多发一次计费请求（计入 /stats）",
 	},
 };

@@ -307,7 +307,7 @@ cd packages/gui
 bun install
 ```
 
-For a build of a specific GUI revision, check out the monorepo repository and commit from that revision's [sidecar-source.json](./sidecar-source.json) before installing dependencies and building the sidecar. The Linux and Windows release workflows use both fields automatically.
+For a build of a specific GUI revision, check out the monorepo repository and commit from that revision's [sidecar-source.json](./sidecar-source.json) before installing dependencies and building the sidecar. The Linux and Windows release workflows use both fields automatically and accept only the `nornzach/oh-my-pi` repository.
 
 Run the following from `packages/gui/`:
 
@@ -676,7 +676,7 @@ cd packages/gui
 bun install
 ```
 
-要复现某个 GUI 版本的打包结果，请先查阅该版本的 [sidecar-source.json](./sidecar-source.json)，在外层 monorepo 检出记录的仓库和提交，再安装依赖并编译 sidecar。Linux 和 Windows 发布流程会自动读取这两个字段。
+要复现某个 GUI 版本的打包结果，请先查阅该版本的 [sidecar-source.json](./sidecar-source.json)，在外层 monorepo 检出记录的仓库和提交，再安装依赖并编译 sidecar。Linux 和 Windows 发布流程会自动读取这两个字段，且只接受 `nornzach/oh-my-pi` 仓库。
 
 在 `packages/gui/` 下执行：
 

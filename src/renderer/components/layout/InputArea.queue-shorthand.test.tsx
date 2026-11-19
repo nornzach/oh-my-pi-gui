@@ -711,6 +711,40 @@ describe("InputArea prompt history", () => {
 	});
 });
 
+describe("InputArea composer prediction (omp 19)", () => {
+	it("shows the predicted next message over the idle, empty composer and inserts it on Tab without sending", async () => {
+		await mount();
+		const command = vi.fn(async () => ok());
+		(window.omp.rpc as unknown as { command: typeof command }).command = command;
+		await act(async () => {
+			useSessionStore.setState({ isStreaming: false });
+			useComposerStore.getState().setPredictions(["run the tests"]);
+		});
+		await flush();
+
+		const textarea = findTextarea();
+		expect(textarea.getAttribute("placeholder")).toBe("run the tests");
+		expect(command).toHaveBeenCalledWith({ type: "composer_prediction_feedback", action: "shown" });
+
+		const propsKey = Object.getOwnPropertyNames(textarea).find(key => key.startsWith("__reactProps$"));
+		const props = (textarea as unknown as Record<string, { onKeyDown?: (event: object) => void }>)[propsKey ?? ""];
+		await act(async () =>
+			props?.onKeyDown?.({
+				key: "Tab",
+				shiftKey: false,
+				ctrlKey: false,
+				metaKey: false,
+				altKey: false,
+				nativeEvent: { isComposing: false },
+				preventDefault: () => {},
+			}),
+		);
+		expect(useComposerStore.getState().draft).toBe("run the tests");
+		expect(command).toHaveBeenCalledWith({ type: "composer_prediction_feedback", action: "accepted", rank: 0 });
+		expect(prompt).not.toHaveBeenCalled();
+	});
+});
+
 describe("InputArea transcript quote", () => {
 	it("inserts a quote at the caret the textarea kept after losing focus (#54)", async () => {
 		await mount();

@@ -22,6 +22,7 @@ import type { AvailableCommand, ImageContent } from "../../../shared/rpc-types";
 import { useFollowUpModifierHeld } from "../../hooks/use-follow-up-modifier";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { splitAttachmentMentions } from "../../lib/attachment-mentions";
+import { sendPredictionFeedback } from "../../lib/composer-prediction";
 import { useDisplayPreference } from "../../lib/display-preferences";
 import { tryEmojiInlineReplace } from "../../lib/emoji";
 import { describeError } from "../../lib/errors";
@@ -230,6 +231,18 @@ export function InputArea() {
 	// and reroutes sending. Detected from the prefix alone so the badge appears
 	// while the user is still typing.
 	const composerMode = useMemo(() => parseComposerMode(text), [text]);
+	// The agent's guess at the next message (omp 19 composer predictions): shown
+	// over the empty, idle composer only, and reported once when first shown.
+	const predictions = useComposerStore(s => s.predictions);
+	const predictionShown = useComposerStore(s => s.predictionShown);
+	const markPredictionShown = useComposerStore(s => s.markPredictionShown);
+	const prediction =
+		status === "ready" && !isStreaming && text === "" && images.length === 0 ? predictions[0] : undefined;
+	useEffect(() => {
+		if (!prediction || predictionShown) return;
+		markPredictionShown();
+		sendPredictionFeedback(rpc, "shown");
+	}, [prediction, predictionShown, markPredictionShown, rpc]);
 	const modeColor =
 		composerMode?.mode === "bash"
 			? "var(--omp-info)"
@@ -607,6 +620,18 @@ export function InputArea() {
 			}
 			return;
 		}
+		// Tab takes the predicted next message into the empty composer (TUI parity) once
+		// no paste decision is pending; it is only inserted, never sent.
+		if (prediction && e.key === "Tab" && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+			e.preventDefault();
+			setText(prediction);
+			sendPredictionFeedback(rpc, "accepted", 0);
+			requestAnimationFrame(() => {
+				const target = textareaRef.current;
+				target?.setSelectionRange(prediction.length, prediction.length);
+			});
+			return;
+		}
 		if (menu && ["ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(e.key)) {
 			setMenu(null);
 			return;
@@ -969,13 +994,15 @@ export function InputArea() {
 								onPaste={handlePaste}
 								rows={2}
 								placeholder={
-									status !== "ready"
-										? t("input.placeholder.connecting")
-										: isStreaming
-											? t("input.placeholder.streaming", { chord: FOLLOW_UP_CHORD })
-											: isChat
-												? t("input.placeholder.chat")
-												: t("input.placeholder.idle")
+									prediction
+										? prediction
+										: status !== "ready"
+											? t("input.placeholder.connecting")
+											: isStreaming
+												? t("input.placeholder.streaming", { chord: FOLLOW_UP_CHORD })
+												: isChat
+													? t("input.placeholder.chat")
+													: t("input.placeholder.idle")
 								}
 								className="max-h-[40vh] min-h-[44px] w-full resize-none bg-transparent text-omp-xl leading-[1.5] text-[var(--omp-text)] outline-none placeholder:truncate placeholder:text-[var(--omp-dim)]"
 							/>
@@ -983,6 +1010,12 @@ export function InputArea() {
 
 						{dictation.view && (
 							<DictationStrip view={dictation.view} onDone={dictation.stop} onCancel={dictation.cancel} />
+						)}
+
+						{prediction && (
+							<div className="omp-composer-prediction-hint px-3.5 pb-1 text-omp-sm text-[var(--omp-dim)]">
+								{t("input.prediction.hint")}
+							</div>
 						)}
 
 						{argHint && (

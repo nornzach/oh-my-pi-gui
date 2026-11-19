@@ -766,7 +766,7 @@ export const RU_SETTINGS: Record<string, { label?: string; description?: string 
 	"providers.cacheWarming": {
 		label: "Прогрев кеша",
 		description:
-			"Повторно отправлять последний запрос с лимитом вывода в один токен незадолго до истечения срока записи в кеш промптов",
+			"Обновлять запись кеша промптов последнего запроса незадолго до истечения (Anthropic — прогрев с max_tokens 0, остальные — повтор с одним токеном)",
 	},
 	"providers.streamFirstEventTimeoutSeconds": {
 		label: "Тайм-аут первого события потока",
@@ -2495,5 +2495,35 @@ export const RU_SETTINGS: Record<string, { label?: string; description?: string 
 		label: "Путь к WebKit браузера",
 		description:
 			"Движок WebKit от omp: его исполняемый файл-хост или каталог движка ABKit (в нём он называется ABHost, ABHost.exe в Windows). Если не задан, omp запускает установленный движок ~/.o2/lib/abkit/ABHost (ABHost.exe в Windows). Поддерживает ~. PI_BROWSER_WEBKIT_PATH переопределяет его.",
+	},
+	"mcp.builtinTransforms": {
+		label: "Встроенные замены MCP",
+		description:
+			"Пропускать распознанные MCP-серверы, которые заменяют собственные инструменты omp (node_repl из Codex, пока eval выполняет JavaScript)",
+	},
+	"mcp.evalNamespaces": {
+		label: "Пространства имён MCP в eval",
+		description:
+			"Открывать каждый MCP-сервер как глобальный объект eval (github.create_issue(...)) вместо инструментов верхнего уровня или xd://",
+	},
+	"providers.cacheWarmingStrategy": {
+		label: "Стратегия прогрева кеша",
+		description:
+			"Как продлевать долгий вызов инструмента, когда обновление перестаёт окупаться: сжать историю до истечения кеша или дать ему истечь",
+	},
+	"providers.cacheWarmingCompactPercent": {
+		label: "Доля окна для сжатия при продлении",
+		description:
+			"Доля окна контекста, после которой долгий вызов инструмента можно продлить сжатием; применяется меньшее из этого значения и лимита токенов",
+	},
+	"providers.cacheWarmingCompactTokens": {
+		label: "Токены для сжатия при продлении",
+		description:
+			"Число токенов промпта, после которого долгий вызов инструмента можно продлить сжатием; применяется меньшее из этого значения и доли окна",
+	},
+	"task.crossInstance": {
+		label: "Сообщения агентов между экземплярами",
+		description:
+			"Разрешить другим экземплярам omp в этой папке читать вывод агентов и отправлять сообщения, которые могут их будить",
 	},
 };

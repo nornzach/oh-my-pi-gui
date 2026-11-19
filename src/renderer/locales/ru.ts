@@ -365,6 +365,7 @@ export const ru: Record<string, string> = {
 	"input.history.legacy": "Старая история · рабочая область неизвестна",
 	"input.history.hint": "↑↓ переход · Enter вставить · Esc закрыть",
 	"input.mode.bash.title": "Режим Bash — Enter запускает команду локально через Shell (!cmd)",
+	"input.prediction.hint": "Tab вставит предложенное следующее сообщение",
 	"input.mode.python.title": "Режим Python — запуск через инструмент Python агента ($ code)",
 	"input.agentConnecting": "Агент всё ещё подключается.",
 	"input.bashFailed": "Не удалось выполнить команду Shell",

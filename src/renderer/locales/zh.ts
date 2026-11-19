@@ -366,6 +366,7 @@ export const zh: Record<string, string> = {
 	"input.history.legacy": "旧历史 · 工作区未知",
 	"input.history.hint": "↑↓ 选择 · Enter 插入 · Esc 关闭",
 	"input.mode.bash.title": "Bash 模式 — Enter 通过 shell 本地运行 (!cmd)",
+	"input.prediction.hint": "按 Tab 填入建议的下一句",
 	"input.mode.python.title": "Python 模式 — 通过代理的 python 工具运行 ($ code)",
 	"input.agentConnecting": "omp 代理仍在连接中。",
 	"input.bashFailed": "Shell 命令失败",
