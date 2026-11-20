@@ -1,6 +1,6 @@
 {
   "name": "@oh-my-pi/omp-gui",
-  "version": "1.0.1",
+	"version": "1.0.2",
   "author": "nornzach <287694139+nornzach@users.noreply.github.com>",
   "private": true,
   "type": "module",

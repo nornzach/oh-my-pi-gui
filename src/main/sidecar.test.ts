@@ -174,16 +174,15 @@ describe("SidecarManager", () => {
 				messageUpdates?: string;
 			}>;
 			expect(commands.map(command => command.type)).toEqual([
+				"set_ask_dialog",
 				"negotiate_protocol",
 				"set_event_filter",
-				"set_ask_dialog",
 				"terminal_configure",
 			]);
-			expect(commands[1]?.events).toContain("message_update");
-			// Without `form`, the agent's questions fall back to one dialog per field.
-			expect(commands[2]).toMatchObject({ enabled: true, form: true });
+			expect(commands[2]?.events).toContain("message_update");
+			expect(commands[0]).toMatchObject({ enabled: true, form: true });
 			// Full snapshots per token stall the main process (gui#19).
-			expect(commands[1]?.messageUpdates).toBe("delta");
+			expect(commands[2]?.messageUpdates).toBe("delta");
 		} finally {
 			sidecar.dispose();
 			await fs.rm(tempDir, { recursive: true, force: true });
@@ -670,7 +669,7 @@ describe("SidecarManager warm spare", () => {
 			expect(statuses).toEqual(["starting", "ready"]);
 			expect(prompts).toEqual(["boot-prompt"]);
 			expect(await fake.spawns()).toEqual([["--mode", "rpc-ui", "--no-auto-resume"]]);
-			expect((await fake.commands()).map(command => command.type)).toEqual(["switch_session"]);
+			expect((await fake.commands()).map(command => command.type)).toEqual(["set_ask_dialog", "switch_session"]);
 		} finally {
 			sidecar.dispose();
 			await fs.rm(tempDir, { recursive: true, force: true });
@@ -696,7 +695,10 @@ describe("SidecarManager warm spare", () => {
 			// The boot's own ready is not the tab's: the session is not open yet.
 			expect(statuses.filter(status => status === "ready")).toHaveLength(1);
 			expect(await fake.spawns()).toEqual([["--mode", "rpc-ui", "--no-auto-resume"]]);
-			expect(await fake.commands()).toEqual([expect.objectContaining({ type: "switch_session", sessionPath })]);
+			expect(await fake.commands()).toEqual([
+				expect.objectContaining({ type: "set_ask_dialog", enabled: true, form: true }),
+				expect.objectContaining({ type: "switch_session", sessionPath }),
+			]);
 			expect(prompts).toEqual(["boot-prompt"]);
 		} finally {
 			sidecar.dispose();

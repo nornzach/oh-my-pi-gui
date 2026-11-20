@@ -2,9 +2,20 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-21
+
 ### Added
 
-- Collapse an expanded process, thinking block, tool output, read group, or context detail from the button at its bottom.
+- Collapse each expanded process, thinking block, tool output, read group, or context detail from its own bottom button, including after a reply finishes ([#68](https://github.com/nornzach/oh-my-pi-gui/issues/68)).
+
+### Changed
+
+- Update the bundled agent and native modules to OMP Core 19.0.1 plus upstream changes through `2be72551c1`.
+
+### Fixed
+
+- Forms opened by startup extensions use the same desktop dialog as forms opened during a conversation.
+- Session statistics include cache writes when calculating the prompt cache hit rate.
 
 ## [1.0.1] - 2026-11-19
 
