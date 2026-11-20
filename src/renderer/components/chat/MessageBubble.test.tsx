@@ -8,6 +8,7 @@ import { I18nProvider } from "../../lib/i18n";
 import { useMessagesStore } from "../../stores/messages";
 import { useSessionStore } from "../../stores/session";
 import { useToolsStore } from "../../stores/tools";
+import { useUiStore } from "../../stores/ui";
 
 import { MessageBubble } from "./MessageBubble";
 
@@ -45,6 +46,7 @@ const toolResultMessage: AgentMessage = {
 
 afterEach(() => {
 	useToolsStore.getState().reset();
+	useUiStore.getState().setThinkingExpanded(false);
 });
 
 describe("MessageBubble tool messages", () => {
@@ -196,6 +198,45 @@ describe("MessageBubble user content", () => {
 		const { document } = parseHTML(html);
 		expect(document.querySelectorAll(".omp-thinking-block")).toHaveLength(1);
 		expect(document.querySelector(".markdown-body")?.textContent).toBe("Ready to ship.");
+	});
+
+	it("can fold either thinking block in one answer independently even without a message ID", async () => {
+		useUiStore.getState().setThinkingExpanded(true);
+		const container = document.createElement("div");
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		try {
+			await act(async () => {
+				root.render(
+					<I18nProvider>
+						<MessageBubble
+							message={{
+								role: "assistant",
+								content: [
+									{ type: "thinking", thinking: "First thought" },
+									{ type: "text", text: "The answer." },
+									{ type: "thinking", thinking: "Second thought" },
+								],
+							}}
+						/>
+					</I18nProvider>,
+				);
+			});
+
+			const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>(".omp-collapse-button"));
+			const headers = Array.from(container.querySelectorAll(".omp-thinking-header"));
+			expect(buttons).toHaveLength(2);
+			expect(headers).toHaveLength(2);
+			expect(headers.every(header => header.getAttribute("aria-expanded") === "true")).toBe(true);
+
+			await act(async () => buttons[1]!.click());
+			expect(headers.map(header => header.getAttribute("aria-expanded"))).toEqual(["true", "false"]);
+			await act(async () => buttons[0]!.click());
+			expect(headers.map(header => header.getAttribute("aria-expanded"))).toEqual(["false", "false"]);
+		} finally {
+			await act(async () => root.unmount());
+			container.remove();
+		}
 	});
 
 	it("shows an assistant reaction on the user bubble", () => {

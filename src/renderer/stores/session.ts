@@ -16,7 +16,7 @@ export interface TranscriptView {
 	sessionId: string;
 	pinned: boolean;
 	preCompactionOpen: boolean;
-	expandedProcessKeys: Set<string>;
+	processExpansion: ReadonlyMap<string, boolean>;
 	scrollOffset: number;
 	anchorKey?: string;
 	anchorOffset: number;

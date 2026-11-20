@@ -12,7 +12,7 @@ import {
 	Square,
 	Terminal,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
 import type { AgentMessage, ImageContent, MessageContent, ToolCallContent } from "../../../shared/rpc-types";
 import { OutputText } from "../../lib/ansi";
@@ -31,6 +31,7 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { toast } from "../../stores/toast";
 import { toolEntryKey } from "../../stores/tools";
 import { useUiStore } from "../../stores/ui";
+import { CollapseButton } from "../common/Collapse";
 import { FileAttachmentCard } from "../common/FileAttachmentCard";
 import { ZoomableImage } from "../common/ImageViewer";
 import { TechnicalDetails } from "../common/TechnicalDetails";
@@ -270,6 +271,9 @@ function ContextBubble({ message }: { message: AgentMessage }) {
 	const t = useT();
 	const [expanded, setExpanded] = useState(false);
 	const isFiles = message.role === "fileMention";
+	const collapseDetails = (event: MouseEvent<HTMLButtonElement>) => {
+		event.currentTarget.closest("details")?.removeAttribute("open");
+	};
 	const compactionMethodKey = message.method ? COMPACTION_METHOD_KEYS[message.method] : undefined;
 	const compactionMethod = message.method
 		? compactionMethodKey
@@ -320,6 +324,7 @@ function ContextBubble({ message }: { message: AgentMessage }) {
 									{file.content.slice(0, FILE_PREVIEW_CHARS)}
 									{file.content.length > FILE_PREVIEW_CHARS ? `\n${t("chat.context.previewTruncated")}` : ""}
 								</pre>
+								<CollapseButton label={t("chat.context.collapseDetails")} onClick={collapseDetails} />
 							</details>
 						))}
 					</div>
@@ -336,9 +341,12 @@ function ContextBubble({ message }: { message: AgentMessage }) {
 								{t("chat.context.details")}
 							</summary>
 							{expanded && (
-								<div className={PREVIEW_SCROLL_LG}>
-									<MarkdownRenderer content={message.summary ?? ""} />
-								</div>
+								<>
+									<div className={PREVIEW_SCROLL_LG}>
+										<MarkdownRenderer content={message.summary ?? ""} />
+									</div>
+									<CollapseButton label={t("chat.context.collapseDetails")} onClick={collapseDetails} />
+								</>
 							)}
 						</details>
 					</>

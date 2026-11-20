@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
 import { _electron as electron } from "playwright";
 import { DEFAULT_CATALOGS } from "../src/renderer/components/panels/plugins/catalog-model";
 import { IPC_EVENTS } from "../src/shared/ipc-types";
-import type { RpcSessionState } from "../src/shared/rpc-types";
+import type { AgentMessage, AgentSessionEvent, RpcSessionState } from "../src/shared/rpc-types";
 
 test("real bundled sidecar persists settings and sessions and serves every stats route", async () => {
 	test.setTimeout(process.env.OMP_GUI_TEST_APP ? 360_000 : 180_000);
@@ -343,6 +343,91 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		await expect(transcript.getByRole("status").filter({ hasText: "Image failed to load" })).toBeVisible();
 		expect(imageRequests).toBe(0);
 		await page.screenshot({ path: "test-results/conversation-layout.png", scale: "css", animations: "disabled" });
+
+		await page.evaluate(() => window.omp.prefs.set("language", "zh"));
+		const sendEvents = (events: AgentSessionEvent[]) =>
+			app.evaluate(
+				({ BrowserWindow }, { channel, batch }) =>
+					BrowserWindow.getAllWindows()[0]?.webContents.send(channel, batch),
+				{ channel: IPC_EVENTS.EVENTS_BATCH, batch: { tabId, payload: events } },
+			);
+		const startedAt = Date.now();
+		const thought = (offset: number, thinking: string): AgentMessage => ({
+			role: "assistant",
+			timestamp: startedAt + offset,
+			content: [{ type: "thinking", thinking }],
+		});
+		await sendEvents([
+			{ type: "message_end", message: thought(1, "先检查图纸上的标注。") },
+			{
+				type: "message_end",
+				message: { role: "user", timestamp: startedAt + 2, content: "再核对一下尺寸和单位。" },
+			},
+			{ type: "message_end", message: thought(3, "先核对图纸上的尺寸。") },
+			{ type: "message_end", message: thought(4, "再确认长度的单位是毫米。") },
+		]);
+		await expect(transcript.getByText("再核对一下尺寸和单位。", { exact: true })).toBeVisible();
+		const processGroups = transcript.locator(".omp-execution-group");
+		const groupCount = await processGroups.count();
+		const olderGroup = processGroups.nth(groupCount - 2);
+		await olderGroup.locator(".omp-execution-group-header").click();
+		const thinkingGroup = processGroups.nth(groupCount - 1);
+		await thinkingGroup.locator(".omp-execution-group-header").click();
+		const olderFooter = olderGroup.getByRole("button", { name: "收起过程", exact: true });
+		const currentFooter = thinkingGroup.getByRole("button", { name: "收起过程", exact: true });
+		await expect(olderFooter).toBeVisible();
+		await expect(currentFooter).toBeVisible();
+		const thinkingHeaders = thinkingGroup.locator(".omp-thinking-header");
+		await thinkingHeaders.nth(0).click();
+		await thinkingHeaders.nth(1).click();
+		const thoughts = thinkingGroup.locator(".omp-thinking-block");
+		const firstFooter = thoughts.nth(0).getByRole("button", { name: "收起思考", exact: true });
+		const secondFooter = thoughts.nth(1).getByRole("button", { name: "收起思考", exact: true });
+		await expect(firstFooter).toBeVisible();
+		await expect(secondFooter).toBeVisible();
+		await thinkingGroup.screenshot({ path: "test-results/process-collapse-buttons.png", animations: "disabled" });
+		await firstFooter.click();
+		await expect(firstFooter).toBeHidden();
+		await expect(thinkingHeaders.nth(0)).toHaveAttribute("aria-expanded", "false");
+		await expect(secondFooter).toBeVisible();
+		const liveThought = "最后检查公差。";
+		const liveMessage = thought(5, liveThought);
+		await sendEvents([
+			{ type: "message_start", message: { ...liveMessage, content: [] } },
+			{
+				type: "message_update",
+				message: liveMessage,
+				assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: liveThought },
+			},
+		]);
+		const nextGroup = processGroups.last();
+		await expect(nextGroup).toHaveAttribute("data-state", "running");
+		await nextGroup.locator(".omp-execution-group-header").click();
+		await expect(nextGroup.getByRole("button", { name: "收起过程", exact: true })).toBeVisible();
+		await sendEvents([
+			{ type: "message_end", message: liveMessage },
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					timestamp: startedAt + 6,
+					content: [{ type: "text", text: "尺寸与单位都已核对。" }],
+				},
+			},
+		]);
+		const finalProcessAnswer = transcript.getByText("尺寸与单位都已核对。", { exact: true });
+		await expect(finalProcessAnswer).toBeVisible();
+		await expect(nextGroup).toHaveAttribute("data-state", "complete");
+		await nextGroup.getByRole("button", { name: "收起过程", exact: true }).click();
+		await expect(nextGroup.locator(".omp-execution-group-header")).toHaveAttribute("aria-expanded", "false");
+		await expect(thinkingHeaders).toHaveCount(2);
+		await olderFooter.click();
+		await expect(olderGroup.locator(".omp-execution-group-header")).toHaveAttribute("aria-expanded", "false");
+		await expect(thinkingHeaders.nth(1)).toHaveAttribute("aria-expanded", "true");
+		await currentFooter.click();
+		await expect(thinkingHeaders).toHaveCount(0);
+		await expect(finalProcessAnswer).toBeVisible();
+		await page.evaluate(() => window.omp.prefs.set("language", "en"));
 
 		// Drive the real Add Project action with a deterministic native-picker result.
 		await app.evaluate(({ dialog }, folder) => {

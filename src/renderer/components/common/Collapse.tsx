@@ -4,7 +4,8 @@
  * `grid-template-rows` between 0fr and 1fr, so no height is ever measured.
  */
 
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { ChevronUp } from "lucide-react";
+import { type MouseEventHandler, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { cx } from "../../lib/format";
 
@@ -15,6 +16,19 @@ export interface CollapseProps {
 	open: boolean;
 	children: ReactNode;
 	className?: string;
+}
+
+export function CollapseButton({ label, onClick }: { label: string; onClick: MouseEventHandler<HTMLButtonElement> }) {
+	return (
+		<button
+			className="omp-collapse-button omp-pressable mt-1 inline-flex min-h-7 items-center gap-1 rounded-md border border-(--omp-border-muted) px-2 text-omp-sm font-medium text-(--omp-text) hover:bg-(--omp-selected-bg)"
+			onClick={onClick}
+			type="button"
+		>
+			<ChevronUp aria-hidden size={14} />
+			{label}
+		</button>
+	);
 }
 
 export function Collapse({ open, children, className }: CollapseProps) {

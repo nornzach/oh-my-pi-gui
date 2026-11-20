@@ -13,7 +13,7 @@ import { useT } from "../../lib/i18n";
 import { mergeReadGroupEntries, type ReadGroupEntry, type ReadGroupUsage, readGroupTitle } from "../../lib/read-group";
 import { useToolsStore } from "../../stores/tools";
 import { UsageRow } from "../chat/UsageRow";
-import { Collapse } from "../common/Collapse";
+import { Collapse, CollapseButton } from "../common/Collapse";
 import { type RunningIndicator, ToolCard } from "./ToolCard";
 
 function statusOf(status: string | undefined): "pending" | "success" | "error" | "aborted" {
@@ -90,6 +90,7 @@ export function ReadGroupCard({
 				<Collapse open={open}>
 					<div className="omp-read-group-body ml-4 mt-1">
 						<ToolCard toolCallId={entry.toolKey} toolName="read" args={entry.args} runningIndicator="dot" />
+						<CollapseButton label={t("readGroup.collapse")} onClick={() => setOpen(false)} />
 					</div>
 				</Collapse>
 				{usage?.map((item, index) => (
@@ -131,6 +132,7 @@ export function ReadGroupCard({
 							runningIndicator="dot"
 						/>
 					))}
+					<CollapseButton label={t("readGroup.collapse")} onClick={() => setOpen(false)} />
 				</div>
 			</Collapse>
 			{usage?.map((item, index) => (

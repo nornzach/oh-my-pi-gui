@@ -422,7 +422,7 @@ function summarizeProcess(messages: AgentMessage[]): ProcessMeta {
 export function buildHistoryRows(
 	messages: AgentMessage[],
 	detail: TranscriptDetail,
-	preservedProcessStarts?: ReadonlySet<string>,
+	preservedProcessStarts?: Pick<ReadonlySet<string>, "has">,
 ): HistoryRow[] {
 	const rows: HistoryRow[] = [];
 	let processMessages: AgentMessage[] = [];

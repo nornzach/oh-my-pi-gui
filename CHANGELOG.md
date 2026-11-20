@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Collapse an expanded process, thinking block, tool output, read group, or context detail from the button at its bottom.
+
 ## [1.0.1] - 2026-11-19
 
 ### Added

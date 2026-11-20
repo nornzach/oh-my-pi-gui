@@ -138,8 +138,8 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	const saveView = useSessionStore(s => s.saveTranscriptView);
 	const [restoreView] = useState(() => (savedView?.sessionId === sessionId ? savedView : null));
 	const [preCompactionOpen, setPreCompactionOpen] = useState(restoreView?.preCompactionOpen ?? false);
-	const [expandedProcessKeys, setExpandedProcessKeys] = useState<Set<string>>(
-		() => restoreView?.expandedProcessKeys ?? new Set(),
+	const [processExpansion, setProcessExpansion] = useState<ReadonlyMap<string, boolean>>(
+		() => restoreView?.processExpansion ?? new Map(),
 	);
 	const [pinned, setPinned] = useState(restoreView?.pinned ?? true);
 	const [visibleRowIndex, setVisibleRowIndex] = useState(Number.MAX_SAFE_INTEGER);
@@ -163,7 +163,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		const built = buildHistoryRows(
 			hiddenCount > 0 ? displayMessages.slice(hiddenCount) : displayMessages,
 			transcriptDetail,
-			expandedProcessKeys,
+			processExpansion,
 		);
 		// Read-tool grouping (TUI parity) folds consecutive collapsible reads into
 		// one card — only in full mode; compact mode's ProcessGroup already folds
@@ -171,7 +171,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		const grouped = transcriptDetail === "compact" ? built : (groupReadRows(built) as HistoryRow[]);
 		// Archived todo changes interleave by timestamp (transcript archive rows).
 		return mergeTodoSnapshots(grouped, todoHistory);
-	}, [displayMessages, hiddenCount, transcriptDetail, todoHistory, expandedProcessKeys]);
+	}, [displayMessages, hiddenCount, transcriptDetail, todoHistory, processExpansion]);
 
 	// What the latest run changed on disk, once it has settled: closes the turn
 	// with one line leading to the review drawer. Tool events stream in at a high
@@ -334,8 +334,8 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		if (el && footerRef.current?.offsetHeight) el.scrollTop = el.scrollHeight;
 		else virtualizer.scrollToEnd();
 	}, [virtualizer]);
-	const viewRef = useRef({ pinned, preCompactionOpen, expandedProcessKeys });
-	viewRef.current = { pinned, preCompactionOpen, expandedProcessKeys };
+	const viewRef = useRef({ pinned, preCompactionOpen, processExpansion });
+	viewRef.current = { pinned, preCompactionOpen, processExpansion };
 	useLayoutEffect(
 		() => () => {
 			const scrollOffset = virtualizer.scrollOffset ?? 0;
@@ -615,13 +615,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	useEffect(() => () => revealCancelRef.current?.(), []);
 	const jumpToConversation = useCallback((rowIndex: number) => revealRow(rowIndex), [revealRow]);
 	const updateProcessExpanded = useCallback((key: string, expanded: boolean) => {
-		setExpandedProcessKeys(current => {
-			if (current.has(key) === expanded) return current;
-			const next = new Set(current);
-			if (expanded) next.add(key);
-			else next.delete(key);
-			return next;
-		});
+		setProcessExpansion(current => (current.get(key) === expanded ? current : new Map(current).set(key, expanded)));
 	}, []);
 
 	// Open at a message (conversation search): once this tab shows the requested
@@ -880,13 +874,13 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 											<ReadGroupCard entries={row.entries} runningIndicator="dot" usage={row.usage} />
 										) : row.kind === "process" ? (
 											<ProcessGroup
-												expanded={expandedProcessKeys.has(rowKey)}
+												expanded={processExpansion.get(rowKey) === true}
 												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
 												row={row}
 											/>
 										) : row.kind === "streaming" ? (
 											<StreamingRows
-												expanded={expandedProcessKeys.has(rowKey)}
+												expanded={processExpansion.get(rowKey) === true}
 												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
 											/>
 										) : row.kind === "queued" ? (

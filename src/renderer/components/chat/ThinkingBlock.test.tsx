@@ -102,4 +102,15 @@ describe("ThinkingBlock", () => {
 		expect(container.textContent).not.toContain("**");
 		expect(container.querySelector(".omp-thinking-pulse")).toBeNull();
 	});
+
+	it("keeps live thinking folded after its own bottom button is clicked and more text arrives", async () => {
+		useUiStore.getState().setThinkingExpanded(true);
+		useMessagesStore.setState({ streamingThinking: "First phase" });
+		await mount(<ThinkingBlock live />);
+		const footer = document.querySelector<HTMLButtonElement>(".omp-collapse-button");
+		if (!footer) throw new Error("Expanded live thinking has no bottom button");
+		await act(async () => footer.click());
+		await act(async () => useMessagesStore.setState({ streamingThinking: "First phase continues" }));
+		expect(document.querySelector(".omp-thinking-header")?.getAttribute("aria-expanded")).toBe("false");
+	});
 });

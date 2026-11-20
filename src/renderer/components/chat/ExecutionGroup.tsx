@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useToolsStore } from "../../stores/tools";
-import { Collapse } from "../common/Collapse";
+import { Collapse, CollapseButton } from "../common/Collapse";
 
 interface ExecutionGroupProps {
 	children: ReactNode;
@@ -93,7 +93,10 @@ export function ExecutionGroup({
 				/>
 			</button>
 			<Collapse open={expanded}>
-				<div className="omp-execution-group-body">{children}</div>
+				<div className="omp-execution-group-body">
+					{children}
+					<CollapseButton label={t("chat.process.collapse")} onClick={() => onExpandedChange(false)} />
+				</div>
 			</Collapse>
 		</section>
 	);

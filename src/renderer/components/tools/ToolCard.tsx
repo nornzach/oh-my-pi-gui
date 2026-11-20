@@ -5,7 +5,7 @@ import { useT } from "../../lib/i18n";
 import { useNowTick } from "../../lib/now-tick";
 import { useToolsStore } from "../../stores/tools";
 import { useUiStore } from "../../stores/ui";
-import { Collapse } from "../common/Collapse";
+import { Collapse, CollapseButton } from "../common/Collapse";
 import { GenericRenderer } from "./GenericRenderer";
 import { getToolRenderer, getToolSummary } from "./index";
 
@@ -180,6 +180,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 							interrupted={isAborted}
 						/>
 					)}
+					<CollapseButton label={t("tools.collapseOutput")} onClick={() => setExpanded(false)} />
 				</div>
 			</Collapse>
 		</div>
