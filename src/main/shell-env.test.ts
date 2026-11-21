@@ -140,6 +140,7 @@ describe("shellSpawnEnv", () => {
 						SHELL_ONLY_API_KEY: "from-rc",
 						LAUNCH_WINS_KEY: "from-rc",
 						HTTPS_PROXY: "rc-proxy-must-not-leak",
+						NO_PROXY: "git.corp.example,.internal",
 						PWD: "/rc/pwd/must/not/leak",
 					},
 					false,
@@ -147,11 +148,15 @@ describe("shellSpawnEnv", () => {
 			);
 			setEnv("SHELL", fakeShell);
 			deleteEnv("SHELL_ONLY_API_KEY");
+			deleteEnv("NO_PROXY");
 			setEnv("LAUNCH_WINS_KEY", "from-launch");
 			const overlay = await shellSpawnEnv();
 			expect(overlay.SHELL_ONLY_API_KEY).toBe("from-rc");
 			expect(overlay.LAUNCH_WINS_KEY).toBeUndefined();
 			expect(overlay.HTTPS_PROXY).toBeUndefined();
+			// A bypass list narrows a proxy instead of choosing one, so the user's
+			// rc entry survives the precedence chain that keeps rc proxies out.
+			expect(overlay.NO_PROXY).toBe("git.corp.example,.internal");
 			expect(overlay.PWD).toBeUndefined();
 			expect(overlay.PATH.split(":")).toContain("/probed/bin");
 		} finally {

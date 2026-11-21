@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- Connect directly without any proxy — the system proxy included — via Settings → System & advanced → Advanced → HTTP proxy ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
+
+### Fixed
+
+- Local and private-network model servers (localhost, 127.\*, 10.\*, 172.16–31.\*, 192.168.\*) connect directly instead of through the configured or system proxy, so turns no longer fail with a connection reset when a proxy is set ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
+- A `NO_PROXY` bypass list exported in your shell profile is kept instead of discarded.
+
 ## [1.0.2] - 2026-11-21
 
 ### Added

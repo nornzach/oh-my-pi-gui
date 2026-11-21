@@ -2030,7 +2030,10 @@ export const en: Record<string, string> = {
 	"settings.gui.transcript.fullDesc": "Show every reasoning block and tool card.",
 	"settings.gui.proxy": "HTTP proxy",
 	"settings.gui.proxyDesc":
-		"Routes the agent's provider requests (OAuth, streaming, usage) through this proxy. HTTP and HTTPS proxies only, not SOCKS: use your proxy client's HTTP port. Leave empty to follow the system proxy. Applies on agent restart — restarted for you when idle.",
+		"Routes the agent's provider requests (OAuth, streaming, usage) through this proxy. HTTP and HTTPS proxies only, not SOCKS: use your proxy client's HTTP port. Leave empty to follow the system proxy. Local and private-network addresses (localhost, 127.*, 10.*, 172.16–31.*, 192.168.*) always connect directly. Applies on agent restart — restarted for you when idle.",
+	"settings.gui.proxyDirect": "Connect directly (ignore the system proxy)",
+	"settings.gui.proxyDirectDesc":
+		"Every request connects straight to its server, skipping the address above, any proxy in the launch environment, and the system proxy. Turn this on when a proxy breaks local or internal servers. Applies on agent restart — restarted for you when idle.",
 	"settings.gui.proxyUnsupported":
 		"The agent only works with HTTP and HTTPS proxies, so this address isn't used. Enter your proxy client's HTTP port instead, such as http://127.0.0.1:7890.",
 	"settings.gui.proxyApplied": "Proxy saved — restarting the agent to apply…",

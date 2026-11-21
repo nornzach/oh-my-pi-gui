@@ -4,6 +4,7 @@
  * skipped for the next source and reported, without ever repeating its value.
  */
 import { describe, expect, it, vi } from "vitest";
+import { LOCAL_NO_PROXY } from "../shared/proxy";
 import { dropUnsupportedProxies, type ProxySources, resolveProxyForSpawn } from "./proxy-env";
 
 const SOCKS = "socks5://127.0.0.1:1085";
@@ -23,6 +24,8 @@ describe("resolveProxyForSpawn: saved setting", () => {
 			https_proxy: HTTP,
 			http_proxy: HTTP,
 			all_proxy: HTTP,
+			NO_PROXY: LOCAL_NO_PROXY,
+			no_proxy: LOCAL_NO_PROXY,
 		});
 		expect(dropped).toEqual([]);
 	});
@@ -112,6 +115,112 @@ describe("resolveProxyForSpawn: system proxy", () => {
 	it("treats a failed system lookup as having no proxy", async () => {
 		const result = await resolve({ systemPac: () => Promise.reject(new Error("no session")) });
 		expect(result).toEqual({ env: {}, dropped: [] });
+	});
+});
+
+/**
+ * NO_PROXY matching as Bun's fetch implements it: exact host, dot-suffix, or
+ * IPv4 CIDR. Bun proxies loopback and private hosts too unless a rule names
+ * them, and it reads only the environment — the agent's own per-request bypass
+ * cannot undo that, so these rules are what keeps a local provider reachable.
+ */
+function noProxyCovers(rules: string, host: string): boolean {
+	const target = host.replace(/^\[|\]$/g, "").toLowerCase();
+	const asV4 = (value: string): number | undefined => {
+		const parts = value.split(".");
+		if (parts.length !== 4) return undefined;
+		let bits = 0;
+		for (const part of parts) {
+			if (!/^\d{1,3}$/.test(part) || Number(part) > 255) return undefined;
+			bits = bits * 256 + Number(part);
+		}
+		return bits;
+	};
+	const targetV4 = asV4(target);
+	for (const raw of rules.split(",")) {
+		const rule = raw
+			.trim()
+			.replace(/^\[|\]$/g, "")
+			.toLowerCase();
+		if (!rule) continue;
+		if (rule === target) return true;
+		if (rule.startsWith(".") && (target === rule.slice(1) || target.endsWith(rule))) return true;
+		const [network, prefix] = rule.split("/");
+		if (prefix === undefined || targetV4 === undefined) continue;
+		const networkV4 = asV4(network);
+		const width = Number(prefix);
+		if (networkV4 === undefined || !Number.isInteger(width) || width < 0 || width > 32) continue;
+		const mask = width === 0 ? 0 : (0xffffffff << (32 - width)) >>> 0;
+		if ((networkV4 & mask) === (targetV4 & mask)) return true;
+	}
+	return false;
+}
+
+const LOCAL_HOSTS = [
+	"127.0.0.1",
+	"127.5.6.7",
+	"localhost",
+	"ollama.localhost",
+	"::1",
+	"10.1.2.3",
+	"172.16.5.4",
+	"172.31.9.9",
+	"192.168.3.231",
+	"169.254.169.254",
+	"metadata.google.internal",
+];
+
+describe("resolveProxyForSpawn: local traffic stays out of the proxy", () => {
+	it("bypasses local and private hosts when the proxy came from the system", async () => {
+		const { env } = await resolve({ systemPac: async () => "PROXY 192.168.3.231:909" });
+		expect(env.HTTP_PROXY).toBe("http://192.168.3.231:909");
+		for (const host of LOCAL_HOSTS) expect(noProxyCovers(env.NO_PROXY ?? "", host), host).toBe(true);
+		expect(env.no_proxy).toBe(env.NO_PROXY);
+	});
+
+	it("bypasses the same hosts for a saved proxy", async () => {
+		const { env } = await resolve({ pref: HTTP });
+		for (const host of LOCAL_HOSTS) expect(noProxyCovers(env.NO_PROXY ?? "", host), host).toBe(true);
+	});
+
+	it("never widens the bypass to public hosts", async () => {
+		const { env } = await resolve({ pref: HTTP });
+		for (const host of ["api.openai.com", "chatgpt.com", "8.8.8.8", "192.169.1.1", "172.32.0.1", "11.0.0.1"]) {
+			expect(noProxyCovers(env.NO_PROXY ?? "", host), host).toBe(false);
+		}
+	});
+
+	it("keeps the user's own bypass entries beside the local ones", async () => {
+		const { env } = await resolve({ pref: HTTP, inherited: { NO_PROXY: "git.corp.example,.internal" } });
+		expect(noProxyCovers(env.NO_PROXY ?? "", "git.corp.example")).toBe(true);
+		expect(noProxyCovers(env.NO_PROXY ?? "", "build.internal")).toBe(true);
+		expect(noProxyCovers(env.NO_PROXY ?? "", "127.0.0.1")).toBe(true);
+	});
+});
+
+describe("resolveProxyForSpawn: direct connection", () => {
+	it("clears every proxy variable, including per-provider ones, without asking the system", async () => {
+		const systemPac = vi.fn(async () => "PROXY 192.168.3.231:909");
+		const { env, dropped } = await resolve({
+			direct: true,
+			pref: HTTP,
+			inherited: { HTTPS_PROXY: HTTP, PI_PROXY_ANTHROPIC: HTTP },
+			systemPac,
+		});
+		expect(systemPac).not.toHaveBeenCalled();
+		for (const name of [
+			"PI_PROXY",
+			"HTTPS_PROXY",
+			"HTTP_PROXY",
+			"ALL_PROXY",
+			"https_proxy",
+			"http_proxy",
+			"all_proxy",
+		]) {
+			expect(env[name], name).toBe("");
+		}
+		expect(env.PI_PROXY_ANTHROPIC).toBe("");
+		expect(dropped).toEqual([]);
 	});
 });
 

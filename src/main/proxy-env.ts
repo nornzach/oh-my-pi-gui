@@ -5,13 +5,17 @@
  * behind a firewall) would silently hang every provider request. Resolution
  * order per spawn: explicit GUI pref → inherited env (terminal launch) → system
  * proxy. A source the agent can't use is skipped and reported, so the next one
- * still gets its chance.
+ * still gets its chance. The "direct" pref opts out of all three. Every proxy
+ * handed out carries a NO_PROXY bypass list, because Bun's env-proxy path
+ * proxies local hosts too and the agent cannot override it per request.
  */
-import { type DroppedProxy, isUnsupportedProxyUrl } from "../shared/proxy";
+import { type DroppedProxy, isUnsupportedProxyUrl, LOCAL_NO_PROXY, mergeNoProxy } from "../shared/proxy";
 
 export interface ProxySources {
 	/** The saved `proxyUrl` preference, unvalidated: prefs.json may predate the settings check. */
 	pref: unknown;
+	/** The saved "connect directly" preference: no proxy at all, system proxy included. */
+	direct?: boolean;
 	/** What the spawn would otherwise inherit. */
 	inherited: NodeJS.ProcessEnv;
 	/** Chromium's PAC result for a representative URL. */
@@ -31,7 +35,7 @@ const PROXY_VAR = /^(?:PI_PROXY(?:_.+)?|https?_proxy|all_proxy)$/i;
 const INHERITED_CHOICE_VARS = ["PI_PROXY", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"];
 
 /** Expand one proxy URL into the full env-var set the agent and Bun honor. */
-function proxyEnvVars(proxyUrl: string): Record<string, string> {
+function proxyEnvVars(proxyUrl: string, noProxy: string): Record<string, string> {
 	return {
 		PI_PROXY: proxyUrl,
 		HTTPS_PROXY: proxyUrl,
@@ -40,7 +44,32 @@ function proxyEnvVars(proxyUrl: string): Record<string, string> {
 		https_proxy: proxyUrl,
 		http_proxy: proxyUrl,
 		all_proxy: proxyUrl,
+		// Bun proxies loopback/private hosts too unless NO_PROXY names them, so a
+		// proxy without a bypass list takes local model gateways down with it.
+		NO_PROXY: noProxy,
+		no_proxy: noProxy,
 	};
+}
+
+const STANDARD_PROXY_VARS = [
+	"PI_PROXY",
+	"HTTPS_PROXY",
+	"HTTP_PROXY",
+	"ALL_PROXY",
+	"https_proxy",
+	"http_proxy",
+	"all_proxy",
+];
+
+/**
+ * "Direct" has to be an explicit empty value, not an absent key: the spawn env
+ * is layered over the inherited one, so only an override can clear a proxy the
+ * launch environment (or a per-provider PI_PROXY_*) already carries. Bun reads
+ * an empty proxy variable as no proxy.
+ */
+function directEnvVars(inherited: NodeJS.ProcessEnv): Record<string, string> {
+	const names = new Set([...STANDARD_PROXY_VARS, ...Object.keys(inherited).filter(name => PROXY_VAR.test(name))]);
+	return Object.fromEntries([...names].map(name => [name, ""]));
 }
 
 /** Accept "127.0.0.1:7890" shorthand; keep explicit schemes as-is. */
@@ -68,7 +97,14 @@ function parsePacResult(pac: string): { url?: string; socksOnly: boolean } {
 	return { socksOnly: sawSocks };
 }
 
-export async function resolveProxyForSpawn({ pref, inherited, systemPac }: ProxySources): Promise<ProxyResolution> {
+export async function resolveProxyForSpawn({
+	pref,
+	direct,
+	inherited,
+	systemPac,
+}: ProxySources): Promise<ProxyResolution> {
+	if (direct) return { env: directEnvVars(inherited), dropped: [] };
+	const noProxy = mergeNoProxy(inherited.NO_PROXY, inherited.no_proxy, LOCAL_NO_PROXY);
 	const unusableVars = Object.keys(inherited).filter(
 		name => PROXY_VAR.test(name) && isUnsupportedProxyUrl(inherited[name] ?? ""),
 	);
@@ -82,7 +118,7 @@ export async function resolveProxyForSpawn({ pref, inherited, systemPac }: Proxy
 		if (!isUnsupportedProxyUrl(url)) {
 			// The setting replaces every standard variable, so only a per-provider one can go unnoticed.
 			reportVars(unusableVars.filter(name => PROVIDER_PROXY_VAR.test(name)));
-			return { env: proxyEnvVars(url), dropped };
+			return { env: proxyEnvVars(url, noProxy), dropped };
 		}
 		dropped.push({ source: "setting" });
 	}
@@ -101,7 +137,7 @@ export async function resolveProxyForSpawn({ pref, inherited, systemPac }: Proxy
 
 	try {
 		const { url, socksOnly } = parsePacResult(await systemPac());
-		if (url) return { env: proxyEnvVars(url), dropped };
+		if (url) return { env: proxyEnvVars(url, noProxy), dropped };
 		if (socksOnly) dropped.push({ source: "system" });
 	} catch {
 		// No system proxy answer: same as having none.

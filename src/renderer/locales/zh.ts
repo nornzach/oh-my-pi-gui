@@ -1968,7 +1968,10 @@ export const zh: Record<string, string> = {
 	"settings.gui.transcript.fullDesc": "逐条显示全部思考和工具卡片。",
 	"settings.gui.proxy": "HTTP 代理",
 	"settings.gui.proxyDesc":
-		"让 omp 的提供商请求（OAuth、流式、用量）走此代理。只支持 HTTP 和 HTTPS 代理，不支持 SOCKS，请填写代理客户端的 HTTP 端口。留空则跟随系统代理。重启后端后生效——空闲时会自动重启。",
+		"让 omp 的提供商请求（OAuth、流式、用量）走此代理。只支持 HTTP 和 HTTPS 代理，不支持 SOCKS，请填写代理客户端的 HTTP 端口。留空则跟随系统代理。本机与内网地址（localhost、127.*、10.*、172.16–31.*、192.168.*）始终直连，不走代理。重启后端后生效——空闲时会自动重启。",
+	"settings.gui.proxyDirect": "直连（忽略系统代理）",
+	"settings.gui.proxyDirectDesc":
+		"所有请求都直接连接目标服务器，跳过上方填写的代理、启动环境里带的代理以及系统代理。代理导致本地或内网服务连不上时打开它。重启后端后生效——空闲时会自动重启。",
 	"settings.gui.proxyUnsupported":
 		"omp 只能使用 HTTP 和 HTTPS 代理，这个地址不会生效。请改填代理客户端的 HTTP 端口，例如 http://127.0.0.1:7890。",
 	"settings.gui.proxyApplied": "代理设置已保存——正在重启后端以应用…",

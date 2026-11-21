@@ -126,6 +126,8 @@ function resolveSourceCli(): string | null {
 interface MainPrefs {
 	lastProject?: string;
 	proxyUrl?: string;
+	/** Opt out of every proxy source, the system proxy included. */
+	proxyDirect?: boolean;
 	/** One layout per live window, in window order. */
 	tabLayouts?: PersistedTabLayout[];
 	/** Pre-multi-window shape, migrated on the first persist. */
@@ -153,6 +155,7 @@ async function resolveProxy(): Promise<ProxyResolution> {
 	const shellEnv = await shellSpawnEnv().catch(() => ({}));
 	return resolveProxyForSpawn({
 		pref: prefsStore().get("proxyUrl"),
+		direct: prefsStore().get("proxyDirect") === true,
 		inherited: { ...process.env, ...shellEnv },
 		systemPac: () => session.defaultSession.resolveProxy(SYSTEM_PROXY_PROBE_URL),
 	});

@@ -1137,7 +1137,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		}
 		prefsStore.set(payload.key, payload.value);
 		// The proxy is spawn-time env: a spare booted under the old one must go.
-		if (payload.key === "proxyUrl") sidecarPool.refreshSpare();
+		if (payload.key === "proxyUrl" || payload.key === "proxyDirect") sidecarPool.refreshSpare();
 		if (payload.key === "language" && isLanguage(payload.value)) {
 			createMenu(windowManager, deps.spawnWindow, deps.browserHost);
 			for (const window of BrowserWindow.getAllWindows()) {

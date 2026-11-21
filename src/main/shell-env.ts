@@ -40,16 +40,15 @@ const OVERLAY_DENYLIST = new Set([
 	"USER",
 	"_",
 	// Proxy resolution has its own precedence chain (GUI pref → inherited
-	// env → system PAC); rc-file proxy exports must not bypass it.
+	// env → system PAC); rc-file proxy exports must not bypass it. NO_PROXY is
+	// not a proxy choice — it only narrows one — so the user's bypass list stays.
 	"ALL_PROXY",
 	"HTTP_PROXY",
 	"HTTPS_PROXY",
-	"NO_PROXY",
 	"PI_PROXY",
 	"all_proxy",
 	"http_proxy",
 	"https_proxy",
-	"no_proxy",
 ]);
 
 export interface LoginShellEnv {

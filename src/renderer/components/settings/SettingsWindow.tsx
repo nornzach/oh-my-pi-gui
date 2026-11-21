@@ -331,6 +331,7 @@ export function SettingsWindow() {
 	const [fontSizeDraft, setFontSizeDraft] = useState<string | null>(null);
 	const [proxyDraft, setProxyDraft] = useState<string | null>(null);
 	const [savedProxy, setSavedProxy] = useState("");
+	const [proxyDirect, setProxyDirect] = useState(false);
 	const [proxySaving, setProxySaving] = useState(false);
 	const proxyPending = useRef(false);
 	const [launchProfile, setLaunchProfile] = useState<LaunchProfile>({});
@@ -510,6 +511,12 @@ export function SettingsWindow() {
 				if (!cancelled) setSavedProxy(typeof value === "string" ? value : "");
 			})
 			.catch(() => {});
+		void window.omp.prefs
+			.get("proxyDirect")
+			.then(value => {
+				if (!cancelled) setProxyDirect(value === true);
+			})
+			.catch(() => {});
 		return () => {
 			cancelled = true;
 		};
@@ -591,23 +598,14 @@ export function SettingsWindow() {
 			setFontSizeDraft(null);
 		});
 	};
-	const commitProxy = async () => {
-		if (proxyDraft === null || proxyPending.current) return;
-		const next = proxyDraft.trim();
-		if (next === savedProxy) {
-			setProxyDraft(null);
-			return;
-		}
-		// The field says why; the draft stays so the address can be corrected in place.
-		if (isUnsupportedProxyUrl(next)) return;
+	// Proxy prefs are spawn-time env: save, then restart the focused agent when it
+	// is idle so the change is visible without a manual relaunch.
+	const saveProxyPref = async (key: "proxyUrl" | "proxyDirect", value: unknown, apply: () => void) => {
 		const origin = focusedSessionRuntime();
 		proxyPending.current = true;
 		setProxySaving(true);
 		try {
-			const saved = await saveGuiPreference("proxyUrl", next || null, () => {
-				setSavedProxy(next);
-				setProxyDraft(draft => (draft === proxyDraft ? null : draft));
-			});
+			const saved = await saveGuiPreference(key, value, apply);
 			if (!saved) return;
 			const restart = () => {
 				const state = useSessionStore.getState();
@@ -637,6 +635,24 @@ export function SettingsWindow() {
 			proxyPending.current = false;
 			setProxySaving(false);
 		}
+	};
+	const commitProxy = async () => {
+		if (proxyDraft === null || proxyPending.current) return;
+		const next = proxyDraft.trim();
+		if (next === savedProxy) {
+			setProxyDraft(null);
+			return;
+		}
+		// The field says why; the draft stays so the address can be corrected in place.
+		if (isUnsupportedProxyUrl(next)) return;
+		await saveProxyPref("proxyUrl", next || null, () => {
+			setSavedProxy(next);
+			setProxyDraft(draft => (draft === proxyDraft ? null : draft));
+		});
+	};
+	const applyProxyDirect = async (next: boolean) => {
+		if (proxyPending.current) return;
+		await saveProxyPref("proxyDirect", next, () => setProxyDirect(next));
 	};
 
 	// ── Launch profile (per-workspace, prefs `launchProfiles.<cwd>`) ──
@@ -1510,9 +1526,17 @@ export function SettingsWindow() {
 										{tab === ADVANCED_TAB_ID && (
 											<>
 												<Section id="setting-gui-proxy" title={t("settings.gui.proxy")}>
+													<Toggle
+														className="omp-settings-row"
+														checked={proxyDirect}
+														description={t("settings.gui.proxyDirectDesc")}
+														disabled={proxySaving}
+														label={t("settings.gui.proxyDirect")}
+														onChange={applyProxyDirect}
+													/>
 													<Input
 														compact
-														disabled={proxySaving}
+														disabled={proxySaving || proxyDirect}
 														onBlur={commitProxy}
 														onChange={event => setProxyDraft(event.target.value)}
 														onKeyDown={event => {
