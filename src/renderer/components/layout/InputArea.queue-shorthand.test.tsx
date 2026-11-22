@@ -4,6 +4,7 @@
  * menu's outside-dismiss listener.
  */
 import { parseHTML } from "linkedom";
+import { Bot } from "lucide-react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
@@ -28,6 +29,7 @@ import { useSettingsStore } from "../../stores/settings";
 import { createTabRuntime, replaceTabRuntime } from "../../stores/tab-runtime";
 import { useTabsStore } from "../../stores/tabs";
 import { useUiStore } from "../../stores/ui";
+import { DockCard } from "../chat/dock/DockCard";
 import { InputArea } from "./InputArea";
 
 const { document, window, Event, CustomEvent, HTMLElement, Node } = parseHTML("<html><body></body></html>");
@@ -1020,5 +1022,55 @@ describe("InputArea GPT sign-in speed", () => {
 		await flush();
 		expect(setFastMode).toHaveBeenCalledExactlyOnceWith(true, true);
 		expect(speed.textContent).toContain("Ultrafast");
+	});
+});
+
+describe("InputArea overlay layering", () => {
+	it("paints the slash completion list above the dock cards' sticky header (#73)", async () => {
+		await mount(true);
+		const rpc = (window as unknown as { omp: { rpc: { commandForTab: Mock } } }).omp.rpc;
+		rpc.commandForTab.mockImplementation(async (_tabId: string, command: { type: string }) => {
+			if (command.type === "get_available_commands")
+				return ok({ commands: [{ name: "mcp", description: "MCP servers", source: "builtin" }] });
+			return ok({});
+		});
+		await act(async () => {
+			withSessionRuntime("t0", () => useSessionStore.setState({ sessionId: "reload-commands" }));
+		});
+		await flush();
+		await typeInto(findTextarea(), "/");
+		const textarea = findTextarea() as unknown as Element;
+		Object.defineProperty(textarea, "selectionStart", { value: 1, configurable: true });
+		Object.defineProperty(textarea, "selectionEnd", { value: 1, configurable: true });
+		await act(async () => {
+			textarea.dispatchEvent(new Event("keyup"));
+		});
+		await flush();
+
+		const popup = document.querySelector("div.absolute.bottom-full");
+		expect(popup).not.toBeNull();
+
+		const dockHost = document.createElement("div");
+		document.body.appendChild(dockHost as never);
+		const dockRoot = createRoot(dockHost as unknown as Element);
+		await act(async () => {
+			dockRoot.render(
+				<I18nProvider>
+					<DockCard id="agents" icon={Bot} title="Agents">
+						<span>body</span>
+					</DockCard>
+				</I18nProvider>,
+			);
+		});
+		const header = dockHost.querySelector("div.sticky");
+		expect(header).not.toBeNull();
+		const zOf = (element: Element): number => {
+			const match = /(?:^|\s)z-(\d+)(?:\s|$)/.exec((element as unknown as { className: string }).className);
+			return match ? Number(match[1]) : 0;
+		};
+		expect(zOf(popup as Element)).toBeGreaterThan(zOf(header as Element));
+
+		await act(async () => dockRoot.unmount());
+		dockHost.remove();
 	});
 });

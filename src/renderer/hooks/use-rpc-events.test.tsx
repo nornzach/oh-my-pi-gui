@@ -1048,6 +1048,26 @@ describe("useRpcEvents non-transcript frames", () => {
 		);
 	});
 
+	it("keeps slash-command output visible across the hydrate that follows the builtin prompt", async () => {
+		const { omp, emitCommandOutput } = installMockOmp();
+		await mount(<RpcEventsProbe />);
+		const committed: AgentMessage = { role: "user", content: "earlier turn", timestamp: 1, entryId: "e1" };
+		omp.rpc.getTranscript.mockResolvedValue(success({ messages: [committed] }));
+		await hydrateSession();
+
+		await act(async () => {
+			emitCommandOutput({ type: "command_output", text: "mysql | stdio | enabled" });
+		});
+		await hydrateSession();
+
+		const messages = useMessagesStore.getState().messages;
+		expect(messages).toHaveLength(2);
+		expect(messages[0]).toEqual(committed);
+		expect(messages[1]).toEqual(
+			expect.objectContaining({ customType: "command", content: [{ type: "text", text: "mysql | stdio | enabled" }] }),
+		);
+	});
+
 	it("keeps a retried run's prompt and hands the retry row to the retried run", async () => {
 		const { omp, emitBatch } = installMockOmp();
 		await mount(<RpcEventsProbe />);

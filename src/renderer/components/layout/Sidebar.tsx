@@ -15,6 +15,7 @@ import {
 	Command,
 	ExternalLink,
 	Folder,
+	FolderMinus,
 	FolderPlus,
 	GitBranchPlus,
 	GitPullRequest,
@@ -1998,18 +1999,33 @@ export function Sidebar() {
 										setGroupMenu(null);
 									},
 								},
-								{
-									id: "group-delete",
-									label: t("common.delete"),
-									icon: Trash2,
-									danger: true,
-									disabled: groupHasBusySession || groupMenu.group.sessions.length === 0,
-									disabledReason: t("sidebar.deleteGroupStreaming"),
-									onSelect: () => {
-										setPendingDelete({ kind: "group", group: groupMenu.group });
-										setGroupMenu(null);
-									},
-								},
+								...(groupMenu.group.sessions.length === 0
+									? [
+											{
+												id: "group-remove",
+												label: t("sidebar.menu.removeWorkspace"),
+												icon: FolderMinus,
+												danger: true,
+												onSelect: () => {
+													void useSidebarPrefs.getState().removeWorkspace(groupMenu.group.cwd);
+													setGroupMenu(null);
+												},
+											},
+										]
+									: [
+											{
+												id: "group-delete",
+												label: t("sidebar.menu.deleteSessions"),
+												icon: Trash2,
+												danger: true,
+												disabled: groupHasBusySession,
+												disabledReason: t("sidebar.deleteGroupStreaming"),
+												onSelect: () => {
+													setPendingDelete({ kind: "group", group: groupMenu.group });
+													setGroupMenu(null);
+												},
+											},
+										]),
 							]}
 						/>
 					);

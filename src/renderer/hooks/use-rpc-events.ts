@@ -870,11 +870,14 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 		const handleCommandOutput = (frame: CommandOutputFrame, tabId: string) => {
 			if (!frame.text || closedTabFrame(tabId)) return;
 			withSessionRuntime(tabId, () => {
-				useMessagesStore.getState().appendMessage({
+				const store = useMessagesStore.getState();
+				store.appendMessage({
 					role: "custom",
 					customType: "command",
 					content: [{ type: "text", text: frame.text }],
 					timestamp: Date.now(),
+					localOnly: true,
+					localAfterEntryId: store.messages.findLast(message => message.entryId)?.entryId ?? null,
 				});
 			});
 		};

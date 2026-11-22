@@ -208,7 +208,27 @@ function upsertCommittedMessages(current: AgentMessage[], committed: AgentMessag
 	return next;
 }
 
-/** Preserve only committed rows appended after a transcript request began. */
+/** A row the persisted transcript will never carry, so a fetch must not replace it. */
+function isLocalOnly(message: AgentMessage): boolean {
+	return message.localOnly === true;
+}
+
+/** Put local-only rows back after the committed row they followed, in creation order. */
+function reinsertLocalRows(merged: AgentMessage[], locals: AgentMessage[]): AgentMessage[] {
+	if (locals.length === 0) return merged;
+	let next = merged;
+	for (const row of locals) {
+		const anchor = row.localAfterEntryId;
+		const index = anchor == null ? -1 : next.findIndex(entry => entry.entryId === anchor);
+		let at = anchor != null && index < 0 ? next.length : index + 1;
+		while (at < next.length && isLocalOnly(next[at])) at++;
+		if (next === merged) next = [...merged];
+		next.splice(at, 0, row);
+	}
+	return next;
+}
+
+/** Preserve committed rows and never-persisted local rows appended around a transcript request. */
 export function mergeFetchedTranscript(
 	fetched: AgentMessage[],
 	before: AgentMessage[],
@@ -223,10 +243,13 @@ export function mergeFetchedTranscript(
 				? message.entryId !== undefined && message.entryId === currentMessage.entryId
 				: message === currentMessage;
 		});
-	if (!prefixIntact) return fetched;
+	if (!prefixIntact) return reinsertLocalRows(fetched, current.filter(isLocalOnly));
 	const fetchedIds = new Set(fetched.flatMap(message => (message.entryId ? [message.entryId] : [])));
-	const tail = current.slice(before.length).filter(message => message.entryId && !fetchedIds.has(message.entryId));
-	return tail.length === 0 ? fetched : [...fetched, ...tail];
+	const tail = current
+		.slice(before.length)
+		.filter(message => (message.entryId && !fetchedIds.has(message.entryId)) || isLocalOnly(message));
+	const merged = tail.length === 0 ? fetched : [...fetched, ...tail];
+	return reinsertLocalRows(merged, current.slice(0, before.length).filter(isLocalOnly));
 }
 
 export const createMessagesStore = () =>

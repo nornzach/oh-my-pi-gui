@@ -45,6 +45,8 @@ interface SidebarPrefsStore {
 	hydrated: boolean;
 	hydrate: () => Promise<void>;
 	addWorkspace: (cwd: string) => Promise<void>;
+	/** Drop a registered project from the list; session files on disk are untouched. */
+	removeWorkspace: (cwd: string) => Promise<void>;
 	toggleGroupPin: (cwd: string) => Promise<void>;
 	toggleSessionPin: (path: string) => Promise<void>;
 	setSessionsArchived: (paths: readonly string[], archived: boolean) => Promise<void>;
@@ -165,6 +167,21 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 			mutate: state => ({ registeredWorkspaces: [...state.registeredWorkspaces, cwd] }),
 			persist: () => writePrefs(get),
 			onFailure: message => toast({ variant: "error", title: translate("titlebar.openProjectFailed"), message }),
+		});
+	},
+
+	removeWorkspace: async cwd => {
+		if (!get().registeredWorkspaces.includes(cwd)) return;
+		await optimisticWrite({
+			store: { getState: get, setState: set },
+			mutate: state => ({
+				registeredWorkspaces: state.registeredWorkspaces.filter(item => item !== cwd),
+				pinnedGroups: state.pinnedGroups.filter(item => item !== cwd),
+				groupAliases: Object.fromEntries(Object.entries(state.groupAliases).filter(([key]) => key !== cwd)),
+			}),
+			persist: () => writePrefs(get),
+			onFailure: message =>
+				toast({ variant: "error", title: translate("sidebar.removeWorkspaceFailed"), message }),
 		});
 	},
 

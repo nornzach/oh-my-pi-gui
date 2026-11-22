@@ -14,6 +14,14 @@ const dialogLayers: HTMLElement[] = [];
  */
 export const DIALOG_OVERLAY_Z = "z-[120]";
 
+/**
+ * Composer slide-up overlays (completion list, paste menu, history search)
+ * share the column's stacking context with the transcript, where dock cards
+ * scroll a sticky header at z-20 under them. They must outrank that chrome or
+ * the header paints over the list (#73).
+ */
+export const COLUMN_SLIDEUP_Z = "z-30";
+
 // Where each dialog sends focus back to when it closes.
 const restoreTargets = new WeakMap<HTMLElement, HTMLElement | null>();
 

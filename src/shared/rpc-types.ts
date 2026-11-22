@@ -2167,6 +2167,10 @@ export interface AgentMessage {
 	optimisticAfterEntryId?: string | null;
 	/** The local echo has received its wire delivery and must not match another user message. */
 	optimisticDelivered?: boolean;
+	/** GUI-only row the persisted transcript will never contain (builtin command output). */
+	localOnly?: boolean;
+	/** Last committed entry when this local-only row was created; null means an empty transcript. */
+	localAfterEntryId?: string | null;
 	role:
 		| "user"
 		| "assistant"

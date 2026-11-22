@@ -137,4 +137,40 @@ describe("sidebar-prefs store", () => {
 			}),
 		);
 	});
+
+	it("removes a registered project with its pin and alias, leaving other projects alone", async () => {
+		await useSidebarPrefs.getState().addWorkspace("/work/empty");
+		await useSidebarPrefs.getState().addWorkspace("/work/kept");
+		await useSidebarPrefs.getState().toggleGroupPin("/work/empty");
+		await useSidebarPrefs.getState().setGroupAlias("/work/empty", "Scratch");
+
+		await useSidebarPrefs.getState().removeWorkspace("/work/empty");
+
+		const state = useSidebarPrefs.getState();
+		expect(state.registeredWorkspaces).toEqual(["/work/kept"]);
+		expect(state.pinnedGroups).toEqual([]);
+		expect(state.groupAliases).toEqual({});
+		const persisted = set.mock.lastCall?.[1];
+		useSidebarPrefs.getState().reset();
+		get.mockResolvedValueOnce(persisted);
+		await useSidebarPrefs.getState().hydrate();
+		expect(useSidebarPrefs.getState().registeredWorkspaces).toEqual(["/work/kept"]);
+	});
+
+	it("ignores removal of a project that was never registered", async () => {
+		await useSidebarPrefs.getState().removeWorkspace("/work/unknown");
+		expect(set).not.toHaveBeenCalled();
+	});
+
+	it("rolls back a removal when the prefs write is rejected", async () => {
+		await useSidebarPrefs.getState().addWorkspace("/work/empty");
+		set.mockRejectedValueOnce(new Error("disk full"));
+
+		await useSidebarPrefs.getState().removeWorkspace("/work/empty");
+
+		expect(useSidebarPrefs.getState().registeredWorkspaces).toEqual(["/work/empty"]);
+		expect(useToastStore.getState().toasts).toContainEqual(
+			expect.objectContaining({ variant: "error", title: translate("sidebar.removeWorkspaceFailed") }),
+		);
+	});
 });

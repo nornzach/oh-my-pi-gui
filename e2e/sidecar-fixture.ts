@@ -193,6 +193,7 @@ if (process.argv.includes("stats")) {
 	let streamChunks = 0;
 	let holdSettings = false;
 	let releaseSettings: (() => void) | undefined;
+	let dockVisible = false;
 	const write = (data: unknown) => process.stdout.write(`${JSON.stringify(data)}\n`);
 	const values: Record<string, unknown> = {
 		"approval.mode": "ask",
@@ -230,7 +231,22 @@ if (process.argv.includes("stats")) {
 				ok({ messages });
 				break;
 			case "get_subagents":
-				ok({ subagents: [] });
+				ok({
+					subagents: dockVisible
+						? [
+								{
+									id: "sub-1",
+									index: 0,
+									agent: "Explore",
+									agentSource: "builtin",
+									description: "fixture scout",
+									status: "running",
+									lastUpdate: Date.now(),
+									spawnedAt: Date.now(),
+								},
+							]
+						: [],
+				});
 				break;
 			case "get_queue":
 				ok({ steering: [], followUp: [], entries: queue });
@@ -557,6 +573,61 @@ if (process.argv.includes("stats")) {
 				write({ type: "agent_end", messages: [], isTerminal: true });
 				break;
 			case "prompt": {
+				// A local builtin answers without a run; the deferred prompt_result is
+				// what makes the GUI rehydrate the transcript (rpc-prompt-results.ts).
+				const localBuiltin = () => {
+					ok({ agentInvoked: false });
+					setImmediate(() => {
+						write({
+							type: "prompt_result",
+							id: command.id,
+							agentInvoked: false,
+							status: "completed",
+							sessionSettled: true,
+						});
+						write({ type: "session_settled" });
+					});
+				};
+				if (command.message === "fixture builtin") {
+					write({ type: "command_output", text: "mysql | stdio | enabled [user]" });
+					localBuiltin();
+					break;
+				}
+				if (command.message === "fixture form") {
+					ok({ agentInvoked: false });
+					write({
+						type: "extension_ui_request",
+						id: "form-e2e",
+						method: "form",
+						sections: [
+							{
+								title: [{ text: "Deploy" }],
+								blocks: [
+									{
+										kind: "field",
+										field: {
+											kind: "text",
+											name: "target",
+											type: "text",
+											multiline: false,
+											label: [{ text: "Target" }],
+											value: "",
+											placeholder: "",
+											required: true,
+											rows: 1,
+										},
+									},
+								],
+							},
+						],
+					});
+					break;
+				}
+				if (command.message === "fixture dock") {
+					dockVisible = true;
+					localBuiltin();
+					break;
+				}
 				if (command.message === "fixture hold settings") {
 					holdSettings = true;
 					ok();

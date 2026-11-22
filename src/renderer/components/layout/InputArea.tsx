@@ -54,6 +54,7 @@ import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
+import { COLUMN_SLIDEUP_Z } from "../common/dialog-layer";
 import { FileAttachmentCard } from "../common/FileAttachmentCard";
 import { ZoomableImage } from "../common/ImageViewer";
 import { AdvisorBadge } from "./AdvisorBadge";
@@ -773,7 +774,7 @@ export function InputArea() {
 						ref={pasteMenuRef}
 						role="dialog"
 						aria-label={t("input.paste.title", { lines: pasteMenu.lineCount, chars: pasteMenu.content.length })}
-						className="omp-pop-in absolute bottom-full left-0 right-0 z-20 mb-2 rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-3 shadow-[var(--omp-shadow-lg)]"
+						className={`omp-pop-in absolute bottom-full left-0 right-0 ${COLUMN_SLIDEUP_Z} mb-2 rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-3 shadow-[var(--omp-shadow-lg)]`}
 					>
 						<div className="flex items-baseline justify-between gap-3">
 							<span className="text-omp-md font-medium text-[var(--omp-text)]">
@@ -842,7 +843,8 @@ export function InputArea() {
 					{menu && (
 						<div
 							ref={menuListRef}
-							className="absolute bottom-full left-0 z-10 mb-2 max-h-[60vh] w-[420px] max-w-full overflow-y-auto rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-1 shadow-[var(--omp-shadow-lg)]"
+							data-completion-menu
+							className={`absolute bottom-full left-0 ${COLUMN_SLIDEUP_Z} mb-2 max-h-[60vh] w-[420px] max-w-full overflow-y-auto rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] p-1 shadow-[var(--omp-shadow-lg)]`}
 						>
 							{menu.items.map((item, index) => (
 								<Fragment key={`${menu.source}:${item.label}`}>

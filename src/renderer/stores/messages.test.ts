@@ -437,3 +437,67 @@ describe("transcript hydration", () => {
 		expect(useMessagesStore.getState().messages).toEqual([next]);
 	});
 });
+
+describe("local-only builtin output survives hydration (#75)", () => {
+	function commandRow(text: string, anchor: string | null): AgentMessage {
+		return {
+			role: "custom",
+			customType: "command",
+			content: [{ type: "text", text }],
+			timestamp: 9,
+			localOnly: true,
+			localAfterEntryId: anchor,
+		};
+	}
+
+	it("keeps output appended before the transcript request began", () => {
+		const a = userMessage("a");
+		const output = commandRow("mcp servers", "a");
+		const current = [a, output];
+
+		useMessagesStore.getState().reconcileFetched(mergeFetchedTranscript([a], current, current));
+
+		expect(useMessagesStore.getState().messages).toEqual([a, output]);
+	});
+
+	it("keeps output appended while the transcript request was in flight", () => {
+		const a = userMessage("a");
+		const output = commandRow("mcp servers", "a");
+
+		expect(mergeFetchedTranscript([a], [a], [a, output])).toEqual([a, output]);
+	});
+
+	it("keeps several outputs in creation order around later committed rows", () => {
+		const a = userMessage("a");
+		const b = userMessage("b");
+		const first = commandRow("first", "a");
+		const second = commandRow("second", "b");
+		const current = [a, first, b, second];
+
+		expect(mergeFetchedTranscript([a, b], current, current)).toEqual([a, first, b, second]);
+	});
+
+	it("keeps outputs sharing one anchor in creation order", () => {
+		const a = userMessage("a");
+		const first = commandRow("first", "a");
+		const second = commandRow("second", "a");
+		const current = [a, first, second];
+
+		expect(mergeFetchedTranscript([a], current, current)).toEqual([a, first, second]);
+	});
+
+	it("re-anchors output at the end when a rewrite dropped its anchor", () => {
+		const a = userMessage("a");
+		const output = commandRow("orphan", "a");
+		const rewritten = userMessage("c");
+
+		expect(mergeFetchedTranscript([rewritten], [a, output], [a, output])).toEqual([rewritten, output]);
+	});
+
+	it("still drops delivered rows that the fetch will own", () => {
+		const a = userMessage("a");
+		const delivered: AgentMessage = { role: "assistant", content: "stale", timestamp: 2 };
+
+		expect(mergeFetchedTranscript([a], [a], [a, delivered])).toEqual([a]);
+	});
+});

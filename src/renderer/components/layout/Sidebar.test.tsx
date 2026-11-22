@@ -519,7 +519,34 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(labels.some(label => label.includes("Select sessions"))).toBe(true);
 		expect(labels.some(label => label.includes("Pin to top"))).toBe(true);
 		expect(labels.some(label => label.includes("Delete"))).toBe(true);
+		expect(labels.some(label => label.includes("Remove project from list"))).toBe(false);
 		expect(labels).toHaveLength(6);
+	});
+
+	it("removes an empty registered project from the list instead of offering a dead delete (#76)", async () => {
+		installMockOmp(LIST);
+		seedStores();
+		await mount(<Sidebar />);
+		await act(async () => {
+			await useSidebarPrefs.getState().addWorkspace("/work/empty");
+		});
+		await flush();
+
+		const header = container.querySelector('[data-workspace-group="/work/empty"]');
+		expect(header).not.toBeNull();
+		await fire(header as unknown as TestElement, "onContextMenu");
+
+		const labels = menuItemLabels();
+		expect(labels.some(label => label.includes("Remove project from list"))).toBe(true);
+		expect(labels.some(label => label.includes("Delete sessions"))).toBe(false);
+
+		const removeItem = [...document.body.querySelectorAll('[role="menu"] button')].find(button =>
+			(button.textContent ?? "").includes("Remove project from list"),
+		);
+		await fire(removeItem as Element, "onClick");
+
+		expect(useSidebarPrefs.getState().registeredWorkspaces).toEqual([]);
+		expect(container.querySelector('[data-workspace-group="/work/empty"]')).toBeNull();
 	});
 
 	it("right-click on a session row opens the 7-item session menu", async () => {

@@ -5,11 +5,16 @@
 ### Added
 
 - Connect directly without any proxy — the system proxy included — via Settings → System & advanced → Advanced → HTTP proxy ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
+- Optional inline ask forms: Settings → GUI → "Show ask forms inline in the chat" renders the agent's question at the end of the conversation instead of a modal, keeping the surrounding context visible; typed answers survive tab switches, and forms in background tabs still open as a dialog ([#74](https://github.com/nornzach/oh-my-pi-gui/issues/74)).
+- Token Meter: clicking the title-bar token/cost readout opens a live throughput panel — streaming rate with a rolling 60 s sparkline, per-turn t/s and TTFT, the session token grid (in/out/think/cache/cache-hit/consumed) and cost economics including effective $/1M ([#71](https://github.com/nornzach/oh-my-pi-gui/issues/71)).
 
 ### Fixed
 
 - Local and private-network model servers (localhost, 127.\*, 10.\*, 172.16–31.\*, 192.168.\*) connect directly instead of through the configured or system proxy, so turns no longer fail with a connection reset when a proxy is set ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
 - A `NO_PROXY` bypass list exported in your shell profile is kept instead of discarded.
+- Typed builtin commands (`/mcp list`, `/usage`, `/tools`, …) keep their reply on screen instead of it being wiped by the transcript refresh that follows the command ([#75](https://github.com/nornzach/oh-my-pi-gui/issues/75)).
+- Projects with no sessions can be removed from the sidebar via right-click → "Remove project from list"; the folder on disk is untouched, and deleting a project's sessions no longer leaves an undeletable empty row ([#76](https://github.com/nornzach/oh-my-pi-gui/issues/76)).
+- The slash-command and paste menus now paint above the Agents/Todo/Plan dock card headers instead of being covered by their title bars ([#73](https://github.com/nornzach/oh-my-pi-gui/issues/73)).
 
 ## [1.0.2] - 2026-11-21
 

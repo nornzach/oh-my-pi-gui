@@ -6,6 +6,7 @@ import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import type { InputHistoryEntry } from "../../stores/input-history";
 import { filterHistory, useInputHistoryStore, workspaceHistory } from "../../stores/input-history";
+import { COLUMN_SLIDEUP_Z } from "../common/dialog-layer";
 
 /**
  * Ctrl+R history search overlay (GUI counterpart of the TUI
@@ -115,7 +116,7 @@ export function HistorySearchOverlay({ cwd, onSelect, onClose }: HistorySearchOv
 	return (
 		<div
 			ref={overlayRef}
-			className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] shadow-[var(--omp-shadow-lg)]"
+			className={`absolute bottom-full left-0 right-0 ${COLUMN_SLIDEUP_Z} mb-2 overflow-hidden rounded-xl border border-[var(--omp-border)] bg-[var(--omp-bg-elevated)] shadow-[var(--omp-shadow-lg)]`}
 			role="dialog"
 			aria-label={t("input.history.title")}
 			aria-modal="false"
