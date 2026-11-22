@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { ExtensionUIRequest } from "../../shared/rpc-types";
+import type { FormFieldDraft } from "../components/dialogs/FormDialog";
 import {
 	allSessionRuntimes,
 	createScopedStoreHook,
@@ -13,11 +14,15 @@ export interface ExtensionUiSnapshot {
 	pendingRequests: ExtensionUIRequest[];
 	statusWidgets: Record<string, string>;
 	widgetPanels: Record<string, string[]>;
+	/** Typed answers of a pending form, kept with its request so switching between
+	 *  the modal and the inline card (or across tabs) never retypes them. */
+	formDrafts: Record<string, FormFieldDraft[]>;
 }
 
 export interface ExtensionUiStore extends ExtensionUiSnapshot {
 	pushRequest: (request: ExtensionUIRequest) => void;
 	removeRequest: (id: string) => void;
+	forgetFormDraft: (id: string) => void;
 	setStatus: (key: string, text: string | undefined) => void;
 	setWidget: (key: string, lines: string[] | undefined) => void;
 	clearAll: () => void;
@@ -41,7 +46,13 @@ export function applyExtensionUiRequest(
 		return { ...snapshot, widgetPanels };
 	}
 	if (request.method === "cancel") {
-		return { ...snapshot, pendingRequests: snapshot.pendingRequests.filter(item => item.id !== request.targetId) };
+		const formDrafts = { ...snapshot.formDrafts };
+		delete formDrafts[request.targetId];
+		return {
+			...snapshot,
+			formDrafts,
+			pendingRequests: snapshot.pendingRequests.filter(item => item.id !== request.targetId),
+		};
 	}
 	return { ...snapshot, pendingRequests: [...snapshot.pendingRequests, request] };
 }
@@ -51,8 +62,21 @@ export const createExtensionUiStore = () =>
 		pendingRequests: [],
 		statusWidgets: {},
 		widgetPanels: {},
+		formDrafts: {},
 		pushRequest: request => set(state => applyExtensionUiRequest(state, request)),
-		removeRequest: id => set({ pendingRequests: get().pendingRequests.filter(r => r.id !== id) }),
+		removeRequest: id =>
+			set(state => {
+				const formDrafts = { ...state.formDrafts };
+				delete formDrafts[id];
+				return { pendingRequests: state.pendingRequests.filter(r => r.id !== id), formDrafts };
+			}),
+		forgetFormDraft: id =>
+			set(state => {
+				if (!(id in state.formDrafts)) return state;
+				const formDrafts = { ...state.formDrafts };
+				delete formDrafts[id];
+				return { formDrafts };
+			}),
 		setStatus: (key, text) => {
 			const next = { ...get().statusWidgets };
 			if (text) {
@@ -71,7 +95,7 @@ export const createExtensionUiStore = () =>
 			}
 			set({ widgetPanels: next });
 		},
-		clearAll: () => set({ pendingRequests: [], statusWidgets: {}, widgetPanels: {} }),
+		clearAll: () => set({ pendingRequests: [], statusWidgets: {}, widgetPanels: {}, formDrafts: {} }),
 	}));
 
 const defaultExtensionUiStore = createExtensionUiStore();
@@ -160,6 +184,31 @@ export function useAllPendingRequests(): ExtensionUIRequest[] {
 export function removeExtensionRequest(id: string): void {
 	defaultExtensionUiStore.getState().removeRequest(id);
 	for (const { store } of runtimeExtensionStores()) store.getState().removeRequest(id);
+}
+
+/** Drafts of a pending form, from whichever tab store owns the request. */
+export function readFormDraft(id: string | undefined): FormFieldDraft[] | undefined {
+	if (!id) return undefined;
+	for (const { store } of runtimeExtensionStores()) {
+		const draft = store.getState().formDrafts[id];
+		if (draft) return draft;
+	}
+	return defaultExtensionUiStore.getState().formDrafts[id];
+}
+
+export function writeFormDraft(id: string, drafts: FormFieldDraft[]): void {
+	for (const { store } of runtimeExtensionStores()) {
+		if (store.getState().pendingRequests.some(request => request.id === id)) {
+			store.setState(state => ({ formDrafts: { ...state.formDrafts, [id]: drafts } }));
+			return;
+		}
+	}
+	defaultExtensionUiStore.setState(state => ({ formDrafts: { ...state.formDrafts, [id]: drafts } }));
+}
+
+export function forgetFormDraft(id: string): void {
+	for (const { store } of runtimeExtensionStores()) store.getState().forgetFormDraft(id);
+	defaultExtensionUiStore.getState().forgetFormDraft(id);
 }
 
 /** A sign-in's browser step, or a prompt it is waiting on (a pasted code, an API key). */

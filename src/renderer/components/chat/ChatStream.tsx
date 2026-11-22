@@ -64,6 +64,7 @@ import {
 	tabAwaitsTranscript,
 } from "./chat-stream-utils";
 import { ExecutionGroup } from "./ExecutionGroup";
+import { InlineAskCard } from "./InlineAskCard";
 import { MessageBubble } from "./MessageBubble";
 import { StreamingText } from "./StreamingText";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -905,11 +906,10 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 							);
 						})}
 					</div>
-					{footer && (
-						<div className="omp-composer-shell" ref={footerRef}>
-							{footer}
-						</div>
-					)}
+					<div className="omp-composer-shell" ref={footerRef}>
+						<InlineAskCard />
+						{footer}
+					</div>
 				</div>
 				<button
 					type="button"

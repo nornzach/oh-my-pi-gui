@@ -40,6 +40,7 @@ import { ContextMenu, type ContextMenuAnchor, type ContextMenuItem } from "../co
 import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
 import { NotificationBell } from "./NotificationBell";
 import { sessionCacheHitPercent, sessionExecutionDurationMs } from "./session-metrics";
+import { TokenMeterPopover } from "./TokenMeterPopover";
 
 /**
  * Native desktop toolbar. Session controls stay here; model and execution
@@ -91,6 +92,8 @@ export function TitleBar() {
 	const [editingName, setEditingName] = useState(false);
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);
 	const [actionsMenu, setActionsMenu] = useState<ContextMenuAnchor | null>(null);
+	const [meterAnchor, setMeterAnchor] = useState<{ x: number; y: number } | null>(null);
+	const meterButtonRef = useRef<HTMLButtonElement | null>(null);
 	const [draft, setDraft] = useState("");
 	const [stats, setStats] = useState<SessionStats | null>(null);
 	const [now, setNow] = useState(() => Date.now());
@@ -465,10 +468,25 @@ export function TitleBar() {
 			{/* One quiet readout: only figures that carry information are printed
 			    (a row of zeros is noise); the full breakdown is in the tooltip. */}
 			{pageAgentId && <AgentTitleFacts agentId={pageAgentId} />}
-			{!pageAgentId && metricParts.length > 0 && (
-				<span
-					className="omp-session-metrics no-drag flex shrink-0 items-center gap-1.5 px-1.5 text-omp-sm tabular-nums text-[var(--omp-dim)]"
+			{!pageAgentId && (metricParts.length > 0 || isStreaming) && (
+				<button
+					aria-expanded={meterAnchor !== null}
+					aria-haspopup="dialog"
+					className="omp-session-metrics no-drag omp-pressable flex shrink-0 items-center gap-1.5 rounded-lg px-1.5 text-omp-sm tabular-nums text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+					onClick={event => {
+						if (meterAnchor) {
+							setMeterAnchor(null);
+							return;
+						}
+						const rect = event.currentTarget.getBoundingClientRect();
+						setMeterAnchor({
+							x: Math.max(8, Math.min(rect.left, window.innerWidth - 368)),
+							y: (Number.isFinite(rect.bottom) ? rect.bottom : 40) + 6,
+						});
+					}}
+					ref={meterButtonRef}
 					title={metricsTitle}
+					type="button"
 				>
 					{metricParts.map((part, index) => (
 						<span className="flex items-center gap-1.5" key={part}>
@@ -476,7 +494,17 @@ export function TitleBar() {
 							{part}
 						</span>
 					))}
-				</span>
+				</button>
+			)}
+			{meterAnchor && !pageAgentId && (
+				<TokenMeterPopover
+					anchor={meterAnchor}
+					anchorRef={meterButtonRef}
+					isStreaming={isStreaming}
+					messages={messages}
+					onClose={() => setMeterAnchor(null)}
+					stats={visibleStats}
+				/>
 			)}
 			<NotificationBell className={iconButton} />
 			<button

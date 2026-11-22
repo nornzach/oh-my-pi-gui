@@ -316,6 +316,7 @@ export function SettingsWindow() {
 	const tabRows = useUiStore(state => state.tabRows);
 	const linkOpenMode = useUiStore(state => state.linkOpenMode);
 	const collapseLargePastes = useUiStore(state => state.collapseLargePastes);
+	const askInline = useUiStore(state => state.askInline);
 	const sidecarStatus = useSessionStore(state => state.status);
 	const sidecarReady = sidecarStatus === "ready";
 	const sidecarError = useUiStore(state => state.sidecarError);
@@ -566,6 +567,9 @@ export function SettingsWindow() {
 	};
 	const applyCollapseLargePastes = (next: boolean) => {
 		return saveGuiPreference("collapseLargePastes", next, () => useUiStore.getState().setCollapseLargePastes(next));
+	};
+	const applyAskInline = (next: boolean) => {
+		return saveGuiPreference("askInline", next, () => useUiStore.getState().setAskInline(next));
 	};
 	const applyNotifications = (next: boolean) => {
 		return saveGuiPreference("notifications", next, () => setNotifications(next));
@@ -1297,6 +1301,15 @@ export function SettingsWindow() {
 															description={t("settings.gui.collapseLargePastesDesc")}
 															label={t("settings.gui.collapseLargePastes")}
 															onChange={applyCollapseLargePastes}
+														/>
+													</div>
+													<div id="setting-gui-askInline" className="mt-4">
+														<Toggle
+															className="omp-settings-row"
+															checked={askInline}
+															description={t("settings.gui.askInlineDesc")}
+															label={t("settings.gui.askInline")}
+															onChange={applyAskInline}
 														/>
 													</div>
 													{/* Same row geometry as the switches above: label left, a

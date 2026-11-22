@@ -6,7 +6,7 @@ import { useT } from "../../lib/i18n";
 /** Below this the rate is nonsense (cached/instant responses yield absurd tok/s). */
 const MIN_DURATION_MS = 100;
 
-interface MessageUsage {
+export interface MessageUsage {
 	input: number;
 	output: number;
 	cacheRead: number;
@@ -33,7 +33,7 @@ export interface UsageSource {
  * (absent on other roles). Returns null when nothing billable was recorded —
  * aborted/errored turns carry an all-zero usage block not worth a row.
  */
-function readUsage(message: UsageSource): MessageUsage | null {
+export function readUsage(message: UsageSource): MessageUsage | null {
 	const usage = message.usage;
 	if (usage == null || typeof usage !== "object") return null;
 	const record = usage as Record<string, unknown>;
@@ -59,6 +59,11 @@ function formatCost(total: number): string {
 	return `$${total >= 1 ? total.toFixed(2) : total.toPrecision(2)}`;
 }
 
+/** Output tok/s of a turn; null below the duration floor where the rate is nonsense. */
+export function usageTokPerSec(output: number, durationMs: number): number | null {
+	return durationMs > MIN_DURATION_MS && output > 0 ? (output / durationMs) * 1000 : null;
+}
+
 /**
  * Compact usage/cost footer under completed assistant messages (TUI
  * usage-row.ts parity): model, in/out tokens, cache reads, cost, wall-clock
@@ -80,7 +85,7 @@ export function UsageRow({ message }: { message: UsageSource }) {
 	const durationMs = typeof message.duration === "number" && Number.isFinite(message.duration) ? message.duration : 0;
 	const ttftMs = typeof message.ttft === "number" && Number.isFinite(message.ttft) ? message.ttft : 0;
 	const totalInput = usage.input + usage.cacheWrite;
-	const tokPerSec = durationMs > MIN_DURATION_MS && usage.output > 0 ? (usage.output / durationMs) * 1000 : 0;
+	const tokPerSec = usageTokPerSec(usage.output, durationMs) ?? 0;
 	// Message time (TUI usage-row parity): the wire timestamp is an ISO string
 	// or epoch ms; render a compact HH:MM.
 	const timestampMs =

@@ -16,6 +16,7 @@ import type {
 } from "../../../shared/rpc-types";
 import { cx, sanitizeToolText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { forgetFormDraft, readFormDraft, writeFormDraft } from "../../stores/extension-ui";
 import { Button, Input, Modal, TextArea } from "../common";
 
 /** One selectable row; `multi` draws a checkbox, otherwise a radio. */
@@ -64,7 +65,7 @@ interface ChoiceDraft {
 	checked: ReadonlySet<number>;
 	other: string;
 }
-type FieldDraft = string | ChoiceDraft;
+export type FormFieldDraft = string | ChoiceDraft;
 
 function plainText(spans: ExtensionFormSpan[]): string {
 	return sanitizeToolText(spans.map(span => span.text).join(""));
@@ -90,7 +91,7 @@ function Spans({ spans }: { spans: ExtensionFormSpan[] }) {
 	);
 }
 
-function initialDraft(field: ExtensionFormField): FieldDraft {
+function initialDraft(field: ExtensionFormField): FormFieldDraft {
 	if (field.kind === "text") return field.value;
 	return {
 		checked: new Set(field.options.flatMap((option, index) => (option.checked && !option.disabled ? [index] : []))),
@@ -98,7 +99,7 @@ function initialDraft(field: ExtensionFormField): FieldDraft {
 	};
 }
 
-function isBlank(field: ExtensionFormField, draft: FieldDraft | undefined): boolean {
+function isBlank(field: ExtensionFormField, draft: FormFieldDraft | undefined): boolean {
 	if (typeof draft === "string") return draft.trim() === "";
 	return field.kind === "choice" && (draft === undefined || (draft.checked.size === 0 && draft.other.trim() === ""));
 }
@@ -110,7 +111,7 @@ function choiceFormValue(field: ExtensionFormChoiceField, draft: ChoiceDraft): s
 	return other || values[0];
 }
 
-function formDataOf(fields: ExtensionFormField[], drafts: FieldDraft[]): Record<string, string | string[]> {
+function formDataOf(fields: ExtensionFormField[], drafts: FormFieldDraft[]): Record<string, string | string[]> {
 	const data: Record<string, string | string[]> = {};
 	fields.forEach((field, index) => {
 		const draft = drafts[index];
@@ -281,17 +282,20 @@ function ContextBlock({ block }: { block: Exclude<ExtensionFormBlock, { kind: "f
 	}
 }
 
-export function FormDialog({
+export function AskFormBody({
 	sections,
 	footer,
 	onSubmit,
 	onCancel,
+	draftKey,
 }: {
 	sections: ExtensionFormSection[];
 	/** Countdown shown beside the buttons. */
 	footer: ReactNode;
 	onSubmit: (formData: Record<string, string | string[]>) => void;
 	onCancel: () => void;
+	/** Pending request id: drafts survive switching between the modal and the inline card. */
+	draftKey?: string;
 }) {
 	const t = useT();
 	const fields = useMemo(
@@ -301,16 +305,23 @@ export function FormDialog({
 			),
 		[sections],
 	);
-	const [drafts, setDrafts] = useState<FieldDraft[]>(() => fields.map(initialDraft));
+	const [drafts, setDrafts] = useState<FormFieldDraft[]>(() => readFormDraft(draftKey) ?? fields.map(initialDraft));
 	const [missing, setMissing] = useState<ReadonlySet<number>>(new Set());
 
-	const update = (index: number, draft: FieldDraft) => {
-		setDrafts(previous => previous.map((item, position) => (position === index ? draft : item)));
+	const update = (index: number, draft: FormFieldDraft) => {
+		const next = drafts.map((item, position) => (position === index ? draft : item));
+		setDrafts(next);
+		if (draftKey) writeFormDraft(draftKey, next);
 		setMissing(previous => {
-			const next = new Set(previous);
-			next.delete(index);
-			return next;
+			const nextMissing = new Set(previous);
+			nextMissing.delete(index);
+			return nextMissing;
 		});
+	};
+
+	const cancel = () => {
+		if (draftKey) forgetFormDraft(draftKey);
+		onCancel();
 	};
 
 	const submit = () => {
@@ -319,6 +330,7 @@ export function FormDialog({
 			setMissing(new Set(blank));
 			return;
 		}
+		if (draftKey) forgetFormDraft(draftKey);
 		onSubmit(formDataOf(fields, drafts));
 	};
 
@@ -348,40 +360,66 @@ export function FormDialog({
 	};
 
 	return (
-		<Modal onClose={onCancel} open size="lg" title={t("extDialog.ask.title")}>
-			<form
-				className="space-y-5"
-				onSubmit={event => {
-					event.preventDefault();
-					submit();
-				}}
-			>
-				{sections.map((section, sectionIndex) => (
-					<div className="space-y-3" key={sectionIndex}>
-						{section.title.length > 0 && (
-							<h3 className="text-omp-xs font-semibold break-words whitespace-pre-wrap text-(--omp-text)">
-								<Spans spans={section.title} />
-							</h3>
-						)}
-						{section.blocks.map((block, blockIndex) => (
-							<div key={blockIndex}>
-								{block.kind === "field" ? renderField(block.field) : <ContextBlock block={block} />}
-							</div>
-						))}
-					</div>
-				))}
-				<div className="flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-3">
-					<div className="flex items-center gap-2">{footer}</div>
-					<div className="flex gap-2">
-						<Button onClick={onCancel} size="sm" type="button" variant="ghost">
-							{t("common.cancel")}
-						</Button>
-						<Button size="sm" type="submit" variant="primary">
-							{t("extDialog.submit")}
-						</Button>
-					</div>
+		<form
+			className="space-y-5"
+			onSubmit={event => {
+				event.preventDefault();
+				submit();
+			}}
+		>
+			{sections.map((section, sectionIndex) => (
+				<div className="space-y-3" key={sectionIndex}>
+					{section.title.length > 0 && (
+						<h3 className="text-omp-xs font-semibold break-words whitespace-pre-wrap text-(--omp-text)">
+							<Spans spans={section.title} />
+						</h3>
+					)}
+					{section.blocks.map((block, blockIndex) => (
+						<div key={blockIndex}>
+							{block.kind === "field" ? renderField(block.field) : <ContextBlock block={block} />}
+						</div>
+					))}
 				</div>
-			</form>
+			))}
+			<div className="flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-3">
+				<div className="flex items-center gap-2">{footer}</div>
+				<div className="flex gap-2">
+					<Button onClick={cancel} size="sm" type="button" variant="ghost">
+						{t("common.cancel")}
+					</Button>
+					<Button size="sm" type="submit" variant="primary">
+						{t("extDialog.submit")}
+					</Button>
+				</div>
+			</div>
+		</form>
+	);
+}
+
+export function FormDialog({
+	sections,
+	footer,
+	onSubmit,
+	onCancel,
+	draftKey,
+}: {
+	sections: ExtensionFormSection[];
+	/** Countdown shown beside the buttons. */
+	footer: ReactNode;
+	onSubmit: (formData: Record<string, string | string[]>) => void;
+	onCancel: () => void;
+	draftKey?: string;
+}) {
+	const t = useT();
+	return (
+		<Modal onClose={onCancel} open size="lg" title={t("extDialog.ask.title")}>
+			<AskFormBody
+				draftKey={draftKey}
+				footer={footer}
+				onCancel={onCancel}
+				onSubmit={onSubmit}
+				sections={sections}
+			/>
 		</Modal>
 	);
 }

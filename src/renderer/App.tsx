@@ -254,6 +254,7 @@ export function App() {
 				"tabRows",
 				"linkOpenMode",
 				"collapseLargePastes",
+				"askInline",
 				"panelTab",
 			] as const) {
 				if (next[key] !== previous[key]) changedPreferences.add(key);
@@ -323,6 +324,9 @@ export function App() {
 				}
 				if (typeof prefs.collapseLargePastes === "boolean" && !changedPreferences.has("collapseLargePastes")) {
 					useUiStore.setState({ collapseLargePastes: prefs.collapseLargePastes });
+				}
+				if (typeof prefs.askInline === "boolean" && !changedPreferences.has("askInline")) {
+					useUiStore.setState({ askInline: prefs.askInline });
 				}
 				// Restore the default workspace panel tab (written by Settings → GUI).
 				if (

@@ -22,6 +22,7 @@ import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
 import { removeExtensionRequest, useAllPendingRequests, useExtensionUiStore } from "../../stores/extension-ui";
 import { toast } from "../../stores/toast";
+import { useUiStore } from "../../stores/ui";
 import { Button, Input, Modal, Spinner } from "../common";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { ChoiceRow, FormDialog } from "./FormDialog";
@@ -73,7 +74,7 @@ function ExtensionSurfaces() {
 	);
 }
 
-function useCountdown(request: ExtensionUIRequest | null): number | null {
+export function useCountdown(request: ExtensionUIRequest | null): number | null {
 	const requestId = request?.id ?? null;
 	const timeout =
 		request && request.method === "select"
@@ -109,7 +110,7 @@ function useCountdown(request: ExtensionUIRequest | null): number | null {
 	return remaining;
 }
 
-function TimeoutFooter({ remaining }: { remaining: number | null }) {
+export function TimeoutFooter({ remaining }: { remaining: number | null }) {
 	const t = useT();
 	if (remaining === null) return null;
 	return (
@@ -508,7 +509,7 @@ type ExtensionResponse =
 	| { formData: Record<string, string | string[]> }
 	| { cancelled: true };
 
-function answerExtensionRequest(id: string, response: ExtensionResponse): void {
+export function answerExtensionRequest(id: string, response: ExtensionResponse): void {
 	window.omp.ui.respondExtensionUi({ type: "extension_ui_response", id, ...response });
 	removeExtensionRequest(id);
 }
@@ -744,6 +745,7 @@ function ActiveDialog({
 		case "form":
 			return (
 				<FormDialog
+					draftKey={request.id}
 					footer={<TimeoutFooter remaining={remaining} />}
 					key={request.id}
 					onCancel={cancel}
@@ -796,6 +798,12 @@ export function ExtensionDialog() {
 		[pending, request],
 	);
 	const remaining = useCountdown(request);
+	// Inline mode (#74): the owning tab's transcript renders the form beside the
+	// conversation. A form parked in a BACKGROUND tab still pops here, so a
+	// blocking prompt is never invisible while its tab is off screen.
+	const askInline = useUiStore(state => state.askInline);
+	const renderedInline =
+		askInline && request?.method === "form" && focusedPending.some(item => item.id === request.id);
 
 	// Consume non-dialog requests in place. Editor/title mutations must target
 	// real GUI surfaces directly; dispatching listenerless events drops them.
@@ -843,7 +851,7 @@ export function ExtensionDialog() {
 	return (
 		<>
 			<ExtensionSurfaces />
-			{request && <ActiveDialog codePrompt={codePrompt} remaining={remaining} request={request} />}
+			{request && !renderedInline && <ActiveDialog codePrompt={codePrompt} remaining={remaining} request={request} />}
 		</>
 	);
 }

@@ -153,6 +153,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "collapseLargePastes paste marker fold expand 粘贴 折叠 展开 вставка",
 	},
 	{
+		id: "askInline",
+		labelKey: "settings.gui.askInline",
+		aliases: "askInline ask form inline question chat modal 表单 内联 提问 对话 форма вопрос แบบฟอร์ม",
+	},
+	{
 		id: "pasteMenuThreshold",
 		labelKey: "settings.display.pasteMenuThreshold",
 		aliases: "paste.largeMenuThreshold paste 粘贴 阈值",

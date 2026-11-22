@@ -11,6 +11,8 @@ import {
 	setFocusedSessionRuntime,
 } from "../../stores/session-runtime-context";
 import { createTabRuntime } from "../../stores/tab-runtime";
+import { useUiStore } from "../../stores/ui";
+import { InlineAskCard } from "../chat/InlineAskCard";
 import { ExtensionDialog } from "./ExtensionDialog";
 
 const { document, window, Event, CustomEvent, HTMLElement, Node } = parseHTML("<html><body></body></html>");
@@ -188,6 +190,7 @@ afterEach(async () => {
 	deleteSessionRuntime("tab-bg");
 	deleteSessionRuntime("tab-fg");
 	setFocusedSessionRuntime(null);
+	useUiStore.setState({ askInline: false });
 	vi.restoreAllMocks();
 	document.title = "";
 });
@@ -604,5 +607,135 @@ describe("ExtensionDialog sign-in browser step", () => {
 		await submit(document.querySelector("form") as unknown as TestElement);
 
 		expect(respondExtensionUi.mock.calls).toEqual(expected);
+	});
+});
+
+describe("ExtensionDialog inline ask (#74)", () => {
+	const spans = (text: string) => [{ text }];
+	const formRequest = (id: string): ExtensionUIRequest => ({
+		type: "extension_ui_request",
+		id,
+		method: "form",
+		sections: [
+			{
+				title: spans("Deploy"),
+				blocks: [
+					{
+						kind: "field",
+						field: {
+							kind: "text",
+							name: "api_key",
+							type: "text",
+							multiline: false,
+							label: spans("API key"),
+							value: "",
+							placeholder: "",
+							required: false,
+							rows: 1,
+						},
+					},
+				],
+			},
+		],
+	});
+	let inlineRoot: Root | null = null;
+	let inlineHost: TestElement | null = null;
+	const mountInlineCard = async () => {
+		inlineHost = document.createElement("div") as unknown as TestElement;
+		document.body.appendChild(inlineHost as never);
+		const cardRoot = createRoot(inlineHost as unknown as Element);
+		inlineRoot = cardRoot;
+		await act(async () => {
+			cardRoot.render(
+				<I18nProvider>
+					<InlineAskCard />
+				</I18nProvider>,
+			);
+		});
+		await flush();
+	};
+	const unmountInlineCard = async () => {
+		if (inlineRoot) await act(async () => inlineRoot?.unmount());
+		inlineHost?.remove();
+		inlineRoot = null;
+		inlineHost = null;
+	};
+	const apiKeyInput = () => document.querySelector("form input") as unknown as TestElement | null;
+
+	it("renders the focused tab's form in the transcript card instead of a modal", async () => {
+		await mount();
+		await mountInlineCard();
+		await act(async () => {
+			useUiStore.setState({ askInline: true });
+		});
+		await push(formRequest("form-inline"));
+
+		expect(document.querySelector("[data-inline-ask]")).not.toBeNull();
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
+		expect(document.body.textContent).toContain("API key");
+		await unmountInlineCard();
+	});
+
+	it("answers from the inline card and closes it", async () => {
+		await mount();
+		await mountInlineCard();
+		await act(async () => {
+			useUiStore.setState({ askInline: true });
+		});
+		await push(formRequest("form-inline"));
+
+		const input = apiKeyInput();
+		if (!input) throw new Error("missing inline input");
+		await typeInto(input, "sk-inline");
+		await submit(document.querySelector("[data-inline-ask] form") as unknown as TestElement);
+
+		expect(respondExtensionUi).toHaveBeenCalledWith({
+			type: "extension_ui_response",
+			id: "form-inline",
+			formData: { api_key: "sk-inline" },
+		});
+		expect(document.querySelector("[data-inline-ask]")).toBeNull();
+		await unmountInlineCard();
+	});
+
+	it("still pops a modal for a form parked in a background tab", async () => {
+		createTabRuntime("tab-fg");
+		createTabRuntime("tab-bg");
+		setFocusedSessionRuntime("tab-fg");
+		await mount();
+		await mountInlineCard();
+		useUiStore.setState({ askInline: true });
+		await act(async () => {
+			sessionRuntimeStore<ExtensionUiStore>("tab-bg", "extensionUi")?.getState().pushRequest(formRequest("form-bg"));
+		});
+		await flush();
+
+		expect(document.querySelector(".omp-dialog-overlay")).not.toBeNull();
+		expect(document.querySelector("[data-inline-ask]")).toBeNull();
+		await unmountInlineCard();
+	});
+
+	it("keeps typed answers when the surface switches between modal and inline", async () => {
+		await mount();
+		await mountInlineCard();
+		await push(formRequest("form-draft"));
+
+		const modalInput = apiKeyInput();
+		if (!modalInput) throw new Error("missing modal input");
+		await typeInto(modalInput, "sk-kept");
+
+		await act(async () => {
+			useUiStore.setState({ askInline: true });
+		});
+		await flush();
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
+		expect((apiKeyInput() as unknown as { value: string } | null)?.value).toBe("sk-kept");
+
+		await act(async () => {
+			useUiStore.setState({ askInline: false });
+		});
+		await flush();
+		expect((apiKeyInput() as unknown as { value: string } | null)?.value).toBe("sk-kept");
+		await unmountInlineCard();
 	});
 });
