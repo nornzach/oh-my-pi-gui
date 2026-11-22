@@ -6,7 +6,7 @@
 
 - Connect directly without any proxy — the system proxy included — via Settings → System & advanced → Advanced → HTTP proxy ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
 - Optional inline ask forms: Settings → GUI → "Show ask forms inline in the chat" renders the agent's question at the end of the conversation instead of a modal, keeping the surrounding context visible; typed answers survive tab switches, and forms in background tabs still open as a dialog ([#74](https://github.com/nornzach/oh-my-pi-gui/issues/74)).
-- Token Meter: clicking the title-bar token/cost readout opens a live throughput panel — streaming rate with a rolling 60 s sparkline, per-turn t/s and TTFT, the session token grid (in/out/think/cache/cache-hit/consumed) and cost economics including effective $/1M ([#71](https://github.com/nornzach/oh-my-pi-gui/issues/71)).
+- Token Meter: clicking the title-bar token/cost readout opens a live throughput panel — streaming rate with a rolling 60 s sparkline, per-turn t/s and TTFT, the session token grid (in/out/think/cache/cache-hit/consumed), cost economics including effective $/1M, and the model's peak/off-peak tariff with its discount, current rate card and next UTC change ([#71](https://github.com/nornzach/oh-my-pi-gui/issues/71)).
 
 ### Fixed
 

@@ -190,6 +190,11 @@ export const zh: Record<string, string> = {
 	"tokenMeter.effective": "等效单价",
 	"tokenMeter.totalCost": "累计费用",
 	"tokenMeter.lastTurnCost": "上一回合费用",
+	"tokenMeter.tariffPeak": "峰时",
+	"tokenMeter.tariffOffPeak": "谷时",
+	"tokenMeter.nextChange": "下次 {time} UTC",
+	"tokenMeter.rateIn": "输入",
+	"tokenMeter.rateOut": "输出",
 	"tokenMeter.note": "实时仪表按流式字符/秒计量；每回合 t/s、token 与费用来自已落盘用量。",
 	"titlebar.metric.duration": "真实执行时间",
 	"titlebar.rename": "重命名会话",
@@ -568,7 +573,8 @@ export const zh: Record<string, string> = {
 	"sidebar.rename": "重命名会话",
 	"sidebar.renameFailed": "重命名失败",
 	"sidebar.deleteGroupConfirm": "删除工作区会话？",
-	"sidebar.deleteGroupMessage": '将永久删除工作区 "{name}" 的全部 {count} 个会话文件。保留在列表中的空项目需另行移除。',
+	"sidebar.deleteGroupMessage":
+		'将永久删除工作区 "{name}" 的全部 {count} 个会话文件。保留在列表中的空项目需另行移除。',
 	"sidebar.deleteGroupWarning": "这将永久删除这些会话文件，无法撤销。",
 	"sidebar.loading": "正在加载会话…",
 	"sidebar.loadFailed": "会话列表加载失败。",
@@ -1942,7 +1948,8 @@ export const zh: Record<string, string> = {
 	"settings.gui.collapseLargePastesDesc":
 		"粘贴超过 10 行或 1000 字符时折叠为 [Paste #N] 标记；关闭后直接在输入框中原样展开",
 	"settings.gui.askInline": "ask 表单内联显示在对话中",
-	"settings.gui.askInlineDesc": "把 agent 的提问表单渲染在会话末尾而非弹窗，回答时仍能看到上下文；后台页签的表单仍以弹窗提示",
+	"settings.gui.askInlineDesc":
+		"把 agent 的提问表单渲染在会话末尾而非弹窗，回答时仍能看到上下文；后台页签的表单仍以弹窗提示",
 	"settings.gui.linkOpenMode": "链接左键打开方式",
 	"settings.gui.linkOpenMode.panel": "右侧浏览器面板",
 	"settings.gui.linkOpenMode.panelDesc": "左键在应用内浏览器面板打开（⌘/Ctrl+点击改用系统默认浏览器）",

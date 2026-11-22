@@ -7,10 +7,17 @@
 import { X, Zap } from "lucide-react";
 import { type RefObject, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, SessionStats } from "../../../shared/rpc-types";
+import type { AgentMessage, ModelCost, SessionStats } from "../../../shared/rpc-types";
 import { formatCost, formatDuration, formatPercent, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { onEscape } from "../../lib/keymap";
+import {
+	effectiveRateCard,
+	formatUtcMinute,
+	nextPricingTransition,
+	pricingPeriod,
+	tariffMultiplier,
+} from "../../lib/model-pricing";
 import { effectiveCostPerMillion, lastTurnFacts, useLiveThroughput } from "../../lib/token-meter";
 import { sessionCacheHitPercent } from "./session-metrics";
 
@@ -42,6 +49,7 @@ export function TokenMeterPopover({
 	isStreaming,
 	anchor,
 	anchorRef,
+	cost,
 	onClose,
 }: {
 	stats: SessionStats | null;
@@ -50,6 +58,8 @@ export function TokenMeterPopover({
 	anchor: { x: number; y: number };
 	/** The readout button that opened this panel; clicking it again closes it. */
 	anchorRef?: RefObject<HTMLElement | null>;
+	/** The live model's rate card, for the peak/off-peak tariff row. */
+	cost?: ModelCost;
 	onClose: () => void;
 }) {
 	const t = useT();
@@ -62,6 +72,11 @@ export function TokenMeterPopover({
 	const totalCost = stats ? (stats.history?.cost ?? stats.cost) : null;
 	const totalTokens = stats ? (stats.history?.totalTokens ?? stats.tokens.total) : 0;
 	const perMillion = totalCost === null ? null : effectiveCostPerMillion(totalCost, totalTokens);
+	const now = Date.now();
+	const period = pricingPeriod(cost, now);
+	const multiplier = tariffMultiplier(cost, now);
+	const nextChange = nextPricingTransition(cost, now);
+	const rates = effectiveRateCard(cost, now);
 
 	useEffect(() => {
 		const onPointerDown = (event: PointerEvent) => {
@@ -148,6 +163,25 @@ export function TokenMeterPopover({
 				<Fact label={t("tokenMeter.totalCost")} value={totalCost !== null ? formatCost(totalCost, 4) : "—"} />
 				<Fact label={t("tokenMeter.lastTurnCost")} value={turn.cost !== null ? formatCost(turn.cost, 4) : "—"} />
 			</div>
+			{period && (
+				<div className="mt-3 border-t border-(--omp-border-muted) pt-3" data-tariff>
+					<div className="flex items-baseline justify-between gap-2 text-omp-xs">
+						<span className="font-semibold text-(--omp-text)">
+							{period === "off-peak" ? t("tokenMeter.tariffOffPeak") : t("tokenMeter.tariffPeak")}
+							{multiplier !== 1 && <span className="ml-1 font-mono text-(--omp-accent)">×{multiplier}</span>}
+						</span>
+						{nextChange !== undefined && (
+							<span className="tabular-nums text-(--omp-dim)">
+								{t("tokenMeter.nextChange", { time: formatUtcMinute(nextChange) })}
+							</span>
+						)}
+					</div>
+					<div className="mt-1 font-mono text-omp-xs tabular-nums text-(--omp-dim)">
+						{formatCost(rates.input * multiplier, 2)} {t("tokenMeter.rateIn")} ·{" "}
+						{formatCost(rates.output * multiplier, 2)} {t("tokenMeter.rateOut")} /1M
+					</div>
+				</div>
+			)}
 			<p className="mt-3 text-omp-xs leading-relaxed text-(--omp-dim)">{t("tokenMeter.note")}</p>
 		</div>,
 		document.body,

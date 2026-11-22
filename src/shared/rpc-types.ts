@@ -1561,11 +1561,35 @@ export interface ContextUsage {
 }
 
 /** Per-million-token rate card, as carried by the catalog model on the wire. */
+/** One recurring UTC peak window: minutes of the UTC day, `[startMinute, endMinute)`. */
+export interface ModelPeakWindow {
+	weekdays: number[];
+	startMinute: number;
+	endMinute: number;
+}
+
+/** A dated rate card replacing the base legs from `effectiveFrom` (Unix ms). */
+export interface ModelEffectiveRate {
+	input: number;
+	output: number;
+	cacheRead: number;
+	cacheWrite: number;
+	effectiveFrom: number;
+}
+
+/** Scheduled pricing the catalog ships on the model row: off-peak discounts and dated rate cards. */
+export interface ModelTariff {
+	offPeakMultiplier: number;
+	peakWindows: ModelPeakWindow[];
+	effectiveRates?: ModelEffectiveRate[];
+}
+
 export interface ModelCost {
 	input?: number;
 	output?: number;
 	cacheRead?: number;
 	cacheWrite?: number;
+	timeBased?: ModelTariff;
 }
 
 export interface DiscoverProviderModelsParams {

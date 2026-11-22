@@ -196,6 +196,11 @@ export const ru: Record<string, string> = {
 	"tokenMeter.effective": "Эффективная цена",
 	"tokenMeter.totalCost": "Всего API",
 	"tokenMeter.lastTurnCost": "Прошлый ход",
+	"tokenMeter.tariffPeak": "Пик",
+	"tokenMeter.tariffOffPeak": "Вне пика",
+	"tokenMeter.nextChange": "далее {time} UTC",
+	"tokenMeter.rateIn": "вход",
+	"tokenMeter.rateOut": "выход",
 	"tokenMeter.note":
 		"Живой датчик измеряет символы в секунду потока; t/s, токены и стоимость хода берутся из зафиксированного usage.",
 	"titlebar.metric.duration": "Фактическое время выполнения",
@@ -585,7 +590,8 @@ export const ru: Record<string, string> = {
 	"sidebar.rename": "Переименовать сессию",
 	"sidebar.renameFailed": "Не удалось переименовать",
 	"sidebar.deleteGroupConfirm": "Удалить сессии рабочей области?",
-	"sidebar.deleteGroupMessage": "Удалить все файлы сессий ({count}) рабочей области «{name}». Пустой проект останется в списке, пока вы не уберёте его отдельно.",
+	"sidebar.deleteGroupMessage":
+		"Удалить все файлы сессий ({count}) рабочей области «{name}». Пустой проект останется в списке, пока вы не уберёте его отдельно.",
 	"sidebar.deleteGroupWarning": "Файлы сессии будут удалены безвозвратно. Это действие нельзя отменить.",
 	"sidebar.loading": "Загрузка сессий…",
 	"sidebar.loadFailed": "Не удалось загрузить сессии.",

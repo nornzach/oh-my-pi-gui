@@ -181,6 +181,9 @@ test("#71 the Token Meter reports live throughput and closes on Escape", async (
 	await expect(meter).toBeVisible();
 	await expect(meter).toContainText("char/s");
 	await expect(meter).toContainText("last 60 s");
+	// The fixture model carries an always-off-peak tariff, so the row is stable.
+	await expect(meter.locator("[data-tariff]")).toContainText("Off-peak");
+	await expect(meter.locator("[data-tariff]")).toContainText("×0.5");
 	// The gauge samples the streaming buffer, so it must climb above zero while
 	// the fixture keeps delivering deltas.
 	await expect.poll(async () => Number(await meter.locator("span.text-3xl").textContent())).toBeGreaterThan(0);

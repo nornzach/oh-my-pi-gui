@@ -158,7 +158,15 @@ if (process.argv.includes("stats")) {
 		contextWindow: 128000,
 		maxTokens: 4096,
 		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		cost: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			// A discount with no peak windows is off-peak at every instant, so the
+			// Token Meter's tariff row is deterministic whenever the suite runs.
+			timeBased: { offPeakMultiplier: 0.5, peakWindows: [] },
+		},
 	};
 	const state: RpcSessionState = {
 		model,

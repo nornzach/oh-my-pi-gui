@@ -202,6 +202,11 @@ export const en: Record<string, string> = {
 	"tokenMeter.effective": "Effective",
 	"tokenMeter.totalCost": "Total API",
 	"tokenMeter.lastTurnCost": "Last turn",
+	"tokenMeter.tariffPeak": "Peak",
+	"tokenMeter.tariffOffPeak": "Off-peak",
+	"tokenMeter.nextChange": "next {time} UTC",
+	"tokenMeter.rateIn": "in",
+	"tokenMeter.rateOut": "out",
 	"tokenMeter.note":
 		"The live gauge measures streaming characters per second; per-turn t/s, tokens and cost come from committed usage.",
 	"titlebar.metric.duration": "Actual execution time",
@@ -597,7 +602,8 @@ export const en: Record<string, string> = {
 	"sidebar.rename": "Rename session",
 	"sidebar.renameFailed": "Rename failed",
 	"sidebar.deleteGroupConfirm": "Delete workspace sessions?",
-	"sidebar.deleteGroupMessage": 'Delete all {count} session files of the workspace "{name}". A project kept in the list stays until you remove it.',
+	"sidebar.deleteGroupMessage":
+		'Delete all {count} session files of the workspace "{name}". A project kept in the list stays until you remove it.',
 	"sidebar.deleteGroupWarning": "This permanently deletes the session files. It cannot be undone.",
 	"sidebar.loading": "Loading sessions…",
 	"sidebar.loadFailed": "Could not load your sessions.",

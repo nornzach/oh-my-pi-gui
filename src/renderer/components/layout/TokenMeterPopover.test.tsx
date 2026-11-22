@@ -2,7 +2,7 @@ import { parseHTML } from "linkedom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AgentMessage, SessionStats } from "../../../shared/rpc-types";
+import type { AgentMessage, ModelCost, SessionStats } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
 import { TokenMeterPopover } from "./TokenMeterPopover";
 
@@ -42,7 +42,11 @@ const messages: AgentMessage[] = [
 let root: Root | null = null;
 let host: HTMLElement | null = null;
 
-async function mount(onClose: () => void, anchorRef?: { current: HTMLElement | null }): Promise<void> {
+async function mount(
+	onClose: () => void,
+	anchorRef?: { current: HTMLElement | null },
+	cost?: ModelCost,
+): Promise<void> {
 	host = document.createElement("div");
 	document.body.appendChild(host as never);
 	root = createRoot(host as unknown as Element);
@@ -52,6 +56,7 @@ async function mount(onClose: () => void, anchorRef?: { current: HTMLElement | n
 				<TokenMeterPopover
 					anchor={{ x: 8, y: 40 }}
 					anchorRef={anchorRef}
+					cost={cost}
 					isStreaming={false}
 					messages={messages}
 					onClose={onClose}
@@ -128,5 +133,27 @@ describe("TokenMeterPopover", () => {
 			document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }) as never);
 		});
 		expect(onClose).toHaveBeenCalledTimes(1);
+	});
+
+	it("prints the off-peak tariff with the discounted rate card", async () => {
+		// No windows at a 0.5 multiplier is off-peak at every instant, so the
+		// assertion does not depend on when the suite runs.
+		await mount(() => {}, undefined, {
+			input: 0.28,
+			output: 0.42,
+			timeBased: { offPeakMultiplier: 0.5, peakWindows: [] },
+		});
+		const tariff = document.querySelector("[data-tariff]");
+
+		expect(tariff?.textContent).toContain("Off-peak");
+		expect(tariff?.textContent).toContain("×0.5");
+		expect(tariff?.textContent).toContain("$0.14");
+		expect(tariff?.textContent).toContain("$0.21");
+	});
+
+	it("omits the tariff row for a model priced at a flat rate", async () => {
+		await mount(() => {}, undefined, { input: 0.28, output: 0.42 });
+
+		expect(document.querySelector("[data-tariff]")).toBeNull();
 	});
 });

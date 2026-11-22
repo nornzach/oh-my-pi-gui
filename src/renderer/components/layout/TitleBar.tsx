@@ -28,6 +28,7 @@ import { useTabRpc } from "../../lib/tab-rpc";
 import { headerHasAppMenu } from "../../lib/window-chrome";
 import { useAgentPagesStore, useShownAgentPage } from "../../stores/agent-pages";
 import { useMessagesStore } from "../../stores/messages";
+import { useModelStore } from "../../stores/model";
 import { type SessionStore, useSessionStore } from "../../stores/session";
 import { sessionRuntimeStore, useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
@@ -156,6 +157,7 @@ export function TitleBar() {
 	// "New session" while the tab beside it already shows the conversation.
 	const displayName = sessionName || (current ? sessionDisplayTitle(current, "") : "") || t("sidebar.newSession");
 	const visibleStats = stats?.sessionId === sessionId ? stats : null;
+	const modelCost = useModelStore(state => state.model?.cost);
 	const cacheHit = sessionCacheHitPercent(visibleStats);
 	const usedTokens = visibleStats ? (visibleStats.history?.totalTokens ?? visibleStats.tokens.total) : 0;
 	const executionDuration = sessionExecutionDurationMs({
@@ -500,6 +502,7 @@ export function TitleBar() {
 				<TokenMeterPopover
 					anchor={meterAnchor}
 					anchorRef={meterButtonRef}
+					cost={modelCost}
 					isStreaming={isStreaming}
 					messages={messages}
 					onClose={() => setMeterAnchor(null)}
