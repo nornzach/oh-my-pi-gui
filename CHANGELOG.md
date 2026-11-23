@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep inline ask forms on the transcript surface and let the Token Meter's live rate follow the GUI font size.
+
 ## [1.0.3] - 2026-11-23
 
 ### Added

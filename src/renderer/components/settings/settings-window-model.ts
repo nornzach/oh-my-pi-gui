@@ -1,10 +1,5 @@
-import { GUI_DISPLAY_BOOL_FIELDS, GUI_DISPLAY_LEGACY_PATHS } from "../../lib/display-preferences";
-/**
- * SettingsWindow model: launch-profile field constants, tab id constants,
- * and nav-group metadata. Extracted verbatim from SettingsWindow.tsx.
- */
-
 import type { SettingProvenance } from "../../../shared/rpc-types";
+import { GUI_DISPLAY_BOOL_FIELDS, GUI_DISPLAY_LEGACY_PATHS } from "../../lib/display-preferences";
 import type { TabItem } from "../common";
 import { GENERAL_SCHEMA_TABS, GUI_TAB_ID, isSettingSupportedInGui } from "./settings-schema-utils";
 
@@ -68,14 +63,6 @@ export function isAgentSchemaTab(tab: string, schema: { tabs: { id: string }[] }
 		tab !== ADVANCED_TAB_ID
 	);
 }
-
-export const SEARCHABLE_MANAGEMENT_TAB_IDS = new Set([
-	SKILLS_TAB_ID,
-	MCP_TAB_ID,
-	RESOURCES_TAB_ID,
-	HOOKS_TAB_ID,
-	COMMANDS_TAB_ID,
-]);
 
 export interface SettingsNavGroup {
 	id: "experience" | "models" | "tasks" | "tools" | "extensions" | "security" | "memory" | "system";

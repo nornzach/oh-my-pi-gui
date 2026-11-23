@@ -151,7 +151,10 @@ export function TokenMeterPopover({
 			</div>
 
 			<div className="mt-3 flex items-baseline gap-2">
-				<span className="font-mono text-3xl font-semibold tabular-nums text-(--omp-accent)">
+				<span
+					className="font-mono text-omp-2xl font-semibold tabular-nums text-(--omp-accent)"
+					data-token-meter-rate
+				>
 					{live.rate >= 0.05 ? Math.round(live.rate) : 0}
 				</span>
 				<span className="text-omp-xs text-(--omp-dim)">{t("tokenMeter.charPerSec")}</span>

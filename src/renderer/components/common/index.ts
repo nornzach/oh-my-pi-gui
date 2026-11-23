@@ -1,21 +1,14 @@
-/**
- * Common UI primitives barrel.
- */
-
-export { AsyncSection, type AsyncSectionProps } from "./AsyncSection";
-export { Badge, type BadgeProps, type BadgeVariant } from "./Badge";
-export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./Button";
-export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
-export { Glide, type GlideProps, type GlideVariant } from "./Glide";
-export { Input, type InputProps, TextArea, type TextAreaProps } from "./Input";
+export { AsyncSection } from "./AsyncSection";
+export { Badge, type BadgeVariant } from "./Badge";
+export { Button } from "./Button";
+export { ConfirmDialog } from "./ConfirmDialog";
+export { Input, TextArea } from "./Input";
 export { Kbd, kbdClass } from "./Kbd";
-export { LangSwitcher, type LangSwitcherProps } from "./LangSwitcher";
-export { LongTaskStatus, type LongTaskStatusProps } from "./LongTaskStatus";
-export { Modal, type ModalProps, type ModalSize } from "./Modal";
+export { LongTaskStatus } from "./LongTaskStatus";
+export { Modal } from "./Modal";
 export { PanelErrorBoundary } from "./PanelErrorBoundary";
-export { PiLogo, type PiLogoProps } from "./PiLogo";
-export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
-export { Spinner, type SpinnerProps, type SpinnerSize } from "./Spinner";
-export { type TabItem, Tabs, type TabsProps } from "./Tabs";
+export { PiLogo } from "./PiLogo";
+export { ProgressBar } from "./ProgressBar";
+export { Spinner } from "./Spinner";
+export { type TabItem, Tabs } from "./Tabs";
 export { ToastStack } from "./Toast";
-export { type TreeNode, TreeView, type TreeViewProps } from "./TreeView";

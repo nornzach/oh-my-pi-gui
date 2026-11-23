@@ -63,6 +63,35 @@ async function pressEscape({ isComposing = false, keyCode = 27 } = {}): Promise<
 	await flush();
 }
 
+function StackedDialogs({ closeBottom, closeTop }: { closeBottom: () => void; closeTop: () => void }) {
+	const [bottomOpen, setBottomOpen] = useState(true);
+	const [topOpen, setTopOpen] = useState(true);
+	return (
+		<>
+			<Modal
+				onClose={() => {
+					closeBottom();
+					setBottomOpen(false);
+				}}
+				open={bottomOpen}
+				title="Bottom"
+			>
+				<button type="button">Bottom action</button>
+			</Modal>
+			<Modal
+				onClose={() => {
+					closeTop();
+					setTopOpen(false);
+				}}
+				open={topOpen}
+				title="Top"
+			>
+				<button type="button">Top action</button>
+			</Modal>
+		</>
+	);
+}
+
 afterEach(async () => {
 	if (root) {
 		await act(async () => {
@@ -220,36 +249,7 @@ describe("Modal", () => {
 		const closeBottom = vi.fn();
 		const closeTop = vi.fn();
 
-		function StackedDialogs() {
-			const [bottomOpen, setBottomOpen] = useState(true);
-			const [topOpen, setTopOpen] = useState(true);
-			return (
-				<>
-					<Modal
-						onClose={() => {
-							closeBottom();
-							setBottomOpen(false);
-						}}
-						open={bottomOpen}
-						title="Bottom"
-					>
-						<button type="button">Bottom action</button>
-					</Modal>
-					<Modal
-						onClose={() => {
-							closeTop();
-							setTopOpen(false);
-						}}
-						open={topOpen}
-						title="Top"
-					>
-						<button type="button">Top action</button>
-					</Modal>
-				</>
-			);
-		}
-
-		await mount(<StackedDialogs />);
+		await mount(<StackedDialogs closeBottom={closeBottom} closeTop={closeTop} />);
 		await pressEscape();
 		expect(closeTop).toHaveBeenCalledTimes(1);
 		expect(closeBottom).not.toHaveBeenCalled();

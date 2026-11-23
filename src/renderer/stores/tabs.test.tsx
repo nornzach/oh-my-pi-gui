@@ -1056,6 +1056,11 @@ describe("tabs store applyTabStatus", () => {
 	});
 });
 
+function SessionTabsProbe(): null {
+	useSessionTabs();
+	return null;
+}
+
 describe("useSessionTabs hook", () => {
 	let container: { remove(): void };
 	let root: Root;
@@ -1066,13 +1071,8 @@ describe("useSessionTabs hook", () => {
 		document.body.appendChild(element as never);
 		root = createRoot(container as unknown as Element);
 		await act(async () => {
-			root.render(<Probe />);
+			root.render(<SessionTabsProbe />);
 		});
-	}
-
-	function Probe(): null {
-		useSessionTabs();
-		return null;
 	}
 
 	afterEach(async () => {

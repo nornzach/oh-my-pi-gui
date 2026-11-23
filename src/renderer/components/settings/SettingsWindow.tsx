@@ -192,7 +192,7 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
  * that applies them. Stays pinned while the page scrolls; a run in progress
  * holds the restart back rather than cutting it off.
  */
-export function PendingRestartBanner({
+function PendingRestartBanner({
 	pending,
 	busy,
 	onRestart,
@@ -1879,12 +1879,3 @@ export function SettingsWindow() {
 		document.body,
 	);
 }
-
-export { SchemaTabContent } from "./pages/SchemaTabContent";
-// Re-export schema helpers for tests and consumers importing them from SettingsWindow.
-export {
-	groupSchemaEntries,
-	isSettingVisible,
-	isSettingVisibleInGui,
-	resolveSettingsTarget,
-} from "./settings-schema-utils";

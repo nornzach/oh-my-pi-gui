@@ -1,8 +1,3 @@
-/**
- * Text input with label/error, auto-growing TextArea, and monospace variant.
- * All elements forward refs so react-hook-form register() works directly.
- */
-
 import {
 	forwardRef,
 	type InputHTMLAttributes,
@@ -20,7 +15,7 @@ const BASE_INPUT =
  * Field metrics. `compact` is the dense-form size (settings rows), the same
  * height and type step as the dropdowns beside it; the default suits dialogs.
  */
-export const FIELD_SIZE = {
+const FIELD_SIZE = {
 	default: "px-3 py-[9px] text-omp-lg",
 	compact: "px-2.5 py-1.5 text-omp-md",
 } as const;

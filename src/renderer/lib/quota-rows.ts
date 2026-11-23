@@ -90,7 +90,7 @@ export function quotaWindow(label: string): { short: string; hours: number } {
 }
 
 /** The limit's used fraction, from whichever figures the provider reported. */
-export function limitUsedFraction(limit: UsageLimit): number | undefined {
+function limitUsedFraction(limit: UsageLimit): number | undefined {
 	if (typeof limit.remainingFraction === "number" && Number.isFinite(limit.remainingFraction))
 		return 1 - limit.remainingFraction;
 	if (typeof limit.usedFraction === "number" && Number.isFinite(limit.usedFraction)) return limit.usedFraction;
@@ -158,7 +158,7 @@ export function quotaRows(reports: readonly UsageReport[] | null): QuotaRow[] {
 }
 
 /** Catalog names carry the plan in parentheses ("Anthropic (Claude Pro/Max)"); a row keeps the provider. */
-export function shortProviderName(name: string): string {
+function shortProviderName(name: string): string {
 	return name.replace(/\s*\([^)]*\)\s*$/, "") || name;
 }
 

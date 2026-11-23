@@ -1,11 +1,42 @@
 import { parseHTML } from "linkedom";
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, test, vi } from "vitest";
 import { useStats, useStatsList } from "./use-stats";
 
-test("late ranges cannot replace the selected range, failed refresh retains only its own data, and requests do not overlap", async () => {
+function StatsProbe({ range, onRefetch }: { range?: string; onRefetch?: (refetch: () => void) => void }) {
+	const result = useStats<{ count: number }>("/api/stats/overview", range === undefined ? {} : { range });
+	const { refetch } = result;
+	useEffect(() => onRefetch?.(refetch), [onRefetch, refetch]);
+	return <p>{JSON.stringify(result)}</p>;
+}
+
+function StatsListProbe() {
+	const result = useStatsList<{ timestamp: number }>("/api/stats/errors", { range: "24h" });
+	return <p>{JSON.stringify(result)}</p>;
+}
+
+function setupStats(fetch: () => Promise<unknown>) {
 	const { document, window } = parseHTML("<html><body><div id='root'></div></body></html>");
+	vi.stubGlobal("document", document);
+	vi.stubGlobal("window", Object.assign(window, { omp: { stats: { fetch } } }));
+	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+	const node = document.getElementById("root")!;
+	const root = createRoot(node);
+	return {
+		node,
+		root,
+		dispose: async () => {
+			try {
+				await act(async () => root.unmount());
+			} finally {
+				vi.unstubAllGlobals();
+			}
+		},
+	};
+}
+
+test("late ranges cannot replace the selected range, failed refresh retains only its own data, and requests do not overlap", async () => {
 	const slow = Promise.withResolvers<unknown>();
 	const fast = Promise.withResolvers<unknown>();
 	const fetch = vi
@@ -13,25 +44,19 @@ test("late ranges cannot replace the selected range, failed refresh retains only
 		.mockReturnValueOnce(slow.promise)
 		.mockReturnValueOnce(fast.promise)
 		.mockRejectedValueOnce(new Error("offline"));
-	vi.stubGlobal("document", document);
-	vi.stubGlobal("window", Object.assign(window, { omp: { stats: { fetch } } }));
-	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-	const node = document.getElementById("root")!;
-	const root = createRoot(node);
+	const { node, root, dispose } = setupStats(fetch);
 	let refresh = () => {};
-	function Probe({ range }: { range: string }) {
-		const result = useStats<{ count: number }>("/api/stats/overview", { range });
-		refresh = result.refetch;
-		return <p>{JSON.stringify(result)}</p>;
-	}
+	const captureRefetch = (refetch: () => void) => {
+		refresh = refetch;
+	};
 	try {
-		await act(async () => root.render(<Probe range="all" />));
+		await act(async () => root.render(<StatsProbe range="all" onRefetch={captureRefetch} />));
 		await act(async () => {
 			refresh();
 			refresh();
 		});
 		expect(fetch).toHaveBeenCalledTimes(1);
-		await act(async () => root.render(<Probe range="24h" />));
+		await act(async () => root.render(<StatsProbe range="24h" onRefetch={captureRefetch} />));
 		expect(node.textContent).toContain('"data":null');
 		await act(async () => fast.resolve({ count: 2 }));
 		await act(async () => slow.resolve({ count: 900 }));
@@ -43,30 +68,20 @@ test("late ranges cannot replace the selected range, failed refresh retains only
 		expect(node.textContent).toContain("offline");
 		expect(node.textContent).toContain('"count":2');
 	} finally {
-		await act(async () => root.unmount());
-		vi.unstubAllGlobals();
+		await dispose();
 	}
 });
 
 test("an unavailable stats server keeps the route loading and self-heals once the server is ready", async () => {
-	const { document, window } = parseHTML("<html><body><div id='root'></div></body></html>");
 	let ready = false;
 	const fetch = vi.fn(async () =>
 		ready
 			? { count: 7 }
 			: { error: "The bundled stats server is not ready. Please retry shortly.", unavailable: true },
 	);
-	vi.stubGlobal("document", document);
-	vi.stubGlobal("window", Object.assign(window, { omp: { stats: { fetch } } }));
-	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-	const node = document.getElementById("root")!;
-	const root = createRoot(node);
-	function Probe() {
-		const result = useStats<{ count: number }>("/api/stats/overview", {});
-		return <p>{JSON.stringify(result)}</p>;
-	}
+	const { node, root, dispose } = setupStats(fetch);
 	try {
-		await act(async () => root.render(<Probe />));
+		await act(async () => root.render(<StatsProbe />));
 		// Not ready yet: still loading, never a dead-end error.
 		expect(node.textContent).toContain('"isLoading":true');
 		expect(node.textContent).toContain('"error":null');
@@ -81,32 +96,21 @@ test("an unavailable stats server keeps the route loading and self-heals once th
 		expect(node.textContent).toContain('"error":null');
 		expect(node.textContent).toContain('"isLoading":false');
 	} finally {
-		await act(async () => root.unmount());
-		vi.unstubAllGlobals();
+		await dispose();
 	}
 });
 
 test("a list endpoint that replies with a non-array becomes an error state, never rows", async () => {
-	const { document, window } = parseHTML("<html><body><div id='root'></div></body></html>");
 	const fetch = vi.fn(async () => ({}));
-	vi.stubGlobal("document", document);
-	vi.stubGlobal("window", Object.assign(window, { omp: { stats: { fetch } } }));
-	vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-	const node = document.getElementById("root")!;
-	const root = createRoot(node);
-	function Probe() {
-		const result = useStatsList<{ timestamp: number }>("/api/stats/errors", { range: "24h" });
-		return <p>{JSON.stringify(result)}</p>;
-	}
+	const { node, root, dispose } = setupStats(fetch);
 	try {
-		await act(async () => root.render(<Probe />));
+		await act(async () => root.render(<StatsListProbe />));
 		// Storing `{}` as data makes every row expression in the route throw and the
 		// whole renderer falls back to the crash screen.
 		expect(node.textContent).toContain('"data":null');
 		expect(node.textContent).toContain('"isLoading":false');
 		expect(node.textContent).toContain("/api/stats/errors");
 	} finally {
-		await act(async () => root.unmount());
-		vi.unstubAllGlobals();
+		await dispose();
 	}
 });

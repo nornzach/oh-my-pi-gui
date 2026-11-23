@@ -169,17 +169,19 @@ function runtimeStore<T>(runtime: SessionRuntime | null, key: RuntimeStoreKey, f
 	return (runtime?.stores.get(key) as StoreApi<T> | undefined) ?? fallback;
 }
 
+function useRuntimeBoundStore<T, U>(key: RuntimeStoreKey, fallback: StoreApi<T>, selector?: (state: T) => U): T | U {
+	const store = runtimeStore(useSessionRuntime(), key, fallback);
+	const select = selector ?? ((state: T) => state as unknown as U);
+	return useStore(store, select);
+}
+
 /**
  * Bind an existing zustand store API to the nearest session runtime. Static
  * `getState`/`setState`/`subscribe` calls follow the focused runtime so legacy
  * window-level actions keep targeting the pane the user most recently focused.
  */
 export function createScopedStoreHook<T>(key: RuntimeStoreKey, fallback: StoreApi<T>): UseBoundStore<StoreApi<T>> {
-	const useScopedStore = (<U,>(selector?: (state: T) => U): T | U => {
-		const store = runtimeStore(useContext(SessionRuntimeContext), key, fallback);
-		const select = selector ?? ((state: T) => state as unknown as U);
-		return useStore(store, select);
-	}) as UseBoundStore<StoreApi<T>>;
+	const useScopedStore = (useRuntimeBoundStore<T, unknown>).bind(null, key, fallback) as UseBoundStore<StoreApi<T>>;
 
 	useScopedStore.getState = () => runtimeStore(focusedSessionRuntime(), key, fallback).getState();
 	useScopedStore.getInitialState = () => runtimeStore(focusedSessionRuntime(), key, fallback).getInitialState();

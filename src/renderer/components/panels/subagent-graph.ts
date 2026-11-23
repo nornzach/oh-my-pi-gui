@@ -149,11 +149,6 @@ export interface SubagentDagLayout {
 	unresolved: string[];
 }
 
-/** The spawning subagent id, absent for root spawns from the main session. */
-export function parentSubagentIdOf(agent: SubagentSnapshot): string | undefined {
-	return agent.parentSubagentId;
-}
-
 /** Human task label used consistently by list, graph, and hub surfaces. */
 export function subagentPrimaryLabel(agent: SubagentSnapshot, maxLength = 60): string {
 	// `description` is the sidecar's tiny-model UI label. `assignment` is the
@@ -213,7 +208,7 @@ function resolveParent(
 	toolCallOwners: ReadonlyMap<string, string>,
 ): { parentId: string; inferred: boolean } {
 	// Preferred: explicit spawn link on the wire.
-	const parentId = parentSubagentIdOf(agent);
+	const parentId = agent.parentSubagentId;
 	if (parentId && parentId !== agent.id && byId.has(parentId)) return { parentId, inferred: false };
 
 	// Fallback: attribute the spawning `task` tool call to its owning session.

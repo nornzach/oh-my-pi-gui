@@ -15,7 +15,7 @@ let reported = "";
 let reading: Promise<void> | null = null;
 
 /** Re-read the layout now; concurrent calls share one read. */
-export function refreshKeyboardLayout(): Promise<void> {
+function refreshKeyboardLayout(): Promise<void> {
 	reading ??= readLayout().finally(() => {
 		reading = null;
 	});

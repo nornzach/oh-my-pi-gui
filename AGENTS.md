@@ -15,22 +15,21 @@ This file governs the **omp GUI sub-repository**. Read it before any edit here �
 | [`nornzach/oh-my-pi`](https://github.com/nornzach/oh-my-pi) | **Monorepo fork** (`origin` of the enclosing checkout) — agent source; the only sidecar build source, and the monorepo the README's build-from-source flow clones. | ✅ (from the monorepo root, not from here) | only own commits |
 | [`can1357/oh-my-pi`](https://github.com/can1357/oh-my-pi) | **Upstream** (`upstream` of the enclosing checkout) — where new omp features come from. | ❌ **NEVER** | ✅ `scripts/sync-upstream.sh` |
 
-- **All GUI work commits to this repo and pushes to `origin/main`.** Never commit GUI paths into the enclosing monorepo's git — from its perspective this directory is an intentionally untracked, self-contained checkout.
+- GUI changes belong to this repo and its `origin`. Before syncing, committing, or packaging, check status, active ref, and remote in each repository separately. Preserve existing changes and nested checkouts; stage paths explicitly. Do not commit, push, or release unless the task authorizes it.
 - Agent-side work (RPC commands, session logic, `packages/agent|coding-agent|ai|…`) belongs to the **monorepo**, commits at the monorepo root, and pushes to `nornzach/oh-my-pi` (fork) — it does not exist in this repo's history even though the files sit above this directory.
 
 ### Upstream sync (pulling new omp features)
 
-Always the script (it re-provisions what a plain merge misses), from anywhere:
+Run the script from the monorepo root; it performs the rebuild and verification a plain merge misses:
 
 ```bash
-bash packages/gui/scripts/sync-upstream.sh   # run from the GUI repo; it cds to the monorepo root
+bash packages/gui/scripts/sync-upstream.sh
 # fetch upstream → incoming list → merge upstream/main → bun install →
 # pi_natives re-provision on version bump → gen:stats → build:omp → GUI build + tests
 ```
 
 - Conflicts: resolve, commit the merge, re-run with `SKIP_MERGE=1`.
-- A sync touches monorepo files only until step 6; the sidecar rebuild (`build:omp`) and GUI build/tests close the loop. Push monorepo results from the monorepo root (fork), GUI results from here.
-- **Every release starts with a sync** (README → Release process step 1) so the DMG's sidecar carries current upstream.
+- The script ends by writing `sidecar-source.json` from the current fork commit. Recheck that pin if any Core changes are committed after the sync; its value must match the source that actually builds the release binaries.
 
 ## Nested Checkout Layout
 
@@ -46,7 +45,7 @@ oh-my-pi/                    ← monorepo (upstream sync + sidecar source)
     └── resources/omp*       ← sidecar binaries (gitignored, built locally)
 ```
 
-- The monorepo exists for **upstream feature sync and building the sidecar**; the GUI repo is **the only commit/release target**.
+- The monorepo is the Core source and upstream integration point. The GUI repo owns the desktop installer releases.
 - `git status` / `git log` / `git push` run inside `packages/gui/` act on the GUI repo. Anything outside `packages/gui/` acts on the monorepo.
 - Do not move this directory out of the monorepo: `scripts/build-bundled-omp.ts` resolves `../../coding-agent` relative to it. If you clone standalone, building the sidecar requires the monorepo next to it (see README → Build from source).
 
@@ -62,211 +61,80 @@ The GUI runs the agent as a **bundled sidecar** (`resources/omp`, a compiled `Bu
 
 ## Release Runbook
 
-The standard procedure for every release. Run the phases **in order**; never skip, reorder, or substitute hand-rolled equivalents — each step guards a failure that has actually happened (wrong-arch sidecars, stale natives, missing `latest-mac.yml`, unsigned apps). If a step cannot run, stop and surface it rather than improvising around it.
+Follow these steps for an authorized GUI release. A local test package needs the same source and architecture checks, but no tag, upload, or updater changes.
 
-Conventions, fixed for every release:
+### 1. Confirm source and sync Core
 
-- Version `X.Y.Z` is semver; the tag is exactly `vX.Y.Z`.
-- Release commit message is `release(gui): vX.Y.Z` (older `chore(release):` entries predate this convention — do not copy them).
-- Everything GUI-side commits and tags in **this** repo (`packages/gui/.git`) and pushes to `origin` (`nornzach/oh-my-pi-gui`). Monorepo changes commit at the monorepo root and push to the fork's `origin`. `upstream` is never a push target.
-
-### Phase 0 — Preconditions
-
-1. GUI checkout on `main`, clean, current: `git -C packages/gui status` and `git -C packages/gui pull --ff-only`.
-2. Monorepo checkout clean — `git status` at the monorepo root shows nothing but the intentionally untracked `packages/gui/`.
-3. Version number chosen; changelog content drafted.
-
-### Phase 1 — Upstream sync (mandatory, every release)
+- Start from current, clean GUI `main` and the intended fork ref. Compare each with its own `origin`; fast-forward clean tracking branches with `git pull --ff-only`. The enclosing repo may show separate GUI and wiki checkouts as untracked.
+- Check Bun against the Core `packageManager` requirement before provisioning natives. Sync upstream via `scripts/sync-upstream.sh` and verify compatibility with the merged Core. Use `UPSTREAM_TAG=vX.Y.Z` in a clean fork release checkout when intentionally targeting published Core and its matching npm addons.
 
 ```bash
-bash packages/gui/scripts/sync-upstream.sh        # upstream/main integration
-# To ship the published Core (and its matching npm native addons), sync the official
-# stable tag in a clean release checkout based on the fork before any post-tag commits:
-# UPSTREAM_TAG=vX.Y.Z bash packages/gui/scripts/sync-upstream.sh
-# merge conflict → resolve at the MONOREPO root → git add -A && git commit →
-SKIP_MERGE=1 bash packages/gui/scripts/sync-upstream.sh
+bash packages/gui/scripts/sync-upstream.sh
+# After resolving and committing any merge conflicts at the monorepo root:
+# SKIP_MERGE=1 bash packages/gui/scripts/sync-upstream.sh
 ```
 
-Commit remaining monorepo changes at the monorepo root and push to the fork's `origin`. Never push to `upstream`.
+- Push Core changes to the fork first. Use the monorepo's oxfmt/oxlint for Core and Biome for GUI files. Generate the full Core SHA from `git rev-parse HEAD`, resolve it in the fork locally and on GitHub, and verify it is reachable from the intended remote ref. A matching short prefix or release note is insufficient.
 
-Format and lint monorepo files with the monorepo's tooling (`bunx oxfmt` / `bunx oxlint` from `packages/coding-agent`), never the GUI's Biome — a Biome `--write` on merge-resolved files once added ~4k lines of formatting churn against upstream.
+### 2. Prepare and verify the GUI tag
 
-### Phase 2 — Release prep (inside `packages/gui/`)
+1. Set `package.json` to `X.Y.Z`, finalize the changelog, and update version notes or fixed links in both languages of README. Keep new user-facing notes under `[Unreleased]` during development and leave prior release sections intact.
+2. Set `sidecar-source.json` to `nornzach/oh-my-pi` and the verified **full** Core SHA. Use the same Core source for local builds and CI. Run `bun run test`, `bun run check`, `bun run check:protocol`, and `bun run build` from the GUI repo. Run targeted Electron tests for changed interactions.
+3. Commit in the GUI repo with `release(gui): vX.Y.Z` and tag it `vX.Y.Z`. Before pushing, read `git show vX.Y.Z:sidecar-source.json` and compare both fields with the verified fork and full build SHA. Push GUI `main` and the tag to its `origin`, then check the remote ref resolves to the expected GUI commit. Treat pushed release tags as immutable.
 
-1. Bump `version` in `package.json`.
-2. Write the release's `CHANGELOG.md` section.
-3. Update README install links, version mentions, and release notes in **both** the English and 中文 sections — keep them in sync.
-4. Verify: `bunx vitest run && bun run check:types && bun run build`, plus `bunx biome check <touched files>`.
+### 3. Build and verify packages
 
-### Phase 3 — Commit, tag, push (GUI repo only)
-
-```bash
-git commit -am "release(gui): vX.Y.Z"
-git tag vX.Y.Z
-git push origin main && git push origin vX.Y.Z
-```
-
-Both checkouts must be clean before any artifact is produced.
-
-### Phase 4 — Sidecars (all three, every release)
+Build from the clean GUI tag and pinned Core checkout. Check that each sidecar matches its target and Core version; matching the version string alone does not prove the source was current. Choose the architecture explicitly, especially for an arm64 test package after new commits.
 
 ```bash
 bun run build:omp          # → resources/omp     (darwin-arm64)
 bun run build:omp:x64      # → resources/omp.x64 (darwin-x64)
-bun run build:omp:win      # → resources/omp.exe (windows-x64)
-file resources/omp resources/omp.x64            # confirm each architecture
-bun scripts/smoke-sidecar.mjs resources/omp     # + .x64 on an Intel host, .exe on Windows
-```
-
-Cross-compilation is not runtime verification — smoke-test each binary on a compatible host.
-
-An npm natives leaf may ship only one x64 variant (`pi-natives-darwin-x64@18.8.0` carries `baseline` only); `build:omp` sets aside a stale local sibling for the build so the embedder doesn't reject it, then restores it.
-
-### Phase 5 — Installers
-
-```bash
+bun scripts/smoke-sidecar.mjs resources/omp
 bun run package:mac:arm64 -- --publish never
-bun run package:mac:x64   -- --publish never   # dedicated x64 config — never plain package:mac
-bun run package:win       -- --publish never
+bun run package:mac:x64   -- --publish never
 ```
 
-Inspect every artifact before publishing:
+- macOS: verify the DMGs (`hdiutil verify`), the mounted app seal (`codesign --verify --deep --strict`), the installed ASAR and sidecar freshness, and the sidecar architecture (`file`). The unsuffixed DMG is Intel; the `-arm64.dmg` is Apple silicon. Keep the matching ZIPs and generated blockmaps. Merge the two builds' updater entries into **one** `latest-mac.yml` containing both architectures' DMGs and ZIPs; check filename, SHA-512 and size against the files. Ad-hoc signing does not imply notarization.
+- Launch or run the sidecar smoke on a compatible host. Require `VERDICT PASS` and a zero exit status for RPC and the settings round trip. Test an installed GUI with a separate user data directory and a temporary profile; unset a leaked `ELECTRON_RUN_AS_NODE` before launching. Separate static packaging checks, runtime smoke, and full interaction E2E when reporting results.
+- Windows x64 and Linux x64 are built by [release-windows.yml](.github/workflows/release-windows.yml) and [release-linux.yml](.github/workflows/release-linux.yml). They build from the tagged GUI and pinned fork, smoke the sidecar, and attach their assets when the release is published. Windows CI also checks PE architecture, locale `.pak` files, and renderer startup. For local Windows verification use `bun run build:omp:win` and `bun run package:win -- --publish never` on a compatible host; a cross-built executable is not runtime evidence.
 
-- Mount each DMG; verify the seal: `codesign --verify --deep --strict --verbose=2 "<path>/omp.app"`.
-- `file "<path>/omp.app/Contents/Resources/omp"` — the bundled sidecar arch must match the DMG (`omp-X.Y.Z-arm64.dmg` = arm64; `omp-X.Y.Z.dmg` = Intel).
-- Launch each package on a compatible host: sidecar reaches `ready`, `get_settings` RPC succeeds, one settings toggle persists. From an agent shell, launch with `env -u ELECTRON_RUN_AS_NODE …/Contents/MacOS/omp --user-data-dir=/tmp/<dir>`: a leaked `ELECTRON_RUN_AS_NODE=1` makes Electron exit 0 silently, and a separate user-data dir avoids the single-instance lock of an installed copy.
-- Windows: `file win-unpacked/resources/omp.exe` (arch must be x86-64). Preferred path is CI: `.github/workflows/release-windows.yml` (windows-latest) runs on release publish — or dispatch it for an existing tag — and reproduces the sidecar from `sidecar-source.json`'s monorepo pin, smoke-tests it (sidecar RPC handshake + packaged-GUI launch with no renderer crash, plus the locale-pak regression guard), then attaches the setup/portable installers + `latest.yml` itself. Local `bun run package:win -- --publish never` remains available on a Windows host.
-- Linux is built by CI, not locally: `.github/workflows/release-linux.yml` (ubuntu-latest) runs on release publish — or dispatch it for an existing tag — and reproduces the sidecar from `sidecar-source.json`'s monorepo pin, smoke-tests it, then attaches AppImage + deb + `latest-linux.yml` itself.
+### 4. Publish and read back
 
-### Phase 6 — Publish
+Upload the macOS assets to a draft for the verified tag. Check the draft asset names and sizes at GitHub before publishing; give the release the changelog and full fork build SHA. Publishing starts the Windows and Linux jobs. A release is complete only after their exact runs succeed and GitHub lists the expected assets:
 
-Create the GitHub Release on tag `vX.Y.Z` with:
+| Platform | Release assets |
+|---|---|
+| macOS | Both DMGs, both ZIPs, generated blockmaps and `latest-mac.yml` |
+| Windows | Setup, portable, setup blockmap and `latest.yml` |
+| Linux | AppImage, deb, `latest-linux.yml` and a blockmap if generated |
 
-- `omp-X.Y.Z-arm64.dmg` and `omp-X.Y.Z.dmg`, plus both macOS ZIPs
-- `omp-X.Y.Z-setup.exe` and `omp-X.Y.Z-portable.exe`
-- All generated update metadata — critically, a `latest-mac.yml` covering **both** architectures (the built-in updater resolves DMGs from it; a release without it, or with only one architecture's entries, breaks update checks)
-- The changelog as the release body; record the monorepo commit the sidecars were built from, especially when it isn't upstream `main`
+- Query the release asset list using `gh release view vX.Y.Z --repo nornzach/oh-my-pi-gui --json assets`. Read back the three updater feeds; confirm the version, filenames, sizes and hashes against the referenced release files. During an upload with no terminal output, check GitHub for progress before restarting it.
+- If an authorized backfill needs a corrected pin, leave the tag unchanged. Correct the pin on GUI `main` and dispatch the affected workflow from `main` with `tag=vX.Y.Z`, `gui_ref=vX.Y.Z` and `monorepo_sha=<verified full SHA>`. An ordinary rerun still uses the original tag's pin. Verify the rerun and the new assets and updater metadata again.
+- `site/` reads versions and download links from GitHub; a normal release needs no site edit. For follow-up comments, inspect existing replies, link the shipped version and say what the reporter should retest. The enclosing `AGENTS.md` requires approval for the exact target and text before posting; posting a reply does not authorize closing the issue.
 
-Never commit sidecar binaries. Never push to `upstream`.
+## Local Verification
 
-### Phase 7 — Post-release
-
-- `site/` needs no edit: version strings and DMG links resolve from the GitHub releases API at page load.
-- Verify the release page lists every expected asset and that the updater feed resolves `latest-mac.yml`.
-- Confirm the Linux workflow run attached `omp-*.AppImage`, `omp_*.deb`, and `latest-linux.yml` (check the Actions run if they're missing).
-
-## Build, Test, Release
-
-- Commit messages carry no AI attribution trailers — no `Generated with`, `Co-Authored-By`, or similar lines.
-- Check: `bun run check:types` (tsc) and `bunx biome check .` — keep touched files clean even if legacy diagnostics remain.
-- Test: `bunx vitest run` (full suite must stay green).
-- Build: `bun run build` (electron-vite → `out/`), then `bun run package:mac:arm64 -- --publish never` (arm64) or `bun run package:mac:x64 -- --publish never` (Intel).
-- **Every release follows the [Release Runbook](#release-runbook) below, phase by phase, no substitutions.**
-- Every release's DMGs embed the sidecar compiled from the monorepo — record the monorepo commit in the release notes if it isn't upstream `main`.
-- **The public site is `site/`** (`site/index.html` + `site/assets/`). Pages is configured as `build_type=workflow`, so `.github/workflows/pages.yml` is the only publisher: a push to `main` touching `site/**` deploys it. Its version string and DMG links are read from the GitHub releases API at page load, so a release needs **no site edit**; the values in the HTML are only the no-JS fallback.
+- `bun run check` runs the surface policy, Biome, and GUI type checks. Use `bun run check:types` for a focused type pass. The nested checkout can use hoisted tools from the fork; if lint results differ from a standalone clone, check the resolved tool version against the relevant lockfile before changing the rules.
+- `bun run test` runs Vitest; `bun run build` creates `out/` and checks that the packaged main bundle does not rely on hoisted dependencies. `bun run check:protocol` checks RPC and stats contracts against the adjacent Core checkout and also runs during `build:omp`.
+- `bun run test:e2e e2e/issues-fixes.e2e.ts` checks the Electron UI with an isolated profile and a synthetic sidecar after `bun run build`. `e2e/real-core.e2e.ts` exercises the actual sidecar. Give each case its own state; use semantic locators, real clicks, keyboard input, and overlap or focus checks. A DOM node existing does not prove it is visible or clickable.
+- Respect the enclosing commit convention: no AI attribution trailers.
 
 ## Code Conventions
 
 - Follow the enclosing monorepo's `AGENTS.md` for TypeScript style (no `any`, no inline imports, `#private` fields, Bun APIs over Node where cleaner).
-- i18n: every user-visible string goes through `useT()` with entries in **both** `src/renderer/locales/en.ts` and `zh.ts` (they must stay key-identical — `locales.test.ts` enforces it).
+- Keep code at its owner. Core owns provider policy, account identity, and persisted session events. Electron main owns filesystem/process work and settings that affect sidecar spawn. Expose typed IPC via `src/shared/ipc-types.ts` and the preload bridge; the renderer owns interaction and display state. Update the Core producer and GUI consumer together for wire changes; keep `scripts/protocol/` checking the shapes the GUI consumes.
+- Reuse the owning helper and export only what another module consumes. During cleanup trace Electron and HTML entrypoints, lazy imports, IPC/RPC registration, configuration, packaging hooks, test fixtures, and CSS/locale name families. A static scan is a candidate list. Keep compatibility code for released preferences and session formats until its migration path is proven.
+- Keep comments that explain an invariant, race, protocol constraint, or platform workaround. Remove commented-out implementations, stale plan references, and descriptions that repeat the next line. Put durable conventions here and product history in the changelog.
+- i18n: every user-visible string goes through `useT()` (components) or `translate()` (services). Update `src/renderer/locales/{en,zh,ru,th}.ts` together and run the locale tests for key and placeholder parity. Native menus and Core settings-schema labels have separate localization maps.
+- Keep normal content surfaces transparent, using borders, `text-omp-*` and the shared motion tokens in `src/renderer/styles/global.css`. Use the existing overlay primitives and layer helpers for real overlays; menus must paint and receive clicks above dock headers. A focused overlay must handle Escape before the turn abort handler.
 - Rendering model output: sanitize through `MarkdownRenderer` (rehype-sanitize schema in `src/renderer/lib/markdown.tsx`) — never `dangerouslySetInnerHTML` with raw model text.
 - Tool-rendered text follows the monorepo's TUI sanitization rules (tabs, truncation, path shortening) via the helpers in `src/renderer/lib/format.ts`.
 - Preview ceilings come from the tiers in `src/renderer/lib/preview.ts` (`PREVIEW_SCROLL_*` + line caps) — don't invent new `max-h-*` values in tool renderers. Captured subprocess output renders through `AnsiText` (`src/renderer/lib/ansi.tsx`), never raw (ANSI escapes would print literally).
-- Tests use the linkedom harness pattern (see `src/renderer/components/chat/ThinkingBlock.test.tsx`); zustand stores are reset in `afterEach` via their `reset()`/setters — never `mock.module()`.
+- Tests use the linkedom harness pattern (see `src/renderer/components/chat/ThinkingBlock.test.tsx`). Mount through `I18nProvider`; restore mocks and reset stores after each test. Exercise observable changes and races; never use `mock.module()` or source-text assertions.
 
-## Examples
+## Interaction and State Patterns
 
-### Everyday GUI change — commits land in the right repo
-
-```bash
-# cwd: packages/gui/ — every git command here acts on the GUI repo
-bun run dev                              # HMR against resources/omp
-# …edit src/renderer/…
-bunx vitest run && bun run check:types
-bunx biome check <touched files>         # whole-repo check has legacy diagnostics
-git commit -am "Add X to the settings window"   # → nornzach/oh-my-pi-gui
-git push origin main
-```
-
-The same edit one level up (`packages/coding-agent/…`) belongs to the **monorepo**: commit at the monorepo root (`packages/gui/../..`) and push to the `nornzach/oh-my-pi` fork — never from here.
-
-### Upstream sync with a merge conflict
-
-```bash
-bash packages/gui/scripts/sync-upstream.sh
-# merge stops: CONFLICT in packages/coding-agent/src/…
-# resolve the markers, then from the MONOREPO ROOT (git there = fork):
-git add -A && git commit
-SKIP_MERGE=1 bash packages/gui/scripts/sync-upstream.sh   # resumes after the merge step
-git push origin main                       # monorepo root → nornzach/oh-my-pi
-# GUI-side changes (if any) commit and push separately from packages/gui/
-```
-
-### Adding a user-visible string (i18n)
-
-```ts
-// src/renderer/locales/en.ts
-"settings.proxy.enabled": "Proxy enabled",
-// src/renderer/locales/zh.ts — identical key, translated value
-"settings.proxy.enabled": "已启用代理",
-```
-
-```tsx
-// component
-import { useT } from "../../lib/i18n";
-
-const t = useT();
-<span>{t("settings.proxy.enabled")}</span>
-// interpolation: t("input.thinking", { level }) fills "Thinking: {level} — click to change"
-```
-
-Add the key to both locale files in the same commit — `locales.test.ts` fails the suite if the key sets diverge.
-
-### Rendering model or tool text
-
-```tsx
-import { MarkdownRenderer } from "../../lib/markdown";
-
-<MarkdownRenderer content={modelText} />
-```
-
-Never `dangerouslySetInnerHTML` with model output, and never build a second markdown path — extend the sanitize schema in `src/renderer/lib/markdown.tsx` if a construct is missing.
-
-### Writing a component test (linkedom harness)
-
-Follow `ThinkingBlock.test.tsx`: set up linkedom globals once, mount through `I18nProvider`, and reset stores in `afterEach`:
-
-```tsx
-import { parseHTML } from "linkedom";
-import { act, type ReactElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
-import { I18nProvider } from "../../lib/i18n";
-import { useSettingsStore } from "../../stores/settings";
-
-const { document, window, Event, HTMLElement, Element, Node } = parseHTML("<html><body></body></html>");
-const globals = globalThis as Record<string, unknown>;
-Object.assign(globals, { document, window, Event, HTMLElement, Element, Node, IS_REACT_ACT_ENVIRONMENT: true });
-globals.requestAnimationFrame = (callback: () => void) => setTimeout(callback, 0);
-
-let container: Element;
-let root: Root;
-
-async function mount(element: ReactElement): Promise<void> {
-	// linkedom's types don't match React's — cast as in ThinkingBlock.test.tsx
-	container = document.createElement("div") as unknown as Element;
-	document.body.appendChild(container as never);
-	root = createRoot(container);
-	await act(async () => {
-		root.render(<I18nProvider>{element}</I18nProvider>);
-	});
-}
-
-afterEach(async () => {
-	await act(async () => {
-		root.unmount();
-	});
-	container.remove();
-	useSettingsStore.getState().reset();   // setters/reset() — never mock.module()
-});
-```
+- **Session and transcript:** Use `SessionRuntime` and tab-addressed RPC for work that can cross an `await`; recheck the same tab/session and event version before applying a fetched snapshot. Keep persisted entries, optimistic/live messages, and local builtin replies distinct. Reconcile using `mergeFetchedTranscript`/message identity helpers; preserve local command output across refresh, and compare image content by digest when base64 and blob references represent the same image. Verify streaming, `message_end`/`agent_end`, tab switches, hydration, and reopening.
+- **Disclosures and scroll:** Every expanded process, thinking block, tool output, read group, or context detail has its own bottom `CollapseButton`. Bind it to the same open state as the header; it stays clickable after the turn ends, collapses only that block, and does not depend on being the last block, hover, or live state. Exercise click and scroll anchoring with multiple rows open, during streaming and after finalization.
+- **Requests and drafts:** Queue extension UI by tab/request ID, reuse the form body and response handler for inline/modal rendering, and keep one draft per request across tab switches. Use the dialog when the owning conversation is out of view. Keep composer transformations shared between preview and submit; paste-marker folding and the large-paste menu are independent settings.
+- **Quotas, proxy, and project actions:** Merge repeated quota reports by provider/account/organization before display; keep distinct organizations separate and distinguish unknown usage from exhausted allowance. Preserve local/private endpoints and `NO_PROXY` when applying a proxy; explicit direct mode ignores the system proxy. Removing a sidebar project only changes registration; deleting sessions or files is a separate action.

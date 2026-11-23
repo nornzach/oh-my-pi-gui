@@ -2013,8 +2013,7 @@
 	}
 }
 
-/* A subagent page's assignment (plan/24 §5.4): three lines of the prompt,
-   faded at the cut, until the reader asks for all of it. */
+/* Fade the assignment after three lines until expanded. */
 .omp-assignment-clamp {
 	max-height: calc(3 * 1.6 * var(--text-omp-xl));
 	overflow: hidden;
@@ -2024,8 +2023,7 @@
 	mask-image: linear-gradient(to bottom, #000 60%, transparent);
 }
 
-/* Agents under their session in the sidebar (plan/24 §5.3): elbow guides from
-   each parent's signal dot, in the border tone the sidebar canvas can show. */
+/* Connector lines from each parent session to its agents. */
 .omp-sidebar-agent-elbow {
 	position: absolute;
 	top: 0;

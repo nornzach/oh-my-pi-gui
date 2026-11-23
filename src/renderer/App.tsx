@@ -420,9 +420,7 @@ export function App() {
 		};
 		return window.omp.events.onDeepLink(link => void handle(link));
 	}, [t]);
-	// User keybinding overrides → precompiled chord → actionId lookup (B3,
-	// plan/15 §3.5): keydown dispatch is an O(1) map hit, never a config walk.
-	// The memo recomputes only when the overrides object identity changes.
+	// Compile shortcuts on preference changes so keydown dispatch is a lookup.
 	// Turned-off shortcuts hold [] and compile to no chord.
 	const keymapOverrides = useEffectiveKeymapOverrides();
 	const keymap = useMemo(() => compileKeymap(KEYMAP_ACTIONS, keymapOverrides), [keymapOverrides]);
@@ -515,7 +513,6 @@ export function App() {
 					void useTabsStore.getState().openTab({ kind: "chat" });
 					return;
 				case "tab.newWorktree":
-					// ⌥T — new worktree tab (create dialog, plan/20).
 					useUiStore.getState().openWorktreeDialog();
 					return;
 				case "tab.close":
@@ -524,7 +521,6 @@ export function App() {
 					closeActiveTab();
 					return;
 				case "pr.center":
-					// ⌥P — PR Center panel (plan/21).
 					useUiStore.getState().openPrCenter();
 					return;
 				case "model.select":

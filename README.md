@@ -338,12 +338,12 @@ The Windows configuration targets x64 and bundles `resources/omp.exe`. It produc
 ```bash
 bun run dev                         # HMR, using resources/omp
 OMP_SIDECAR=source bun run dev       # explicit dev override: monorepo agent source
-bunx vitest run                     # GUI tests
-bun run check:types                 # GUI type checks
+bun run test                        # GUI tests
+bun run check                       # surface policy, Biome, and type checks
 bun run build                      # production GUI build and main-bundle check
 ```
 
-Run Biome on touched supported files as well. Changes to agent/RPC code belong in the monorepo and require rebuilding the bundled sidecar before validating a packaged GUI.
+Changes to agent/RPC code belong in the monorepo. Run `bun run check:protocol` against the adjacent Core checkout and rebuild the bundled sidecar before validating a packaged GUI.
 
 #### Reproduce the screenshots
 
@@ -379,7 +379,7 @@ The capture script renders the actual Electron GUI using a fresh temporary HOME,
 <details>
 <summary><b>Canonical procedure: the Release Runbook in AGENTS.md</b></summary>
 
-The standard, step-by-step release procedure is the [Release Runbook](AGENTS.md#release-runbook) in `AGENTS.md`. Every release follows it exactly — checkout preconditions, upstream sync, version/CHANGELOG/README prep and verification, commit + `vX.Y.Z` tag + push, all three sidecar builds with smoke tests, installer builds with per-artifact inspection, then the GitHub Release carrying both DMGs, both ZIPs, the Windows NSIS and portable installers, and update metadata.
+Follow the [Release Runbook](AGENTS.md#release-runbook): sync Core, verify the full fork commit in the GUI tag, then validate and upload both macOS builds. Publishing starts the Windows and Linux workflows. Check the completed runs, installers, and updater feeds for all three platforms.
 
 Releases belong only to [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh-my-pi-gui/releases). Never commit sidecar binaries; never push to `upstream`.
 
@@ -704,12 +704,12 @@ Windows 配置目标为 x64，并将 `resources/omp.exe` 放入应用包；它�
 ```bash
 bun run dev                         # HMR，使用 resources/omp
 OMP_SIDECAR=source bun run dev       # 显式开发覆盖：使用 monorepo Agent 源码
-bunx vitest run                     # GUI 测试
-bun run check:types                 # GUI 类型检查
+bun run test                        # GUI 测试
+bun run check                       # 界面样式规则、Biome 和类型检查
 bun run build                      # GUI 生产构建与主进程 bundle 检查
 ```
 
-同时用 Biome 检查修改过且受其支持的文件。Agent/RPC 改动归属 monorepo；验证打包 GUI 前，需要重新构建内置 sidecar。
+Agent/RPC 改动归属 monorepo。验证打包 GUI 前，先用 `bun run check:protocol` 对照相邻的 Core 检出检查协议，再重建内置 sidecar。
 
 #### 复现截图
 
@@ -745,7 +745,7 @@ bun scripts/capture-showcase.ts
 <details>
 <summary><b>标准流程：AGENTS.md 中的 Release Runbook</b></summary>
 
-标准的分步发布流程以 `AGENTS.md` 的 [Release Runbook](AGENTS.md#release-runbook) 为准，每次发布严格照此执行——检出前置检查、上游同步、版本/CHANGELOG/README 准备与验证、提交 + `vX.Y.Z` 标签 + 推送、三个 sidecar 构建与烟测、安装包构建与逐产物检查，最后是携带两个 DMG、两个 ZIP、Windows NSIS 与便携版安装包及更新元数据的 GitHub Release。
+按 [Release Runbook](AGENTS.md#release-runbook) 同步 Core，核对 GUI 标签固定的完整 fork 提交，再验证并上传两种架构的 macOS 安装包。发布会启动 Windows 和 Linux 工作流；两者成功后，从 GitHub 核对三平台的安装包和更新元数据。
 
 发布只属于 [`nornzach/oh-my-pi-gui`](https://github.com/nornzach/oh-my-pi-gui/releases)。绝不提交 sidecar 二进制，也不向 `upstream` 推送。
 

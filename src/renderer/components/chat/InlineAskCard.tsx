@@ -1,8 +1,3 @@
-/**
- * The agent's ask form rendered at the end of the transcript (#74), so the
- * conversation that prompted it stays on screen while answering. Opt-in via
- * Settings → GUI; a form parked in a background tab still pops as a modal.
- */
 import { MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useT } from "../../lib/i18n";
@@ -37,11 +32,13 @@ export function InlineAskCard() {
 			data-inline-ask
 			ref={cardRef}
 		>
-			<div className="sticky top-0 z-20 flex min-h-10 items-center gap-2 bg-(--omp-bg-secondary) px-3 py-1.5">
+			<div
+				className="sticky top-0 z-20 flex min-h-10 items-center gap-2 bg-(--omp-bg-secondary) px-3 py-1.5" // surface-ok: the sticky header covers scrolling form fields
+			>
 				<MessageCircleQuestion aria-hidden className="shrink-0 text-(--omp-accent)" size={15} />
 				<span className="text-omp-md font-semibold text-(--omp-text)">{t("extDialog.ask.title")}</span>
 			</div>
-			<div className="bg-(--omp-bg-primary) px-3 py-3">
+			<div className="p-3">
 				<AskFormBody
 					draftKey={request.id}
 					footer={<TimeoutFooter remaining={remaining} />}

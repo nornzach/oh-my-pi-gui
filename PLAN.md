@@ -134,7 +134,7 @@ manifest 按 D1 判定:
 | P1/P3/P7(backend)/P8 | monorepo 根(`feat/plugin-marketplace`) | `origin`(nornzach/oh-my-pi fork) |
 | P2/P4/P6/P7(gui)/P9 | 本仓库(`feat/plugin-marketplace`) | `origin/main`(nornzach/oh-my-pi-gui) |
 
-- wire 类型改动 = 双侧手改 + `bun run gen:types` 漂移检查(**审计确认**:gen-types 是检查器非生成器)
+- wire 类型改动 = 双侧更新 + `bun run check:protocol`，核对 GUI 实际消费的 RPC 类型与 stats 路由。
 - 发版前:`sync-upstream.sh` → `build:omp` → GUI 冒烟(ready、get_settings、
   添加一个用户提供的 fixture marketplace 并走完整确认/激活链)
 

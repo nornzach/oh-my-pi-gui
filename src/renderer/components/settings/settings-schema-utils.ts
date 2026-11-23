@@ -34,7 +34,7 @@ const CONDITION_EVALUATORS: Record<string, (values: Record<string, unknown>) => 
  * when its condition names a known, client-evaluable gate that currently
  * resolves false. Unknown gates fail open (visible).
  */
-export function isSettingVisible(entry: SettingEntry, values: Record<string, unknown>): boolean {
+function isSettingVisible(entry: SettingEntry, values: Record<string, unknown>): boolean {
 	if (entry.condition === undefined) return true;
 	const evaluate = CONDITION_EVALUATORS[entry.condition];
 	return evaluate === undefined ? true : evaluate(values);

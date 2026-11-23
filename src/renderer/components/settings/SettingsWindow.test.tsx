@@ -12,14 +12,9 @@ import { I18nProvider } from "../../lib/i18n";
 import { useUiStore } from "../../stores/ui";
 import { Toggle } from "./editors/Toggle";
 import { CapabilitiesHome } from "./pages/CapabilitiesHome";
-import {
-	groupSchemaEntries,
-	isSettingVisibleInGui,
-	resolveSettingsTarget,
-	SchemaTabContent,
-	SettingsConnectionNotice,
-	SettingsWindow,
-} from "./SettingsWindow";
+import { SchemaTabContent } from "./pages/SchemaTabContent";
+import { SettingsConnectionNotice, SettingsWindow } from "./SettingsWindow";
+import { groupSchemaEntries, isSettingVisibleInGui, resolveSettingsTarget } from "./settings-schema-utils";
 import { buildSettingsNavGroups, isAgentSchemaTab } from "./settings-window-model";
 
 function entry(partial: Partial<SettingEntry> & { path: string }): SettingEntry {

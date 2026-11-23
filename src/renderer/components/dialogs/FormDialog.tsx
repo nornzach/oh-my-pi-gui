@@ -413,13 +413,7 @@ export function FormDialog({
 	const t = useT();
 	return (
 		<Modal onClose={onCancel} open size="lg" title={t("extDialog.ask.title")}>
-			<AskFormBody
-				draftKey={draftKey}
-				footer={footer}
-				onCancel={onCancel}
-				onSubmit={onSubmit}
-				sections={sections}
-			/>
+			<AskFormBody draftKey={draftKey} footer={footer} onCancel={onCancel} onSubmit={onSubmit} sections={sections} />
 		</Modal>
 	);
 }

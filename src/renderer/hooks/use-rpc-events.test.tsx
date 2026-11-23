@@ -1064,7 +1064,10 @@ describe("useRpcEvents non-transcript frames", () => {
 		expect(messages).toHaveLength(2);
 		expect(messages[0]).toEqual(committed);
 		expect(messages[1]).toEqual(
-			expect.objectContaining({ customType: "command", content: [{ type: "text", text: "mysql | stdio | enabled" }] }),
+			expect.objectContaining({
+				customType: "command",
+				content: [{ type: "text", text: "mysql | stdio | enabled" }],
+			}),
 		);
 	});
 

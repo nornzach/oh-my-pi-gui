@@ -1,16 +1,10 @@
-/**
- * Browser-level proof for the issue batch: #75 builtin output survives the
- * post-prompt hydrate, #76 an empty project leaves the sidebar, #74 ask forms
- * answer inline (and still pop as a modal when the preference is off), #71 the
- * Token Meter reads live throughput, #73 the slash menu paints over the dock.
- */
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { expect, test } from "@playwright/test";
 import { type ElectronApplication, _electron as electron, type Page } from "playwright";
 
-let app: ElectronApplication;
+let app: ElectronApplication | undefined;
 let page: Page;
 let profile: string;
 let record: string;
@@ -18,7 +12,12 @@ let emptyProject: string;
 const errors: string[] = [];
 
 async function command(text: string) {
-	const composer = page.locator("textarea").first();
+	const composer = page.getByRole("textbox", { name: /Ask omp/ });
+	// Native text correction can change fixture commands as the composer blurs.
+	await composer.evaluate(element => {
+		element.setAttribute("spellcheck", "false");
+		element.setAttribute("autocorrect", "off");
+	});
 	await composer.fill(text);
 	await page.getByRole("button", { name: "Send (Enter)", exact: true }).click();
 }
@@ -36,7 +35,8 @@ async function transcriptReads() {
 	return (await recorded("get_transcript")).length + (await recorded("get_messages")).length;
 }
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
+	errors.length = 0;
 	profile = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "omp-gui-issues-")));
 	const project = path.join(profile, "project");
 	emptyProject = path.join(profile, "empty-project");
@@ -76,10 +76,17 @@ test.beforeAll(async () => {
 	await expect.poll(async () => (await page.evaluate(() => window.omp.sidecar.getStatus())).status).toBe("ready");
 });
 
-test.afterAll(async () => {
-	if (app) await app.evaluate(({ app }) => app.exit(0));
-	if (record) await fs.copyFile(record, "test-results/issues-rpc.jsonl").catch(() => {});
-	if (profile) await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+test.afterEach(async () => {
+	const testInfo = test.info();
+	try {
+		if (app) await app.evaluate(({ app }) => app.exit(0));
+		if (testInfo.status !== testInfo.expectedStatus && record) {
+			await testInfo.attach("rpc", { path: record, contentType: "application/jsonl" }).catch(() => {});
+		}
+	} finally {
+		app = undefined;
+		if (profile) await fs.rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+	}
 });
 
 test("#75 builtin output stays on screen after the hydrate its prompt triggers", async () => {
@@ -118,6 +125,8 @@ test("#76 an empty project can be removed from the sidebar without touching its 
 });
 
 test("#74 an ask form answers inline while the conversation stays on screen", async () => {
+	await command("fixture committed reply");
+	await expect(page.getByText("Local fixture reply")).toBeVisible();
 	await command("fixture form");
 	const card = page.locator("[data-inline-ask]");
 	await expect(card).toBeVisible();
@@ -168,8 +177,6 @@ test("#74 turning the preference off brings the modal back", async () => {
 			(await recorded("extension_ui_response")).filter(item => item.formData?.target === "production"),
 		)
 		.toHaveLength(1);
-	// Restore the seeded preference.
-	await page.evaluate(() => window.omp.prefs.set("askInline", true));
 });
 
 test("#71 the Token Meter reports live throughput and closes on Escape", async () => {
@@ -186,7 +193,9 @@ test("#71 the Token Meter reports live throughput and closes on Escape", async (
 	await expect(meter.locator("[data-tariff]")).toContainText("×0.5");
 	// The gauge samples the streaming buffer, so it must climb above zero while
 	// the fixture keeps delivering deltas.
-	await expect.poll(async () => Number(await meter.locator("span.text-3xl").textContent())).toBeGreaterThan(0);
+	await expect
+		.poll(async () => Number(await meter.locator("[data-token-meter-rate]").textContent()))
+		.toBeGreaterThan(0);
 	await page.screenshot({ path: "test-results/issues-71-meter.png", scale: "css", animations: "disabled" });
 	await page.keyboard.press("Escape");
 	await expect(meter).toHaveCount(0);

@@ -88,19 +88,20 @@ function mockProvider(): CustomProviderView {
 
 const roots: Root[] = [];
 
+function MountedDialog() {
+	const open = useUiStore(s => s.providerConfigOpen);
+	const edit = useUiStore(s => s.providerConfigEdit);
+	const close = useUiStore(s => s.closeProviderConfig);
+	return <ProviderConfigDialog open={open} editProvider={edit} onClose={close} />;
+}
+
 async function mountDialog(): Promise<void> {
 	const root = createRoot(document.body as unknown as Element);
 	roots.push(root);
-	const Mounted = () => {
-		const open = useUiStore(s => s.providerConfigOpen);
-		const edit = useUiStore(s => s.providerConfigEdit);
-		const close = useUiStore(s => s.closeProviderConfig);
-		return <ProviderConfigDialog open={open} editProvider={edit} onClose={close} />;
-	};
 	await act(async () => {
 		root.render(
 			<I18nProvider>
-				<Mounted />
+				<MountedDialog />
 			</I18nProvider>,
 		);
 	});

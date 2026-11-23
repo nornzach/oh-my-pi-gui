@@ -180,8 +180,7 @@ export const useSidebarPrefs = create<SidebarPrefsStore>()((set, get) => ({
 				groupAliases: Object.fromEntries(Object.entries(state.groupAliases).filter(([key]) => key !== cwd)),
 			}),
 			persist: () => writePrefs(get),
-			onFailure: message =>
-				toast({ variant: "error", title: translate("sidebar.removeWorkspaceFailed"), message }),
+			onFailure: message => toast({ variant: "error", title: translate("sidebar.removeWorkspaceFailed"), message }),
 		});
 	},
 

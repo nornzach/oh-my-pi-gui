@@ -50,7 +50,7 @@ let speaking = false;
  * another utterance is still active (see the module header); RPC failures
  * surface as an error toast.
  */
-export function speakText(text: string): void {
+function speakText(text: string): void {
 	const trimmed = text.trim();
 	if (!trimmed || speaking) return;
 	speaking = true;

@@ -1,15 +1,5 @@
-// Sidecar deadlock smoke probe (dev only — requires the native addon at
-// packages/natives/native/pi_natives.darwin-arm64.node).
-//
-// Boots the SAME spawn the GUI uses for source sidecars —
-//   `bun packages/coding-agent/src/cli.ts --mode rpc-ui`
-// then replays the deadlock sequence:
-//   get_state → get_available_models (the command that wedged the serial queue)
-//   → get_state (must still answer) → set_thinking_level (mutating).
-//
-// Wedge signal is post-discovery LATENCY: a bricked serial queue returns
-// nothing, so any post-discovery command exceeding WEDGE_MS means the queue is
-// still bricked. Run: `bun run packages/gui/scripts/smoke-sidecar.mjs`.
+// Verify RPC liveness after model discovery and a settings round-trip.
+// Pass the packaged sidecar path, or omit it to probe the adjacent Core source.
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -97,9 +87,9 @@ child.on("exit", code => {
 	});
 	console.log(`READY protocolVersion=${ready.protocolVersion}`);
 
-	await send("negotiate_protocol", { protocolVersion: 2 });
+	const negotiated = await send("negotiate_protocol", { protocolVersion: 2 });
 
-	await send("get_state");
+	const boot = await send("get_state");
 	console.log(`get_state[boot]         ${results.at(-1).ok ? "ok " : "ERR"} ${results.at(-1).ms}ms`);
 
 	await send("get_available_models");
@@ -124,21 +114,26 @@ child.on("exit", code => {
 		const toggledColorBlindMode = !originalColorBlindMode;
 		const toggle = await send("set_setting", { path: "colorBlindMode", value: toggledColorBlindMode });
 		const settingsAfter = await send("get_settings", { paths: ["colorBlindMode"] });
-		settingsPersisted = toggle.success && settingsAfter.data?.values?.colorBlindMode === toggledColorBlindMode;
-		console.log(`set_setting round-trip  ${settingsPersisted ? "ok " : "ERR"} ${results.at(-2).ms + results.at(-1).ms}ms`);
-		await send("set_setting", { path: "colorBlindMode", value: originalColorBlindMode });
+		const roundTripMs = results.at(-2).ms + results.at(-1).ms;
+		const restored = await send("set_setting", { path: "colorBlindMode", value: originalColorBlindMode });
+		settingsPersisted =
+			toggle.success && settingsAfter.success && settingsAfter.data?.values?.colorBlindMode === toggledColorBlindMode &&
+			restored.success;
+		console.log(`set_setting round-trip  ${settingsPersisted ? "ok " : "ERR"} ${roundTripMs}ms`);
 	}
 
 	const postDiscovery = [follow, mutate];
 	const wedged = postDiscovery.some(r => r.ms > WEDGE_MS);
 	const modelsReturned = models.ms <= WEDGE_MS;
-	const pass = !wedged && modelsReturned && settingsReadable && settingsPersisted;
+	const commandsSucceeded = negotiated.success && boot.success && models.ok && postDiscovery.every(result => result.ok);
+	const pass = commandsSucceeded && !wedged && modelsReturned && settingsPersisted;
 	console.log(
 		`\nVERDICT ${pass ? "PASS" : "FAIL"}  postDiscoveryMax=${Math.max(...postDiscovery.map(r => r.ms))}ms  models=${models.ms}ms  commands=${results.length}`,
 	);
 	if (!modelsReturned) console.log("FAIL get_available_models hung past the bound — discovery await not bounded");
 	if (wedged) console.log("FAIL a post-discovery command wedged — serial queue still bricked");
 
+	process.exitCode = pass ? 0 : 1;
 	finished = true;
 	clearTimeout(hardKill);
 	child.kill("SIGTERM");

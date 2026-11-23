@@ -57,8 +57,3 @@ export const createPlanApprovalStore = () =>
 
 const defaultPlanApprovalStore = createPlanApprovalStore();
 export const usePlanApprovalStore = createScopedStoreHook("planApproval", defaultPlanApprovalStore);
-
-/** Fire-and-forget helper for non-component call sites. */
-export function clearPendingPlanProposal(): void {
-	usePlanApprovalStore.getState().clearProposal();
-}
