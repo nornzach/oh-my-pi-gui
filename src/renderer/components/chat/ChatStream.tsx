@@ -822,7 +822,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 					{awaitingTranscript && rows.length === 0 && !switchPending && <TranscriptLoading />}
 					{!awaitingTranscript && rows.length === 0 && !isStreaming && !switchPending && readOnly === null && (
 						<div className="omp-empty-canvas flex min-h-full flex-col justify-center pb-20">
-							<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--omp-border-muted)] bg-[var(--omp-selected-bg)] text-[var(--omp-accent)]">
+							<div className="omp-empty-logo mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[color-mix(in_srgb,var(--omp-accent)_25%,var(--omp-border-muted))] bg-[var(--omp-accent-dim)] text-[var(--omp-accent)] shadow-[var(--omp-shadow-sm)]">
 								<PiLogo size={22} />
 							</div>
 							<h1 className="font-display text-omp-display font-semibold leading-tight tracking-[-0.025em] text-[var(--omp-text)]">
@@ -841,14 +841,14 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 												new CustomEvent("omp:fill-composer", { detail: { text: prompt, tabId } }),
 											)
 										}
-										className="omp-starter-card omp-lift group flex min-h-20 items-start gap-3 rounded-2xl border border-[var(--omp-border)] p-4 text-left shadow-[var(--omp-shadow-sm)] hover:border-[var(--omp-border-accent)] hover:bg-[var(--omp-bg-secondary)]"
+										className="omp-starter-card group flex min-h-20 items-start gap-3.5 rounded-2xl border border-[var(--omp-border-muted)] p-4 text-left"
 									>
 										<span className="omp-starter-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--omp-selected-bg)] text-[var(--omp-accent)]">
 											<Icon size={17} />
 										</span>
-										<span>
-											<span className="block text-omp-lg font-semibold text-[var(--omp-text)]">{title}</span>
-											<span className="mt-1 block text-omp-lg leading-snug text-[var(--omp-muted)]">
+										<span className="min-w-0">
+											<span className="block text-omp-md font-semibold text-[var(--omp-text)]">{title}</span>
+											<span className="mt-1 block text-omp-sm leading-relaxed text-[var(--omp-muted)]">
 												{prompt}
 											</span>
 										</span>

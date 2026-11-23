@@ -150,9 +150,19 @@ export function CodeBlock({
 			type="button"
 			onClick={handleCopy}
 			title={t("chat.copyCode")}
-			className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--omp-dim)] opacity-60 transition-[opacity,background-color,color] duration-150 hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] focus:opacity-100 group-hover/code:opacity-100"
+			className="omp-pressable inline-flex h-6 items-center gap-1 rounded-md px-2 text-omp-xs font-medium text-[var(--omp-dim)] opacity-75 transition-[opacity,background-color,color] duration-150 hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] focus:opacity-100 group-hover/code:opacity-100"
 		>
-			{copied ? <Check size={12} className="text-[var(--omp-success)]" /> : <Copy size={12} />}
+			{copied ? (
+				<>
+					<Check size={11} className="text-[var(--omp-success)]" />
+					<span className="text-[var(--omp-success)]">{t("chat.custom.commandCopied")}</span>
+				</>
+			) : (
+				<>
+					<Copy size={11} />
+					<span>{t("chat.custom.copyShort")}</span>
+				</>
+			)}
 		</button>
 	);
 
@@ -164,14 +174,21 @@ export function CodeBlock({
 			)}
 		>
 			{label !== null && (
-				<div className="omp-code-block-header flex h-8 items-center gap-2 px-3.5">
-					<span className="text-omp-xs font-medium text-[var(--omp-dim)]">{label}</span>
+				<div className="omp-code-block-header flex h-9 items-center gap-2 px-3.5">
+					<span className="font-mono text-omp-xs font-medium text-[var(--omp-muted)]">{label}</span>
+					{lineCount > 1 && (
+						<span className="rounded-full bg-[var(--omp-selected-bg)] px-1.5 py-px font-mono text-omp-xxs tabular-nums text-[var(--omp-dim)]">
+							{lineCount}
+						</span>
+					)}
 					{showCopy && <span className="ml-auto">{copyButton}</span>}
 				</div>
 			)}
 			{label === null && showCopy && (
 				// No header to sit in: the button floats over the code's corner on hover.
-				<span className="absolute end-2 top-2 z-10 rounded-md bg-[var(--omp-code-bg)]">{copyButton}</span>
+				<span className="absolute end-2 top-2 z-10 rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] shadow-[var(--omp-shadow-sm)]">
+					{copyButton}
+				</span>
 			)}
 			<div className={cx("overflow-auto", maxHeightClass)}>
 				{showLineNumbers && lineCount > 0 ? (
@@ -182,12 +199,12 @@ export function CodeBlock({
 							startLine={startLine}
 							className="px-2.5 py-3 text-omp-md leading-[1.5]"
 						/>
-						<pre className="min-w-0 flex-1 overflow-x-auto px-3.5 py-3 font-mono text-omp-md leading-[1.5]">
+						<pre className="min-w-0 flex-1 overflow-x-auto px-4 py-3 font-mono text-omp-md leading-[1.5]">
 							{codeElement}
 						</pre>
 					</div>
 				) : (
-					<pre className="overflow-x-auto px-3.5 py-3 font-mono text-omp-md leading-[1.55]">{codeElement}</pre>
+					<pre className="overflow-x-auto px-4 py-3 font-mono text-omp-md leading-[1.55]">{codeElement}</pre>
 				)}
 			</div>
 		</div>

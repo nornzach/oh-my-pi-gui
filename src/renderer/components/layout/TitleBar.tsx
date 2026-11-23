@@ -432,7 +432,7 @@ export function TitleBar() {
 			{pageAgentId ? (
 				<AgentTitleStatus agentId={pageAgentId} />
 			) : (
-				<div className="omp-titlebar-status no-drag flex shrink-0 items-center gap-1.5 px-1 text-omp-sm font-medium text-[var(--omp-muted)]">
+				<div className="omp-titlebar-status no-drag flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--omp-border-muted)] bg-[var(--omp-selected-bg)]/50 px-2.5 py-0.5 text-omp-xs font-medium text-[var(--omp-muted)]">
 					<span
 						role="img"
 						aria-label={statusLabel}

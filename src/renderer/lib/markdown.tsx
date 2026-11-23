@@ -383,9 +383,9 @@ function CodeBlock({ className, children, ...props }: ComponentPropsWithoutRef<"
 }
 
 const INLINE_CODE_CLASS =
-	"px-1 py-0.5 rounded bg-[var(--omp-code-bg)] text-[var(--omp-md-code)] font-mono text-[0.9em]";
+	"px-1.5 py-[0.08em] rounded-[5px] border border-[color-mix(in_srgb,var(--omp-border)_70%,transparent)] bg-[var(--omp-code-bg)] text-[var(--omp-md-code)] font-mono text-[0.87em]";
 const LINKED_CODE_CLASS =
-	"px-1 py-0.5 rounded bg-[var(--omp-code-bg)] text-[var(--omp-md-link)] font-mono text-[0.9em] underline decoration-dotted decoration-[var(--omp-md-link-url)] underline-offset-2 hover:decoration-solid";
+	"px-1.5 py-[0.08em] rounded-[5px] border border-[color-mix(in_srgb,var(--omp-md-link)_25%,transparent)] bg-[var(--omp-code-bg)] text-[var(--omp-md-link)] font-mono text-[0.87em] underline decoration-dotted decoration-[var(--omp-md-link-url)] underline-offset-2 hover:decoration-solid";
 
 /** Inline code; a whole web address or a path that exists on disk becomes a link. */
 function InlineCode({ children, ...props }: ComponentPropsWithoutRef<"code">) {
@@ -441,10 +441,7 @@ function H3({ children, ...props }: ComponentPropsWithoutRef<"h3">) {
 
 function Blockquote({ children, ...props }: ComponentPropsWithoutRef<"blockquote">) {
 	return (
-		<blockquote
-			{...props}
-			className="border-l-2 border-[var(--omp-md-quote-border)] pl-3 text-[var(--omp-md-quote)] italic"
-		>
+		<blockquote {...props} className="omp-md-blockquote text-[var(--omp-md-quote)]">
 			{children}
 		</blockquote>
 	);

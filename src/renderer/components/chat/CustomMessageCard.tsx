@@ -12,26 +12,40 @@
 import {
 	AlertTriangle,
 	ArrowRightLeft,
+	Check,
 	CheckCircle2,
 	ChevronDown,
 	ChevronRight,
+	Copy,
 	Lightbulb,
 	MessagesSquare,
+	SlidersHorizontal,
+	Terminal,
 	XCircle,
 	Zap,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import type { AgentMessage } from "../../../shared/rpc-types";
-import { cx, formatDuration, formatTimeAgo, headLines, resultDetails, resultText } from "../../lib/format";
+import { OutputText } from "../../lib/ansi";
+import { copyText, cx, formatDuration, formatTimeAgo, headLines, resultDetails, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
+import { useUiStore } from "../../stores/ui";
 import { Badge, type BadgeVariant } from "../common/Badge";
+import {
+	type CommandTone,
+	classifyTableCell,
+	isMcpCommandOutput,
+	parseCommandOutput,
+	statusBadgeVariant,
+} from "./command-output";
 import { launchCompletionDaemons } from "./completion-events";
 
-/** customTypes with a dedicated card (the TUI dispatch set). */
+/** customTypes with a dedicated card (the TUI dispatch set + local slash command output). */
 const CARD_TYPES: Record<string, true> = {
 	advisor: true,
 	"async-result": true,
+	command: true,
 	"launch-completion": true,
 	"lsp-late-diagnostic": true,
 	"skill-prompt": true,
@@ -53,6 +67,8 @@ export function CustomMessageCard({ message, inProcess = false }: { message: Age
 			return <AdvisorCard message={message} />;
 		case "async-result":
 			return <AsyncResultCard inProcess={inProcess} message={message} />;
+		case "command":
+			return <CommandOutputCard message={message} />;
 		case "launch-completion":
 			return <LaunchCompletionCard inProcess={inProcess} message={message} />;
 		case "lsp-late-diagnostic":
@@ -87,11 +103,16 @@ function num(value: unknown): number | undefined {
 const HEADER_CLASS = "mb-2 flex items-center gap-1.5 text-omp-xs font-semibold text-[var(--omp-custom-msg-label)]";
 const HEADER_META_CLASS = "font-medium normal-case tracking-normal text-[var(--omp-dim)]";
 
-/** Card frame matching ContextBubble: rounded custom-message background on the chat gutter. */
-function CardFrame({ children }: { children: ReactNode }) {
+/** Card frame matching ContextBubble: rounded custom-message surface on the chat gutter. */
+function CardFrame({ children, className }: { children: ReactNode; className?: string }) {
 	return (
 		<div className="omp-custom-turn ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-3">
-			<div className="omp-transcript-content rounded-[10px] border border-[var(--omp-border-muted)] bg-[var(--omp-custom-msg-bg)] px-3.5 py-3 shadow-[var(--omp-shadow-sm)]">
+			<div
+				className={cx(
+					"omp-transcript-content omp-surface-card rounded-xl border border-[var(--omp-border-muted)] bg-[var(--omp-custom-msg-bg)] px-4 py-3.5",
+					className,
+				)}
+			>
 				{children}
 			</div>
 		</div>
@@ -738,5 +759,332 @@ function HandoffCard({ message }: { message: AgentMessage }) {
 			</div>
 			<MarkdownRenderer content={doc || t("chat.custom.handoffEmpty")} />
 		</CardFrame>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// command — local builtin slash-command output (/mcp list, /mcp help, etc.)
+// ---------------------------------------------------------------------------
+
+const COMMAND_PREVIEW_LINES = 14;
+
+function ToneIcon({ tone }: { tone: CommandTone }) {
+	if (tone === "success") {
+		return <CheckCircle2 aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-[var(--omp-success)]" />;
+	}
+	if (tone === "error") {
+		return <XCircle aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-[var(--omp-error)]" />;
+	}
+	if (tone === "warning") {
+		return <AlertTriangle aria-hidden="true" size={14} className="mt-0.5 shrink-0 text-[var(--omp-warning)]" />;
+	}
+	return null;
+}
+
+function CommandOutputCard({ message }: { message: AgentMessage }) {
+	const t = useT();
+	const [copied, setCopied] = useState(false);
+	const [expanded, setExpanded] = useState(false);
+
+	const rawText = resultText(message.content);
+	const details = resultDetails(message);
+	const command = str(details?.command);
+	const parsed = useMemo(() => parseCommandOutput(rawText), [rawText]);
+	const isMcp = useMemo(() => isMcpCommandOutput(command, rawText, parsed), [command, rawText, parsed]);
+
+	const countLabel = useMemo(() => {
+		switch (parsed.kind) {
+			case "mcp-list":
+				return t("chat.custom.mcp.count", {
+					count: parsed.rows.length,
+					plural: parsed.rows.length === 1 ? "" : "s",
+				});
+			case "pipe-table":
+				return t("chat.custom.entriesCount", {
+					count: parsed.rows.length,
+					plural: parsed.rows.length === 1 ? "" : "s",
+				});
+			case "usage-help":
+				return t("chat.custom.entriesCount", {
+					count: parsed.rows.length,
+					plural: parsed.rows.length === 1 ? "" : "s",
+				});
+			case "kv":
+				return t("chat.custom.entriesCount", {
+					count: parsed.rows.length,
+					plural: parsed.rows.length === 1 ? "" : "s",
+				});
+			case "bullet-list":
+				return t("chat.custom.entriesCount", {
+					count: parsed.items.length,
+					plural: parsed.items.length === 1 ? "" : "s",
+				});
+			default:
+				return null;
+		}
+	}, [parsed, t]);
+
+	const handleCopy = () => {
+		void copyText(rawText).then(ok => {
+			if (!ok) return;
+			setCopied(true);
+			window.setTimeout(() => setCopied(false), 1400);
+		});
+	};
+
+	const renderBody = () => {
+		if (parsed.kind === "mcp-list") {
+			const hasTarget = parsed.rows.some(row => row.target);
+			const hasScope = parsed.rows.some(row => row.scope);
+			return (
+				<div className="omp-command-table-wrap overflow-x-auto">
+					<table className="omp-command-table w-full border-collapse text-left">
+						<thead>
+							<tr>
+								<th>{t("chat.custom.mcp.server")}</th>
+								<th>{t("chat.custom.mcp.transport")}</th>
+								<th>{t("chat.custom.mcp.status")}</th>
+								{hasTarget && <th>{t("chat.custom.mcp.target")}</th>}
+								{hasScope && <th className="text-right">{t("chat.custom.mcp.scope")}</th>}
+							</tr>
+						</thead>
+						<tbody>
+							{parsed.rows.map((row, index) => (
+								<tr key={`${row.name}-${index}`}>
+									<td className="font-mono text-omp-sm font-semibold whitespace-nowrap text-[var(--omp-text)]">
+										{row.name}
+									</td>
+									<td className="whitespace-nowrap">
+										<span className="omp-command-chip">{row.transport}</span>
+									</td>
+									<td className="whitespace-nowrap">
+										<Badge dot variant={statusBadgeVariant(row.status)}>
+											{row.status}
+										</Badge>
+									</td>
+									{hasTarget && (
+										<td className="max-w-[24rem]">
+											<span
+												title={row.target}
+												className="block truncate font-mono text-omp-xs text-[var(--omp-muted)]"
+											>
+												{row.target ?? "—"}
+											</span>
+										</td>
+									)}
+									{hasScope && (
+										<td className="text-right whitespace-nowrap">
+											{row.scope ? <Badge variant="muted">{row.scope}</Badge> : null}
+										</td>
+									)}
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			);
+		}
+
+		if (parsed.kind === "pipe-table") {
+			const hasScope = parsed.rows.some(row => row.scope);
+			return (
+				<div className="omp-command-table-wrap overflow-x-auto">
+					<table className="omp-command-table w-full border-collapse text-left">
+						<tbody>
+							{parsed.rows.map((row, rowIndex) => (
+								<tr key={rowIndex}>
+									{row.cells.map((cell, cellIndex) => {
+										const semantic = cellIndex > 0 ? classifyTableCell(cell) : null;
+										return (
+											<td
+												key={cellIndex}
+												className={cx(
+													cellIndex === 0
+														? "font-mono text-omp-sm font-semibold whitespace-nowrap text-[var(--omp-text)]"
+														: "text-omp-sm text-[var(--omp-muted)]",
+												)}
+											>
+												{semantic?.kind === "status" ? (
+													<Badge dot variant={semantic.variant}>
+														{cell}
+													</Badge>
+												) : semantic?.kind === "tag" ? (
+													<span className="omp-command-chip">{cell}</span>
+												) : (
+													<span
+														title={cell.length > 48 ? cell : undefined}
+														className="block max-w-[26rem] truncate font-mono text-omp-xs"
+													>
+														{cell}
+													</span>
+												)}
+											</td>
+										);
+									})}
+									{hasScope && (
+										<td className="text-right whitespace-nowrap">
+											{row.scope ? <Badge variant="muted">{row.scope}</Badge> : null}
+										</td>
+									)}
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			);
+		}
+
+		if (parsed.kind === "usage-help") {
+			return (
+				<div className="px-4 py-3">
+					{parsed.title && (
+						<p className="mb-2.5 text-omp-sm font-medium text-[var(--omp-text-secondary)]">{parsed.title}</p>
+					)}
+					<div className="omp-command-kv-list divide-y divide-[var(--omp-border-muted)]/60">
+						{parsed.rows.map((row, index) => (
+							<div key={index} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-1.5">
+								<code className="shrink-0 font-mono text-omp-xs font-medium text-[var(--omp-accent)]">
+									{row.command}
+								</code>
+								<span className="min-w-0 flex-1 text-omp-sm text-[var(--omp-muted)]">{row.description}</span>
+							</div>
+						))}
+					</div>
+				</div>
+			);
+		}
+
+		if (parsed.kind === "kv") {
+			return (
+				<div className="px-4 py-3">
+					{parsed.title && (
+						<p className="mb-2.5 text-omp-sm font-medium text-[var(--omp-text-secondary)]">{parsed.title}</p>
+					)}
+					<dl className="grid grid-cols-[minmax(6rem,auto)_minmax(0,1fr)] gap-x-4 gap-y-2">
+						{parsed.rows.map((row, index) => (
+							<div key={index} className="contents">
+								<dt className="text-omp-xs font-medium text-[var(--omp-dim)]">{row.key}</dt>
+								<dd className="min-w-0 break-words font-mono text-omp-sm text-[var(--omp-text)]">
+									{row.value}
+								</dd>
+							</div>
+						))}
+					</dl>
+				</div>
+			);
+		}
+
+		if (parsed.kind === "bullet-list") {
+			return (
+				<div className="px-4 py-3">
+					{parsed.title && (
+						<div className="mb-2.5 flex items-start gap-2 text-omp-sm font-medium text-[var(--omp-text)]">
+							<ToneIcon tone={parsed.tone} />
+							<span>{parsed.title}</span>
+						</div>
+					)}
+					<ul className="flex flex-wrap gap-1.5">
+						{parsed.items.map((item, index) => (
+							<li key={index} className="omp-command-chip">
+								{item}
+							</li>
+						))}
+					</ul>
+				</div>
+			);
+		}
+
+		if (parsed.singleLine) {
+			return (
+				<div className="flex items-start gap-2 px-4 py-3 text-omp-sm leading-[1.55] text-[var(--omp-text)]">
+					<ToneIcon tone={parsed.tone} />
+					<span className="min-w-0 flex-1 break-words font-mono text-omp-sm text-[var(--omp-text-secondary)]">
+						<OutputText text={parsed.text} />
+					</span>
+				</div>
+			);
+		}
+
+		const { head, omitted } = headLines(parsed.text, COMMAND_PREVIEW_LINES);
+		return (
+			<div className="px-4 py-3">
+				<pre
+					className={cx(
+						"font-mono text-omp-sm leading-[1.6] break-words whitespace-pre-wrap text-[var(--omp-tool-output)]",
+						expanded ? "max-h-96 overflow-auto" : "overflow-x-auto",
+					)}
+				>
+					<OutputText text={expanded ? parsed.text : head} />
+				</pre>
+				{omitted > 0 && (
+					<button
+						type="button"
+						onClick={() => setExpanded(value => !value)}
+						className="omp-pressable mt-2 text-omp-xs font-medium text-[var(--omp-accent)] hover:underline"
+					>
+						{expanded
+							? t("chat.custom.showLess")
+							: t("chat.custom.moreLines", { count: omitted, plural: omitted === 1 ? "" : "s" })}
+					</button>
+				)}
+			</div>
+		);
+	};
+
+	return (
+		<div className="omp-custom-turn ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-3">
+			<div className="omp-transcript-content omp-command-card overflow-hidden rounded-xl border border-[var(--omp-border-muted)] bg-[var(--omp-custom-msg-bg)]">
+				<div className="omp-command-card-header flex flex-wrap items-center gap-2 border-b border-[var(--omp-border-muted)] px-3.5 py-2">
+					<span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--omp-accent-dim)] text-[var(--omp-accent)]">
+						<Terminal aria-hidden="true" size={11} />
+					</span>
+					{command ? (
+						<code className="min-w-0 truncate font-mono text-omp-sm font-semibold text-[var(--omp-text)]">
+							{command}
+						</code>
+					) : (
+						<span className="text-omp-xs font-semibold text-[var(--omp-text-secondary)]">
+							{t("chat.custom.commandOutput")}
+						</span>
+					)}
+					{countLabel && (
+						<span className="rounded-full bg-[var(--omp-selected-bg)] px-2 py-px text-omp-xxs font-medium tabular-nums text-[var(--omp-muted)]">
+							{countLabel}
+						</span>
+					)}
+					<div className="ml-auto flex shrink-0 items-center gap-1">
+						{isMcp && (
+							<button
+								type="button"
+								onClick={() => useUiStore.getState().openExtensions("mcp")}
+								className="omp-pressable inline-flex h-6 items-center gap-1 rounded-md border border-[var(--omp-border-muted)] px-2 text-omp-xs font-medium text-[var(--omp-muted)] hover:border-[var(--omp-border)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+							>
+								<SlidersHorizontal aria-hidden="true" size={11} />
+								<span>{t("chat.custom.openMcp")}</span>
+							</button>
+						)}
+						<button
+							type="button"
+							onClick={handleCopy}
+							title={t("chat.custom.commandCopy")}
+							className="omp-pressable inline-flex h-6 items-center gap-1 rounded-md px-2 text-omp-xs font-medium text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+						>
+							{copied ? (
+								<>
+									<Check aria-hidden="true" size={11} className="text-[var(--omp-success)]" />
+									<span className="text-[var(--omp-success)]">{t("chat.custom.commandCopied")}</span>
+								</>
+							) : (
+								<>
+									<Copy aria-hidden="true" size={11} />
+									<span>{t("chat.custom.copyShort")}</span>
+								</>
+							)}
+						</button>
+					</div>
+				</div>
+				{renderBody()}
+			</div>
+		</div>
 	);
 }

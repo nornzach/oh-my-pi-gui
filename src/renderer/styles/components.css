@@ -233,17 +233,27 @@
 .markdown-body li::marker {
 	color: var(--omp-md-list-bullet);
 }
-.markdown-body blockquote {
-	margin: 0.85em 0;
-	padding: 0.1em 0 0.1em 1em;
-	border-left: 2px solid var(--omp-md-quote-border);
+.markdown-body blockquote,
+.markdown-body .omp-md-blockquote {
+	margin: 0.9em 0;
+	padding: 0.55em 0.95em;
+	border-left: 3px solid color-mix(in srgb, var(--omp-accent) 45%, var(--omp-md-quote-border));
+	border-radius: 0 8px 8px 0;
+	background: color-mix(in srgb, var(--omp-text) 2.5%, transparent);
 	color: var(--omp-md-quote);
+	font-style: normal;
+}
+.markdown-body blockquote > :first-child {
+	margin-top: 0;
+}
+.markdown-body blockquote > :last-child {
+	margin-bottom: 0;
 }
 .markdown-body hr {
 	margin: 1.5em 0;
 	border: none;
 	height: 1px;
-	background: var(--omp-md-hr);
+	background: linear-gradient(90deg, transparent, var(--omp-md-hr) 12%, var(--omp-md-hr) 88%, transparent);
 }
 /* Fenced code blocks render through the shared CodeBlock component (badge,
    copy, gutter), so no raw <pre> box styling lives here. This rule only guards
@@ -258,16 +268,23 @@
 .markdown-body code {
 	font-family: var(--font-mono);
 	font-size: 0.86em;
-	background: var(--omp-selected-bg);
-	border: 0;
+	background: color-mix(in srgb, var(--omp-text) 5.5%, transparent);
+	border: 1px solid color-mix(in srgb, var(--omp-border) 70%, transparent);
 	border-radius: 5px;
-	padding: 0.12em 0.36em;
+	padding: 0.1em 0.38em;
 	color: var(--omp-md-code);
+}
+.omp-markdown-table {
+	border: 1px solid var(--omp-border-muted);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--omp-text) 1.5%, transparent);
+	box-shadow: var(--omp-shadow-sm);
 }
 .markdown-body table {
 	border-collapse: collapse;
 	margin: 1em 0;
-	font-size: 0.93em;
+	font-size: 0.92em;
+	font-variant-numeric: tabular-nums;
 	width: auto;
 	max-width: 100%;
 	display: block;
@@ -277,8 +294,9 @@
 .markdown-body td {
 	border: 0;
 	border-bottom: 1px solid var(--omp-border-muted);
-	padding: 0.5em 1.25em 0.5em 0;
+	padding: 0.58em 0.95em;
 	text-align: left;
+	vertical-align: top;
 }
 /* A narrow column is as wide as its header and never narrower than a short
    word, so "Owner", a date or a two-word note stays on one line while the
@@ -286,15 +304,21 @@
    that no longer fits. */
 .markdown-body th {
 	white-space: nowrap;
+	background: color-mix(in srgb, var(--omp-text) 3.5%, transparent);
+	font-size: 0.88em;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	color: var(--omp-text-secondary);
+	border-bottom-color: var(--omp-border);
 }
 .markdown-body td {
 	min-width: 6.25em;
 }
-.markdown-body th {
-	background: transparent;
-	font-weight: 600;
-	color: var(--omp-text);
-	border-bottom-color: var(--omp-border);
+.markdown-body tbody tr {
+	transition: background-color var(--omp-motion-fast) var(--omp-ease);
+}
+.markdown-body tbody tr:hover {
+	background: color-mix(in srgb, var(--omp-selected-bg) 70%, transparent);
 }
 .markdown-body tr:last-child td {
 	border-bottom: 0;
@@ -677,11 +701,13 @@
 }
 
 .omp-transcript-editorial .omp-user-bubble {
-	border: 1px solid var(--omp-transcript-user-border);
-	border-radius: 16px;
+	border: 1px solid color-mix(in srgb, var(--omp-transcript-user-border) 82%, transparent);
+	border-radius: 18px 18px 6px 18px;
 	background: var(--omp-transcript-user-bg);
-	box-shadow: none !important;
-	padding: 9px 14px;
+	box-shadow:
+		0 1px 2px color-mix(in srgb, #000000 10%, transparent),
+		inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent) !important;
+	padding: 10px 16px;
 }
 
 .omp-transcript-editorial .omp-user-bubble-layout {
@@ -828,8 +854,8 @@
 }
 
 .omp-transcript-editorial .omp-tool-header {
-	min-height: 28px;
-	padding: 3px 8px 3px 0;
+	min-height: 30px;
+	padding: 4px 8px 4px 6px;
 	border-radius: 8px;
 	font-size: var(--text-omp-sm);
 }
@@ -838,11 +864,15 @@
 	background: var(--omp-selected-bg);
 }
 
+.omp-transcript-editorial .omp-tool-header[aria-expanded="true"] {
+	background: color-mix(in srgb, var(--omp-selected-bg) 55%, transparent);
+}
+
 .omp-transcript-editorial .omp-tool-name {
 	min-width: 40px;
 	font-size: var(--text-omp-sm);
 	font-weight: 600;
-	letter-spacing: 0;
+	letter-spacing: -0.005em;
 }
 
 .omp-transcript-editorial .omp-tool-summary {
@@ -862,10 +892,10 @@
 }
 
 .omp-transcript-editorial .omp-tool-duration {
-	min-width: 44px;
-	border-radius: 0;
-	background: transparent;
-	padding: 0;
+	min-width: 40px;
+	border-radius: 5px;
+	background: color-mix(in srgb, var(--omp-text) 4.5%, transparent);
+	padding: 1px 6px;
 	text-align: right;
 	font-size: calc(var(--gui-font-size, 15px) * 11 / 15);
 	color: var(--omp-dim);
@@ -1135,30 +1165,44 @@
 }
 
 .omp-transcript-editorial .omp-thinking-header {
-	min-height: 26px;
-	padding: 2px 0;
-	font-size: var(--text-omp-md);
+	min-height: 28px;
+	width: auto;
+	max-width: 100%;
+	border-radius: 8px;
+	padding: 3px 10px 3px 4px;
+	font-size: var(--text-omp-sm);
+	transition: background-color var(--omp-motion-fast) var(--omp-ease);
 }
 
 .omp-transcript-editorial .omp-thinking-header:hover {
-	background: transparent;
+	background: var(--omp-selected-bg);
 }
 
 .omp-transcript-editorial .omp-thinking-body {
-	max-height: min(12rem, 30vh);
-	margin-left: 0;
-	border-left: 0;
-	padding: 4px 0 6px 12px;
+	max-height: min(14rem, 32vh);
+	margin-left: 8px;
+	margin-top: 3px;
+	border-left: 2px solid color-mix(in srgb, var(--omp-border) 80%, transparent);
+	padding: 3px 0 6px 12px;
 	font-size: calc(var(--gui-font-size, 15px) * 13 / 15);
-	line-height: 1.55;
+	line-height: 1.58;
 }
 
 .omp-transcript-editorial .omp-thinking-brain,
 .omp-transcript-editorial .omp-thinking-level,
 .omp-transcript-editorial .omp-thinking-gauge,
-.omp-transcript-editorial .omp-thinking-count,
-.omp-transcript-editorial .omp-thinking-duration {
+.omp-transcript-editorial .omp-thinking-count {
 	display: none;
+}
+
+.omp-transcript-editorial .omp-thinking-duration {
+	display: inline;
+	margin-left: 6px;
+	border-radius: 5px;
+	background: color-mix(in srgb, var(--omp-text) 4.5%, transparent);
+	padding: 1px 6px;
+	font-size: calc(var(--gui-font-size, 15px) * 11 / 15);
+	color: var(--omp-dim);
 }
 
 .omp-transcript-editorial .omp-thinking-state,
@@ -1218,6 +1262,13 @@
 	margin: 0.42em 0;
 }
 
+.omp-transcript-editorial .omp-thinking-body .markdown-body .omp-markdown-table {
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
 .omp-transcript-editorial .omp-thinking-body .markdown-body :is(table, thead, tbody, tr, th, td) {
 	border: 0;
 	background: transparent;
@@ -1258,9 +1309,16 @@
 	width: 100%;
 }
 
-.omp-transcript-editorial .markdown-body .omp-code-block-header {
+.omp-code-block {
+	box-shadow:
+		var(--omp-shadow-sm),
+		inset 0 1px 0 color-mix(in srgb, #ffffff 4%, transparent);
+}
+
+.omp-transcript-editorial .markdown-body .omp-code-block-header,
+.omp-code-block-header {
 	border-bottom: 1px solid var(--omp-border-muted);
-	background: color-mix(in srgb, var(--omp-code-bg) 80%, var(--omp-bg-elevated));
+	background: color-mix(in srgb, var(--omp-text) 2.5%, var(--omp-code-bg));
 }
 
 .omp-transcript-editorial .markdown-body pre code {
@@ -1848,10 +1906,10 @@
 }
 
 .omp-transcript-editorial .omp-execution-group-body {
-	margin-top: 2px;
+	margin-top: 4px;
 	padding-left: 14px;
-	border-left: 1px solid var(--omp-border-muted);
-	margin-left: 2px;
+	border-left: 2px solid color-mix(in srgb, var(--omp-border) 80%, transparent);
+	margin-left: 8px;
 }
 
 /* ── Workspace drawer ─────────────────────────────────────────────────────
@@ -2090,13 +2148,24 @@
 
 /* A finished or running step group reads as a quiet chip, not loose text. */
 .omp-transcript-editorial .omp-execution-group-header {
-	padding: 3px 10px 3px 8px;
+	padding: 4px 11px 4px 9px;
 	border: 1px solid var(--omp-border-muted);
 	border-radius: 9999px;
+	background: color-mix(in srgb, var(--omp-text) 2.5%, transparent);
 	transition:
 		background-color var(--omp-motion-fast) var(--omp-ease),
 		border-color var(--omp-motion-fast) var(--omp-ease),
 		color var(--omp-motion-fast) var(--omp-ease);
+}
+
+.omp-transcript-editorial .omp-execution-group[data-state="running"] > .omp-execution-group-header {
+	border-color: color-mix(in srgb, var(--omp-accent) 32%, var(--omp-border-muted));
+	background: color-mix(in srgb, var(--omp-accent) 6%, transparent);
+}
+
+.omp-transcript-editorial .omp-execution-group[data-state="failed"] > .omp-execution-group-header {
+	border-color: color-mix(in srgb, var(--omp-error) 32%, var(--omp-border-muted));
+	background: color-mix(in srgb, var(--omp-error) 6%, transparent);
 }
 
 .omp-transcript-editorial .omp-execution-group-header:hover {
@@ -2107,14 +2176,18 @@
 /* The composer is the one raised surface: it lifts off the canvas, and focus
    brings the accent in as a soft ring. */
 .omp-composer-box {
-	box-shadow: var(--omp-shadow-md);
+	border-color: color-mix(in srgb, var(--omp-input-border) 92%, var(--omp-text) 4%);
+	box-shadow:
+		var(--omp-shadow-md),
+		inset 0 1px 0 color-mix(in srgb, #ffffff 6%, transparent);
 }
 
 .omp-composer-box:focus-within {
-	border-color: color-mix(in srgb, var(--omp-accent) 50%, var(--omp-input-border));
+	border-color: color-mix(in srgb, var(--omp-accent) 55%, var(--omp-input-border));
 	box-shadow:
 		0 0 0 3px color-mix(in srgb, var(--omp-accent) 14%, transparent),
-		var(--omp-shadow-md);
+		var(--omp-shadow-md),
+		inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent);
 }
 
 /* Send is the primary action. The label color is the canvas color so it holds
@@ -2329,8 +2402,103 @@
 .omp-inline-code {
 	font-family: var(--font-mono);
 	font-size: 0.86em;
-	background: var(--omp-selected-bg);
+	background: color-mix(in srgb, var(--omp-text) 5.5%, transparent);
+	border: 1px solid color-mix(in srgb, var(--omp-border) 70%, transparent);
 	border-radius: 5px;
-	padding: 0.08em 0.34em;
+	padding: 0.08em 0.36em;
 	color: var(--omp-md-code);
+}
+
+/* ---------------------------------------------------------------------------
+   Elevated transcript cards, CommandOutputCard, and starter polish
+   ------------------------------------------------------------------------- */
+.omp-surface-card,
+.omp-command-card {
+	box-shadow:
+		var(--omp-shadow-sm),
+		inset 0 1px 0 color-mix(in srgb, #ffffff 5%, transparent);
+}
+
+.omp-card-header-tint,
+.omp-command-card-header {
+	background: color-mix(in srgb, var(--omp-text) 2.5%, transparent);
+}
+
+.omp-command-table {
+	font-variant-numeric: tabular-nums;
+}
+
+.omp-command-table thead th {
+	padding: 8px 14px;
+	border-bottom: 1px solid var(--omp-border-muted);
+	background: color-mix(in srgb, var(--omp-text) 2%, transparent);
+	font-size: var(--text-omp-xxs);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--omp-dim);
+	white-space: nowrap;
+}
+
+.omp-command-table tbody td {
+	padding: 9px 14px;
+	border-bottom: 1px solid color-mix(in srgb, var(--omp-border-muted) 75%, transparent);
+	vertical-align: middle;
+}
+
+.omp-command-table tbody tr {
+	transition: background-color var(--omp-motion-fast) var(--omp-ease);
+}
+
+.omp-command-table tbody tr:hover {
+	background: color-mix(in srgb, var(--omp-selected-bg) 75%, transparent);
+}
+
+.omp-command-table tbody tr:last-child td {
+	border-bottom: 0;
+}
+
+.omp-command-chip {
+	display: inline-flex;
+	align-items: center;
+	border: 1px solid var(--omp-border-muted);
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--omp-text) 4%, transparent);
+	padding: 1px 7px;
+	font-family: var(--font-mono);
+	font-size: var(--text-omp-xxs);
+	font-weight: 500;
+	line-height: 1.5;
+	color: var(--omp-text-secondary);
+}
+
+/* Starter cards on the empty canvas: crisp subtle glass-like sheen and gentle hover highlight. */
+.omp-starter-card {
+	background: color-mix(in srgb, var(--omp-text) 1.5%, transparent);
+	box-shadow:
+		var(--omp-shadow-sm),
+		inset 0 1px 0 color-mix(in srgb, #ffffff 5%, transparent);
+	transition:
+		border-color var(--omp-motion-fast) var(--omp-ease),
+		background-color var(--omp-motion-fast) var(--omp-ease),
+		box-shadow var(--omp-motion-fast) var(--omp-ease);
+}
+
+.omp-starter-card:hover {
+	border-color: color-mix(in srgb, var(--omp-accent) 42%, var(--omp-border));
+	background: color-mix(in srgb, var(--omp-accent) 4%, transparent);
+	box-shadow: var(--omp-shadow-md);
+}
+
+.omp-starter-card:hover .omp-starter-icon {
+	background: var(--omp-accent-dim);
+}
+
+/* Titlebar and sidebar crisp hairline polish. */
+.omp-titlebar {
+	border-bottom: 1px solid color-mix(in srgb, var(--omp-border-muted) 70%, transparent);
+}
+
+.omp-sidebar-session-row[data-active="true"] {
+	box-shadow: inset 2px 0 0 var(--omp-accent);
 }

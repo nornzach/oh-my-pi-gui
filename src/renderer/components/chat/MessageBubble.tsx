@@ -212,9 +212,11 @@ function ExecutionBubble({ message }: { message: AgentMessage }) {
 
 	return (
 		<div className="omp-execution-turn px-6 py-4">
-			<div className="omp-transcript-content overflow-hidden rounded-[10px] border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] shadow-[var(--omp-shadow-sm)]">
-				<div className="flex items-center gap-2 border-b border-[var(--omp-border-muted)] px-3.5 py-2">
-					<Terminal className="text-[var(--omp-status-path)]" size={13} />
+			<div className="omp-transcript-content omp-surface-card overflow-hidden rounded-xl border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)]">
+				<div className="omp-card-header-tint flex items-center gap-2 border-b border-[var(--omp-border-muted)] px-3.5 py-2">
+					<span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--omp-selected-bg)] text-[var(--omp-status-path)]">
+						<Terminal size={11} />
+					</span>
 					<span className="text-omp-sm font-semibold text-[var(--omp-text)]">
 						{python ? t("chat.exec.python") : t("chat.exec.shell")}
 					</span>
@@ -299,7 +301,7 @@ function ContextBubble({ message }: { message: AgentMessage }) {
 
 	return (
 		<div className="omp-context-turn px-6 py-3">
-			<div className="omp-transcript-content rounded-[10px] border border-[var(--omp-border-muted)] px-3.5 py-3">
+			<div className="omp-transcript-content omp-surface-card rounded-xl border border-[var(--omp-border-muted)] bg-[var(--omp-custom-msg-bg)] px-4 py-3.5">
 				<div className="mb-2 flex items-center gap-1.5 text-omp-xs font-semibold text-[var(--omp-status-context)]">
 					{isFiles ? <FileText size={12} /> : <Archive size={12} />}
 					{label}

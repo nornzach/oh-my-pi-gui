@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { AgentMessage, AvailableCommand } from "../../../shared/rpc-types";
-import { hydrateTabSession } from "../../hooks/use-rpc-events";
+import { hydrateTabSession, recordPendingSlashCommand } from "../../hooks/use-rpc-events";
 import {
 	type ComposerSendMode,
 	isGuiOnlyBuiltinCommand,
@@ -467,6 +467,9 @@ export function useComposerSubmit({
 					if (optimisticMessage) originMessages.getState().removeLiveMessage(optimisticMessage);
 					restoreDraft(message, previousImages, files);
 					return;
+				}
+				if (expandedMessage.startsWith("/")) {
+					recordPendingSlashCommand(originTabId, expandedMessage);
 				}
 				void submit
 					.request()

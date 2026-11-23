@@ -89,6 +89,30 @@ type NotifyKind = keyof typeof NOTIFY_DEFAULTS;
 const retryPendingTabs = new Set<string>();
 
 /**
+ * Most recently submitted slash command per tab, used to label incoming
+ * `command_output` frames (which only carry plain `text`) in CommandOutputCard.
+ * Expires quickly so unrelated later output is never mislabelled.
+ */
+const PENDING_SLASH_TTL_MS = 20_000;
+const pendingSlashCommands = new Map<string, { command: string; at: number }>();
+
+export function recordPendingSlashCommand(tabId: string, command: string): void {
+	const trimmed = command.split("\n")[0]?.trim() ?? "";
+	if (!trimmed.startsWith("/")) return;
+	pendingSlashCommands.set(tabId, { command: trimmed, at: Date.now() });
+}
+
+function recentPendingSlashCommand(tabId: string): string | undefined {
+	const entry = pendingSlashCommands.get(tabId);
+	if (!entry) return undefined;
+	if (Date.now() - entry.at > PENDING_SLASH_TTL_MS) {
+		pendingSlashCommands.delete(tabId);
+		return undefined;
+	}
+	return entry.command;
+}
+
+/**
  * Late frames for a tab the user already closed must be dropped: its runtime
  * is gone, and withSessionRuntime would otherwise fall back to the FOCUSED
  * runtime — polluting a live session's transcript, or (a closed tab's
@@ -869,12 +893,14 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 		// output as local custom messages instead of silently dropping the frame.
 		const handleCommandOutput = (frame: CommandOutputFrame, tabId: string) => {
 			if (!frame.text || closedTabFrame(tabId)) return;
+			const command = recentPendingSlashCommand(tabId);
 			withSessionRuntime(tabId, () => {
 				const store = useMessagesStore.getState();
 				store.appendMessage({
 					role: "custom",
 					customType: "command",
 					content: [{ type: "text", text: frame.text }],
+					...(command ? { details: { command } } : {}),
 					timestamp: Date.now(),
 					localOnly: true,
 					localAfterEntryId: store.messages.findLast(message => message.entryId)?.entryId ?? null,
