@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import { sanitizeToolText } from "../../lib/format";
 import { decodeXdevPayload, xdevDispatch, xdevInnerResult, xdevWriteTarget } from "../../lib/xdev";
-import { AskRenderer } from "./AskRenderer";
+import { AskRenderer, askResultSummary } from "./AskRenderer";
 import { AstEditRenderer } from "./AstEditRenderer";
 import { AstGrepRenderer } from "./AstGrepRenderer";
 import { askFormSummary } from "./ask-form";
@@ -206,7 +206,7 @@ function firstItemContent(args: Record<string, unknown>): string {
  * header and the body describe the same call; a `switch` in the transcript
  * layer is what let `find`, `checkpoint` and every device call show nothing.
  */
-const SUMMARIES: Record<string, (args: Record<string, unknown>) => string> = {
+const SUMMARIES: Record<string, (args: Record<string, unknown>, result?: unknown) => string> = {
 	read: args => argLine(args, ["path", "file"]),
 	write: args => {
 		const device = xdevWriteTarget(args);
@@ -228,7 +228,12 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>) => string> = {
 	github: args => argLine(args, ["action", "repo", "url"]),
 	hub: args => argLine(args, ["op", "agent"]),
 	wait: () => "background activity",
-	ask: args => argLine(args, ["question", "i"]) || sanitizeToolText(askFormSummary(args.html)),
+	ask: (args, result) => {
+		const question = argLine(args, ["question", "i"]) || sanitizeToolText(askFormSummary(args.html));
+		const answer = result !== undefined ? askResultSummary(result) : "";
+		if (question && answer) return `${question} → ${answer}`;
+		return answer || question;
+	},
 	goal: args => argLine(args, ["objective", "op"]),
 	checkpoint: args => argLine(args, ["goal"]),
 	rewind: args => argLine(args, ["report"]),
@@ -252,7 +257,7 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>) => string> = {
 const FALLBACK_ARG_KEYS = ["path", "file", "name", "pattern", "query", "command", "action", "i", "text"] as const;
 
 /** Header text for any tool call; unknown tools fall back to their first scalar argument. */
-export function getToolSummary(name: string, args: Record<string, unknown>): string {
+export function getToolSummary(name: string, args: Record<string, unknown>, result?: unknown): string {
 	const summary = SUMMARIES[name];
-	return clipCardText(summary ? summary(args) : argLine(args, FALLBACK_ARG_KEYS));
+	return clipCardText(summary ? summary(args, result) : argLine(args, FALLBACK_ARG_KEYS));
 }

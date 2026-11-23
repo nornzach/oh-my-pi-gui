@@ -198,6 +198,8 @@ interface UiStore {
 	notificationsWhenFocused: boolean;
 	/** Expand reasoning (thinking) blocks by default (Settings → GUI, default off). */
 	thinkingExpanded: boolean;
+	/** Expand reasoning and tool steps while a reply streams, then auto-collapse on completion (#77). */
+	autoCollapseProcess: boolean;
 	/** Provider quotas above the sidebar footer (Settings → GUI, default off). */
 	sidebarQuotas: boolean;
 	/** Ask before `/delete` (`/drop`) deletes the current session; off deletes at once (#57). */
@@ -343,6 +345,7 @@ interface UiStore {
 	setNotifications: (enabled: boolean) => void;
 	setNotificationsWhenFocused: (enabled: boolean) => void;
 	setThinkingExpanded: (enabled: boolean) => void;
+	setAutoCollapseProcess: (enabled: boolean) => void;
 	setSidebarQuotas: (enabled: boolean) => void;
 	setTranscriptDetail: (detail: TranscriptDetail) => void;
 	setTabWidth: (width: TabWidth) => void;
@@ -398,6 +401,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	notifications: true,
 	notificationsWhenFocused: false,
 	thinkingExpanded: false,
+	autoCollapseProcess: false,
 	sidebarQuotas: false,
 	confirmSessionDelete: true,
 	transcriptDetail: "compact",
@@ -683,6 +687,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	setNotifications: enabled => set({ notifications: enabled }),
 	setNotificationsWhenFocused: enabled => set({ notificationsWhenFocused: enabled }),
 	setThinkingExpanded: enabled => set({ thinkingExpanded: enabled }),
+	setAutoCollapseProcess: enabled => set({ autoCollapseProcess: enabled }),
 	setSidebarQuotas: enabled => set({ sidebarQuotas: enabled }),
 	setTranscriptDetail: detail => set({ transcriptDetail: detail }),
 	setTabWidth: width => set({ tabWidth: width }),

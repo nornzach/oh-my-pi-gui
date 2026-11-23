@@ -309,6 +309,7 @@ export function SettingsWindow() {
 	const notifications = useUiStore(state => state.notifications);
 	const notificationsWhenFocused = useUiStore(state => state.notificationsWhenFocused);
 	const thinkingExpanded = useUiStore(state => state.thinkingExpanded);
+	const autoCollapseProcess = useUiStore(state => state.autoCollapseProcess);
 	const sidebarQuotas = useUiStore(state => state.sidebarQuotas);
 	const confirmSessionDelete = useUiStore(state => state.confirmSessionDelete);
 	const transcriptDetail = useUiStore(state => state.transcriptDetail);
@@ -579,6 +580,9 @@ export function SettingsWindow() {
 	};
 	const applyThinkingExpanded = (next: boolean) => {
 		return saveGuiPreference("thinkingExpanded", next, () => useUiStore.getState().setThinkingExpanded(next));
+	};
+	const applyAutoCollapseProcess = (next: boolean) => {
+		return saveGuiPreference("autoCollapseProcess", next, () => useUiStore.getState().setAutoCollapseProcess(next));
 	};
 	const applySidebarQuotas = (next: boolean) => {
 		return saveGuiPreference("sidebarQuotas", next, () => useUiStore.getState().setSidebarQuotas(next));
@@ -1502,6 +1506,15 @@ export function SettingsWindow() {
 														label={t("settings.gui.thinkingExpanded")}
 														onChange={applyThinkingExpanded}
 													/>
+													<div id="setting-gui-autoCollapseProcess">
+														<Toggle
+															className="omp-settings-row"
+															checked={autoCollapseProcess}
+															description={t("settings.gui.autoCollapseProcessDesc")}
+															label={t("settings.gui.autoCollapseProcess")}
+															onChange={applyAutoCollapseProcess}
+														/>
+													</div>
 												</Section>
 												<Section
 													id="setting-gui-transcriptDetail"

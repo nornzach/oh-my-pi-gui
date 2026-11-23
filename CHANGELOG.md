@@ -2,9 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add Settings → GUI → "Auto-collapse reasoning and tools after reply" to keep reasoning and tool steps expanded while generating and fold them automatically once the reply finishes ([#77](https://github.com/nornzach/oh-my-pi-gui/issues/77)).
+
 ### Fixed
 
 - Keep inline ask forms on the transcript surface and let the Token Meter's live rate follow the GUI font size.
+- Keep follow-up and background-session `ask` prompts inline when inline ask is enabled instead of popping a modal, and keep answered `ask` selections and custom answers visible in the conversation transcript ([#78](https://github.com/nornzach/oh-my-pi-gui/issues/78)).
 
 ## [1.0.3] - 2026-11-23
 

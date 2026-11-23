@@ -724,7 +724,55 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		]);
 	});
 
-	it("still pops a modal for a form parked in a background tab", async () => {
+	it("keeps a follow-up ask inline after answering the first ask (#78)", async () => {
+		await mount();
+		await mountInlineCard();
+		await act(async () => useUiStore.setState({ askInline: true }));
+		await push(formRequest("ask-1", "step1", "First question"));
+
+		expect(document.querySelector("[data-inline-ask]")).not.toBeNull();
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
+		const firstInput = apiKeyInput();
+		if (!firstInput) throw new Error("missing first inline input");
+		await typeInto(firstInput, "one");
+		await submit(document.querySelector("[data-inline-ask] form") as unknown as TestElement);
+
+		// A derived second ask arrives right after the first completes: must stay inline, never pop a modal.
+		await push(formRequest("ask-2", "step2", "Follow-up question"));
+		expect(document.querySelector("[data-inline-ask]")).not.toBeNull();
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
+		expect(document.body.textContent).toContain("Follow-up question");
+
+		const secondInput = apiKeyInput();
+		if (!secondInput) throw new Error("missing second inline input");
+		await typeInto(secondInput, "two");
+		await submit(document.querySelector("[data-inline-ask] form") as unknown as TestElement);
+
+		expect(respondExtensionUi.mock.calls).toEqual([
+			[{ type: "extension_ui_response", id: "ask-1", formData: { step1: "one" } }],
+			[{ type: "extension_ui_response", id: "ask-2", formData: { step2: "two" } }],
+		]);
+	});
+
+	it("keeps ask and askDialog requests inline when askInline is enabled (#78)", async () => {
+		await mount();
+		await mountInlineCard();
+		await act(async () => useUiStore.setState({ askInline: true }));
+		await push({
+			type: "extension_ui_request",
+			id: "ask-q1",
+			method: "ask",
+			questions: [
+				{ id: "env", question: "Target environment?", options: [{ label: "Staging" }, { label: "Prod" }] },
+			],
+		});
+
+		expect(document.querySelector("[data-inline-ask]")).not.toBeNull();
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
+		expect(document.body.textContent).toContain("Target environment?");
+	});
+
+	it("keeps a background tab's ask parked inline without popping a modal over another session (#78)", async () => {
 		createTabRuntime("tab-fg");
 		createTabRuntime("tab-bg");
 		setFocusedSessionRuntime("tab-fg");
@@ -736,14 +784,26 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		});
 		await flush();
 
-		expect(document.querySelector(".omp-dialog-overlay")).not.toBeNull();
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
 		expect(document.querySelector("[data-inline-ask]")).toBeNull();
+		// A non-ask blocking request in the background tab still surfaces as a modal without being blocked by the inline ask.
+		await act(async () => {
+			sessionRuntimeStore<ExtensionUiStore>("tab-bg", "extensionUi")?.getState().pushRequest({
+				type: "extension_ui_request",
+				id: "confirm-bg",
+				method: "confirm",
+				title: "Delete file?",
+				message: "Confirm delete",
+			});
+		});
+		await flush();
+		expect(document.querySelector(".omp-dialog-overlay")).not.toBeNull();
 	});
 
 	it.each([
 		["an agent page", () => useAgentPagesStore.getState().open("tab-fg", "agent-1")],
 		["a workspace page", () => useUiStore.getState().openTasksPage()],
-	])("shows a modal when %s hides the main conversation", async (_name, openPage) => {
+	])("does not pop a modal while %s is open when askInline is enabled (#78)", async (_name, openPage) => {
 		await mount();
 		await mountInlineCard();
 		await act(async () => {
@@ -753,15 +813,7 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		});
 		await push(formRequest("hidden-conversation"));
 
-		const modalForm = document.querySelector(".omp-dialog-overlay form");
-		expect(modalForm).not.toBeNull();
-		expect(document.querySelector("[data-inline-ask]")).toBeNull();
-		await submit(modalForm as unknown as TestElement);
-		expect(respondExtensionUi).toHaveBeenCalledWith({
-			type: "extension_ui_response",
-			id: "hidden-conversation",
-			formData: { api_key: "" },
-		});
+		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
 	});
 
 	it("keeps typed answers when the surface switches between modal and inline", async () => {

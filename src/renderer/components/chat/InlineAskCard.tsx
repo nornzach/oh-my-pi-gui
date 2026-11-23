@@ -2,7 +2,14 @@ import { MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useT } from "../../lib/i18n";
 import { onEscape } from "../../lib/keymap";
-import { answerExtensionRequest, TimeoutFooter, useCountdown, useInlineAskRequest } from "../dialogs/ExtensionDialog";
+import {
+	AskQuestionsBody,
+	answerAskQuestionsRequest,
+	answerExtensionRequest,
+	TimeoutFooter,
+	useCountdown,
+	useInlineAskRequest,
+} from "../dialogs/ExtensionDialog";
 import { AskFormBody } from "../dialogs/FormDialog";
 import { useReadOnlyTranscript } from "./transcript-mode";
 
@@ -24,6 +31,16 @@ export function InlineAskCard() {
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
 	}, [requestId]);
+	useEffect(() => {
+		if (!requestId) return;
+		cardRef.current?.scrollIntoView?.({ block: "nearest" });
+	}, [requestId]);
+	// Inline requests bypass ExtensionDialog's global modal, so their deadline is
+	// enforced here too.
+	useEffect(() => {
+		if (!requestId || remaining === null || remaining > 0) return;
+		answerExtensionRequest(requestId, { cancelled: true, timedOut: true });
+	}, [requestId, remaining]);
 	if (readOnly !== null || !request) return null;
 	return (
 		<section
@@ -39,14 +56,24 @@ export function InlineAskCard() {
 				<span className="text-omp-md font-semibold text-(--omp-text)">{t("extDialog.ask.title")}</span>
 			</div>
 			<div className="p-3">
-				<AskFormBody
-					draftKey={request.id}
-					footer={<TimeoutFooter remaining={remaining} />}
-					key={request.id}
-					onCancel={() => answerExtensionRequest(request.id, { cancelled: true })}
-					onSubmit={formData => answerExtensionRequest(request.id, { formData })}
-					sections={request.sections}
-				/>
+				{request.method === "form" ? (
+					<AskFormBody
+						draftKey={request.id}
+						footer={<TimeoutFooter remaining={remaining} />}
+						key={request.id}
+						onCancel={() => answerExtensionRequest(request.id, { cancelled: true })}
+						onSubmit={formData => answerExtensionRequest(request.id, { formData })}
+						sections={request.sections}
+					/>
+				) : (
+					<AskQuestionsBody
+						key={request.id}
+						onCancel={() => answerExtensionRequest(request.id, { cancelled: true })}
+						onSubmit={result => answerAskQuestionsRequest(request, result)}
+						remaining={remaining}
+						request={request}
+					/>
+				)}
 			</div>
 		</section>
 	);

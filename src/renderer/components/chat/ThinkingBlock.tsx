@@ -72,10 +72,12 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 	const hideThinkingBlock = useDisplayPreference("hideThinkingBlock");
 	const proseOnly = useDisplayPreference("proseOnlyThinking");
 	const thinkingExpanded = useUiStore(s => s.thinkingExpanded);
-	const [open, setOpen] = useState(thinkingExpanded);
+	const autoCollapseProcess = useUiStore(s => s.autoCollapseProcess);
+	const defaultOpen = live ? thinkingExpanded || autoCollapseProcess : thinkingExpanded && !autoCollapseProcess;
+	const [open, setOpen] = useState(defaultOpen);
 	// The Settings → GUI toggle applies to already-mounted blocks too; a manual
-	// chevron click then overrides until the pref changes again.
-	useEffect(() => setOpen(thinkingExpanded), [thinkingExpanded]);
+	// chevron click then overrides until the pref or live state changes again.
+	useEffect(() => setOpen(defaultOpen), [defaultOpen]);
 
 	const content = live ? streamingThinking : (text ?? "");
 	const isLive = live && content.length > 0;

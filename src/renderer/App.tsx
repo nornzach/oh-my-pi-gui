@@ -247,6 +247,7 @@ export function App() {
 				"notifications",
 				"notificationsWhenFocused",
 				"thinkingExpanded",
+				"autoCollapseProcess",
 				"sidebarQuotas",
 				"confirmSessionDelete",
 				"transcriptDetail",
@@ -294,6 +295,9 @@ export function App() {
 				}
 				if (typeof prefs.thinkingExpanded === "boolean" && !changedPreferences.has("thinkingExpanded")) {
 					useUiStore.setState({ thinkingExpanded: prefs.thinkingExpanded });
+				}
+				if (typeof prefs.autoCollapseProcess === "boolean" && !changedPreferences.has("autoCollapseProcess")) {
+					useUiStore.setState({ autoCollapseProcess: prefs.autoCollapseProcess });
 				}
 				if (typeof prefs.confirmSessionDelete === "boolean" && !changedPreferences.has("confirmSessionDelete")) {
 					useUiStore.setState({ confirmSessionDelete: prefs.confirmSessionDelete });

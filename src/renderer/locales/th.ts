@@ -1957,8 +1957,7 @@ export const th: Record<string, string> = {
 	"settings.gui.collapseLargePastesDesc":
 		"ย่อข้อความที่วางเกิน 10 บรรทัดหรือ 1,000 อักขระเป็นมาร์กเกอร์ [Paste #N] ปิดเพื่อวางข้อความเต็มตามเดิม",
 	"settings.gui.askInline": "แสดงฟอร์ม ask ในแชต",
-	"settings.gui.askInlineDesc":
-		"แสดงฟอร์มคำถามของเอเจนต์ท้ายบทสนทนาแทนโมดัล เพื่อให้เห็นบริบทโดยรอบขณะตอบ ฟอร์มของแท็บพื้นหลังยังเปิดเป็นไดอะล็อก",
+	"settings.gui.askInlineDesc": "แสดงฟอร์มคำถามของเอเจนต์ท้ายบทสนทนาของแท็บนั้นแทนโมดัล รวมถึงคำถามต่อเนื่องและแท็บที่อยู่เบื้องหลัง",
 	"settings.gui.linkOpenMode": "คลิกซ้ายที่ลิงก์เพื่อเปิดใน",
 	"settings.gui.linkOpenMode.panel": "แผงเบราว์เซอร์",
 	"settings.gui.linkOpenMode.panelDesc": "เปิดลิงก์เว็บในแผงข้างแชต (⌘/Ctrl+คลิก เพื่อเปิดในเบราว์เซอร์เริ่มต้น)",
@@ -1995,6 +1994,9 @@ export const th: Record<string, string> = {
 		"แจ้งเตือนด้วยแม้คุณกำลังดูหน้าต่าง omp อยู่ ถ้าปิด หน้าต่างที่กำลังโฟกัสจะเงียบ และ transcript ก็แสดงผลลัพธ์อยู่แล้ว",
 	"settings.gui.thinkingExpanded": "ขยาย reasoning ไว้เป็นค่าเริ่มต้น",
 	"settings.gui.thinkingExpandedDesc": "แสดงลำดับ reasoning ของโมเดลทันทีโดยไม่ต้องคลิกทีละบล็อก และยังยุบแต่ละบล็อกแยกได้เหมือนเดิม",
+	"settings.gui.autoCollapseProcess": "ยุบขั้นตอน reasoning และเครื่องมืออัตโนมัติหลังตอบเสร็จ",
+	"settings.gui.autoCollapseProcessDesc":
+		"ขยายขั้นตอน reasoning และการเรียกใช้เครื่องมือระหว่างที่เอเจนต์กำลังสร้างคำตอบ แล้วพับเก็บโดยอัตโนมัติเมื่อตอบเสร็จ",
 	"settings.gui.confirmSessionDelete": "ยืนยันก่อนลบเซสชัน",
 	"settings.gui.confirmSessionDeleteDesc":
 		"ถามก่อนที่ /delete (/drop) จะลบเซสชันปัจจุบัน หากปิดไว้ เซสชันจะถูกลบทันทีและไม่สามารถย้อนกลับได้",

@@ -1950,7 +1950,7 @@ export const zh: Record<string, string> = {
 		"粘贴超过 10 行或 1000 字符时折叠为 [Paste #N] 标记；关闭后直接在输入框中原样展开",
 	"settings.gui.askInline": "ask 表单内联显示在对话中",
 	"settings.gui.askInlineDesc":
-		"把 agent 的提问表单渲染在会话末尾而非弹窗，回答时仍能看到上下文；后台页签的表单仍以弹窗提示",
+		"把 agent 的提问表单内联显示在对应会话末尾而不再弹窗，连续追问与后台会话同样保持内联等待",
 	"settings.gui.linkOpenMode": "链接左键打开方式",
 	"settings.gui.linkOpenMode.panel": "右侧浏览器面板",
 	"settings.gui.linkOpenMode.panelDesc": "左键在应用内浏览器面板打开（⌘/Ctrl+点击改用系统默认浏览器）",
@@ -1987,6 +1987,8 @@ export const zh: Record<string, string> = {
 		"正在查看 omp 窗口时也发出通知。关闭时，聚焦中的窗口保持安静，因为对话里已经显示结果。",
 	"settings.gui.thinkingExpanded": "默认展开推理内容",
 	"settings.gui.thinkingExpandedDesc": "无需逐条点击即可查看模型的推理过程，仍可单独折叠某一条。",
+	"settings.gui.autoCollapseProcess": "生成回复后自动折叠推理与过程",
+	"settings.gui.autoCollapseProcessDesc": "生成回复期间自动展开推理过程与工具调用，回复结束后自动折叠以保持会话整洁。",
 	"settings.gui.confirmSessionDelete": "删除会话前确认",
 	"settings.gui.confirmSessionDeleteDesc":
 		"执行 /delete（/drop）删除当前会话前先弹出确认。关闭后会立即删除，无法撤销。",

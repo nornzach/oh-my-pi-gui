@@ -42,11 +42,13 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 	const t = useT();
 	const entry = useToolsStore(s => s.activeTools.get(toolCallId));
 	const expandAll = useUiStore(s => s.toolsExpandAll);
-	const [expanded, setExpanded] = useState(expandAll.expanded);
+	// `ask` cards carry the user's own selections and custom answers; keep them
+	// expanded in the transcript so the Q&A record stays immediately visible (#78).
+	const [expanded, setExpanded] = useState(() => toolName === "ask" || expandAll.expanded);
 
 	// ⌃O expand/collapse-all: every card snaps to the latest shared target.
 	useEffect(() => {
-		setExpanded(expandAll.expanded);
+		if (expandAll.seq > 0) setExpanded(expandAll.expanded);
 	}, [expandAll]);
 
 	const entryStatus = entry?.status ?? "running";
@@ -65,7 +67,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 			? entry.streamingArgs.slice(0, 160)
 			: undefined;
 	const Renderer = getToolRenderer(toolName);
-	const summary = getToolSummary(toolName, args);
+	const summary = getToolSummary(toolName, args, entry?.result);
 
 	const railColor =
 		status === "error" || isError

@@ -486,12 +486,15 @@ export function buildHistoryRows(
 		}
 
 		const hasToolCall = message.content.some(block => block.type === "toolCall");
+		const hasAskTool = message.content.some(block => block.type === "toolCall" && block.name === "ask");
 		const hasImage = message.content.some(block => block.type === "image");
-		if (hasToolCall && !hasImage) {
+		if (hasToolCall && !hasImage && !hasAskTool) {
 			// Text accompanying a tool call is intermediate narration. Keep every
 			// narrated phase in the same disclosure until the API delivers the final
 			// answer, so a long run leaves one activity summary instead of a stack of
-			// nearly identical completed rows.
+			// nearly identical completed rows. Ask tool calls stay visible outside
+			// the folded process group so the user's choices and custom answers
+			// remain part of the readable conversation (#78).
 			processMessages.push(message);
 			continue;
 		}

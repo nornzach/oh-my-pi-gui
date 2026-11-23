@@ -194,6 +194,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "thinkingExpanded reasoning thinking 思考 推理",
 	},
 	{
+		id: "autoCollapseProcess",
+		labelKey: "settings.gui.autoCollapseProcess",
+		aliases: "autoCollapseProcess reasoning thinking process collapse fold 自动折叠 推理 过程 сворачивать",
+	},
+	{
 		id: "transcriptDetail",
 		labelKey: "settings.gui.transcriptDetail",
 		aliases: "transcriptDetail tools detail transcript 对话 工具 过程",

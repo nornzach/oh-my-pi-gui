@@ -2010,7 +2010,7 @@ export const en: Record<string, string> = {
 		"Turn pasted text over 10 lines or 1,000 characters into a compact [Paste #N] marker; turn off to insert text verbatim",
 	"settings.gui.askInline": "Show ask forms inline in the chat",
 	"settings.gui.askInlineDesc":
-		"Render the agent's question form at the end of the conversation instead of a modal, so the surrounding context stays visible; forms in background tabs still open as a dialog",
+		"Render the agent's question form at the end of its own conversation instead of popping a modal, including follow-up questions and background sessions",
 	"settings.gui.linkOpenMode": "Link left-click opens in",
 	"settings.gui.linkOpenMode.panel": "Browser panel",
 	"settings.gui.linkOpenMode.panelDesc": "Open web links beside the conversation (⌘/Ctrl-click uses default browser)",
@@ -2049,6 +2049,9 @@ export const en: Record<string, string> = {
 	"settings.gui.thinkingExpanded": "Expand reasoning by default",
 	"settings.gui.thinkingExpandedDesc":
 		"Show the model's reasoning trace without clicking each block; blocks can still be collapsed individually.",
+	"settings.gui.autoCollapseProcess": "Auto-collapse reasoning and tools after reply",
+	"settings.gui.autoCollapseProcessDesc":
+		"Keep reasoning and tool steps expanded while the agent is generating, then automatically fold them once the reply completes.",
 	"settings.gui.confirmSessionDelete": "Confirm before deleting a session",
 	"settings.gui.confirmSessionDeleteDesc":
 		"Ask before /delete (/drop) deletes the current session. When off, the session is deleted at once; this cannot be undone.",

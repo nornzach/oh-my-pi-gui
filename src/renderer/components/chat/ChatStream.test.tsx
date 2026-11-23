@@ -480,6 +480,23 @@ describe("mergeTodoSnapshots", () => {
 		const rows = buildHistoryRows([assistant([{ type: "text", text: "Solo" }])], "full");
 		expect(mergeTodoSnapshots(rows, [])).toEqual(rows);
 	});
+
+	it("keeps ask tool calls outside collapsed process groups in compact mode (#78)", () => {
+		const rows = buildHistoryRows(
+			[
+				assistant([{ type: "toolCall", id: "r1", name: "read", arguments: { path: "a.ts" } }]),
+				assistant([
+					{ type: "thinking", thinking: "Need user input" },
+					{ type: "toolCall", id: "a1", name: "ask", arguments: { html: "<form><input name='x'></form>" } },
+				]),
+			],
+			"compact",
+		);
+		expect(rows.map(row => row.kind)).toEqual(["process", "message"]);
+		expect(
+			rows[1]?.kind === "message" && Array.isArray(rows[1].message.content) ? rows[1].message.content : [],
+		).toEqual([{ type: "toolCall", id: "a1", name: "ask", arguments: { html: "<form><input name='x'></form>" } }]);
+	});
 });
 
 describe("transcript row entrances", () => {

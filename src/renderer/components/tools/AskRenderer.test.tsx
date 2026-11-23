@@ -2,7 +2,7 @@ import { parseHTML } from "linkedom";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "../../lib/i18n";
-import { AskRenderer } from "./AskRenderer";
+import { AskRenderer, askResultSummary } from "./AskRenderer";
 import { askFormSummary } from "./ask-form";
 import type { ToolRendererProps } from "./ToolCard";
 
@@ -131,6 +131,32 @@ describe("Ask HTML forms", () => {
 	it("summarizes a collapsed call by its first question", () => {
 		expect(askFormSummary(DEPLOY_FORM)).toBe("Where should this deploy?");
 		expect(askFormSummary(undefined)).toBe("");
+	});
+
+	it("renders option notes and falls back to JSON text answers including custom answers (#78)", () => {
+		const withNotes = render({
+			args: { html: DEPLOY_FORM },
+			result: {
+				details: {
+					answers: deployAnswers({ target: "Other: Canary cluster" }),
+					notes: [{ field: "target", option: "Other", text: "Need gradual rollout" }],
+				},
+			},
+		});
+		expect(withNotes.querySelectorAll("section")[0].textContent).toContain("Answered: Other: Canary cluster");
+		expect(withNotes.querySelectorAll("section")[0].textContent).toContain("Other: Need gradual rollout");
+
+		const jsonOnly = render({
+			args: { html: DEPLOY_FORM },
+			result: {
+				content: [{ type: "text", text: 'User answers:\n{"target":"Custom region","why":"Low latency"}' }],
+			},
+		});
+		expect(jsonOnly.querySelectorAll("section")[0].textContent).toContain("Answered: Custom region");
+		expect(jsonOnly.querySelectorAll("section")[1].textContent).toContain("Answered: Low latency");
+		expect(askResultSummary({ details: { answers: deployAnswers({ target: "Other: Canary" }) } })).toContain(
+			"Other: Canary",
+		);
 	});
 });
 

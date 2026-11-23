@@ -56,6 +56,7 @@ afterEach(async () => {
 	useSettingsStore.getState().reset();
 	useMessagesStore.getState().reset();
 	useUiStore.getState().setThinkingExpanded(false);
+	useUiStore.getState().setAutoCollapseProcess(false);
 });
 
 describe("ThinkingBlock", () => {
@@ -111,6 +112,22 @@ describe("ThinkingBlock", () => {
 		if (!footer) throw new Error("Expanded live thinking has no bottom button");
 		await act(async () => footer.click());
 		await act(async () => useMessagesStore.setState({ streamingThinking: "First phase continues" }));
+		expect(document.querySelector(".omp-thinking-header")?.getAttribute("aria-expanded")).toBe("false");
+	});
+
+	it("expands live thinking and collapses finalized thinking when autoCollapseProcess is enabled (#77)", async () => {
+		useUiStore.setState({ thinkingExpanded: false, autoCollapseProcess: true });
+		useMessagesStore.setState({ streamingThinking: "Working through the plan" });
+		await mount(<ThinkingBlock live />);
+		expect(document.querySelector(".omp-thinking-header")?.getAttribute("aria-expanded")).toBe("true");
+
+		await act(async () => {
+			root.render(
+				<I18nProvider>
+					<ThinkingBlock text="Finished reasoning" />
+				</I18nProvider>,
+			);
+		});
 		expect(document.querySelector(".omp-thinking-header")?.getAttribute("aria-expanded")).toBe("false");
 	});
 });

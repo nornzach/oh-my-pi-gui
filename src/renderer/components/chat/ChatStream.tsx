@@ -134,6 +134,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	// Shared agent compaction preference and GUI-local transcript detail.
 	const collapseCompacted = useDisplayPreference("collapseCompacted");
 	const transcriptDetail = useUiStore(s => s.transcriptDetail);
+	const autoCollapseProcess = useUiStore(s => s.autoCollapseProcess);
 	const switchPending = useSessionStore(s => s.switchPending);
 	const savedView = useSessionStore(s => s.transcriptView);
 	const saveView = useSessionStore(s => s.saveTranscriptView);
@@ -263,6 +264,24 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	const canvasRef = useRef<HTMLDivElement>(null);
 	const footerRef = useRef<HTMLDivElement>(null);
 	const conversationAnchors = useMemo(() => buildConversationAnchors(rows, rowKeys), [rows, rowKeys]);
+	const lastUserRowIndex = conversationAnchors.at(-1)?.rowIndex ?? -1;
+	// Auto-collapse the just-finished turn's process groups once streaming ends (#77).
+	const wasStreamingRef = useRef(isStreaming);
+	useEffect(() => {
+		const finished = wasStreamingRef.current && !isStreaming;
+		wasStreamingRef.current = isStreaming;
+		if (!finished || !autoCollapseProcess) return;
+		setProcessExpansion(current => {
+			if (current.size === 0) return current;
+			let changed = false;
+			const next = new Map(current);
+			for (let i = lastUserRowIndex + 1; i < rowKeys.length; i++) {
+				const key = rowKeys[i];
+				if (key && next.delete(key)) changed = true;
+			}
+			return changed ? next : current;
+		});
+	}, [isStreaming, autoCollapseProcess, lastUserRowIndex, rowKeys]);
 	const tailRowKey = rowKeys.at(-1);
 	const activeConversationIndex = useMemo(
 		() => findConversationAnchorIndex(conversationAnchors, visibleRowIndex),
@@ -875,13 +894,16 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 											<ReadGroupCard entries={row.entries} runningIndicator="dot" usage={row.usage} />
 										) : row.kind === "process" ? (
 											<ProcessGroup
-												expanded={processExpansion.get(rowKey) === true}
+												expanded={
+													processExpansion.get(rowKey) ??
+													(autoCollapseProcess && isStreaming && item.index > lastUserRowIndex)
+												}
 												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
 												row={row}
 											/>
 										) : row.kind === "streaming" ? (
 											<StreamingRows
-												expanded={processExpansion.get(rowKey) === true}
+												expanded={processExpansion.get(rowKey) ?? autoCollapseProcess}
 												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
 											/>
 										) : row.kind === "queued" ? (

@@ -20,12 +20,9 @@ import type { ExtensionAskDialogResult, ExtensionUIRequest } from "../../../shar
 import { AnsiText } from "../../lib/ansi";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
-import { useShownAgentPage } from "../../stores/agent-pages";
 import { removeExtensionRequest, useAllPendingRequests, useExtensionUiStore } from "../../stores/extension-ui";
-import { useSessionRuntime } from "../../stores/session-runtime-context";
-import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
-import { activeWorkspacePage, useUiStore } from "../../stores/ui";
+import { useUiStore } from "../../stores/ui";
 import { Button, Input, Modal, Spinner } from "../common";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { ChoiceRow, FormDialog } from "./FormDialog";
@@ -256,7 +253,7 @@ interface AskAnswerState {
  * optional note input. Single-select mirrors the TUI: picking an option
  * replaces the custom answer, typing one clears the option selection.
  */
-function AskDialog({
+export function AskQuestionsBody({
 	request,
 	remaining,
 	onSubmit,
@@ -333,97 +330,109 @@ function AskDialog({
 	};
 
 	return (
-		<Modal onClose={onCancel} open size="lg" title={t("extDialog.ask.title")}>
-			<form
-				className="space-y-5"
-				onSubmit={event => {
-					event.preventDefault();
-					submit();
-				}}
-			>
-				{request.questions.map((question, questionIndex) => {
-					const answer = answers[questionIndex];
-					return (
-						<div className="space-y-2" key={question.id}>
-							{question.header && (
-								<div className="text-omp-xxs font-medium text-(--omp-dim)">{question.header}</div>
-							)}
-							<p className="text-omp-xs leading-relaxed font-medium break-words whitespace-pre-wrap text-(--omp-text)">
-								{request.questions.length > 1 ? `${questionIndex + 1}. ` : ""}
-								{question.question}
-							</p>
-							<div className="space-y-1">
-								{question.options.map((option, optionIndex) => {
-									const checked = answer?.selected.has(option.label) ?? false;
-									return (
-										<ChoiceRow
-											checked={checked}
-											key={option.label}
-											multi={question.multi ?? false}
-											onClick={() => toggleOption(questionIndex, option.label)}
-										>
-											<span className="flex items-center gap-1.5 text-omp-xs text-(--omp-text)">
-												<span className="min-w-0 break-words">{option.label}</span>
-												{question.recommended === optionIndex && (
-													<span className="shrink-0 rounded border border-(--omp-border-accent) px-1 py-px text-omp-xxs font-medium text-(--omp-accent)">
-														{t("extDialog.ask.recommended")}
-													</span>
-												)}
-											</span>
-											{option.description && (
-												<span className="mt-0.5 block text-omp-xs leading-snug break-words text-(--omp-dim)">
-													{option.description}
+		<form
+			className="space-y-5"
+			onSubmit={event => {
+				event.preventDefault();
+				submit();
+			}}
+		>
+			{request.questions.map((question, questionIndex) => {
+				const answer = answers[questionIndex];
+				return (
+					<div className="space-y-2" key={question.id}>
+						{question.header && (
+							<div className="text-omp-xxs font-medium text-(--omp-dim)">{question.header}</div>
+						)}
+						<p className="text-omp-xs leading-relaxed font-medium break-words whitespace-pre-wrap text-(--omp-text)">
+							{request.questions.length > 1 ? `${questionIndex + 1}. ` : ""}
+							{question.question}
+						</p>
+						<div className="space-y-1">
+							{question.options.map((option, optionIndex) => {
+								const checked = answer?.selected.has(option.label) ?? false;
+								return (
+									<ChoiceRow
+										checked={checked}
+										key={option.label}
+										multi={question.multi ?? false}
+										onClick={() => toggleOption(questionIndex, option.label)}
+									>
+										<span className="flex items-center gap-1.5 text-omp-xs text-(--omp-text)">
+											<span className="min-w-0 break-words">{option.label}</span>
+											{question.recommended === optionIndex && (
+												<span className="shrink-0 rounded border border-(--omp-border-accent) px-1 py-px text-omp-xxs font-medium text-(--omp-accent)">
+													{t("extDialog.ask.recommended")}
 												</span>
 											)}
-										</ChoiceRow>
-									);
-								})}
-							</div>
-							{question.options
-								.filter(option => answer?.selected.has(option.label) && option.preview)
-								.map(option => (
-									<div
-										className="rounded-md border border-(--omp-border-muted) bg-(--omp-code-bg) px-2.5 py-2 text-omp-sm"
-										key={`preview:${option.label}`}
-									>
-										<MarkdownRenderer content={option.preview!} />
-									</div>
-								))}
-							<Input
-								onChange={event => setCustom(questionIndex, event.target.value)}
-								placeholder={t("extDialog.ask.customPlaceholder")}
-								value={answer?.custom ?? ""}
-							/>
-							<Input
-								onChange={event => setNote(questionIndex, event.target.value)}
-								placeholder={t("extDialog.ask.notePlaceholder")}
-								value={answer?.note ?? ""}
-							/>
+										</span>
+										{option.description && (
+											<span className="mt-0.5 block text-omp-xs leading-snug break-words text-(--omp-dim)">
+												{option.description}
+											</span>
+										)}
+									</ChoiceRow>
+								);
+							})}
 						</div>
-					);
-				})}
-				<div className="flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-3">
-					<div className="flex items-center gap-2">
-						<TimeoutFooter remaining={remaining} />
-						{unansweredCount > 0 && (
-							<span className="text-omp-xs text-(--omp-warning)">
-								{t("extDialog.ask.unanswered", { count: unansweredCount })}
-							</span>
-						)}
+						{question.options
+							.filter(option => answer?.selected.has(option.label) && option.preview)
+							.map(option => (
+								<div
+									className="rounded-md border border-(--omp-border-muted) bg-(--omp-code-bg) px-2.5 py-2 text-omp-sm"
+									key={`preview:${option.label}`}
+								>
+									<MarkdownRenderer content={option.preview!} />
+								</div>
+							))}
+						<Input
+							onChange={event => setCustom(questionIndex, event.target.value)}
+							placeholder={t("extDialog.ask.customPlaceholder")}
+							value={answer?.custom ?? ""}
+						/>
+						<Input
+							onChange={event => setNote(questionIndex, event.target.value)}
+							placeholder={t("extDialog.ask.notePlaceholder")}
+							value={answer?.note ?? ""}
+						/>
 					</div>
-					<div className="flex gap-2">
-						<Button onClick={onCancel} size="sm" type="button" variant="ghost">
-							{t("common.cancel")}
-						</Button>
-						<Button onClick={() => onSubmit({ kind: "chat" })} size="sm" type="button" variant="secondary">
-							{t("extDialog.ask.chat")}
-						</Button>
-						<Button size="sm" type="submit" variant="primary">
-							{t("extDialog.submit")}
-						</Button>
-					</div>
+				);
+			})}
+			<div className="flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-3">
+				<div className="flex items-center gap-2">
+					<TimeoutFooter remaining={remaining} />
+					{unansweredCount > 0 && (
+						<span className="text-omp-xs text-(--omp-warning)">
+							{t("extDialog.ask.unanswered", { count: unansweredCount })}
+						</span>
+					)}
 				</div>
-			</form>
+				<div className="flex gap-2">
+					<Button onClick={onCancel} size="sm" type="button" variant="ghost">
+						{t("common.cancel")}
+					</Button>
+					<Button onClick={() => onSubmit({ kind: "chat" })} size="sm" type="button" variant="secondary">
+						{t("extDialog.ask.chat")}
+					</Button>
+					<Button size="sm" type="submit" variant="primary">
+						{t("extDialog.submit")}
+					</Button>
+				</div>
+			</div>
+		</form>
+	);
+}
+
+function AskDialog(props: {
+	request: Extract<ExtensionUIRequest, { method: "askDialog" | "ask" }>;
+	remaining: number | null;
+	onSubmit: (result: ExtensionAskDialogResult) => void;
+	onCancel: () => void;
+}) {
+	const t = useT();
+	return (
+		<Modal onClose={props.onCancel} open size="lg" title={t("extDialog.ask.title")}>
+			<AskQuestionsBody {...props} />
 		</Modal>
 	);
 }
@@ -510,7 +519,7 @@ type ExtensionResponse =
 	| { askDialog: ExtensionAskDialogResult }
 	| { answers: Array<{ id: string; selectedOptions: string[]; customInput?: string }> }
 	| { formData: Record<string, string | string[]> }
-	| { cancelled: true };
+	| { cancelled: true; timedOut?: boolean };
 
 export function answerExtensionRequest(id: string, response: ExtensionResponse): void {
 	window.omp.ui.respondExtensionUi({ type: "extension_ui_response", id, ...response });
@@ -781,28 +790,60 @@ function ActiveDialog({
 	}
 }
 
-/** A form can go inline only in the visible conversation of the focused tab. */
-export function useInlineAskRequest() {
+export type InlineAskRequest = Extract<ExtensionUIRequest, { method: "form" | "ask" | "askDialog" }>;
+
+export function isInlineAskRequest(request: ExtensionUIRequest): request is InlineAskRequest {
+	return request.method === "form" || request.method === "ask" || request.method === "askDialog";
+}
+
+export function answerAskQuestionsRequest(
+	request: Extract<ExtensionUIRequest, { method: "ask" | "askDialog" }>,
+	result: ExtensionAskDialogResult,
+): void {
+	if (request.method === "askDialog") {
+		answerExtensionRequest(request.id, { askDialog: result });
+		return;
+	}
+	answerExtensionRequest(
+		request.id,
+		result.kind === "submit"
+			? {
+					answers: result.results.map(item => ({
+						id: item.id,
+						selectedOptions: item.selectedOptions,
+						customInput: item.customInput,
+					})),
+				}
+			: { cancelled: true },
+	);
+}
+
+/** When inline ask is enabled, every ask (`form`/`ask`/`askDialog`) stays in its own tab's conversation (#78). */
+export function useInlineAskRequest(): InlineAskRequest | undefined {
 	const askInline = useUiStore(state => state.askInline);
-	const workspacePage = useUiStore(activeWorkspacePage);
-	const activeTabId = useTabsStore(state => state.activeTabId);
-	const tabId = useSessionRuntime()?.tabId ?? activeTabId;
-	const agentPage = useShownAgentPage(tabId);
-	const request = useExtensionUiStore(state => state.pendingRequests.find(item => item.method === "form"));
-	return askInline && tabId === activeTabId && !workspacePage && !agentPage ? request : undefined;
+	const request = useExtensionUiStore(state => state.pendingRequests.find(isInlineAskRequest));
+	return askInline ? request : undefined;
 }
 
 export function ExtensionDialog() {
-	// Dialog surface is global: a blocking request parked in a background tab's
-	// queue still pops here (its agent waits). Side-effect requests do NOT
-	// aggregate — set_editor_text must fill the OWNING tab's composer, so they
-	// stay scoped to the focused tab and fire when that tab is on screen.
+	// Dialog surface is global: non-ask blocking requests (approvals, confirms,
+	// sign-in prompts) from background tabs still surface here so their agent
+	// never hangs silently. When `askInline` is on, ask requests stay parked in
+	// their own tab's InlineAskCard instead of popping a modal over another tab
+	// or a follow-up ask (#78).
 	const pending = useAllPendingRequests();
 	const focusedPending = useExtensionUiStore(state => state.pendingRequests);
+	const askInline = useUiStore(state => state.askInline);
 
 	const request = useMemo(
-		() => pending.find(req => !NON_DIALOG_METHODS.has(req.method) && !belongsToOpenUrl(req, pending)) ?? null,
-		[pending],
+		() =>
+			pending.find(
+				req =>
+					!NON_DIALOG_METHODS.has(req.method) &&
+					!belongsToOpenUrl(req, pending) &&
+					!(askInline && isInlineAskRequest(req)),
+			) ?? null,
+		[pending, askInline],
 	);
 	const codePrompt = useMemo(
 		() =>
@@ -812,8 +853,6 @@ export function ExtensionDialog() {
 		[pending, request],
 	);
 	const remaining = useCountdown(request);
-	const inlineRequest = useInlineAskRequest();
-	const renderedInline = request?.method === "form" && request.id === inlineRequest?.id;
 
 	// Consume non-dialog requests in place. Editor/title mutations must target
 	// real GUI surfaces directly; dispatching listenerless events drops them.
@@ -861,9 +900,7 @@ export function ExtensionDialog() {
 	return (
 		<>
 			<ExtensionSurfaces />
-			{request && !renderedInline && (
-				<ActiveDialog codePrompt={codePrompt} remaining={remaining} request={request} />
-			)}
+			{request && <ActiveDialog codePrompt={codePrompt} remaining={remaining} request={request} />}
 		</>
 	);
 }
