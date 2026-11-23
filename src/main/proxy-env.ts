@@ -105,6 +105,7 @@ export async function resolveProxyForSpawn({
 }: ProxySources): Promise<ProxyResolution> {
 	if (direct) return { env: directEnvVars(inherited), dropped: [] };
 	const noProxy = mergeNoProxy(inherited.NO_PROXY, inherited.no_proxy, LOCAL_NO_PROXY);
+	const bypass = { NO_PROXY: noProxy, no_proxy: noProxy };
 	const unusableVars = Object.keys(inherited).filter(
 		name => PROXY_VAR.test(name) && isUnsupportedProxyUrl(inherited[name] ?? ""),
 	);
@@ -131,7 +132,7 @@ export async function resolveProxyForSpawn({
 		// `all_proxy=socks5://…` beside a working https_proxy is what proxy clients'
 		// "copy shell command" emits. Nothing the user asked for is lost without it.
 		reportVars(unusableVars.filter(name => !FALLBACK_PROXY_VAR.test(name)));
-		return { env: {}, dropped };
+		return { env: bypass, dropped };
 	}
 	reportVars(unusableVars);
 
@@ -142,7 +143,12 @@ export async function resolveProxyForSpawn({
 	} catch {
 		// No system proxy answer: same as having none.
 	}
-	return { env: {}, dropped };
+	// HTTP-only and per-provider variables can still reach the sidecar even
+	// though they don't suppress a system proxy lookup.
+	const hasRemainingProxy = Object.entries(inherited).some(
+		([name, value]) => PROXY_VAR.test(name) && !!value && !unusableVars.includes(name),
+	);
+	return { env: hasRemainingProxy ? bypass : {}, dropped };
 }
 
 /**

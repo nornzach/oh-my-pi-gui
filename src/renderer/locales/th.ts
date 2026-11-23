@@ -192,6 +192,7 @@ export const th: Record<string, string> = {
 	"tokenMeter.lastTurnCost": "ค่ารอบก่อน",
 	"tokenMeter.tariffPeak": "ช่วงพีค",
 	"tokenMeter.tariffOffPeak": "นอกพีค",
+	"tokenMeter.currentRates": "อัตราปัจจุบัน",
 	"tokenMeter.nextChange": "ถัดไป {time} UTC",
 	"tokenMeter.rateIn": "เข้า",
 	"tokenMeter.rateOut": "ออก",

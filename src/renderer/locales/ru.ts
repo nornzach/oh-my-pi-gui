@@ -198,6 +198,7 @@ export const ru: Record<string, string> = {
 	"tokenMeter.lastTurnCost": "Прошлый ход",
 	"tokenMeter.tariffPeak": "Пик",
 	"tokenMeter.tariffOffPeak": "Вне пика",
+	"tokenMeter.currentRates": "Текущие тарифы",
 	"tokenMeter.nextChange": "далее {time} UTC",
 	"tokenMeter.rateIn": "вход",
 	"tokenMeter.rateOut": "выход",

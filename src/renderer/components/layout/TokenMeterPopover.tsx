@@ -5,7 +5,7 @@
  * because the wire carries no per-delta token counts.
  */
 import { X, Zap } from "lucide-react";
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, ModelCost, SessionStats } from "../../../shared/rpc-types";
 import { formatCost, formatDuration, formatPercent, formatTokens } from "../../lib/format";
@@ -15,11 +15,15 @@ import {
 	effectiveRateCard,
 	formatUtcMinute,
 	nextPricingTransition,
+	nextPricingUpdate,
 	pricingPeriod,
 	tariffMultiplier,
 } from "../../lib/model-pricing";
 import { effectiveCostPerMillion, lastTurnFacts, useLiveThroughput } from "../../lib/token-meter";
 import { sessionCacheHitPercent } from "./session-metrics";
+
+// A dated rate card can be farther out than a browser timer can represent.
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function Sparkline({ history, peak }: { history: number[]; peak: number }) {
 	if (history.length < 2) return <div className="h-8" />;
@@ -72,11 +76,37 @@ export function TokenMeterPopover({
 	const totalCost = stats ? (stats.history?.cost ?? stats.cost) : null;
 	const totalTokens = stats ? (stats.history?.totalTokens ?? stats.tokens.total) : 0;
 	const perMillion = totalCost === null ? null : effectiveCostPerMillion(totalCost, totalTokens);
-	const now = Date.now();
+	const [now, setNow] = useState(Date.now);
 	const period = pricingPeriod(cost, now);
 	const multiplier = tariffMultiplier(cost, now);
 	const nextChange = nextPricingTransition(cost, now);
 	const rates = effectiveRateCard(cost, now);
+	const hasDatedRates = (cost?.timeBased?.effectiveRates?.length ?? 0) > 0;
+	const tariffLabel =
+		period === "off-peak"
+			? "tokenMeter.tariffOffPeak"
+			: period === "peak"
+				? "tokenMeter.tariffPeak"
+				: "tokenMeter.currentRates";
+
+	useEffect(() => {
+		if (!cost?.timeBased) return;
+		let timer: number | undefined;
+		const refresh = () => {
+			window.clearTimeout(timer);
+			const timestamp = Date.now();
+			setNow(timestamp);
+			const next = nextPricingUpdate(cost, timestamp);
+			timer =
+				next === undefined ? undefined : window.setTimeout(refresh, Math.min(MAX_TIMEOUT_MS, next - timestamp));
+		};
+		refresh();
+		window.addEventListener("focus", refresh);
+		return () => {
+			window.clearTimeout(timer);
+			window.removeEventListener("focus", refresh);
+		};
+	}, [cost]);
 
 	useEffect(() => {
 		const onPointerDown = (event: PointerEvent) => {
@@ -163,11 +193,11 @@ export function TokenMeterPopover({
 				<Fact label={t("tokenMeter.totalCost")} value={totalCost !== null ? formatCost(totalCost, 4) : "—"} />
 				<Fact label={t("tokenMeter.lastTurnCost")} value={turn.cost !== null ? formatCost(turn.cost, 4) : "—"} />
 			</div>
-			{period && (
+			{(period || hasDatedRates) && (
 				<div className="mt-3 border-t border-(--omp-border-muted) pt-3" data-tariff>
 					<div className="flex items-baseline justify-between gap-2 text-omp-xs">
 						<span className="font-semibold text-(--omp-text)">
-							{period === "off-peak" ? t("tokenMeter.tariffOffPeak") : t("tokenMeter.tariffPeak")}
+							{t(tariffLabel)}
 							{multiplier !== 1 && <span className="ml-1 font-mono text-(--omp-accent)">×{multiplier}</span>}
 						</span>
 						{nextChange !== undefined && (

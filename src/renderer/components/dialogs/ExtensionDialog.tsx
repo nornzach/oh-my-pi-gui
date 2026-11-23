@@ -20,9 +20,12 @@ import type { ExtensionAskDialogResult, ExtensionUIRequest } from "../../../shar
 import { AnsiText } from "../../lib/ansi";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
+import { useShownAgentPage } from "../../stores/agent-pages";
 import { removeExtensionRequest, useAllPendingRequests, useExtensionUiStore } from "../../stores/extension-ui";
+import { useSessionRuntime } from "../../stores/session-runtime-context";
+import { useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
-import { useUiStore } from "../../stores/ui";
+import { activeWorkspacePage, useUiStore } from "../../stores/ui";
 import { Button, Input, Modal, Spinner } from "../common";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { ChoiceRow, FormDialog } from "./FormDialog";
@@ -778,6 +781,17 @@ function ActiveDialog({
 	}
 }
 
+/** A form can go inline only in the visible conversation of the focused tab. */
+export function useInlineAskRequest() {
+	const askInline = useUiStore(state => state.askInline);
+	const workspacePage = useUiStore(activeWorkspacePage);
+	const activeTabId = useTabsStore(state => state.activeTabId);
+	const tabId = useSessionRuntime()?.tabId ?? activeTabId;
+	const agentPage = useShownAgentPage(tabId);
+	const request = useExtensionUiStore(state => state.pendingRequests.find(item => item.method === "form"));
+	return askInline && tabId === activeTabId && !workspacePage && !agentPage ? request : undefined;
+}
+
 export function ExtensionDialog() {
 	// Dialog surface is global: a blocking request parked in a background tab's
 	// queue still pops here (its agent waits). Side-effect requests do NOT
@@ -798,12 +812,8 @@ export function ExtensionDialog() {
 		[pending, request],
 	);
 	const remaining = useCountdown(request);
-	// Inline mode (#74): the owning tab's transcript renders the form beside the
-	// conversation. A form parked in a BACKGROUND tab still pops here, so a
-	// blocking prompt is never invisible while its tab is off screen.
-	const askInline = useUiStore(state => state.askInline);
-	const renderedInline =
-		askInline && request?.method === "form" && focusedPending.some(item => item.id === request.id);
+	const inlineRequest = useInlineAskRequest();
+	const renderedInline = request?.method === "form" && request.id === inlineRequest?.id;
 
 	// Consume non-dialog requests in place. Editor/title mutations must target
 	// real GUI surfaces directly; dispatching listenerless events drops them.
@@ -851,7 +861,9 @@ export function ExtensionDialog() {
 	return (
 		<>
 			<ExtensionSurfaces />
-			{request && !renderedInline && <ActiveDialog codePrompt={codePrompt} remaining={remaining} request={request} />}
+			{request && !renderedInline && (
+				<ActiveDialog codePrompt={codePrompt} remaining={remaining} request={request} />
+			)}
 		</>
 	);
 }

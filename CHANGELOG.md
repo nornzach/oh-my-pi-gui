@@ -2,16 +2,25 @@
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-23
+
 ### Added
 
 - Connect directly without any proxy — the system proxy included — via Settings → System & advanced → Advanced → HTTP proxy ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
 - Optional inline ask forms: Settings → GUI → "Show ask forms inline in the chat" renders the agent's question at the end of the conversation instead of a modal, keeping the surrounding context visible; typed answers survive tab switches, and forms in background tabs still open as a dialog ([#74](https://github.com/nornzach/oh-my-pi-gui/issues/74)).
 - Token Meter: clicking the title-bar token/cost readout opens a live throughput panel — streaming rate with a rolling 60 s sparkline, per-turn t/s and TTFT, the session token grid (in/out/think/cache/cache-hit/consumed), cost economics including effective $/1M, and the model's peak/off-peak tariff with its discount, current rate card and next UTC change ([#71](https://github.com/nornzach/oh-my-pi-gui/issues/71)).
 
+### Changed
+
+- Update the bundled agent and native addon to OMP Core 19.1.0. The agent is built from [Core fork commit `c463607250`](https://github.com/nornzach/oh-my-pi/commit/c4636072505e4da5100bfe77405f40a8849a5bc5).
+
 ### Fixed
 
-- Local and private-network model servers (localhost, 127.\*, 10.\*, 172.16–31.\*, 192.168.\*) connect directly instead of through the configured or system proxy, so turns no longer fail with a connection reset when a proxy is set ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
+- Local and private-network model servers stay reachable with a configured, inherited, or system proxy ([#69](https://github.com/nornzach/oh-my-pi-gui/issues/69)).
 - A `NO_PROXY` bypass list exported in your shell profile is kept instead of discarded.
+- Queued inline questions keep separate drafts and fall back to a dialog when the conversation is out of view ([#74](https://github.com/nornzach/oh-my-pi-gui/issues/74)).
+- The open Token Meter refreshes when peak hours begin or end or when a new rate card takes effect ([#71](https://github.com/nornzach/oh-my-pi-gui/issues/71)).
+- Sidebar quotas show one row per account and organization even when the provider reports the quota through multiple routes ([#72](https://github.com/nornzach/oh-my-pi-gui/issues/72)).
 - Typed builtin commands (`/mcp list`, `/usage`, `/tools`, …) keep their reply on screen instead of it being wiped by the transcript refresh that follows the command ([#75](https://github.com/nornzach/oh-my-pi-gui/issues/75)).
 - Projects with no sessions can be removed from the sidebar via right-click → "Remove project from list"; the folder on disk is untouched, and deleting a project's sessions no longer leaves an undeletable empty row ([#76](https://github.com/nornzach/oh-my-pi-gui/issues/76)).
 - The slash-command and paste menus now paint above the Agents/Todo/Plan dock card headers instead of being covered by their title bars ([#73](https://github.com/nornzach/oh-my-pi-gui/issues/73)).

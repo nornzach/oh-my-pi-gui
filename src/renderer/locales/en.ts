@@ -204,6 +204,7 @@ export const en: Record<string, string> = {
 	"tokenMeter.lastTurnCost": "Last turn",
 	"tokenMeter.tariffPeak": "Peak",
 	"tokenMeter.tariffOffPeak": "Off-peak",
+	"tokenMeter.currentRates": "Current rates",
 	"tokenMeter.nextChange": "next {time} UTC",
 	"tokenMeter.rateIn": "in",
 	"tokenMeter.rateOut": "out",

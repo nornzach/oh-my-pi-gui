@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { ExtensionUIRequest, ExtensionUIResponse, RpcCommand, RpcResponse } from "../../../shared/rpc-types";
 import { I18nProvider } from "../../lib/i18n";
+import { useAgentPagesStore } from "../../stores/agent-pages";
 import { type ExtensionUiStore, useExtensionUiStore } from "../../stores/extension-ui";
 import {
 	deleteSessionRuntime,
@@ -11,6 +12,7 @@ import {
 	setFocusedSessionRuntime,
 } from "../../stores/session-runtime-context";
 import { createTabRuntime } from "../../stores/tab-runtime";
+import { useTabsStore } from "../../stores/tabs";
 import { useUiStore } from "../../stores/ui";
 import { InlineAskCard } from "../chat/InlineAskCard";
 import { ExtensionDialog } from "./ExtensionDialog";
@@ -612,7 +614,7 @@ describe("ExtensionDialog sign-in browser step", () => {
 
 describe("ExtensionDialog inline ask (#74)", () => {
 	const spans = (text: string) => [{ text }];
-	const formRequest = (id: string): ExtensionUIRequest => ({
+	const formRequest = (id: string, name = "api_key", label = "API key", value = ""): ExtensionUIRequest => ({
 		type: "extension_ui_request",
 		id,
 		method: "form",
@@ -624,11 +626,11 @@ describe("ExtensionDialog inline ask (#74)", () => {
 						kind: "field",
 						field: {
 							kind: "text",
-							name: "api_key",
+							name,
 							type: "text",
 							multiline: false,
-							label: spans("API key"),
-							value: "",
+							label: spans(label),
+							value,
 							placeholder: "",
 							required: false,
 							rows: 1,
@@ -661,6 +663,14 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		inlineHost = null;
 	};
 	const apiKeyInput = () => document.querySelector("form input") as unknown as TestElement | null;
+	afterEach(async () => {
+		await unmountInlineCard();
+		await act(async () => {
+			useUiStore.getState().returnToConversation();
+			useAgentPagesStore.getState().reset();
+			useTabsStore.setState({ activeTabId: null });
+		});
+	});
 
 	it("renders the focused tab's form in the transcript card instead of a modal", async () => {
 		await mount();
@@ -673,7 +683,6 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		expect(document.querySelector("[data-inline-ask]")).not.toBeNull();
 		expect(document.querySelector(".omp-dialog-overlay")).toBeNull();
 		expect(document.body.textContent).toContain("API key");
-		await unmountInlineCard();
 	});
 
 	it("answers from the inline card and closes it", async () => {
@@ -695,7 +704,24 @@ describe("ExtensionDialog inline ask (#74)", () => {
 			formData: { api_key: "sk-inline" },
 		});
 		expect(document.querySelector("[data-inline-ask]")).toBeNull();
-		await unmountInlineCard();
+	});
+
+	it("submits each queued request with its own draft and defaults", async () => {
+		await mount();
+		await mountInlineCard();
+		await act(async () => useUiStore.setState({ askInline: true }));
+		await push(formRequest("region", "region", "Region"), formRequest("branch", "branch", "Branch", "main"));
+
+		const firstInput = apiKeyInput();
+		if (!firstInput) throw new Error("missing first form");
+		await typeInto(firstInput, "singapore");
+		await submit(document.querySelector("[data-inline-ask] form") as unknown as TestElement);
+		await submit(document.querySelector("[data-inline-ask] form") as unknown as TestElement);
+
+		expect(respondExtensionUi.mock.calls).toEqual([
+			[{ type: "extension_ui_response", id: "region", formData: { region: "singapore" } }],
+			[{ type: "extension_ui_response", id: "branch", formData: { branch: "main" } }],
+		]);
 	});
 
 	it("still pops a modal for a form parked in a background tab", async () => {
@@ -704,15 +730,38 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		setFocusedSessionRuntime("tab-fg");
 		await mount();
 		await mountInlineCard();
-		useUiStore.setState({ askInline: true });
 		await act(async () => {
+			useUiStore.setState({ askInline: true });
 			sessionRuntimeStore<ExtensionUiStore>("tab-bg", "extensionUi")?.getState().pushRequest(formRequest("form-bg"));
 		});
 		await flush();
 
 		expect(document.querySelector(".omp-dialog-overlay")).not.toBeNull();
 		expect(document.querySelector("[data-inline-ask]")).toBeNull();
-		await unmountInlineCard();
+	});
+
+	it.each([
+		["an agent page", () => useAgentPagesStore.getState().open("tab-fg", "agent-1")],
+		["a workspace page", () => useUiStore.getState().openTasksPage()],
+	])("shows a modal when %s hides the main conversation", async (_name, openPage) => {
+		await mount();
+		await mountInlineCard();
+		await act(async () => {
+			useTabsStore.setState({ activeTabId: "tab-fg" });
+			useUiStore.setState({ askInline: true });
+			openPage();
+		});
+		await push(formRequest("hidden-conversation"));
+
+		const modalForm = document.querySelector(".omp-dialog-overlay form");
+		expect(modalForm).not.toBeNull();
+		expect(document.querySelector("[data-inline-ask]")).toBeNull();
+		await submit(modalForm as unknown as TestElement);
+		expect(respondExtensionUi).toHaveBeenCalledWith({
+			type: "extension_ui_response",
+			id: "hidden-conversation",
+			formData: { api_key: "" },
+		});
 	});
 
 	it("keeps typed answers when the surface switches between modal and inline", async () => {
@@ -736,6 +785,5 @@ describe("ExtensionDialog inline ask (#74)", () => {
 		});
 		await flush();
 		expect((apiKeyInput() as unknown as { value: string } | null)?.value).toBe("sk-kept");
-		await unmountInlineCard();
 	});
 });

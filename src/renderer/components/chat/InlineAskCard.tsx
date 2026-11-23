@@ -7,17 +7,14 @@ import { MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useT } from "../../lib/i18n";
 import { onEscape } from "../../lib/keymap";
-import { useExtensionUiStore } from "../../stores/extension-ui";
-import { useUiStore } from "../../stores/ui";
-import { answerExtensionRequest, TimeoutFooter, useCountdown } from "../dialogs/ExtensionDialog";
+import { answerExtensionRequest, TimeoutFooter, useCountdown, useInlineAskRequest } from "../dialogs/ExtensionDialog";
 import { AskFormBody } from "../dialogs/FormDialog";
 import { useReadOnlyTranscript } from "./transcript-mode";
 
 export function InlineAskCard() {
 	const t = useT();
-	const enabled = useUiStore(state => state.askInline);
 	const readOnly = useReadOnlyTranscript();
-	const request = useExtensionUiStore(state => state.pendingRequests.find(item => item.method === "form"));
+	const request = useInlineAskRequest();
 	const remaining = useCountdown(request ?? null);
 	const cardRef = useRef<HTMLElement | null>(null);
 	const requestId = request?.id;
@@ -32,7 +29,7 @@ export function InlineAskCard() {
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
 	}, [requestId]);
-	if (!enabled || readOnly !== null || !request || request.method !== "form") return null;
+	if (readOnly !== null || !request) return null;
 	return (
 		<section
 			aria-label={t("extDialog.ask.title")}
@@ -48,6 +45,7 @@ export function InlineAskCard() {
 				<AskFormBody
 					draftKey={request.id}
 					footer={<TimeoutFooter remaining={remaining} />}
+					key={request.id}
 					onCancel={() => answerExtensionRequest(request.id, { cancelled: true })}
 					onSubmit={formData => answerExtensionRequest(request.id, { formData })}
 					sections={request.sections}

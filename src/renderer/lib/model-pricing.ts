@@ -74,6 +74,15 @@ export function nextPricingTransition(cost: ModelCost | undefined, now: number):
 	return next === Infinity ? undefined : next;
 }
 
+/** The first upcoming period flip or dated rate card, whichever comes first. */
+export function nextPricingUpdate(cost: ModelCost | undefined, now: number): number | undefined {
+	let next = nextPricingTransition(cost, now);
+	for (const card of cost?.timeBased?.effectiveRates ?? []) {
+		if (card.effectiveFrom > now && (next === undefined || card.effectiveFrom < next)) next = card.effectiveFrom;
+	}
+	return next;
+}
+
 /** The card in force at `now`: the latest due dated card, else the row's own legs. */
 export function effectiveRateCard(cost: ModelCost | undefined, now: number): TokenRates {
 	let due: ModelEffectiveRate | undefined;

@@ -73,6 +73,7 @@ afterEach(async () => {
 	root = null;
 	host = null;
 	document.body.innerHTML = "";
+	vi.useRealTimers();
 });
 
 describe("TokenMeterPopover", () => {
@@ -149,6 +150,52 @@ describe("TokenMeterPopover", () => {
 		expect(tariff?.textContent).toContain("×0.5");
 		expect(tariff?.textContent).toContain("$0.14");
 		expect(tariff?.textContent).toContain("$0.21");
+	});
+
+	it("refreshes an idle popover at both edges of a peak window", async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-11-23T11:59:59Z"));
+		await mount(() => {}, undefined, {
+			input: 0.28,
+			output: 0.42,
+			timeBased: {
+				offPeakMultiplier: 0.5,
+				peakWindows: [{ weekdays: [1], startMinute: 720, endMinute: 721 }],
+			},
+		});
+		const tariff = () => document.querySelector("[data-tariff]")?.textContent;
+		expect(tariff()).toContain("Off-peak");
+		expect(tariff()).toContain("$0.14");
+
+		await act(async () => vi.advanceTimersByTime(1_000));
+		expect(tariff()).toContain("Peak");
+		expect(tariff()).toContain("$0.28");
+		expect(tariff()).not.toContain("×0.5");
+
+		await act(async () => vi.advanceTimersByTime(60_000));
+		expect(tariff()).toContain("Off-peak");
+		expect(tariff()).toContain("$0.14");
+	});
+
+	it("shows the new rate when a dated card takes effect without peak windows", async () => {
+		vi.useFakeTimers();
+		const boundary = Date.parse("2026-11-24T00:00:00Z");
+		vi.setSystemTime(boundary - 1_000);
+		await mount(() => {}, undefined, {
+			input: 0.28,
+			output: 0.42,
+			timeBased: {
+				offPeakMultiplier: 1,
+				peakWindows: [],
+				effectiveRates: [{ effectiveFrom: boundary, input: 0.8, output: 1.2, cacheRead: 0, cacheWrite: 0 }],
+			},
+		});
+		const tariff = () => document.querySelector("[data-tariff]")?.textContent;
+		expect(tariff()).toContain("$0.28");
+
+		await act(async () => vi.advanceTimersByTime(1_000));
+		expect(tariff()).toContain("$0.80");
+		expect(tariff()).toContain("$1.20");
 	});
 
 	it("omits the tariff row for a model priced at a flat rate", async () => {

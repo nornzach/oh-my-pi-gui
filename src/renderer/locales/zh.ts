@@ -192,6 +192,7 @@ export const zh: Record<string, string> = {
 	"tokenMeter.lastTurnCost": "上一回合费用",
 	"tokenMeter.tariffPeak": "峰时",
 	"tokenMeter.tariffOffPeak": "谷时",
+	"tokenMeter.currentRates": "当前费率",
 	"tokenMeter.nextChange": "下次 {time} UTC",
 	"tokenMeter.rateIn": "输入",
 	"tokenMeter.rateOut": "输出",

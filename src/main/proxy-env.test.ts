@@ -44,7 +44,7 @@ describe("resolveProxyForSpawn: saved setting", () => {
 	it("skips a saved SOCKS setting for a usable inherited proxy without asking the system", async () => {
 		const systemPac = vi.fn(async () => "PROXY 10.0.0.1:1");
 		const { env, dropped } = await resolve({ pref: SOCKS, inherited: { HTTPS_PROXY: HTTP }, systemPac });
-		expect(env).toEqual({});
+		expect(env).toEqual({ NO_PROXY: LOCAL_NO_PROXY, no_proxy: LOCAL_NO_PROXY });
 		expect(dropped).toEqual([{ source: "setting" }]);
 		expect(systemPac).not.toHaveBeenCalled();
 	});
@@ -81,7 +81,7 @@ describe("resolveProxyForSpawn: inherited environment", () => {
 			inherited: { https_proxy: HTTP, http_proxy: HTTP, all_proxy: SOCKS },
 			systemPac,
 		});
-		expect(env).toEqual({});
+		expect(env).toEqual({ NO_PROXY: LOCAL_NO_PROXY, no_proxy: LOCAL_NO_PROXY });
 		expect(dropped).toEqual([]);
 		expect(systemPac).not.toHaveBeenCalled();
 	});
@@ -181,6 +181,28 @@ describe("resolveProxyForSpawn: local traffic stays out of the proxy", () => {
 	it("bypasses the same hosts for a saved proxy", async () => {
 		const { env } = await resolve({ pref: HTTP });
 		for (const host of LOCAL_HOSTS) expect(noProxyCovers(env.NO_PROXY ?? "", host), host).toBe(true);
+	});
+
+	it("keeps inherited proxy addresses and combines both shell bypass lists with the local rules", async () => {
+		const inherited = {
+			HTTP_PROXY: HTTP,
+			HTTPS_PROXY: "http://127.0.0.1:9999",
+			NO_PROXY: "git.corp.example",
+			no_proxy: ".internal",
+		};
+		const { env } = await resolve({ inherited, systemPac: async () => "PROXY 192.168.3.231:909" });
+		const spawnEnv = { ...inherited, ...env };
+		expect(spawnEnv.HTTP_PROXY).toBe(inherited.HTTP_PROXY);
+		expect(spawnEnv.HTTPS_PROXY).toBe(inherited.HTTPS_PROXY);
+		expect(spawnEnv.no_proxy).toBe(spawnEnv.NO_PROXY);
+		for (const host of [...LOCAL_HOSTS, "git.corp.example", "build.internal"]) {
+			expect(noProxyCovers(spawnEnv.NO_PROXY, host), host).toBe(true);
+		}
+	});
+
+	it("adds the local bypass when an HTTP-only shell proxy remains after system lookup", async () => {
+		const { env } = await resolve({ inherited: { http_proxy: HTTP } });
+		expect(noProxyCovers(env.no_proxy ?? "", "127.0.0.1")).toBe(true);
 	});
 
 	it("never widens the bypass to public hosts", async () => {
