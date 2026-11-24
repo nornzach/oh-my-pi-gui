@@ -1271,10 +1271,10 @@ export function SettingsWindow() {
 										)}
 
 										{tab === GUI_TAB_ID && (
-											<div className="space-y-6">
+											<>
 												{/* 1. Appearance & Typography */}
 												<Section title={t("settings.gui.group.appearance")}>
-													<div className="omp-settings-group-card space-y-3 divide-y divide-(--omp-border-muted)/70">
+													<div className="space-y-3 divide-y divide-(--omp-border-muted)/70">
 														<div id="setting-gui-theme" className="scroll-mt-4 space-y-2.5">
 															<SegmentedField
 																label={t("settings.gui.themeSection")}
@@ -1397,7 +1397,7 @@ export function SettingsWindow() {
 
 												{/* 2. Conversation & Code */}
 												<Section title={t("settings.gui.group.conversation")}>
-													<div className="omp-settings-group-card space-y-3 divide-y divide-(--omp-border-muted)/70">
+													<div className="space-y-3 divide-y divide-(--omp-border-muted)/70">
 														<div>
 															<SegmentedField
 																id="setting-gui-transcriptDetail"
@@ -1474,7 +1474,7 @@ export function SettingsWindow() {
 
 												{/* 3. Workspace & Navigation */}
 												<Section title={t("settings.gui.group.workspace")}>
-													<div className="omp-settings-group-card space-y-3 divide-y divide-(--omp-border-muted)/70">
+													<div className="space-y-3 divide-y divide-(--omp-border-muted)/70">
 														<div id="setting-gui-tabStrip" className="scroll-mt-4 space-y-2">
 															<SegmentedField
 																label={t("settings.gui.tabStrip")}
@@ -1614,7 +1614,7 @@ export function SettingsWindow() {
 
 												{/* 4. Notifications & Confirmations */}
 												<Section title={t("settings.gui.group.notifications")}>
-													<div className="omp-settings-group-card space-y-2.5">
+													<div className="space-y-2.5">
 														<div id="setting-gui-notifications" className="scroll-mt-4 space-y-2">
 															<Toggle
 																className="omp-settings-row"
@@ -1650,7 +1650,7 @@ export function SettingsWindow() {
 														</div>
 													</div>
 												</Section>
-											</div>
+											</>
 										)}
 										{tab === ADVANCED_TAB_ID && (
 											<>

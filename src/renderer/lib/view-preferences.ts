@@ -2,8 +2,10 @@
  * Shared view-preference actions: single source of truth for the TitleBar view
  * control center, keyboard shortcuts, command palette, and Settings.
  */
+import { toast } from "../stores/toast";
 import { type ChatWidth, type ThemeMode, type TranscriptDetail, useUiStore } from "../stores/ui";
-import { saveGuiPreference } from "./display-preferences";
+import { translate } from "./i18n";
+import { applyChatWidth, applyCompactDensity, applyFontSize } from "./theme";
 import { applyThemeByName } from "./themes";
 
 export const WIDTH_ORDER: readonly ChatWidth[] = ["standard", "wide", "full"];
@@ -29,13 +31,31 @@ export function resolveProcessPreset(state: {
 	return "balanced";
 }
 
+async function persistPrefs(entries: readonly (readonly [string, unknown])[], rollback: () => void): Promise<boolean> {
+	try {
+		await Promise.all(entries.map(([key, value]) => window.omp.prefs.set(key, value)));
+		return true;
+	} catch (error) {
+		rollback();
+		toast({ variant: "error", title: translate("settings.saveFailed"), message: String(error) });
+		return false;
+	}
+}
+
 export function applyThemeModePreference(mode: ThemeMode): void {
 	applyThemeByName(mode);
 	useUiStore.getState().setTheme(mode);
 }
 
 export function applyChatWidthPreference(next: ChatWidth): void {
-	void saveGuiPreference("chatWidth", next, () => useUiStore.getState().setChatWidth(next));
+	const previous = useUiStore.getState().chatWidth;
+	if (previous === next) return;
+	applyChatWidth(next);
+	useUiStore.getState().setChatWidth(next);
+	void persistPrefs([["chatWidth", next]], () => {
+		applyChatWidth(previous);
+		useUiStore.getState().setChatWidth(previous);
+	});
 }
 
 export function cycleChatWidthPreference(): ChatWidth {
@@ -46,8 +66,14 @@ export function cycleChatWidthPreference(): ChatWidth {
 
 export function applyFontSizePreference(next: number): number {
 	const clamped = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, Math.round(next)));
-	if (clamped !== useUiStore.getState().fontSize) {
-		void saveGuiPreference("fontSize", clamped, () => useUiStore.getState().setFontSize(clamped));
+	const previous = useUiStore.getState().fontSize;
+	if (clamped !== previous) {
+		applyFontSize(clamped);
+		useUiStore.getState().setFontSize(clamped);
+		void persistPrefs([["fontSize", clamped]], () => {
+			applyFontSize(previous);
+			useUiStore.getState().setFontSize(previous);
+		});
 	}
 	return clamped;
 }
@@ -61,7 +87,14 @@ export function resetFontSizePreference(): number {
 }
 
 export function applyCompactDensityPreference(next: boolean): void {
-	void saveGuiPreference("compactDensity", next, () => useUiStore.setState({ compactDensity: next }));
+	const previous = useUiStore.getState().compactDensity;
+	if (previous === next) return;
+	applyCompactDensity(next);
+	useUiStore.setState({ compactDensity: next });
+	void persistPrefs([["compactDensity", next]], () => {
+		applyCompactDensity(previous);
+		useUiStore.setState({ compactDensity: previous });
+	});
 }
 
 export function toggleCompactDensityPreference(): boolean {
@@ -72,6 +105,11 @@ export function toggleCompactDensityPreference(): boolean {
 
 export function applyProcessPresetPreference(preset: ProcessDetailPreset): void {
 	const ui = useUiStore.getState();
+	const previous = {
+		transcriptDetail: ui.transcriptDetail,
+		autoCollapseProcess: ui.autoCollapseProcess,
+		thinkingExpanded: ui.thinkingExpanded,
+	};
 	const config: {
 		transcriptDetail: TranscriptDetail;
 		autoCollapseProcess: boolean;
@@ -83,13 +121,15 @@ export function applyProcessPresetPreference(preset: ProcessDetailPreset): void 
 				? { transcriptDetail: "full", autoCollapseProcess: false, thinkingExpanded: true }
 				: { transcriptDetail: "full", autoCollapseProcess: true, thinkingExpanded: false };
 
-	void saveGuiPreference("transcriptDetail", config.transcriptDetail, () =>
-		ui.setTranscriptDetail(config.transcriptDetail),
-	);
-	void saveGuiPreference("autoCollapseProcess", config.autoCollapseProcess, () =>
-		ui.setAutoCollapseProcess(config.autoCollapseProcess),
-	);
-	void saveGuiPreference("thinkingExpanded", config.thinkingExpanded, () =>
-		ui.setThinkingExpanded(config.thinkingExpanded),
+	// Atomic single-commit update: avoids 3 consecutive ChatStream row rebuilds
+	// and intermediate preset states when switching Minimal / Balanced / Detailed.
+	useUiStore.setState(config);
+	void persistPrefs(
+		[
+			["transcriptDetail", config.transcriptDetail],
+			["autoCollapseProcess", config.autoCollapseProcess],
+			["thinkingExpanded", config.thinkingExpanded],
+		],
+		() => useUiStore.setState(previous),
 	);
 }

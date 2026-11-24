@@ -349,19 +349,6 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		onChange: handleVirtualizerChange,
 	});
 	const totalSize = virtualizer.getTotalSize();
-	const chatWidth = useUiStore(s => s.chatWidth);
-	const fontSize = useUiStore(s => s.fontSize);
-	const compactDensity = useUiStore(s => s.compactDensity);
-	const layoutSignature = `${chatWidth}:${fontSize}:${compactDensity ? "tight" : "comfortable"}:${transcriptDetail}`;
-	const lastLayoutSignatureRef = useRef(layoutSignature);
-	useLayoutEffect(() => {
-		if (lastLayoutSignatureRef.current === layoutSignature) return;
-		lastLayoutSignatureRef.current = layoutSignature;
-		// Column width, typography scale, density, and detail level all change row
-		// wrapping heights; drop stale offscreen estimates so long transcripts do
-		// not jump when toggling between Standard / Wide / Full.
-		virtualizer.measure();
-	}, [layoutSignature, virtualizer]);
 	const scrollToTail = useCallback(() => {
 		const el = parentRef.current;
 		if (el && footerRef.current?.offsetHeight) el.scrollTop = el.scrollHeight;

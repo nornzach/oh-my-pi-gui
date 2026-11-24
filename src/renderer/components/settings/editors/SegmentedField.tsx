@@ -43,7 +43,7 @@ export function SegmentedField<T extends string>({
 								aria-pressed={active}
 								onClick={() => onChange(option.value)}
 								className={cx(
-									"relative z-[1] flex h-7 flex-1 min-w-0 items-center justify-center rounded-[7px] px-3 text-omp-xs font-medium whitespace-nowrap transition-colors",
+									"relative z-[1] flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-[7px] px-3 py-1 text-omp-xs font-medium whitespace-nowrap transition-colors",
 									active ? "text-(--omp-text)" : "text-(--omp-muted) hover:text-(--omp-text)",
 								)}
 							>

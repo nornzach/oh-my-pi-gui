@@ -44,7 +44,7 @@ import { type ChatWidth, type ThemeMode, useEffectiveKeymapOverrides, useUiStore
 import { Glide } from "../common/Glide";
 import { SwitchTrack } from "../common/SwitchTrack";
 
-const PANEL_WIDTH = 316;
+const PANEL_WIDTH = 336;
 const VIEWPORT_EDGE = 12;
 
 function QuickToggleRow({
@@ -225,7 +225,7 @@ export function ViewControlsPopover({ className }: { className: string }) {
 												data-theme-mode-option={option.value}
 												onClick={() => applyThemeModePreference(option.value)}
 												className={cx(
-													"relative z-[1] flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[7px] text-omp-xs font-medium transition-colors",
+													"relative z-[1] flex min-h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[7px] px-1.5 py-1 text-omp-xs font-medium transition-colors",
 													active
 														? "text-[var(--omp-text)]"
 														: "text-[var(--omp-muted)] hover:text-[var(--omp-text)]",
@@ -263,7 +263,7 @@ export function ViewControlsPopover({ className }: { className: string }) {
 													data-chat-width-option={option.value}
 													onClick={() => applyChatWidthPreference(option.value)}
 													className={cx(
-														"relative z-[1] flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-[7px] text-omp-xs font-medium transition-colors",
+														"relative z-[1] flex min-h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-[7px] px-1.5 py-1 text-omp-xs font-medium transition-colors",
 														active
 															? "text-[var(--omp-text)]"
 															: "text-[var(--omp-muted)] hover:text-[var(--omp-text)]",
@@ -317,10 +317,14 @@ export function ViewControlsPopover({ className }: { className: string }) {
 
 								{/* Interface density */}
 								<div className="flex items-center justify-between gap-2 px-0.5">
-									<span className="text-omp-sm text-[var(--omp-text-secondary)]">
+									<span className="shrink-0 text-omp-sm text-[var(--omp-text-secondary)]">
 										{t("chat.quickView.density")}
 									</span>
-									<div className="omp-segmented w-36" role="group" aria-label={t("chat.quickView.density")}>
+									<div
+										className="omp-segmented min-w-[10rem]"
+										role="group"
+										aria-label={t("chat.quickView.density")}
+									>
 										<Glide
 											activeKey={compactDensity ? "tight" : "comfortable"}
 											selector='[aria-pressed="true"]'
@@ -332,7 +336,7 @@ export function ViewControlsPopover({ className }: { className: string }) {
 											data-density-option="comfortable"
 											onClick={() => applyCompactDensityPreference(false)}
 											className={cx(
-												"relative z-[1] flex h-6 min-w-0 flex-1 items-center justify-center rounded-[6px] text-omp-xs font-medium transition-colors",
+												"relative z-[1] flex min-h-6 min-w-0 flex-1 items-center justify-center rounded-[6px] px-2.5 py-0.5 text-omp-xs font-medium transition-colors",
 												!compactDensity
 													? "text-[var(--omp-text)]"
 													: "text-[var(--omp-muted)] hover:text-[var(--omp-text)]",
@@ -346,7 +350,7 @@ export function ViewControlsPopover({ className }: { className: string }) {
 											data-density-option="tight"
 											onClick={() => applyCompactDensityPreference(true)}
 											className={cx(
-												"relative z-[1] flex h-6 min-w-0 flex-1 items-center justify-center rounded-[6px] text-omp-xs font-medium transition-colors",
+												"relative z-[1] flex min-h-6 min-w-0 flex-1 items-center justify-center rounded-[6px] px-2.5 py-0.5 text-omp-xs font-medium transition-colors",
 												compactDensity
 													? "text-[var(--omp-text)]"
 													: "text-[var(--omp-muted)] hover:text-[var(--omp-text)]",
@@ -380,7 +384,7 @@ export function ViewControlsPopover({ className }: { className: string }) {
 													data-process-preset={option.value}
 													onClick={() => applyProcessPresetPreference(option.value)}
 													className={cx(
-														"relative z-[1] flex h-7 min-w-0 flex-1 items-center justify-center rounded-[7px] text-omp-xs font-medium transition-colors",
+														"relative z-[1] flex min-h-7 min-w-0 flex-1 items-center justify-center rounded-[7px] px-1.5 py-1 text-omp-xs font-medium transition-colors",
 														active
 															? "text-[var(--omp-text)]"
 															: "text-[var(--omp-muted)] hover:text-[var(--omp-text)]",

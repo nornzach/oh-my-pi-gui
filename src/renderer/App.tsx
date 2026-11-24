@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from "react";
 import type { MenuAction, MenuActionPayload, RunProgressState } from "../shared/ipc-types";
 import { nextLanguage } from "../shared/languages";
 import { AgentHoverCardLayer } from "./components/agents/AgentHoverCard";
@@ -176,7 +176,7 @@ function FocusedSessionEffects() {
 		const timer = setTimeout(() => window.omp.progress.set(state), 200);
 		return () => clearTimeout(timer);
 	}, [progressEnabled, progressAwaiting, progressStreaming]);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		applyCompactDensity(compactDensity);
 		document.documentElement.dataset.colorblind = colorBlindMode ? "true" : "false";
 	}, [compactDensity, colorBlindMode]);
@@ -398,10 +398,11 @@ export function App() {
 		[],
 	);
 
-	// Font changes do not participate in theme resolution.
+	// Font, width, and density apply synchronously before paint so ResizeObserver
+	// and travelling Glide thumbs measure the updated geometry in the same frame.
 	useEffect(() => watchSystemTheme(theme, () => applyThemeByName("system", { persist: false })), [theme]);
-	useEffect(() => applyFontSize(fontSize), [fontSize]);
-	useEffect(() => applyChatWidth(chatWidth), [chatWidth]);
+	useLayoutEffect(() => applyFontSize(fontSize), [fontSize]);
+	useLayoutEffect(() => applyChatWidth(chatWidth), [chatWidth]);
 
 	// Handle omp:// deep links (omp://new → new session; omp://session/<id> → switch).
 	useEffect(() => {
