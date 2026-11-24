@@ -30,7 +30,10 @@ import {
 	Folder,
 	HardDriveDownload,
 	Keyboard,
+	Minus,
 	Network,
+	Palette,
+	Plus,
 	RefreshCw,
 	RotateCcw,
 	RotateCw,
@@ -62,6 +65,14 @@ import { platformChord } from "../../lib/keymap";
 import { setCodeLineNumbersPref } from "../../lib/markdown";
 import { clearSessionContext, retryLastTurn as retryLastTurnShared } from "../../lib/messages";
 import { dumpTranscriptToClipboard } from "../../lib/transcript-copy";
+import {
+	applyFontSizePreference,
+	applyThemeModePreference,
+	FONT_SIZE_DEFAULT,
+	FONT_SIZE_MAX,
+	FONT_SIZE_MIN,
+	resetFontSizePreference,
+} from "../../lib/view-preferences";
 import { en } from "../../locales/en";
 import { ru } from "../../locales/ru";
 import { zh } from "../../locales/zh";
@@ -84,8 +95,8 @@ import { ExtensionSettingsPage } from "../panels/ExtensionsPanel";
 import { InventorySettingsPage, type TabId as InventoryTabId } from "../panels/InventoryPanel";
 import { ConfigEditorSetting } from "./ConfigEditorSetting";
 import { ArrayChipEditor } from "./editors/ArrayChipEditor";
-import { RadioGroup } from "./editors/RadioGroup";
 import { Section } from "./editors/Section";
+import { SegmentedField } from "./editors/SegmentedField";
 import { Toggle } from "./editors/Toggle";
 import { AdvancedTab } from "./pages/AdvancedTab";
 import { CapabilitiesHome, type CapabilityTarget } from "./pages/CapabilitiesHome";
@@ -294,13 +305,14 @@ export function SettingsWindow() {
 	const open = useUiStore(state => state.settingsOpen);
 	const requestedTab = useUiStore(state => state.settingsTab);
 	const close = useUiStore(state => state.closeSettings);
-	const setFontSize = useUiStore(state => state.setFontSize);
+	const theme = useUiStore(state => state.theme);
 	const pasteMenuThreshold = useDisplayPreference("pasteMenuThreshold");
 	const [pasteThresholdDraft, setPasteThresholdDraft] = useState<string | null>(null);
 	const setPanelTab = useUiStore(state => state.setPanelTab);
 	const setNotifications = useUiStore(state => state.setNotifications);
 	const setNotificationsWhenFocused = useUiStore(state => state.setNotificationsWhenFocused);
 	const setTranscriptDetail = useUiStore(state => state.setTranscriptDetail);
+	const setChatWidth = useUiStore(state => state.setChatWidth);
 	const fontSize = useUiStore(state => state.fontSize);
 	const compactDensity = useUiStore(state => state.compactDensity);
 	const colorBlindMode = useUiStore(state => state.colorBlindMode);
@@ -313,6 +325,7 @@ export function SettingsWindow() {
 	const sidebarQuotas = useUiStore(state => state.sidebarQuotas);
 	const confirmSessionDelete = useUiStore(state => state.confirmSessionDelete);
 	const transcriptDetail = useUiStore(state => state.transcriptDetail);
+	const chatWidth = useUiStore(state => state.chatWidth);
 	const tabWidth = useUiStore(state => state.tabWidth);
 	const tabRows = useUiStore(state => state.tabRows);
 	const linkOpenMode = useUiStore(state => state.linkOpenMode);
@@ -330,7 +343,6 @@ export function SettingsWindow() {
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [schema, setSchema] = useState<SettingsSchemaResult | null>(null);
 	const [values, setValues] = useState<Record<string, unknown>>({});
-	const [fontSizeDraft, setFontSizeDraft] = useState<string | null>(null);
 	const [proxyDraft, setProxyDraft] = useState<string | null>(null);
 	const [savedProxy, setSavedProxy] = useState("");
 	const [proxyDirect, setProxyDirect] = useState(false);
@@ -425,7 +437,6 @@ export function SettingsWindow() {
 					if (typeof data?.advisorEnabled === "boolean") nextValues["advisor.enabled"] = data.advisorEnabled;
 					setAdvisorActive(data?.advisorActive);
 				}
-				setFontSizeDraft(null);
 				setSchema(result);
 				setValues(previous => (version === settingsVersion.current ? nextValues : { ...nextValues, ...previous }));
 				setLoadState("ready");
@@ -590,21 +601,11 @@ export function SettingsWindow() {
 	const applyTranscriptDetail = (next: typeof transcriptDetail) => {
 		void saveGuiPreference("transcriptDetail", next, () => setTranscriptDetail(next));
 	};
+	const applyChatWidth = (next: typeof chatWidth) => {
+		void saveGuiPreference("chatWidth", next, () => setChatWidth(next));
+	};
 	const applyDisplayPreference = (key: "compactDensity" | "colorBlindMode" | "followAgentTheme", value: boolean) => {
 		return saveGuiPreference(key, value, () => useUiStore.setState({ [key]: value }));
-	};
-	const commitFontSize = () => {
-		if (fontSizeDraft === null) return;
-		const parsed = Number(fontSizeDraft);
-		if (!Number.isFinite(parsed) || parsed < 10 || parsed > 20) {
-			setFontSizeDraft(null);
-			toast({ variant: "warning", message: t("settings.fontSizeRange") });
-			return;
-		}
-		void saveGuiPreference("fontSize", parsed, () => {
-			setFontSize(parsed);
-			setFontSizeDraft(null);
-		});
 	};
 	// Proxy prefs are spawn-time env: save, then restart the focused agent when it
 	// is idle so the change is visible without a manual relaunch.
@@ -1270,284 +1271,386 @@ export function SettingsWindow() {
 										)}
 
 										{tab === GUI_TAB_ID && (
-											<>
-												<Section id="setting-gui-theme" title={t("settings.gui.themeSection")}>
-													<Button
-														onClick={() => {
-															close();
-															useUiStore.getState().openThemePicker();
-														}}
-														variant="secondary"
-													>
-														{t("settings.gui.theme")}
-													</Button>
-													<Toggle
-														className="omp-settings-row"
-														checked={followAgentTheme}
-														label={t("settings.gui.followAgentTheme")}
-														description={t("settings.gui.followAgentThemeDesc")}
-														onChange={value => applyDisplayPreference("followAgentTheme", value)}
-													/>
-												</Section>
-												<Section id="setting-gui-display" title={t("settings.display.title")}>
-													<p className="mb-3 text-omp-sm text-(--omp-muted)">
-														{t("settings.display.scope")}
-													</p>
-													<div className="space-y-4">
-														{GUI_DISPLAY_BOOL_FIELDS.map(field => (
-															<DisplayPreferenceRow key={field} field={field} />
-														))}
-													</div>
-													<div id="setting-gui-collapseLargePastes" className="mt-4">
-														<Toggle
-															className="omp-settings-row"
-															checked={collapseLargePastes}
-															description={t("settings.gui.collapseLargePastesDesc")}
-															label={t("settings.gui.collapseLargePastes")}
-															onChange={applyCollapseLargePastes}
-														/>
-													</div>
-													<div id="setting-gui-askInline" className="mt-4">
-														<Toggle
-															className="omp-settings-row"
-															checked={askInline}
-															description={t("settings.gui.askInlineDesc")}
-															label={t("settings.gui.askInline")}
-															onChange={applyAskInline}
-														/>
-													</div>
-													{/* Same row geometry as the switches above: label left, a
-											    number-sized field right — not a full-width text box. */}
-													<div
-														id="setting-gui-pasteMenuThreshold"
-														className="omp-settings-row flex items-center justify-between gap-4"
-													>
-														<span className="text-omp-md font-medium text-(--omp-text)">
-															{t("settings.display.pasteMenuThreshold")}
-														</span>
-														<div className="w-24 shrink-0">
-															<Input
-																compact
-																aria-label={t("settings.display.pasteMenuThreshold")}
-																type="number"
-																min={0}
-																step={1}
-																value={pasteThresholdDraft ?? String(pasteMenuThreshold)}
-																onChange={event => setPasteThresholdDraft(event.target.value)}
-																onBlur={() => {
-																	if (pasteThresholdDraft === null) return;
-																	const value = Number(pasteThresholdDraft);
-																	if (
-																		pasteThresholdDraft.trim() === "" ||
-																		!Number.isInteger(value) ||
-																		value < 0
-																	) {
-																		toast({
-																			variant: "error",
-																			message: t("settings.editors.errNumber"),
-																		});
-																		return;
-																	}
-																	void setDisplayPreference("pasteMenuThreshold", value).then(ok => {
-																		if (ok) setPasteThresholdDraft(null);
-																	});
-																}}
+											<div className="space-y-6">
+												{/* 1. Appearance & Typography */}
+												<Section title={t("settings.gui.group.appearance")}>
+													<div className="omp-settings-group-card space-y-3 divide-y divide-(--omp-border-muted)/70">
+														<div id="setting-gui-theme" className="scroll-mt-4 space-y-2.5">
+															<SegmentedField
+																label={t("settings.gui.themeSection")}
+																onChange={applyThemeModePreference}
+																options={[
+																	{ value: "light", label: t("chat.quickView.themeLight") },
+																	{ value: "dark", label: t("chat.quickView.themeDark") },
+																	{ value: "system", label: t("chat.quickView.themeSystem") },
+																]}
+																value={theme}
+															/>
+															<div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
+																<Button
+																	icon={<Palette size={13} />}
+																	onClick={() => {
+																		close();
+																		useUiStore.getState().openThemePicker();
+																	}}
+																	size="sm"
+																	variant="secondary"
+																>
+																	{t("settings.gui.theme")}
+																</Button>
+															</div>
+															<div id="setting-gui-followAgentTheme" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={followAgentTheme}
+																	label={t("settings.gui.followAgentTheme")}
+																	description={t("settings.gui.followAgentThemeDesc")}
+																	onChange={value => applyDisplayPreference("followAgentTheme", value)}
+																/>
+															</div>
+														</div>
+
+														<div className="pt-2">
+															<SegmentedField
+																id="setting-gui-chatWidth"
+																label={t("settings.gui.chatWidth")}
+																onChange={applyChatWidth}
+																options={[
+																	{
+																		value: "standard",
+																		label: t("settings.gui.chatWidth.standard"),
+																		description: t("settings.gui.chatWidth.standardDesc"),
+																	},
+																	{
+																		value: "wide",
+																		label: t("settings.gui.chatWidth.wide"),
+																		description: t("settings.gui.chatWidth.wideDesc"),
+																	},
+																	{
+																		value: "full",
+																		label: t("settings.gui.chatWidth.full"),
+																		description: t("settings.gui.chatWidth.fullDesc"),
+																	},
+																]}
+																value={chatWidth}
+															/>
+														</div>
+
+														<div id="setting-gui-fontSize" className="scroll-mt-4 pt-3">
+															<div className="omp-settings-row flex items-center justify-between gap-4">
+																<div className="min-w-0">
+																	<div className="text-omp-md font-medium text-(--omp-text)">
+																		{t("settings.gui.fontSize")}
+																	</div>
+																	<p className="mt-0.5 text-omp-xs text-(--omp-muted)">
+																		{t("settings.gui.fontSizeDesc")}
+																	</p>
+																</div>
+																<div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-(--omp-border-muted) p-0.5">
+																	<button
+																		type="button"
+																		disabled={fontSize <= FONT_SIZE_MIN}
+																		aria-label={t("chat.quickView.fontDecrease")}
+																		onClick={() => applyFontSizePreference(fontSize - 1)}
+																		className="omp-pressable flex h-7 w-7 items-center justify-center rounded-md text-(--omp-muted) hover:bg-(--omp-selected-bg) hover:text-(--omp-text) disabled:pointer-events-none disabled:opacity-35"
+																	>
+																		<Minus aria-hidden="true" size={13} />
+																	</button>
+																	<button
+																		type="button"
+																		title={t("chat.quickView.fontReset", { size: FONT_SIZE_DEFAULT })}
+																		onClick={() => resetFontSizePreference()}
+																		className="omp-pressable min-w-[48px] rounded-md px-2 py-1 text-center font-mono text-omp-sm tabular-nums text-(--omp-text) hover:bg-(--omp-selected-bg)"
+																	>
+																		{fontSize}px
+																	</button>
+																	<button
+																		type="button"
+																		disabled={fontSize >= FONT_SIZE_MAX}
+																		aria-label={t("chat.quickView.fontIncrease")}
+																		onClick={() => applyFontSizePreference(fontSize + 1)}
+																		className="omp-pressable flex h-7 w-7 items-center justify-center rounded-md text-(--omp-muted) hover:bg-(--omp-selected-bg) hover:text-(--omp-text) disabled:pointer-events-none disabled:opacity-35"
+																	>
+																		<Plus aria-hidden="true" size={13} />
+																	</button>
+																</div>
+															</div>
+														</div>
+
+														<div id="setting-gui-readability" className="scroll-mt-4 space-y-2 pt-3">
+															<Toggle
+																className="omp-settings-row"
+																checked={compactDensity}
+																label={t("settings.gui.compactDensity")}
+																description={t("settings.gui.compactDensityDesc")}
+																onChange={value => applyDisplayPreference("compactDensity", value)}
+															/>
+															<Toggle
+																className="omp-settings-row"
+																checked={colorBlindMode}
+																label={t("settings.gui.colorBlindMode")}
+																onChange={value => applyDisplayPreference("colorBlindMode", value)}
 															/>
 														</div>
 													</div>
 												</Section>
-												<Section id="setting-gui-linkOpenMode" title={t("settings.gui.linkOpenMode")}>
-													<RadioGroup
-														name="linkOpenMode"
-														onChange={applyLinkOpenMode}
-														options={[
-															{
-																value: "panel",
-																label: t("settings.gui.linkOpenMode.panel"),
-																description: t("settings.gui.linkOpenMode.panelDesc"),
-															},
-															{
-																value: "external",
-																label: t("settings.gui.linkOpenMode.external"),
-																description: t("settings.gui.linkOpenMode.externalDesc"),
-															},
-														]}
-														value={linkOpenMode}
-													/>
-												</Section>
-												<Section id="setting-gui-readability" title={t("settings.gui.readability")}>
-													<Toggle
-														className="omp-settings-row"
-														checked={compactDensity}
-														label={t("settings.gui.compactDensity")}
-														description={t("settings.gui.compactDensityDesc")}
-														onChange={value => applyDisplayPreference("compactDensity", value)}
-													/>
-													<Toggle
-														className="omp-settings-row"
-														checked={colorBlindMode}
-														label={t("settings.gui.colorBlindMode")}
-														onChange={value => applyDisplayPreference("colorBlindMode", value)}
-													/>
-												</Section>
-												<Section id="setting-gui-fontSize" title={t("settings.gui.fontSize")}>
-													<div className="w-40">
-														<Input
-															compact
-															max={20}
-															min={10}
-															onBlur={commitFontSize}
-															onChange={event => setFontSizeDraft(event.target.value)}
-															onKeyDown={event => {
-																if (isImeKeyEvent(event)) return;
-																if (event.key === "Enter") event.currentTarget.blur();
-															}}
-															type="number"
-															value={fontSizeDraft ?? String(fontSize)}
-														/>
-													</div>
-													<p className="mt-1.5 text-omp-sm text-(--omp-muted)">
-														{t("settings.gui.fontSizeDesc")}
-													</p>
-												</Section>
-												{window.omp?.platform === "darwin" && <ConfigEditorSetting />}
-												<Section id="setting-gui-panelDefault" title={t("settings.gui.panelDefault")}>
-													<RadioGroup
-														name="defaultPanelTab"
-														onChange={applyPanelTab}
-														options={[
-															{ value: "diff", label: t("settings.gui.panel.diff") },
-															{ value: "files", label: t("settings.gui.panel.files") },
-														]}
-														value={panelTab}
-													/>
-												</Section>
-												<Section id="setting-gui-tabStrip" title={t("settings.gui.tabStrip")}>
-													<RadioGroup
-														name="tabWidth"
-														onChange={applyTabWidth}
-														options={[
-															{
-																value: "compact",
-																label: t("settings.gui.tabWidth.compact"),
-																description: t("settings.gui.tabWidth.compactDesc"),
-															},
-															{
-																value: "default",
-																label: t("settings.gui.tabWidth.default"),
-																description: t("settings.gui.tabWidth.defaultDesc"),
-															},
-															{
-																value: "wide",
-																label: t("settings.gui.tabWidth.wide"),
-																description: t("settings.gui.tabWidth.wideDesc"),
-															},
-														]}
-														value={tabWidth}
-													/>
-													<Toggle
-														className="omp-settings-row"
-														checked={tabRows === "multi"}
-														description={t("settings.gui.tabRowsDesc")}
-														label={t("settings.gui.tabRows")}
-														onChange={applyTabRows}
-													/>
-												</Section>
-												<Section id="setting-gui-sidebarQuotas" title={t("settings.gui.sidebarQuotas")}>
-													<Toggle
-														className="omp-settings-row"
-														checked={sidebarQuotas}
-														description={t("settings.gui.sidebarQuotasDesc")}
-														label={t("settings.gui.sidebarQuotas")}
-														onChange={applySidebarQuotas}
-													/>
-												</Section>
-												<Section
-													id="setting-gui-confirmSessionDelete"
-													title={t("settings.gui.confirmSessionDelete")}
-												>
-													<Toggle
-														className="omp-settings-row"
-														checked={confirmSessionDelete}
-														description={t("settings.gui.confirmSessionDeleteDesc")}
-														label={t("settings.gui.confirmSessionDelete")}
-														onChange={value =>
-															void saveGuiPreference("confirmSessionDelete", value, () =>
-																useUiStore.setState({ confirmSessionDelete: value }),
-															)
-														}
-													/>
-												</Section>
-												<Section id="setting-gui-notifications" title={t("settings.gui.notifications")}>
-													<Toggle
-														className="omp-settings-row"
-														checked={notifications}
-														description={t("settings.gui.notificationsDesc")}
-														label={t("settings.gui.notifications")}
-														onChange={applyNotifications}
-													/>
-													<Toggle
-														className="omp-settings-row"
-														checked={notificationsWhenFocused}
-														description={t("settings.gui.notificationsWhenFocusedDesc")}
-														disabled={!notifications}
-														label={t("settings.gui.notificationsWhenFocused")}
-														onChange={applyNotificationsWhenFocused}
-													/>
-												</Section>
-												<Section
-													id="setting-gui-thinkingExpanded"
-													title={t("settings.gui.thinkingExpanded")}
-												>
-													<Toggle
-														className="omp-settings-row"
-														checked={thinkingExpanded}
-														description={t("settings.gui.thinkingExpandedDesc")}
-														label={t("settings.gui.thinkingExpanded")}
-														onChange={applyThinkingExpanded}
-													/>
-													<div id="setting-gui-autoCollapseProcess">
-														<Toggle
-															className="omp-settings-row"
-															checked={autoCollapseProcess}
-															description={t("settings.gui.autoCollapseProcessDesc")}
-															label={t("settings.gui.autoCollapseProcess")}
-															onChange={applyAutoCollapseProcess}
-														/>
+
+												{/* 2. Conversation & Code */}
+												<Section title={t("settings.gui.group.conversation")}>
+													<div className="omp-settings-group-card space-y-3 divide-y divide-(--omp-border-muted)/70">
+														<div>
+															<SegmentedField
+																id="setting-gui-transcriptDetail"
+																label={t("settings.gui.transcriptDetail")}
+																onChange={applyTranscriptDetail}
+																options={[
+																	{
+																		value: "compact",
+																		label: t("settings.gui.transcript.compact"),
+																		description: t("settings.gui.transcript.compactDesc"),
+																	},
+																	{
+																		value: "full",
+																		label: t("settings.gui.transcript.full"),
+																		description: t("settings.gui.transcript.fullDesc"),
+																	},
+																]}
+																value={transcriptDetail}
+															/>
+														</div>
+
+														<div id="setting-gui-thinkingExpanded" className="scroll-mt-4 space-y-2 pt-3">
+															<Toggle
+																className="omp-settings-row"
+																checked={thinkingExpanded}
+																description={t("settings.gui.thinkingExpandedDesc")}
+																label={t("settings.gui.thinkingExpanded")}
+																onChange={applyThinkingExpanded}
+															/>
+															<div id="setting-gui-autoCollapseProcess" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={autoCollapseProcess}
+																	description={t("settings.gui.autoCollapseProcessDesc")}
+																	label={t("settings.gui.autoCollapseProcess")}
+																	onChange={applyAutoCollapseProcess}
+																/>
+															</div>
+															<div id="setting-gui-lineNumbers" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={codeLineNumbers}
+																	description={t("codeblock.lineNumbersDesc")}
+																	label={t("codeblock.lineNumbers")}
+																	onChange={applyCodeLineNumbers}
+																/>
+															</div>
+															<div id="setting-gui-askInline" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={askInline}
+																	description={t("settings.gui.askInlineDesc")}
+																	label={t("settings.gui.askInline")}
+																	onChange={applyAskInline}
+																/>
+															</div>
+														</div>
+
+														<div id="setting-gui-display" className="scroll-mt-4 pt-3">
+															<div className="mb-1 text-omp-sm font-medium text-(--omp-text)">
+																{t("settings.display.title")}
+															</div>
+															<p className="mb-3 text-omp-xs text-(--omp-muted)">
+																{t("settings.display.scope")}
+															</p>
+															<div className="space-y-3">
+																{GUI_DISPLAY_BOOL_FIELDS.map(field => (
+																	<DisplayPreferenceRow key={field} field={field} />
+																))}
+															</div>
+														</div>
 													</div>
 												</Section>
-												<Section
-													id="setting-gui-transcriptDetail"
-													title={t("settings.gui.transcriptDetail")}
-												>
-													<RadioGroup
-														name="transcriptDetail"
-														onChange={applyTranscriptDetail}
-														options={[
-															{
-																value: "compact",
-																label: t("settings.gui.transcript.compact"),
-																description: t("settings.gui.transcript.compactDesc"),
-															},
-															{
-																value: "full",
-																label: t("settings.gui.transcript.full"),
-																description: t("settings.gui.transcript.fullDesc"),
-															},
-														]}
-														value={transcriptDetail}
-													/>
+
+												{/* 3. Workspace & Navigation */}
+												<Section title={t("settings.gui.group.workspace")}>
+													<div className="omp-settings-group-card space-y-3 divide-y divide-(--omp-border-muted)/70">
+														<div id="setting-gui-tabStrip" className="scroll-mt-4 space-y-2">
+															<SegmentedField
+																label={t("settings.gui.tabStrip")}
+																onChange={applyTabWidth}
+																options={[
+																	{
+																		value: "compact",
+																		label: t("settings.gui.tabWidth.compact"),
+																		description: t("settings.gui.tabWidth.compactDesc"),
+																	},
+																	{
+																		value: "default",
+																		label: t("settings.gui.tabWidth.default"),
+																		description: t("settings.gui.tabWidth.defaultDesc"),
+																	},
+																	{
+																		value: "wide",
+																		label: t("settings.gui.tabWidth.wide"),
+																		description: t("settings.gui.tabWidth.wideDesc"),
+																	},
+																]}
+																value={tabWidth}
+															/>
+															<Toggle
+																className="omp-settings-row"
+																checked={tabRows === "multi"}
+																description={t("settings.gui.tabRowsDesc")}
+																label={t("settings.gui.tabRows")}
+																onChange={applyTabRows}
+															/>
+														</div>
+
+														<div className="pt-2">
+															<SegmentedField
+																id="setting-gui-linkOpenMode"
+																label={t("settings.gui.linkOpenMode")}
+																onChange={applyLinkOpenMode}
+																options={[
+																	{
+																		value: "panel",
+																		label: t("settings.gui.linkOpenMode.panel"),
+																		description: t("settings.gui.linkOpenMode.panelDesc"),
+																	},
+																	{
+																		value: "external",
+																		label: t("settings.gui.linkOpenMode.external"),
+																		description: t("settings.gui.linkOpenMode.externalDesc"),
+																	},
+																]}
+																value={linkOpenMode}
+															/>
+														</div>
+
+														<div className="pt-2">
+															<SegmentedField
+																id="setting-gui-panelDefault"
+																label={t("settings.gui.panelDefault")}
+																onChange={applyPanelTab}
+																options={[
+																	{ value: "overview", label: t("panel.tabs.overview") },
+																	{ value: "diff", label: t("settings.gui.panel.diff") },
+																	{ value: "files", label: t("settings.gui.panel.files") },
+																]}
+																value={
+																	panelTab === "diff" || panelTab === "files" ? panelTab : "overview"
+																}
+															/>
+														</div>
+
+														<div className="space-y-2.5 pt-3">
+															<div id="setting-gui-collapseLargePastes" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={collapseLargePastes}
+																	description={t("settings.gui.collapseLargePastesDesc")}
+																	label={t("settings.gui.collapseLargePastes")}
+																	onChange={applyCollapseLargePastes}
+																/>
+															</div>
+															<div
+																id="setting-gui-pasteMenuThreshold"
+																className="omp-settings-row flex scroll-mt-4 items-center justify-between gap-4"
+															>
+																<span className="text-omp-md font-medium text-(--omp-text)">
+																	{t("settings.display.pasteMenuThreshold")}
+																</span>
+																<div className="w-24 shrink-0">
+																	<Input
+																		compact
+																		aria-label={t("settings.display.pasteMenuThreshold")}
+																		type="number"
+																		min={0}
+																		step={1}
+																		value={pasteThresholdDraft ?? String(pasteMenuThreshold)}
+																		onChange={event => setPasteThresholdDraft(event.target.value)}
+																		onBlur={() => {
+																			if (pasteThresholdDraft === null) return;
+																			const value = Number(pasteThresholdDraft);
+																			if (
+																				pasteThresholdDraft.trim() === "" ||
+																				!Number.isInteger(value) ||
+																				value < 0
+																			) {
+																				toast({
+																					variant: "error",
+																					message: t("settings.editors.errNumber"),
+																				});
+																				return;
+																			}
+																			void setDisplayPreference("pasteMenuThreshold", value).then(
+																				ok => {
+																					if (ok) setPasteThresholdDraft(null);
+																				},
+																			);
+																		}}
+																	/>
+																</div>
+															</div>
+															<div id="setting-gui-sidebarQuotas" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={sidebarQuotas}
+																	description={t("settings.gui.sidebarQuotasDesc")}
+																	label={t("settings.gui.sidebarQuotas")}
+																	onChange={applySidebarQuotas}
+																/>
+															</div>
+														</div>
+
+														{window.omp?.platform === "darwin" && (
+															<div className="pt-3">
+																<ConfigEditorSetting />
+															</div>
+														)}
+													</div>
 												</Section>
-												<Section id="setting-gui-lineNumbers" title={t("codeblock.title")}>
-													<Toggle
-														className="omp-settings-row"
-														checked={codeLineNumbers}
-														description={t("codeblock.lineNumbersDesc")}
-														label={t("codeblock.lineNumbers")}
-														onChange={applyCodeLineNumbers}
-													/>
+
+												{/* 4. Notifications & Confirmations */}
+												<Section title={t("settings.gui.group.notifications")}>
+													<div className="omp-settings-group-card space-y-2.5">
+														<div id="setting-gui-notifications" className="scroll-mt-4 space-y-2">
+															<Toggle
+																className="omp-settings-row"
+																checked={notifications}
+																description={t("settings.gui.notificationsDesc")}
+																label={t("settings.gui.notifications")}
+																onChange={applyNotifications}
+															/>
+															<Toggle
+																className="omp-settings-row"
+																checked={notificationsWhenFocused}
+																description={t("settings.gui.notificationsWhenFocusedDesc")}
+																disabled={!notifications}
+																label={t("settings.gui.notificationsWhenFocused")}
+																onChange={applyNotificationsWhenFocused}
+															/>
+														</div>
+														<div
+															id="setting-gui-confirmSessionDelete"
+															className="scroll-mt-4 border-t border-(--omp-border-muted)/70 pt-2.5"
+														>
+															<Toggle
+																className="omp-settings-row"
+																checked={confirmSessionDelete}
+																description={t("settings.gui.confirmSessionDeleteDesc")}
+																label={t("settings.gui.confirmSessionDelete")}
+																onChange={value =>
+																	void saveGuiPreference("confirmSessionDelete", value, () =>
+																		useUiStore.setState({ confirmSessionDelete: value }),
+																	)
+																}
+															/>
+														</div>
+													</div>
 												</Section>
-											</>
+											</div>
 										)}
 										{tab === ADVANCED_TAB_ID && (
 											<>

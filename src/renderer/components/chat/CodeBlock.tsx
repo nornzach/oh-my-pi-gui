@@ -1,4 +1,4 @@
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Hash } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { copyText, cx, escapeHtml, escapeRegExp } from "../../lib/format";
 import { getLoadedHljs, HIGHLIGHT_CHAR_CAP, loadHljs } from "../../lib/highlight";
@@ -18,6 +18,8 @@ export interface CodeBlockProps {
 	showCopy?: boolean;
 	/** Show the line-number gutter. */
 	showLineNumbers?: boolean;
+	/** Optional inline toggle for code-block line numbers (wired for markdown fences). */
+	onToggleLineNumbers?: () => void;
 	/** Tokenize with highlight.js. Off for code that is still streaming in. */
 	highlight?: boolean;
 	/** Highlight these literal strings inside the code (e.g. grep pattern). */
@@ -60,6 +62,7 @@ export function CodeBlock({
 	showLanguage = true,
 	showCopy = true,
 	showLineNumbers = true,
+	onToggleLineNumbers,
 	highlight = true,
 	startLine,
 	lineNumbers,
@@ -166,6 +169,24 @@ export function CodeBlock({
 		</button>
 	);
 
+	const lineNumbersButton =
+		onToggleLineNumbers && lineCount > 1 ? (
+			<button
+				type="button"
+				aria-pressed={showLineNumbers}
+				aria-label={t("codeblock.lineNumbers")}
+				title={t("codeblock.lineNumbers")}
+				data-code-line-numbers-toggle=""
+				onClick={onToggleLineNumbers}
+				className={cx(
+					"omp-pressable inline-flex h-6 w-6 items-center justify-center rounded-md text-omp-xs transition-[opacity,background-color,color] duration-150 hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] focus:opacity-100 group-hover/code:opacity-100",
+					showLineNumbers ? "text-[var(--omp-accent)] opacity-90" : "text-[var(--omp-dim)] opacity-60",
+				)}
+			>
+				<Hash aria-hidden="true" size={11} />
+			</button>
+		) : null;
+
 	return (
 		<div
 			className={cx(
@@ -181,13 +202,19 @@ export function CodeBlock({
 							{lineCount}
 						</span>
 					)}
-					{showCopy && <span className="ml-auto">{copyButton}</span>}
+					{(lineNumbersButton || showCopy) && (
+						<span className="ml-auto flex items-center gap-1">
+							{lineNumbersButton}
+							{showCopy && copyButton}
+						</span>
+					)}
 				</div>
 			)}
-			{label === null && showCopy && (
-				// No header to sit in: the button floats over the code's corner on hover.
-				<span className="absolute end-2 top-2 z-10 rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] shadow-[var(--omp-shadow-sm)]">
-					{copyButton}
+			{label === null && (lineNumbersButton || showCopy) && (
+				// No header to sit in: actions float over the code's corner on hover.
+				<span className="absolute end-2 top-2 z-10 flex items-center gap-0.5 rounded-md border border-[var(--omp-border-muted)] bg-[var(--omp-code-bg)] shadow-[var(--omp-shadow-sm)]">
+					{lineNumbersButton}
+					{showCopy && copyButton}
 				</span>
 			)}
 			<div className={cx("overflow-auto", maxHeightClass)}>

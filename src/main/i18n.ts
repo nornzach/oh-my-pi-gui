@@ -29,6 +29,7 @@ export type MainTextKey =
 	| "menu.closeWindow"
 	| "menu.commandCenter"
 	| "menu.contextReport"
+	| "menu.cycleChatWidth"
 	| "menu.debugConsole"
 	| "menu.documentation"
 	| "menu.edit"
@@ -39,6 +40,9 @@ export type MainTextKey =
 	| "menu.find"
 	| "menu.findNext"
 	| "menu.findPrevious"
+	| "menu.fontSizeDecrease"
+	| "menu.fontSizeIncrease"
+	| "menu.fontSizeReset"
 	| "menu.handoff"
 	| "menu.help"
 	| "menu.hotkeys"
@@ -169,6 +173,10 @@ const TEXT: Record<MainTextKey, Record<Exclude<MainLanguage, "ru" | "th">, strin
 	"menu.stats": { en: "Session Stats", zh: "会话统计" },
 	"menu.togglePanel": { en: "Toggle Panel", zh: "显示或隐藏面板" },
 	"menu.toggleSidebar": { en: "Toggle Sidebar", zh: "显示或隐藏侧边栏" },
+	"menu.cycleChatWidth": { en: "Cycle Reading Width", zh: "切换对话阅读宽度" },
+	"menu.fontSizeIncrease": { en: "Increase Font Size", zh: "增大字号" },
+	"menu.fontSizeDecrease": { en: "Decrease Font Size", zh: "减小字号" },
+	"menu.fontSizeReset": { en: "Reset Font Size", zh: "重置字号" },
 	"menu.tools": { en: "Tools", zh: "工具" },
 	"menu.view": { en: "View", zh: "视图" },
 	"menu.window": { en: "Window", zh: "窗口" },

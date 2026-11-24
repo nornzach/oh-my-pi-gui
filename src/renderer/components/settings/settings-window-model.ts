@@ -203,6 +203,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		labelKey: "settings.gui.transcriptDetail",
 		aliases: "transcriptDetail tools detail transcript 对话 工具 过程",
 	},
+	{
+		id: "chatWidth",
+		labelKey: "settings.gui.chatWidth",
+		aliases: "chatWidth width fluid full wide layout reading column 宽度 宽屏 全宽 流式 布局 ширина",
+	},
 	{ id: "lineNumbers", labelKey: "codeblock.lineNumbers", aliases: "codeLineNumbers code lines 代码 行号" },
 	{
 		id: "proxy",

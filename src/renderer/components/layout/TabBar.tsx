@@ -21,10 +21,12 @@ import {
 	MessageCircle,
 	MessageCirclePlus,
 	MoreHorizontal,
+	MoveHorizontal,
 	Plus,
 	Rows2,
 	SplitSquareHorizontal,
 	Unlink,
+	WrapText,
 	X,
 } from "lucide-react";
 import {
@@ -40,6 +42,7 @@ import {
 	useState,
 } from "react";
 import { useSessionList } from "../../hooks/use-session-list";
+import { saveGuiPreference } from "../../lib/display-preferences";
 import { basename, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { actionChords, KEYMAP_ACTION_BY_ID, onEscape } from "../../lib/keymap";
@@ -833,6 +836,33 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 							},
 						});
 					}
+					const nextTabWidth: TabWidth =
+						tabWidth === "compact" ? "default" : tabWidth === "default" ? "wide" : "compact";
+					const nextTabRows = tabRows === "multi" ? "single" : "multi";
+					items.push(
+						{
+							id: "tab-bar-width",
+							label: t("tabs.menu.tabWidth", { current: t(`settings.gui.tabWidth.${tabWidth}`) }),
+							icon: MoveHorizontal,
+							onSelect: () => {
+								setTabMenu(null);
+								void saveGuiPreference("tabWidth", nextTabWidth, () =>
+									useUiStore.getState().setTabWidth(nextTabWidth),
+								);
+							},
+						},
+						{
+							id: "tab-bar-rows",
+							label: t("settings.gui.tabRows"),
+							icon: tabRows === "multi" ? Check : WrapText,
+							onSelect: () => {
+								setTabMenu(null);
+								void saveGuiPreference("tabRows", nextTabRows, () =>
+									useUiStore.getState().setTabRows(nextTabRows),
+								);
+							},
+						},
+					);
 					items.push(
 						{
 							id: "close-left",

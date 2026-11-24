@@ -22,6 +22,21 @@
 			document.documentElement.style.backgroundColor = plain ? background : scheme === "dark" ? "#1f1f1f" : "#ffffff";
 			document.documentElement.style.colorScheme = scheme;
 		}
+		var chatWidth = localStorage.getItem("omp.chatWidth");
+		if (chatWidth === "wide" || chatWidth === "full") {
+			document.documentElement.dataset.chatWidth = chatWidth;
+		}
+		var rawFontSize = localStorage.getItem("omp.fontSize");
+		if (rawFontSize) {
+			var parsedSize = Number(rawFontSize);
+			if (Number.isFinite(parsedSize) && parsedSize >= 10 && parsedSize <= 20) {
+				document.documentElement.style.setProperty("--gui-font-size", Math.round(parsedSize) + "px");
+			}
+		}
+		var density = localStorage.getItem("omp.compactDensity");
+		if (density === "tight" || density === "comfortable") {
+			document.documentElement.dataset.density = density;
+		}
 	} catch (e) {
 		/* no localStorage — the light default background stands */
 	}

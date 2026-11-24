@@ -72,7 +72,7 @@ import { watchPluginActivation } from "./lib/plugin-activation";
 import { closeActiveTab } from "./lib/tab-close";
 import { acceptsActiveTabEvents, onActiveTabRouteSettled, onActiveTabRouteState } from "./lib/tab-routing";
 import { focusedTabRpc } from "./lib/tab-rpc";
-import { applyFontSize, watchSystemTheme } from "./lib/theme";
+import { applyChatWidth, applyCompactDensity, applyFontSize, watchSystemTheme } from "./lib/theme";
 import {
 	applyThemeByName,
 	clearPluginThemes,
@@ -82,6 +82,7 @@ import {
 	refreshPluginThemes,
 	resolveThemeSelection,
 } from "./lib/themes";
+import { cycleChatWidthPreference, resetFontSizePreference, stepFontSizePreference } from "./lib/view-preferences";
 import { startVoiceAutoSpeak } from "./lib/voice";
 import { initCustomThemes } from "./stores/custom-themes";
 import { openHandoffDialog } from "./stores/fork-handoff";
@@ -176,7 +177,7 @@ function FocusedSessionEffects() {
 		return () => clearTimeout(timer);
 	}, [progressEnabled, progressAwaiting, progressStreaming]);
 	useEffect(() => {
-		document.documentElement.dataset.density = compactDensity ? "tight" : "comfortable";
+		applyCompactDensity(compactDensity);
 		document.documentElement.dataset.colorblind = colorBlindMode ? "true" : "false";
 	}, [compactDensity, colorBlindMode]);
 	return null;
@@ -202,6 +203,7 @@ export function App() {
 	const workspacePage = useUiStore(activeWorkspacePage);
 	const theme = useUiStore(s => s.theme);
 	const fontSize = useUiStore(s => s.fontSize);
+	const chatWidth = useUiStore(s => s.chatWidth);
 	const followAgentTheme = useUiStore(s => s.followAgentTheme);
 	const statsDashboardOpen = useUiStore(s => s.statsDashboardOpen);
 	const closeStatsDashboard = useUiStore(s => s.closeStatsDashboard);
@@ -251,6 +253,7 @@ export function App() {
 				"sidebarQuotas",
 				"confirmSessionDelete",
 				"transcriptDetail",
+				"chatWidth",
 				"tabWidth",
 				"tabRows",
 				"linkOpenMode",
@@ -312,6 +315,12 @@ export function App() {
 					useUiStore.setState({ transcriptDetail: prefs.transcriptDetail });
 				}
 				if (
+					(prefs.chatWidth === "standard" || prefs.chatWidth === "wide" || prefs.chatWidth === "full") &&
+					!changedPreferences.has("chatWidth")
+				) {
+					useUiStore.setState({ chatWidth: prefs.chatWidth });
+				}
+				if (
 					(prefs.tabWidth === "compact" || prefs.tabWidth === "default" || prefs.tabWidth === "wide") &&
 					!changedPreferences.has("tabWidth")
 				) {
@@ -336,7 +345,7 @@ export function App() {
 				if (
 					!changedPreferences.has("panelTab") &&
 					typeof prefs.defaultPanelTab === "string" &&
-					["diff", "files"].includes(prefs.defaultPanelTab)
+					["overview", "diff", "files"].includes(prefs.defaultPanelTab)
 				) {
 					useUiStore.setState({ panelTab: prefs.defaultPanelTab as PanelTab });
 				}
@@ -392,6 +401,7 @@ export function App() {
 	// Font changes do not participate in theme resolution.
 	useEffect(() => watchSystemTheme(theme, () => applyThemeByName("system", { persist: false })), [theme]);
 	useEffect(() => applyFontSize(fontSize), [fontSize]);
+	useEffect(() => applyChatWidth(chatWidth), [chatWidth]);
 
 	// Handle omp:// deep links (omp://new → new session; omp://session/<id> → switch).
 	useEffect(() => {
@@ -556,6 +566,29 @@ export function App() {
 				case "panel.toggle":
 					ui.togglePanel();
 					return;
+				case "view.chatWidth": {
+					const next = cycleChatWidthPreference();
+					toast({
+						variant: "info",
+						message: t("chat.quickView.widthChanged", { width: t(`settings.gui.chatWidth.${next}`) }),
+					});
+					return;
+				}
+				case "view.fontSizeIncrease": {
+					const next = stepFontSizePreference(1);
+					toast({ variant: "info", message: t("chat.quickView.fontChanged", { size: next }) });
+					return;
+				}
+				case "view.fontSizeDecrease": {
+					const next = stepFontSizePreference(-1);
+					toast({ variant: "info", message: t("chat.quickView.fontChanged", { size: next }) });
+					return;
+				}
+				case "view.fontSizeReset": {
+					const next = resetFontSizePreference();
+					toast({ variant: "info", message: t("chat.quickView.fontChanged", { size: next }) });
+					return;
+				}
 				case "hotkeys":
 					// ⌘/ or ⌃/ — keyboard shortcuts panel (/hotkeys parity).
 					if (ui.hotkeysOpen) ui.closeHotkeys();
@@ -658,6 +691,29 @@ export function App() {
 			}
 			if (action === "toggle-panel") {
 				ui.togglePanel();
+				return;
+			}
+			if (action === "cycle-chat-width") {
+				const next = cycleChatWidthPreference();
+				toast({
+					variant: "info",
+					message: t("chat.quickView.widthChanged", { width: t(`settings.gui.chatWidth.${next}`) }),
+				});
+				return;
+			}
+			if (action === "font-size-increase") {
+				const next = stepFontSizePreference(1);
+				toast({ variant: "info", message: t("chat.quickView.fontChanged", { size: next }) });
+				return;
+			}
+			if (action === "font-size-decrease") {
+				const next = stepFontSizePreference(-1);
+				toast({ variant: "info", message: t("chat.quickView.fontChanged", { size: next }) });
+				return;
+			}
+			if (action === "font-size-reset") {
+				const next = resetFontSizePreference();
+				toast({ variant: "info", message: t("chat.quickView.fontChanged", { size: next }) });
 				return;
 			}
 			if (action === "toggle-language") {

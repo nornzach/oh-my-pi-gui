@@ -1,11 +1,14 @@
-import { Bell } from "lucide-react";
+import { Bell, BellOff } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { TaskNotice } from "../../../shared/scheduler-types";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
+import { saveGuiPreference } from "../../lib/display-preferences";
 import { cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
+import { useUiStore } from "../../stores/ui";
+import { SwitchTrack } from "../common/SwitchTrack";
 
 const PANEL_WIDTH = 360;
 const VIEWPORT_EDGE = 12;
@@ -30,6 +33,10 @@ export function NotificationBell({ className }: { className: string }) {
 	const t = useT();
 	const notices = useSchedulerStore(state => state.notices);
 	const unread = useUnreadNoticeCount();
+	const notifications = useUiStore(state => state.notifications);
+	const notificationsWhenFocused = useUiStore(state => state.notificationsWhenFocused);
+	const setNotifications = useUiStore(state => state.setNotifications);
+	const setNotificationsWhenFocused = useUiStore(state => state.setNotificationsWhenFocused);
 	const [open, setOpen] = useState(false);
 	const [style, setStyle] = useState<CSSProperties | null>(null);
 	const { mounted, closing } = useOverlayPresence(open);
@@ -86,7 +93,11 @@ export function NotificationBell({ className }: { className: string }) {
 				}}
 				className={cx(className, "relative", open && "bg-[var(--omp-selected-bg)] text-[var(--omp-text)]")}
 			>
-				<Bell aria-hidden="true" size={16} />
+				{notifications ? (
+					<Bell aria-hidden="true" size={16} />
+				) : (
+					<BellOff aria-hidden="true" size={16} className="opacity-60" />
+				)}
 				{unread > 0 && (
 					<span
 						aria-hidden="true"
@@ -174,6 +185,39 @@ export function NotificationBell({ className }: { className: string }) {
 								))}
 							</ul>
 						)}
+						<div className="space-y-0.5 border-t border-[var(--omp-border-muted)] px-2.5 py-2">
+							<button
+								type="button"
+								role="switch"
+								aria-checked={notifications}
+								data-notices-toggle-desktop=""
+								onClick={() =>
+									void saveGuiPreference("notifications", !notifications, () =>
+										setNotifications(!notifications),
+									)
+								}
+								className="omp-pressable flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-omp-sm text-[var(--omp-text-secondary)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+							>
+								<span className="min-w-0 truncate">{t("settings.gui.notifications")}</span>
+								<SwitchTrack on={notifications} className="scale-90" />
+							</button>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={notificationsWhenFocused}
+								disabled={!notifications}
+								data-notices-toggle-focused=""
+								onClick={() =>
+									void saveGuiPreference("notificationsWhenFocused", !notificationsWhenFocused, () =>
+										setNotificationsWhenFocused(!notificationsWhenFocused),
+									)
+								}
+								className="omp-pressable flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-omp-sm text-[var(--omp-text-secondary)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)] disabled:pointer-events-none disabled:opacity-45"
+							>
+								<span className="min-w-0 truncate">{t("settings.gui.notificationsWhenFocused")}</span>
+								<SwitchTrack on={notificationsWhenFocused} className="scale-90" />
+							</button>
+						</div>
 					</div>,
 					document.body,
 				)}

@@ -463,7 +463,29 @@
 .settings-main-canvas {
 	--omp-column-pad: clamp(16px, 3vw, 40px);
 	--omp-column-reading: 48rem; /* ~95 characters of 15px transcript prose */
+	--omp-column-composer: 48rem;
 	--omp-column-workspace: 104rem;
+}
+
+:root[data-chat-width="wide"] .omp-workspace-main {
+	--omp-column-reading: 68rem;
+	--omp-column-composer: 68rem;
+}
+
+:root[data-chat-width="full"] .omp-workspace-main {
+	--omp-column-reading: 100%;
+	/* Transcript expands edge-to-edge while the composer keeps a comfortable typing measure on ultrawides. */
+	--omp-column-composer: 76rem;
+	--omp-column-pad: clamp(16px, 2.2vw, 32px);
+}
+
+:root[data-chat-width="full"] .omp-transcript-editorial .omp-user-bubble.omp-transcript-content {
+	max-width: min(84%, 56rem);
+}
+
+/* Keep the full-width reading column clear of the conversation-navigator rail on wide viewports. */
+:root[data-chat-width="full"] .omp-transcript-editorial {
+	--omp-editorial-edge: max(var(--omp-column-pad), 52px);
 }
 
 .omp-column {
@@ -1414,7 +1436,7 @@
 
 .omp-empty-canvas,
 .omp-composer-shell {
-	width: min(100%, calc(var(--omp-column-reading) + 2 * var(--omp-column-pad)));
+	width: min(100%, calc(var(--omp-column-composer) + 2 * var(--omp-column-pad)));
 	min-width: 0;
 	max-width: 100%;
 	margin-inline: auto;
@@ -2501,4 +2523,29 @@
 
 .omp-sidebar-session-row[data-active="true"] {
 	box-shadow: inset 2px 0 0 var(--omp-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   Unified View Controls popover & Settings surface cards
+   ------------------------------------------------------------------------- */
+.omp-view-popover {
+	background: color-mix(in srgb, var(--omp-bg-elevated) 96%, transparent);
+	backdrop-filter: blur(14px);
+}
+
+:root:is([data-platform="win32"], [data-platform="linux"]) .omp-view-popover {
+	background: var(--omp-bg-elevated);
+	backdrop-filter: none;
+}
+
+.omp-settings-group-card {
+	border: 1px solid var(--omp-border-muted);
+	border-radius: 12px;
+	padding: 16px 18px;
+}
+
+@container omp-workspace (max-width: 900px) {
+	:root[data-chat-width="full"] .omp-transcript-editorial {
+		--omp-editorial-edge: var(--omp-column-pad);
+	}
 }

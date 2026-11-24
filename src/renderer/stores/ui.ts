@@ -4,7 +4,13 @@ import { KEYMAP_DISABLED_PREF, KEYMAP_OVERRIDES_PREF } from "../../shared/hotkey
 import type { CustomProviderView, SessionInfo } from "../../shared/ipc-types";
 import type { SidecarRestartProgress } from "../../shared/rpc-types";
 import { effectiveOverrides, type KeymapOverrides, sanitizeDisabled, sanitizeOverrides } from "../lib/keymap";
-import { readPrepaintThemeMode, type ThemeMode } from "../lib/theme";
+import {
+	readPrepaintChatWidth,
+	readPrepaintCompactDensity,
+	readPrepaintFontSize,
+	readPrepaintThemeMode,
+	type ThemeMode,
+} from "../lib/theme";
 import type { CustomThemeSelection } from "../lib/themes";
 import { useTabsStore } from "./tabs";
 
@@ -67,6 +73,8 @@ export type DiffScope = "repository" | "current" | "timeline" | "artifacts";
 /** Center-dock card identifiers: todo/plan/agents render as live cards above the composer. */
 export type DockCardId = "todo" | "plan" | "agents";
 export type TranscriptDetail = "compact" | "full";
+/** Chat transcript & composer reading-column width (Discussion #53). */
+export type ChatWidth = "standard" | "wide" | "full";
 /** Chip size on the tab strip (Settings → GUI → Tab bar). */
 export type TabWidth = "compact" | "default" | "wide";
 /** One scrolling row of tabs, or up to three wrapped rows. */
@@ -206,6 +214,8 @@ interface UiStore {
 	confirmSessionDelete: boolean;
 	/** Transcript density: compact folds reasoning/tools; full shows every step. */
 	transcriptDetail: TranscriptDetail;
+	/** Reading-column width for the chat transcript and composer (standard, wide, or fluid full width). */
+	chatWidth: ChatWidth;
 	tabWidth: TabWidth;
 	tabRows: TabRows;
 	/** Where plain left-clicks on http(s) links open: built-in browser panel or system browser (#65). */
@@ -348,6 +358,7 @@ interface UiStore {
 	setAutoCollapseProcess: (enabled: boolean) => void;
 	setSidebarQuotas: (enabled: boolean) => void;
 	setTranscriptDetail: (detail: TranscriptDetail) => void;
+	setChatWidth: (width: ChatWidth) => void;
 	setTabWidth: (width: TabWidth) => void;
 	setTabRows: (rows: TabRows) => void;
 	setLinkOpenMode: (mode: LinkOpenMode) => void;
@@ -394,8 +405,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	settingsOpen: false,
 	settingsTab: "capabilities",
 	theme: readPrepaintThemeMode(),
-	fontSize: 15,
-	compactDensity: false,
+	fontSize: readPrepaintFontSize(),
+	compactDensity: readPrepaintCompactDensity(),
 	colorBlindMode: false,
 	followAgentTheme: false,
 	notifications: true,
@@ -405,6 +416,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	sidebarQuotas: false,
 	confirmSessionDelete: true,
 	transcriptDetail: "compact",
+	chatWidth: readPrepaintChatWidth(),
 	tabWidth: "default",
 	tabRows: "single",
 	linkOpenMode: "panel",
@@ -690,6 +702,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	setAutoCollapseProcess: enabled => set({ autoCollapseProcess: enabled }),
 	setSidebarQuotas: enabled => set({ sidebarQuotas: enabled }),
 	setTranscriptDetail: detail => set({ transcriptDetail: detail }),
+	setChatWidth: width => set({ chatWidth: width }),
 	setTabWidth: width => set({ tabWidth: width }),
 	setTabRows: rows => set({ tabRows: rows }),
 	setLinkOpenMode: mode => set({ linkOpenMode: mode }),

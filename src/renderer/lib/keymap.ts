@@ -275,6 +275,34 @@ export const KEYMAP_ACTIONS = [
 		overlaySafe: true,
 		hotkeyGroup: "view",
 	},
+	{
+		id: "view.chatWidth",
+		labelKey: "hotkeys.row.chatWidth",
+		defaults: ["⌥W"],
+		overlaySafe: false,
+		hotkeyGroup: "view",
+	},
+	{
+		id: "view.fontSizeIncrease",
+		labelKey: "hotkeys.row.fontSizeIncrease",
+		defaults: ["⌘=", "⌃="],
+		overlaySafe: true,
+		hotkeyGroup: "view",
+	},
+	{
+		id: "view.fontSizeDecrease",
+		labelKey: "hotkeys.row.fontSizeDecrease",
+		defaults: ["⌘-", "⌃-"],
+		overlaySafe: true,
+		hotkeyGroup: "view",
+	},
+	{
+		id: "view.fontSizeReset",
+		labelKey: "hotkeys.row.fontSizeReset",
+		defaults: ["⌘0", "⌃0"],
+		overlaySafe: true,
+		hotkeyGroup: "view",
+	},
 	{ id: "hotkeys", labelKey: "hotkeys.row.hotkeys", defaults: ["⌘/", "⌃/"], overlaySafe: true, hotkeyGroup: "view" },
 ] as const satisfies readonly KeymapAction[];
 

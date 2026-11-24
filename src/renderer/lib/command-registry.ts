@@ -58,6 +58,7 @@ import {
 import { isRecording, startRecording, stopRecording } from "./recording";
 import { findTextLinks } from "./terminal-links";
 import { copyTodosToClipboard, dumpTranscriptToClipboard, exportTodos, importTodosFromFile } from "./transcript-copy";
+import { cycleChatWidthPreference, toggleCompactDensityPreference } from "./view-preferences";
 import { addWorkspaceDirectory, pickAndMoveSession, pickWorkspaceDirectory } from "./workspace-dirs";
 
 /**
@@ -1480,6 +1481,39 @@ export function buildCommandMenu(ctx: CommandRegistryContext): CommandMenuItem[]
 		description: t("cmd.theme.desc"),
 		category: "view",
 		affordance: { kind: "picker", open: ctx.openThemePicker },
+	});
+	add({
+		name: "width",
+		label: t("cmd.chatWidth"),
+		description: t("cmd.chatWidth.desc"),
+		category: "view",
+		shortcut: "⌥W",
+		affordance: {
+			kind: "action",
+			run: () => {
+				const next = cycleChatWidthPreference();
+				toast({
+					variant: "info",
+					message: t("chat.quickView.widthChanged", { width: t(`settings.gui.chatWidth.${next}`) }),
+				});
+			},
+		},
+	});
+	add({
+		name: "density",
+		label: t("cmd.density"),
+		description: t("cmd.density.desc"),
+		category: "view",
+		affordance: {
+			kind: "action",
+			run: () => {
+				const compact = toggleCompactDensityPreference();
+				toast({
+					variant: "info",
+					message: t(compact ? "chat.quickView.densityCompact" : "chat.quickView.densityComfortable"),
+				});
+			},
+		},
 	});
 	add({
 		name: "settings",

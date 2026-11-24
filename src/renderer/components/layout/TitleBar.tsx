@@ -42,6 +42,7 @@ import { WorkspaceDialog } from "../dialogs/WorkspaceDialog";
 import { NotificationBell } from "./NotificationBell";
 import { sessionCacheHitPercent, sessionExecutionDurationMs } from "./session-metrics";
 import { TokenMeterPopover } from "./TokenMeterPopover";
+import { ViewControlsPopover } from "./ViewControlsPopover";
 
 /**
  * Native desktop toolbar. Session controls stay here; model and execution
@@ -509,6 +510,7 @@ export function TitleBar() {
 					stats={visibleStats}
 				/>
 			)}
+			<ViewControlsPopover className={iconButton} />
 			<NotificationBell className={iconButton} />
 			<button
 				type="button"

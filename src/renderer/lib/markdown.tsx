@@ -335,7 +335,7 @@ export async function setCodeLineNumbersPref(next: boolean): Promise<boolean> {
 const CodeLineNumbersOverride = createContext<boolean | undefined>(undefined);
 const StreamingContent = createContext(false);
 
-function useCodeLineNumbers(): boolean {
+export function useCodeLineNumbers(): boolean {
 	const override = useContext(CodeLineNumbersOverride);
 	const pref = useSyncExternalStore(
 		subscribeCodeLineNumbers,
@@ -489,6 +489,7 @@ function Pre({ children }: ComponentPropsWithoutRef<"pre">) {
 			code={textOf(children).replace(/\n$/, "")}
 			language={language}
 			showLineNumbers={showLineNumbers}
+			onToggleLineNumbers={() => void setCodeLineNumbersPref(!showLineNumbers)}
 			highlight={!streaming}
 			maxHeightClass={PREVIEW_SCROLL_CODE}
 			className="my-2"

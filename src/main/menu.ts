@@ -197,9 +197,25 @@ export function createMenu(windowManager: WindowManager, spawnWindow: SpawnWindo
 				},
 				{ role: "toggleDevTools" },
 				{ type: "separator" },
-				{ role: "resetZoom" },
-				{ role: "zoomIn" },
-				{ role: "zoomOut" },
+				{
+					// No accelerators: ⌥W and ⌘=/⌘-/⌘0 live in the renderer keymap so
+					// users can remap them and font-size adjustments are never hijacked
+					// by Electron's default webContents zoom roles.
+					label: mainT("menu.cycleChatWidth", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "cycle-chat-width"),
+				},
+				{
+					label: mainT("menu.fontSizeReset", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "font-size-reset"),
+				},
+				{
+					label: mainT("menu.fontSizeIncrease", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "font-size-increase"),
+				},
+				{
+					label: mainT("menu.fontSizeDecrease", language),
+					click: () => sendMenuAction(windowManager, spawnWindow, "font-size-decrease"),
+				},
 				{ type: "separator" },
 				{ role: "togglefullscreen" },
 			],

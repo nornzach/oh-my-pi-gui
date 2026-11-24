@@ -13,6 +13,10 @@ export type ResolvedTheme = "dark" | "light";
 export const THEME_SCHEME_STORAGE_KEY = "omp.themeScheme";
 /** The chosen theme's window background, painted by pre-paint.js before the theme loads. */
 export const THEME_BACKGROUND_STORAGE_KEY = "omp.themeBackground";
+/** Pre-paint mirrors for layout/typography so cold start never flashes narrow→wide or 15px→saved. */
+export const CHAT_WIDTH_STORAGE_KEY = "omp.chatWidth";
+export const FONT_SIZE_STORAGE_KEY = "omp.fontSize";
+export const COMPACT_DENSITY_STORAGE_KEY = "omp.compactDensity";
 
 /** Synchronous boot mode mirrored by pre-paint.js before preferences IPC exists. */
 export function readPrepaintThemeMode(): ThemeMode {
@@ -22,6 +26,36 @@ export function readPrepaintThemeMode(): ThemeMode {
 		return value === "dark" || value === "light" || value === "system" ? value : "light";
 	} catch {
 		return "light";
+	}
+}
+
+export function readPrepaintChatWidth(): "standard" | "wide" | "full" {
+	if (typeof window === "undefined") return "standard";
+	try {
+		const value = window.localStorage?.getItem(CHAT_WIDTH_STORAGE_KEY);
+		return value === "wide" || value === "full" ? value : "standard";
+	} catch {
+		return "standard";
+	}
+}
+
+export function readPrepaintFontSize(): number {
+	if (typeof window === "undefined") return 15;
+	try {
+		const raw = window.localStorage?.getItem(FONT_SIZE_STORAGE_KEY);
+		const parsed = raw ? Number(raw) : Number.NaN;
+		return Number.isFinite(parsed) && parsed >= 10 && parsed <= 20 ? Math.round(parsed) : 15;
+	} catch {
+		return 15;
+	}
+}
+
+export function readPrepaintCompactDensity(): boolean {
+	if (typeof window === "undefined") return false;
+	try {
+		return window.localStorage?.getItem(COMPACT_DENSITY_STORAGE_KEY) === "tight";
+	} catch {
+		return false;
 	}
 }
 
@@ -97,6 +131,41 @@ export function applyTheme(mode: ThemeMode): void {
 export function applyFontSize(size: number): void {
 	document.body.style.fontSize = `${size}px`;
 	document.documentElement.style.setProperty("--gui-font-size", `${size}px`);
+	try {
+		window.localStorage?.setItem(FONT_SIZE_STORAGE_KEY, String(size));
+	} catch {
+		// localStorage unavailable in restricted contexts
+	}
+}
+
+/**
+ * Apply the reading-column width mode (`standard` / `wide` / `full`) on <html>
+ * so transcript widens cleanly while the composer keeps a comfortable ceiling.
+ */
+export function applyChatWidth(width: "standard" | "wide" | "full"): void {
+	if (width === "standard") {
+		document.documentElement.removeAttribute("data-chat-width");
+	} else {
+		document.documentElement.setAttribute("data-chat-width", width);
+	}
+	try {
+		window.localStorage?.setItem(CHAT_WIDTH_STORAGE_KEY, width);
+	} catch {
+		// localStorage unavailable in restricted contexts
+	}
+}
+
+/**
+ * Mirror density preference on <html> and into localStorage for pre-paint.
+ */
+export function applyCompactDensity(compact: boolean): void {
+	const value = compact ? "tight" : "comfortable";
+	document.documentElement.dataset.density = value;
+	try {
+		window.localStorage?.setItem(COMPACT_DENSITY_STORAGE_KEY, value);
+	} catch {
+		// localStorage unavailable in restricted contexts
+	}
 }
 
 /**
