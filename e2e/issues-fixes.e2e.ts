@@ -95,8 +95,13 @@ test("#75 builtin output stays on screen after the hydrate its prompt triggers",
 	const readsBefore = await transcriptReads();
 
 	await command("fixture builtin");
-	const output = page.getByText("mysql | stdio | enabled [user]");
+	// The card parses `/mcp list` text into a table, so the surviving row is the
+	// contract — not the raw pipe-delimited line the fixture emitted.
+	const output = page.getByRole("row").filter({ hasText: "mysql" });
 	await expect(output).toBeVisible();
+	await expect(output).toContainText("stdio");
+	await expect(output).toContainText("enabled");
+	await expect(output).toContainText("user");
 	// The hydrate must actually have run: a prompt_result with agentInvoked:false
 	// is what re-reads the transcript, and that read used to drop the local row.
 	await expect.poll(transcriptReads).toBeGreaterThan(readsBefore);

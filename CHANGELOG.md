@@ -2,14 +2,22 @@
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-24
+
 ### Added
 
 - Add Settings → GUI → "Auto-collapse reasoning and tools after reply" to keep reasoning and tool steps expanded while generating and fold them automatically once the reply finishes ([#77](https://github.com/nornzach/oh-my-pi-gui/issues/77)).
 
+### Changed
+
+- Render builtin command output in structured cards and polish transcript and app chrome ([#75](https://github.com/nornzach/oh-my-pi-gui/issues/75)).
+- Update the bundled agent to OMP Core 19.1.1, built from [Core fork commit `51d35277c3`](https://github.com/nornzach/oh-my-pi/commit/51d35277c33401ccc2426f75fe5810a46a5dbf05).
+
 ### Fixed
 
-- Keep inline ask forms on the transcript surface and let the Token Meter's live rate follow the GUI font size.
+- Keep inline ask forms on the transcript surface.
 - Keep follow-up and background-session `ask` prompts inline when inline ask is enabled instead of popping a modal, and keep answered `ask` selections and custom answers visible in the conversation transcript ([#78](https://github.com/nornzach/oh-my-pi-gui/issues/78)).
+- Let the Token Meter's live rate follow the GUI font size.
 
 ## [1.0.3] - 2026-11-23
 

@@ -2,8 +2,8 @@
 // Pass the packaged sidecar path, or omit it to probe the adjacent Core source.
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { attachNdjsonParser } from "../src/main/rpc-bridge.ts";
 
 // `URL.pathname` keeps a leading slash on Windows (`/E:/…`), which `spawn`
 // rejects as a missing cwd — the probe would ENOENT on a healthy binary.
@@ -40,14 +40,13 @@ const send = (type, extra = {}) => {
 	return p;
 };
 
-const rl = createInterface({ input: child.stdout });
-rl.on("line", line => {
-	let f;
-	try {
-		f = JSON.parse(line);
-	} catch {
-		return;
-	}
+// Reuse the product's parser so the probe reassembles v2 chunk sequences exactly
+// as the app does. A catalog response over 1 MiB arrives only as `rpc_chunk`
+// frames; parsing lines by hand would wait forever for a `response` that never
+// comes and report a healthy sidecar as wedged.
+const frameListeners = new Set();
+attachNdjsonParser(child.stdout, f => {
+	for (const listener of frameListeners) listener(f);
 	if (f.type === "response" && f.id && pending.has(f.id)) {
 		const { res, t0 } = pending.get(f.id);
 		pending.delete(f.id);
@@ -73,17 +72,13 @@ child.on("exit", code => {
 
 (async () => {
 	const ready = await new Promise(res => {
-		const onLine = line => {
-			try {
-				const f = JSON.parse(line);
-				if (f.type === "ready") {
-					readyDone = true;
-					rl.off("line", onLine);
-					res(f);
-				}
-			} catch {}
+		const onFrame = f => {
+			if (f.type !== "ready") return;
+			readyDone = true;
+			frameListeners.delete(onFrame);
+			res(f);
 		};
-		rl.on("line", onLine);
+		frameListeners.add(onFrame);
 	});
 	console.log(`READY protocolVersion=${ready.protocolVersion}`);
 
