@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Build and verify Apple Silicon and Intel installers automatically on release, with one update feed covering both architectures.
+
 ## [1.0.4] - 2026-11-24
 
 ### Added

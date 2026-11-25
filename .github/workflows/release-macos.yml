@@ -1,0 +1,117 @@
+name: Release macOS builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to attach artifacts to
+        required: true
+      gui_ref:
+        description: GUI checkout override for an authorized backfill
+        required: false
+      monorepo_sha:
+        description: Full Core SHA override for an authorized backfill
+        required: false
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+            machine: arm64
+            config: electron-builder.yml
+            sidecar: omp
+          - runner: macos-15-intel
+            arch: x64
+            machine: x86_64
+            config: electron-builder.x64.yml
+            sidecar: omp.x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/actions/release-source
+          persist-credentials: false
+      - uses: ./.github/actions/release-source
+        with:
+          gui_ref: ${{ github.event_name == 'release' && github.sha || inputs.gui_ref || format('refs/tags/{0}', inputs.tag) }}
+          tag: ${{ env.RELEASE_TAG }}
+          monorepo_sha: ${{ inputs.monorepo_sha }}
+          core_repo: ${{ vars.OMP_CORE_REPO || 'nornzach/oh-my-pi' }}
+      - name: Build native addons and the matching sidecar
+        working-directory: oh-my-pi
+        env:
+          OMP_NATIVE_CARGO_PROFILE: ci
+        run: |
+          test "$(uname -m)" = '${{ matrix.machine }}'
+          if [[ '${{ matrix.arch }}' == x64 ]]; then
+            PI_NATIVE_VARIANT=modern bun --cwd=packages/natives run build
+            PI_NATIVE_VARIANT=baseline bun --cwd=packages/natives run build
+          else
+            bun --cwd=packages/natives run build
+          fi
+          cd packages/gui
+          bun scripts/build-bundled-omp.ts --out "$PWD/resources/${{ matrix.sidecar }}"
+      - name: Package and verify the installed app
+        working-directory: oh-my-pi/packages/gui
+        run: |
+          bun run build
+          bun ../../node_modules/electron-builder/cli.js --config '${{ matrix.config }}' --mac --${{ matrix.arch }} --publish never \
+            -c.publish.owner="${GITHUB_REPOSITORY%/*}" -c.publish.repo="${GITHUB_REPOSITORY#*/}"
+          dmg=(dist/*.dmg)
+          test "${#dmg[@]}" = 1
+          hdiutil verify "${dmg[0]}"
+          mount=$(mktemp -d)
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${dmg[0]}"
+          trap 'hdiutil detach "$mount"' EXIT
+          app="$mount/omp.app"
+          codesign --verify --deep --strict "$app"
+          lipo -verify_arch '${{ matrix.machine }}' "$app/Contents/MacOS/omp"
+          lipo -verify_arch '${{ matrix.machine }}' "$app/Contents/Resources/omp"
+          bun scripts/smoke-sidecar.mjs "$app/Contents/Resources/omp"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          overwrite: true
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            oh-my-pi/packages/gui/dist/*.dmg
+            oh-my-pi/packages/gui/dist/*.zip
+            oh-my-pi/packages/gui/dist/*.blockmap
+            oh-my-pi/packages/gui/dist/latest-mac.yml
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts/merge-mac-feeds.ts
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mac-*
+          path: builds
+      - name: Verify hashes, combine update feeds and upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir assets
+          bun scripts/merge-mac-feeds.ts "${RELEASE_TAG#v}" builds/mac-arm64 builds/mac-x64 assets/latest-mac.yml
+          gh release upload "$RELEASE_TAG" builds/mac-*/*.dmg builds/mac-*/*.zip builds/mac-*/*.blockmap assets/latest-mac.yml --repo "$GITHUB_REPOSITORY" --clobber

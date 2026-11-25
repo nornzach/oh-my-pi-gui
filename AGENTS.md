@@ -100,15 +100,16 @@ bun run package:mac:x64   -- --publish never
 
 ### 4. Publish and read back
 
-Upload the macOS assets to a draft for the verified tag. Check the draft asset names and sizes at GitHub before publishing; give the release the changelog and full fork build SHA. Publishing starts the Windows and Linux jobs. A release is complete only after their exact runs succeed and GitHub lists the expected assets:
+When a maintainer requests a GUI release, use `vX.Y.Z` from the prepared GUI version and include the changelog and full Core SHA in the Release notes. Ordinary changes do not publish a version. Publishing the verified tag's Release starts the three `release: published` workflows. Check all three runs for this exact tag and commit and check the nonempty attachments below, substituting the GUI version for `X.Y.Z`. The macOS workflow builds and smoke-tests both architectures on native runners and checks both updater feeds against the build outputs. Signing is ad-hoc, not notarized.
 
 | Platform | Release assets |
 |---|---|
-| macOS | Both DMGs, both ZIPs, generated blockmaps and `latest-mac.yml` |
-| Windows | Setup, portable, setup blockmap and `latest.yml` |
-| Linux | AppImage, deb, `latest-linux.yml` and a blockmap if generated |
+| [macOS](.github/workflows/release-macos.yml) | `omp-X.Y.Z-arm64.dmg`, `omp-X.Y.Z-arm64-mac.zip`, `omp-X.Y.Z.dmg`, `omp-X.Y.Z-mac.zip`, their four `.blockmap` files, and `latest-mac.yml` |
+| [Windows](.github/workflows/release-windows.yml) | `omp-X.Y.Z-setup.exe`, `omp-X.Y.Z-setup.exe.blockmap`, `omp-X.Y.Z-portable.exe`, and `latest.yml` |
+| [Linux](.github/workflows/release-linux.yml) | `omp-X.Y.Z.AppImage`, `omp_X.Y.Z_amd64.deb`, and `latest-linux.yml`; also upload a blockmap if generated |
 
 - Query the release asset list using `gh release view vX.Y.Z --repo nornzach/oh-my-pi-gui --json assets`. Read back the three updater feeds; confirm the version, filenames, sizes and hashes against the referenced release files. During an upload with no terminal output, check GitHub for progress before restarting it.
+- Fork drills publish to the triggering GUI repository only. To use a different Core fork, set the repository Actions variable `OMP_CORE_REPO` and commit its matching `sidecar-source.json`. The default source remains `nornzach/oh-my-pi`.
 - If an authorized backfill needs a corrected pin, leave the tag unchanged. Correct the pin on GUI `main` and dispatch the affected workflow from `main` with `tag=vX.Y.Z`, `gui_ref=vX.Y.Z` and `monorepo_sha=<verified full SHA>`. An ordinary rerun still uses the original tag's pin. Verify the rerun and the new assets and updater metadata again.
 - `site/` reads versions and download links from GitHub; a normal release needs no site edit. For follow-up comments, inspect existing replies, link the shipped version and say what the reporter should retest. The enclosing `AGENTS.md` requires approval for the exact target and text before posting; posting a reply does not authorize closing the issue.
 

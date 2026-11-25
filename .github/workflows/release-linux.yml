@@ -25,86 +25,22 @@ permissions:
   contents: write
 
 env:
-  GUI_REPO: nornzach/oh-my-pi-gui
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
 
 jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve release tag
-        id: refs
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-            echo "gui_ref=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-            echo "gui_ref=${{ inputs.gui_ref || inputs.tag }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Read the Core pin from the selected GUI commit
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
-          repository: nornzach/oh-my-pi-gui
-          ref: ${{ steps.refs.outputs.gui_ref }}
-          path: gui-pin
-          sparse-checkout: sidecar-source.json
-          sparse-checkout-cone-mode: false
+          sparse-checkout: .github/actions/release-source
           persist-credentials: false
-
-      - name: Resolve the sidecar source
-        id: sidecar
-        shell: bash
-        env:
-          MONOREPO_SHA: ${{ inputs.monorepo_sha }}
-        run: |
-          repo="nornzach/oh-my-pi"
-          commit="main"
-          if [ -f gui-pin/sidecar-source.json ]; then
-            repo="$(jq -er '(.repo // "nornzach/oh-my-pi") | strings' gui-pin/sidecar-source.json)"
-            # Release binaries are built only from the project's own Core fork: a pin
-            # that names any other repository fails the build instead of shipping it.
-            if [ "$repo" != "nornzach/oh-my-pi" ]; then
-              echo "sidecar-source.json names $repo; release sidecars build only from nornzach/oh-my-pi" >&2
-              exit 1
-            fi
-            commit="$(jq -er '.commit | strings | select(test("^[a-fA-F0-9]{40}$"))' gui-pin/sidecar-source.json)"
-          fi
-          ref="${MONOREPO_SHA:-$commit}"
-          if [[ "$ref" == *$'\n'* || "$ref" == *$'\r'* ]]; then
-            echo "Invalid monorepo ref" >&2
-            exit 1
-          fi
-          gui_sha="$(git -C gui-pin rev-parse HEAD)"
-          printf 'repo=%s\nref=%s\ngui_sha=%s\n' "$repo" "$ref" "$gui_sha" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout the pinned monorepo
-        uses: actions/checkout@v6
+      - uses: ./.github/actions/release-source
         with:
-          repository: ${{ steps.sidecar.outputs.repo }}
-          ref: ${{ steps.sidecar.outputs.ref }}
-          path: oh-my-pi
-          persist-credentials: false
-
-      - name: Checkout GUI source at the same commit
-        uses: actions/checkout@v6
-        with:
-          repository: nornzach/oh-my-pi-gui
-          ref: ${{ steps.sidecar.outputs.gui_sha }}
-          path: oh-my-pi/packages/gui
-          persist-credentials: false
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          # The sidecar build requires the monorepo's exact Bun (packageManager),
-          # so follow the pinned checkout instead of a hard-coded version.
-          bun-version-file: oh-my-pi/package.json
-
-      - name: Install dependencies
-        working-directory: oh-my-pi
-        run: bun install
+          gui_ref: ${{ github.event_name == 'release' && github.sha || inputs.gui_ref || format('refs/tags/{0}', inputs.tag) }}
+          tag: ${{ env.RELEASE_TAG }}
+          monorepo_sha: ${{ inputs.monorepo_sha }}
+          core_repo: ${{ vars.OMP_CORE_REPO || 'nornzach/oh-my-pi' }}
 
       - name: Build native addons from the pinned Core source
         working-directory: oh-my-pi
@@ -132,7 +68,8 @@ jobs:
         run: |
           bun run build
           bun ../../node_modules/electron-builder/cli.js \
-            --config electron-builder.yml --linux AppImage deb --publish never
+            --config electron-builder.yml --linux AppImage deb --publish never \
+            -c.publish.owner="${GITHUB_REPOSITORY%/*}" -c.publish.repo="${GITHUB_REPOSITORY#*/}"
 
       - name: Upload Linux assets to the release
         working-directory: oh-my-pi/packages/gui/dist
@@ -143,5 +80,4 @@ jobs:
           shopt -s nullglob
           files=(omp-*.AppImage omp-*.AppImage.blockmap omp-*.deb omp_*.deb latest-linux.yml)
           printf 'uploading: %s\n' "${files[@]}"
-          gh release upload "${{ steps.refs.outputs.tag }}" \
-            "${files[@]}" --repo "$GUI_REPO" --clobber
+          gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber

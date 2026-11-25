@@ -1,0 +1,59 @@
+name: Prepare release source
+description: Check the GUI version and build against its pinned Core checkout
+inputs:
+  gui_ref:
+    description: GUI commit or release ref to build
+    required: true
+  tag:
+    description: Release tag
+    required: true
+  monorepo_sha:
+    description: Full Core SHA for an explicit backfill
+    required: false
+  core_repo:
+    description: Trusted Core source for this repository
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.gui_ref }}
+        path: gui-source
+        sparse-checkout: |
+          package.json
+          sidecar-source.json
+        sparse-checkout-cone-mode: false
+        persist-credentials: false
+    - id: source
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        CORE_SHA: ${{ inputs.monorepo_sha }}
+        CORE_REPO: ${{ inputs.core_repo }}
+      run: |
+        set -eu
+        cd gui-source
+        git check-ref-format "refs/tags/$TAG"
+        test "$TAG" = "v$(jq -er '.version' package.json | tr -d '\r')" || { echo 'Release tag and package version differ' >&2; exit 1; }
+        test "$(jq -er '.repo' sidecar-source.json | tr -d '\r')" = "$CORE_REPO" || { echo 'Unexpected Core repository' >&2; exit 1; }
+        commit=${CORE_SHA:-$(jq -er '.commit' sidecar-source.json | tr -d '\r')}
+        [[ "$commit" =~ ^[a-fA-F0-9]{40}$ ]] || { echo 'Expected a full Core commit SHA' >&2; exit 1; }
+        printf 'core=%s\ngui=%s\n' "$commit" "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+    - uses: actions/checkout@v6
+      with:
+        repository: ${{ inputs.core_repo }}
+        ref: ${{ steps.source.outputs.core }}
+        path: oh-my-pi
+        persist-credentials: false
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ steps.source.outputs.gui }}
+        path: oh-my-pi/packages/gui
+        persist-credentials: false
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: oh-my-pi/package.json
+    - shell: bash
+      working-directory: oh-my-pi
+      run: bun install
