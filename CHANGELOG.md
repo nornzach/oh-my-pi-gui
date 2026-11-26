@@ -13,9 +13,11 @@
 - Dynamic view folds reasoning and tool steps as soon as answer text appears. The last line has room above the composer, with a soft fade at the scroll edge.
 - The command menu no longer competes with subagent headers for space or clicks ([#73](https://github.com/nornzach/oh-my-pi-gui/issues/73)).
 - Live reasoning follows new lines until you scroll up to read earlier text ([#79](https://github.com/nornzach/oh-my-pi-gui/issues/79)).
-- Both live reasoning views show estimated token counts and rates. Completed reasoning shows the provider's message total when available ([#80](https://github.com/nornzach/oh-my-pi-gui/issues/80)).
+- Live reasoning counts and rates use provider-reported token usage instead of estimating tokens from text bytes; hidden and expanded reasoning use the same presentation, and completed reasoning uses the same token-count format ([#80](https://github.com/nornzach/oh-my-pi-gui/issues/80)).
 - Single-session sidebar deletion honors the same confirmation preference as `/delete` ([#81](https://github.com/nornzach/oh-my-pi-gui/issues/81)).
 - Task activity stays available after work finishes and shows saved tasks and subagents when a session is reopened.
+- Incomplete extension form payloads show a recoverable error instead of crashing the window ([#84](https://github.com/nornzach/oh-my-pi-gui/issues/84)).
+- Linux releases include an RPM package for Fedora-compatible distributions ([#83](https://github.com/nornzach/oh-my-pi-gui/issues/83)).
 
 ### Changed
 
@@ -24,6 +26,7 @@
 - The message field starts at one line and grows with the draft, with smaller text and toolbar labels. Task activity stays on the right, and conversation jump markers sit on the left.
 - Compact conversations keep new steps folded, give reasoning its own row, and show the tool and its target in the process header.
 - Build and verify Apple Silicon and Intel installers automatically on release, with one update feed covering both architectures.
+- Interface and code font families can be set independently in GUI settings ([#85](https://github.com/nornzach/oh-my-pi-gui/issues/85)).
 
 ## [1.0.4] - 2026-11-24
 

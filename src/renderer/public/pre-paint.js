@@ -33,6 +33,23 @@
 				document.documentElement.style.setProperty("--gui-font-size", Math.round(parsedSize) + "px");
 			}
 		}
+		var interfaceFont = localStorage.getItem("omp.interfaceFont");
+		if (interfaceFont) {
+			var quotedInterfaceFont = '"' + interfaceFont.slice(0, 120).replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+			document.documentElement.style.setProperty(
+				"--font-body",
+				quotedInterfaceFont + ', -apple-system, BlinkMacSystemFont, "Inter Variable", "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif',
+			);
+			document.documentElement.style.setProperty("--font-display", document.documentElement.style.getPropertyValue("--font-body"));
+		}
+		var codeFont = localStorage.getItem("omp.codeFont");
+		if (codeFont) {
+			var quotedCodeFont = '"' + codeFont.slice(0, 120).replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+			document.documentElement.style.setProperty(
+				"--font-mono",
+				quotedCodeFont + ', ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Cascadia Code", Menlo, monospace',
+			);
+		}
 		var density = localStorage.getItem("omp.compactDensity");
 		if (density === "tight" || density === "comfortable") {
 			document.documentElement.dataset.density = density;

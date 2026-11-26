@@ -5,7 +5,7 @@
 import { toast } from "../stores/toast";
 import { type ChatWidth, type ThemeMode, type TranscriptDetail, useUiStore } from "../stores/ui";
 import { translate } from "./i18n";
-import { applyChatWidth, applyCompactDensity, applyFontSize } from "./theme";
+import { applyChatWidth, applyCompactDensity, applyFontSize, normalizeFontFamily } from "./theme";
 import { applyThemeByName } from "./themes";
 
 export const WIDTH_ORDER: readonly ChatWidth[] = ["standard", "wide", "full"];
@@ -84,6 +84,14 @@ export function stepFontSizePreference(delta: number): number {
 
 export function resetFontSizePreference(): number {
 	return applyFontSizePreference(FONT_SIZE_DEFAULT);
+}
+
+export function saveFontFamilyPreference(preference: "interfaceFont" | "codeFont", value: string): void {
+	const font = normalizeFontFamily(value);
+	const previous = useUiStore.getState()[preference];
+	if (font === previous) return;
+	useUiStore.setState({ [preference]: font });
+	void persistPrefs([[preference, font]], () => useUiStore.setState({ [preference]: previous }));
 }
 
 export function applyCompactDensityPreference(next: boolean): void {

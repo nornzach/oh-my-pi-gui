@@ -81,9 +81,10 @@ export function ThinkingBlock({
 	const thinkingExpanded = useUiStore(s => s.thinkingExpanded);
 	const autoCollapseProcess = useUiStore(s => s.autoCollapseProcess);
 	const compact = useUiStore(s => s.transcriptDetail === "compact");
-	const defaultOpen = live && !streamingTextStarted
-		? thinkingExpanded || (!compact && autoCollapseProcess)
-		: thinkingExpanded && !autoCollapseProcess;
+	const defaultOpen =
+		live && !streamingTextStarted
+			? thinkingExpanded || (!compact && autoCollapseProcess)
+			: thinkingExpanded && !autoCollapseProcess;
 	const [localOpen, setLocalOpen] = useState(defaultOpen);
 	const open = disclosure?.expanded ?? localOpen;
 	const setOpen = disclosure?.onExpandedChange ?? setLocalOpen;
@@ -120,13 +121,9 @@ export function ThinkingBlock({
 			lastScrollTop.current = body.scrollTop;
 		}
 	}, [formatted, isLive, open, hideThinkingBlock]);
-	const gauge = isLive ? (
-		<ReasoningGauge key={`${streamTime}:${reported !== undefined}`} text={content} reported={reported} />
-	) : messageReasoningTokens !== undefined ? (
-		<span className="tabular-nums text-[var(--omp-dim)]">
-			{t("chat.thinking.messageTokens", { count: messageReasoningTokens.toLocaleString() })}
-		</span>
-	) : null;
+	const gauge = isLive
+		? reported !== undefined && <ReasoningGauge key={streamTime} reported={reported} />
+		: messageReasoningTokens !== undefined && <ReasoningGauge live={false} reported={messageReasoningTokens} />;
 
 	// ── Hidden-thinking glyph pulse ─────────────────────────────────────────
 	const [glyphFrame, setGlyphFrame] = useState(0);

@@ -1977,6 +1977,10 @@ export const th: Record<string, string> = {
 	"chat.context.details": "ดูรายละเอียดบริบท",
 	"settings.gui.fontSize": "ขนาดฟอนต์",
 	"settings.gui.fontSizeDesc": "ขนาดฟอนต์พื้นฐานของ UI หน่วยเป็น px (10–20)",
+	"settings.gui.interfaceFont": "ฟอนต์ส่วนติดต่อผู้ใช้",
+	"settings.gui.codeFont": "ฟอนต์โค้ด",
+	"settings.gui.fontFamilyDesc": "ใช้ฟอนต์ที่ติดตั้งบนคอมพิวเตอร์ เครื่องหมายว่างจะใช้ฟอนต์เริ่มต้น",
+	"settings.gui.fontFamilyDefault": "ค่าเริ่มต้นของระบบ",
 	"settings.gui.configEditor": "ตัวแก้ไขไฟล์การกำหนดค่า",
 	"settings.gui.configEditor.auto": "อัตโนมัติ (Sublime Text แล้วใช้ TextEdit)",
 	"settings.gui.configEditor.sublime": "เปิดด้วย Sublime Text",
@@ -2000,7 +2004,8 @@ export const th: Record<string, string> = {
 	"settings.gui.thinkingExpanded": "ขยาย reasoning ไว้เป็นค่าเริ่มต้น",
 	"settings.gui.thinkingExpandedDesc": "แสดงลำดับ reasoning ของโมเดลทันทีโดยไม่ต้องคลิกทีละบล็อก และยังยุบแต่ละบล็อกแยกได้เหมือนเดิม",
 	"settings.gui.autoCollapseProcess": "ยุบการให้เหตุผลและขั้นตอนการใช้เครื่องมือเมื่อเริ่มแสดงคำตอบ",
-	"settings.gui.autoCollapseProcessDesc": "ยุบขั้นตอนเมื่อข้อความคำตอบปรากฏ คลิกเพื่อเปิดดูอีกครั้ง ในโหมดกะทัดรัด ขั้นตอนใหม่จะเริ่มแบบยุบไว้",
+	"settings.gui.autoCollapseProcessDesc":
+		"ยุบขั้นตอนเมื่อข้อความคำตอบปรากฏ คลิกเพื่อเปิดดูอีกครั้ง ในโหมดกะทัดรัด ขั้นตอนใหม่จะเริ่มแบบยุบไว้",
 	"settings.gui.confirmSessionDelete": "ยืนยันก่อนลบเซสชัน",
 	"settings.gui.confirmSessionDeleteDesc":
 		"ถามก่อนลบเซสชันเดียวจากแถบด้านข้างหรือด้วย /delete (/drop) การลบหลายเซสชันหรือทุกเซสชันในพื้นที่ทำงานต้องยืนยันเสมอ",
@@ -2159,6 +2164,7 @@ export const th: Record<string, string> = {
 	"extDialog.submit": "ส่ง",
 	"extDialog.ask.title": "คำถาม",
 	"extDialog.form.required": "จำเป็น",
+	"extDialog.form.invalid": "แสดงแบบฟอร์มไม่ได้เนื่องจากข้อมูลไม่ครบถ้วน",
 	"extDialog.ask.recommended": "แนะนำ",
 	"extDialog.ask.customPlaceholder": "คำตอบของคุณเอง (ไม่บังคับ)",
 	"extDialog.ask.notePlaceholder": "เพิ่มโน้ต (ไม่บังคับ)",

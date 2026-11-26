@@ -227,6 +227,28 @@ describe("ExtensionDialog select", () => {
 
 describe("ExtensionDialog form", () => {
 	const spans = (text: string) => [{ text }];
+	it("keeps malformed section payloads from crashing the dialog and lets the user cancel", async () => {
+		await mount();
+		await act(async () => {
+			useExtensionUiStore.getState().pushRequest({
+				type: "extension_ui_request",
+				id: "invalid-form",
+				method: "form",
+				sections: [{ title: spans("Deploy"), blocks: undefined }],
+			} as unknown as ExtensionUIRequest);
+		});
+
+		expect(document.querySelector('[role="alert"]')?.textContent).toContain("data was incomplete");
+		const cancel = buttonWithText("Cancel");
+		if (!cancel) throw new Error("invalid form has no cancel action");
+		await click(cancel);
+		expect(respondExtensionUi).toHaveBeenCalledWith({
+			type: "extension_ui_response",
+			id: "invalid-form",
+			cancelled: true,
+		});
+	});
+
 	const showForm = async () => {
 		await act(async () => {
 			useExtensionUiStore.getState().pushRequest({

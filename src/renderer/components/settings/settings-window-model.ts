@@ -163,6 +163,12 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 	},
 	{ id: "fontSize", labelKey: "settings.gui.fontSize", aliases: "fontSize font size 字号 字体" },
 	{
+		id: "interfaceFont",
+		labelKey: "settings.gui.interfaceFont",
+		aliases: "interfaceFont interface font family 界面 字体 Noto Sans JP",
+	},
+	{ id: "codeFont", labelKey: "settings.gui.codeFont", aliases: "code font family 等宽字体 Consolas" },
+	{
 		id: "configEditor",
 		labelKey: "settings.gui.configEditor",
 		aliases: "configuration editor models.yml Sublime Text TextEdit 配置 文本编辑",

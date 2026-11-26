@@ -17,6 +17,23 @@ export const THEME_BACKGROUND_STORAGE_KEY = "omp.themeBackground";
 export const CHAT_WIDTH_STORAGE_KEY = "omp.chatWidth";
 export const FONT_SIZE_STORAGE_KEY = "omp.fontSize";
 export const COMPACT_DENSITY_STORAGE_KEY = "omp.compactDensity";
+export const INTERFACE_FONT_STORAGE_KEY = "omp.interfaceFont";
+export const CODE_FONT_STORAGE_KEY = "omp.codeFont";
+
+export type FontFamilyPreference = "interfaceFont" | "codeFont";
+
+const FONT_FAMILY_STORAGE_KEYS: Record<FontFamilyPreference, string> = {
+	interfaceFont: INTERFACE_FONT_STORAGE_KEY,
+	codeFont: CODE_FONT_STORAGE_KEY,
+};
+
+export function normalizeFontFamily(value: unknown): string {
+	if (typeof value !== "string") return "";
+	return value
+		.replace(/[\u0000-\u001f\u007f]/g, "")
+		.trim()
+		.slice(0, 120);
+}
 
 /** Synchronous boot mode mirrored by pre-paint.js before preferences IPC exists. */
 export function readPrepaintThemeMode(): ThemeMode {
@@ -47,6 +64,15 @@ export function readPrepaintFontSize(): number {
 		return Number.isFinite(parsed) && parsed >= 10 && parsed <= 20 ? Math.round(parsed) : 15;
 	} catch {
 		return 15;
+	}
+}
+
+export function readPrepaintFontFamily(preference: FontFamilyPreference): string {
+	if (typeof window === "undefined") return "";
+	try {
+		return normalizeFontFamily(window.localStorage?.getItem(FONT_FAMILY_STORAGE_KEYS[preference]));
+	} catch {
+		return "";
 	}
 }
 
@@ -133,6 +159,42 @@ export function applyFontSize(size: number): void {
 	document.documentElement.style.setProperty("--gui-font-size", `${size}px`);
 	try {
 		window.localStorage?.setItem(FONT_SIZE_STORAGE_KEY, String(size));
+	} catch {
+		// localStorage unavailable in restricted contexts
+	}
+}
+
+export function applyFontFamilies(interfaceFont: string, codeFont: string): void {
+	const style = document.documentElement.style;
+	const interfaceFamily = normalizeFontFamily(interfaceFont);
+	const codeFamily = normalizeFontFamily(codeFont);
+	if (interfaceFamily) {
+		const quoted = `"${interfaceFamily.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+		const stack = `${quoted}, -apple-system, BlinkMacSystemFont, "Inter Variable", "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif`;
+		style.setProperty("--font-body", stack);
+		style.setProperty("--font-display", stack);
+	} else {
+		style.removeProperty("--font-body");
+		style.removeProperty("--font-display");
+	}
+	if (codeFamily) {
+		const quoted = `"${codeFamily.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+		style.setProperty(
+			"--font-mono",
+			`${quoted}, ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Cascadia Code", Menlo, monospace`,
+		);
+	} else {
+		style.removeProperty("--font-mono");
+	}
+	try {
+		for (const [preference, family] of [
+			["interfaceFont", interfaceFamily],
+			["codeFont", codeFamily],
+		] as const) {
+			const key = FONT_FAMILY_STORAGE_KEYS[preference];
+			if (family) window.localStorage?.setItem(key, family);
+			else window.localStorage?.removeItem(key);
+		}
 	} catch {
 		// localStorage unavailable in restricted contexts
 	}

@@ -73,7 +73,14 @@ import { watchPluginActivation } from "./lib/plugin-activation";
 import { closeActiveTab } from "./lib/tab-close";
 import { acceptsActiveTabEvents, onActiveTabRouteSettled, onActiveTabRouteState } from "./lib/tab-routing";
 import { focusedTabRpc } from "./lib/tab-rpc";
-import { applyChatWidth, applyCompactDensity, applyFontSize, watchSystemTheme } from "./lib/theme";
+import {
+	applyChatWidth,
+	applyCompactDensity,
+	applyFontFamilies,
+	applyFontSize,
+	normalizeFontFamily,
+	watchSystemTheme,
+} from "./lib/theme";
 import {
 	applyThemeByName,
 	clearPluginThemes,
@@ -94,6 +101,7 @@ import { SessionRuntimeProvider } from "./stores/session-runtime-context";
 import { useSettingsStore } from "./stores/settings";
 import { useTabRuntime } from "./stores/tab-runtime";
 import { cycleTab, moveActiveTab, selectTabAt, useSessionTabs, useTabsStore } from "./stores/tabs";
+import { applyTerminalFontFamily } from "./stores/terminals";
 import { toast } from "./stores/toast";
 import { activeWorkspacePage, type PanelTab, useEffectiveKeymapOverrides, useUiStore } from "./stores/ui";
 import { subscribeUpdaterStatus } from "./stores/updater";
@@ -204,6 +212,8 @@ export function App() {
 	const workspacePage = useUiStore(activeWorkspacePage);
 	const theme = useUiStore(s => s.theme);
 	const fontSize = useUiStore(s => s.fontSize);
+	const interfaceFont = useUiStore(s => s.interfaceFont);
+	const codeFont = useUiStore(s => s.codeFont);
 	const chatWidth = useUiStore(s => s.chatWidth);
 	const followAgentTheme = useUiStore(s => s.followAgentTheme);
 	const statsDashboardOpen = useUiStore(s => s.statsDashboardOpen);
@@ -237,7 +247,7 @@ export function App() {
 	const { lang, setLang } = useLang();
 	const t = useT();
 
-	// Seed theme/fontSize from persisted prefs once at boot.
+	// Seed theme/font preferences from persisted prefs once at boot.
 	useEffect(() => {
 		let cancelled = false;
 		const changedPreferences = new Set<string>();
@@ -247,6 +257,8 @@ export function App() {
 				"colorBlindMode",
 				"followAgentTheme",
 				"fontSize",
+				"interfaceFont",
+				"codeFont",
 				"notifications",
 				"notificationsWhenFocused",
 				"thinkingExpanded",
@@ -287,6 +299,12 @@ export function App() {
 				}
 				if (typeof prefs.fontSize === "number" && !changedPreferences.has("fontSize")) {
 					useUiStore.setState({ fontSize: prefs.fontSize });
+				}
+				if (typeof prefs.interfaceFont === "string" && !changedPreferences.has("interfaceFont")) {
+					useUiStore.setState({ interfaceFont: normalizeFontFamily(prefs.interfaceFont) });
+				}
+				if (typeof prefs.codeFont === "string" && !changedPreferences.has("codeFont")) {
+					useUiStore.setState({ codeFont: normalizeFontFamily(prefs.codeFont) });
 				}
 				if (typeof prefs.notifications === "boolean" && !changedPreferences.has("notifications")) {
 					useUiStore.setState({ notifications: prefs.notifications });
@@ -403,6 +421,10 @@ export function App() {
 	// and travelling Glide thumbs measure the updated geometry in the same frame.
 	useEffect(() => watchSystemTheme(theme, () => applyThemeByName("system", { persist: false })), [theme]);
 	useLayoutEffect(() => applyFontSize(fontSize), [fontSize]);
+	useLayoutEffect(() => {
+		applyFontFamilies(interfaceFont, codeFont);
+		applyTerminalFontFamily(getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim());
+	}, [interfaceFont, codeFont]);
 	useLayoutEffect(() => applyChatWidth(chatWidth), [chatWidth]);
 
 	// Handle omp:// deep links (omp://new → new session; omp://session/<id> → switch).

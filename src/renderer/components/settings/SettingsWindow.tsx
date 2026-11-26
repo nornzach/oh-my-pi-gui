@@ -72,6 +72,7 @@ import {
 	FONT_SIZE_MAX,
 	FONT_SIZE_MIN,
 	resetFontSizePreference,
+	saveFontFamilyPreference,
 } from "../../lib/view-preferences";
 import { en } from "../../locales/en";
 import { ru } from "../../locales/ru";
@@ -302,6 +303,12 @@ export function SettingsWindow() {
 	const contentRef = useRef<HTMLDivElement>(null);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 	const [focusedSetting, setFocusedSetting] = useState<string | null>(null);
+	const interfaceFont = useUiStore(state => state.interfaceFont);
+	const codeFont = useUiStore(state => state.codeFont);
+	const [interfaceFontDraft, setInterfaceFontDraft] = useState(interfaceFont);
+	const [codeFontDraft, setCodeFontDraft] = useState(codeFont);
+	useEffect(() => setInterfaceFontDraft(interfaceFont), [interfaceFont]);
+	useEffect(() => setCodeFontDraft(codeFont), [codeFont]);
 	const open = useUiStore(state => state.settingsOpen);
 	const requestedTab = useUiStore(state => state.settingsTab);
 	const close = useUiStore(state => state.closeSettings);
@@ -1374,6 +1381,59 @@ export function SettingsWindow() {
 																		<Plus aria-hidden="true" size={13} />
 																	</button>
 																</div>
+															</div>
+														</div>
+
+														<div id="setting-gui-interfaceFont" className="scroll-mt-4 pt-3">
+															<div className="omp-settings-row flex items-center justify-between gap-4">
+																<div className="min-w-0">
+																	<div className="text-omp-md font-medium text-(--omp-text)">
+																		{t("settings.gui.interfaceFont")}
+																	</div>
+																	<p className="mt-0.5 text-omp-xs text-(--omp-muted)">
+																		{t("settings.gui.fontFamilyDesc")}
+																	</p>
+																</div>
+																<Input
+																	aria-label={t("settings.gui.interfaceFont")}
+																	className="w-52 max-w-[45%]"
+																	maxLength={120}
+																	onBlur={event =>
+																		saveFontFamilyPreference(
+																			"interfaceFont",
+																			event.currentTarget.value,
+																		)
+																	}
+																	onChange={event => setInterfaceFontDraft(event.target.value)}
+																	placeholder={t("settings.gui.fontFamilyDefault")}
+																	spellCheck={false}
+																	value={interfaceFontDraft}
+																/>
+															</div>
+														</div>
+
+														<div id="setting-gui-codeFont" className="scroll-mt-4 pt-3">
+															<div className="omp-settings-row flex items-center justify-between gap-4">
+																<div className="min-w-0">
+																	<div className="text-omp-md font-medium text-(--omp-text)">
+																		{t("settings.gui.codeFont")}
+																	</div>
+																	<p className="mt-0.5 text-omp-xs text-(--omp-muted)">
+																		{t("settings.gui.fontFamilyDesc")}
+																	</p>
+																</div>
+																<Input
+																	aria-label={t("settings.gui.codeFont")}
+																	className="w-52 max-w-[45%]"
+																	maxLength={120}
+																	onBlur={event =>
+																		saveFontFamilyPreference("codeFont", event.currentTarget.value)
+																	}
+																	onChange={event => setCodeFontDraft(event.target.value)}
+																	placeholder={t("settings.gui.fontFamilyDefault")}
+																	spellCheck={false}
+																	value={codeFontDraft}
+																/>
 															</div>
 														</div>
 

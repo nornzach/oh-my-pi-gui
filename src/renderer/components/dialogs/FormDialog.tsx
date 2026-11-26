@@ -75,6 +75,94 @@ interface ChoiceDraft {
 }
 export type FormFieldDraft = string | ChoiceDraft;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function isSpans(value: unknown): value is ExtensionFormSpan[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			span =>
+				isRecord(span) &&
+				typeof span.text === "string" &&
+				(span.style === undefined || span.style === "code" || span.style === "strong" || span.style === "em"),
+		)
+	);
+}
+
+function isFormField(value: unknown): value is ExtensionFormField {
+	if (!isRecord(value) || typeof value.name !== "string" || typeof value.required !== "boolean") return false;
+	if (value.kind === "text") {
+		return (
+			typeof value.type === "string" &&
+			typeof value.multiline === "boolean" &&
+			isSpans(value.label) &&
+			typeof value.value === "string" &&
+			typeof value.placeholder === "string" &&
+			typeof value.rows === "number" &&
+			(value.min === undefined || typeof value.min === "number") &&
+			(value.max === undefined || typeof value.max === "number") &&
+			(value.minLength === undefined || typeof value.minLength === "number") &&
+			(value.maxLength === undefined || typeof value.maxLength === "number") &&
+			(value.pattern === undefined || typeof value.pattern === "string")
+		);
+	}
+	return (
+		value.kind === "choice" &&
+		typeof value.multi === "boolean" &&
+		typeof value.select === "boolean" &&
+		typeof value.other === "boolean" &&
+		isSpans(value.label) &&
+		Array.isArray(value.options) &&
+		value.options.every(
+			option =>
+				isRecord(option) &&
+				typeof option.value === "string" &&
+				isSpans(option.label) &&
+				typeof option.checked === "boolean" &&
+				typeof option.disabled === "boolean",
+		)
+	);
+}
+
+function isFormBlock(value: unknown): value is ExtensionFormBlock {
+	if (!isRecord(value) || typeof value.kind !== "string") return false;
+	switch (value.kind) {
+		case "text":
+			return isSpans(value.spans) && typeof value.heading === "boolean";
+		case "list":
+			return (
+				typeof value.ordered === "boolean" && Array.isArray(value.items) && value.items.every(item => isSpans(item))
+			);
+		case "pre":
+			return typeof value.text === "string";
+		case "table":
+			return (
+				typeof value.headerRows === "number" &&
+				Array.isArray(value.rows) &&
+				value.rows.every(row => Array.isArray(row) && row.every(cell => isSpans(cell)))
+			);
+		case "field":
+			return isFormField(value.field);
+		default:
+			return false;
+	}
+}
+
+function validFormSections(value: unknown): value is ExtensionFormSection[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			section =>
+				isRecord(section) &&
+				isSpans(section.title) &&
+				Array.isArray(section.blocks) &&
+				section.blocks.every(isFormBlock),
+		)
+	);
+}
+
 function plainText(spans: ExtensionFormSpan[]): string {
 	return sanitizeToolText(spans.map(span => span.text).join(""));
 }
@@ -307,12 +395,13 @@ export function AskFormBody({
 	draftKey?: string;
 }) {
 	const t = useT();
+	const safeSections = validFormSections(sections) ? sections : null;
 	const fields = useMemo(
 		() =>
-			sections.flatMap(section =>
+			safeSections?.flatMap(section =>
 				section.blocks.flatMap(block => (block.kind === "field" && block.field.name ? [block.field] : [])),
-			),
-		[sections],
+			) ?? [],
+		[safeSections],
 	);
 	const [drafts, setDrafts] = useState<FormFieldDraft[]>(() => readFormDraft(draftKey) ?? fields.map(initialDraft));
 	const [missing, setMissing] = useState<ReadonlySet<number>>(new Set());
@@ -334,6 +423,7 @@ export function AskFormBody({
 	};
 
 	const submit = () => {
+		if (!safeSections) return;
 		const blank = fields.flatMap((field, index) => (field.required && isBlank(field, drafts[index]) ? [index] : []));
 		if (blank.length > 0) {
 			setMissing(new Set(blank));
@@ -376,27 +466,33 @@ export function AskFormBody({
 				submit();
 			}}
 		>
-			{sections.map((section, sectionIndex) => (
-				<div className="space-y-3" key={sectionIndex}>
-					{section.title.length > 0 && (
-						<h3 className="text-omp-xs font-semibold break-words whitespace-pre-wrap text-(--omp-text)">
-							<Spans spans={section.title} />
-						</h3>
-					)}
-					{section.blocks.map((block, blockIndex) => (
-						<div key={blockIndex}>
-							{block.kind === "field" ? renderField(block.field) : <ContextBlock block={block} />}
-						</div>
-					))}
-				</div>
-			))}
+			{safeSections ? (
+				safeSections.map((section, sectionIndex) => (
+					<div className="space-y-3" key={sectionIndex}>
+						{section.title.length > 0 && (
+							<h3 className="text-omp-xs font-semibold break-words whitespace-pre-wrap text-(--omp-text)">
+								<Spans spans={section.title} />
+							</h3>
+						)}
+						{section.blocks.map((block, blockIndex) => (
+							<div key={blockIndex}>
+								{block.kind === "field" ? renderField(block.field) : <ContextBlock block={block} />}
+							</div>
+						))}
+					</div>
+				))
+			) : (
+				<p role="alert" className="text-omp-sm text-(--omp-error)">
+					{t("extDialog.form.invalid")}
+				</p>
+			)}
 			<div className="flex items-center justify-between gap-2 border-t border-(--omp-border-muted) pt-3">
 				<div className="flex items-center gap-2">{footer}</div>
 				<div className="flex gap-2">
 					<Button onClick={cancel} size="sm" type="button" variant="ghost">
 						{t("common.cancel")}
 					</Button>
-					<Button size="sm" type="submit" variant="primary">
+					<Button disabled={!safeSections} size="sm" type="submit" variant="primary">
 						{t("extDialog.submit")}
 					</Button>
 				</div>

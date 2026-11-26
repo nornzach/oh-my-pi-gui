@@ -1,6 +1,6 @@
 name: Release Linux builds
 
-# Builds the Linux artifacts (AppImage + deb + latest-linux.yml) on Ubuntu and
+# Builds the Linux artifacts (AppImage + deb + rpm + latest-linux.yml) on Ubuntu and
 # attaches them to the release. The bundled sidecar must come from the monorepo
 # fork — upstream lacks the GUI-only flags — so this checks out BOTH repos:
 # the GUI at the selected ref and the monorepo repository and commit recorded
@@ -68,7 +68,7 @@ jobs:
         run: |
           bun run build
           bun ../../node_modules/electron-builder/cli.js \
-            --config electron-builder.yml --linux AppImage deb --publish never \
+            --config electron-builder.yml --linux AppImage deb rpm --publish never \
             -c.publish.owner="${GITHUB_REPOSITORY%/*}" -c.publish.repo="${GITHUB_REPOSITORY#*/}"
 
       - name: Upload Linux assets to the release
@@ -78,6 +78,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           shopt -s nullglob
-          files=(omp-*.AppImage omp-*.AppImage.blockmap omp-*.deb omp_*.deb latest-linux.yml)
+          files=(omp-*.AppImage omp-*.AppImage.blockmap omp-*.deb omp_*.deb omp-*.rpm omp_*.rpm latest-linux.yml)
           printf 'uploading: %s\n' "${files[@]}"
           gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber

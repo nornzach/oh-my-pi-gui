@@ -62,65 +62,60 @@ afterEach(async () => {
 });
 
 describe("ThinkingBlock", () => {
-	it("uses reasoning arrival times and preserves UTF-8 counts across split emoji and idle ticks", async () => {
+	it("shows a rate derived from provider-reported reasoning token deltas", async () => {
 		vi.useFakeTimers({ toFake: ["performance", "setInterval", "clearInterval"] });
 		try {
-			await mount(<ReasoningGauge text="abcd" />);
-			const append = (text: string) =>
+			await mount(<ReasoningGauge reported={1} />);
+			const report = (reported: number) =>
 				act(async () => {
 					root.render(
 						<I18nProvider>
-							<ReasoningGauge text={text} />
+							<ReasoningGauge reported={reported} />
 						</I18nProvider>,
 					);
 				});
-			await act(async () => vi.advanceTimersByTime(400));
-			await append(`abcd${"🙂".repeat(9)}\uD83D`);
-			await act(async () => vi.advanceTimersByTime(600));
-			expect(container.textContent).not.toContain("tok/s");
-			await append(`abcd${"🙂".repeat(10)}`);
+			await act(async () => vi.advanceTimersByTime(2000));
+			await report(11);
 			await act(async () => vi.advanceTimersByTime(500));
-			expect(container.textContent).toContain("≈11 tokens");
-			expect(container.textContent).toContain("≈10.0 tok/s");
+			expect(container.textContent).toContain("11 tokens");
+			expect(container.textContent).toContain("5.0 tok/s");
+			expect(container.textContent).not.toContain("≈");
 			await act(async () => vi.advanceTimersByTime(5000));
-			expect(container.textContent).toContain("≈10.0 tok/s");
+			expect(container.textContent).toContain("5.0 tok/s");
 		} finally {
 			vi.useRealTimers();
 		}
 	});
 
-	it.each([true, false])(
-		"distinguishes estimated and reported reasoning counts with hideThinkingBlock=%s",
-		async hidden => {
-			useSettingsStore.setState({ hideThinkingBlock: hidden });
-			const store = useMessagesStore.getState();
+	it.each([true, false])("shows no guessed count and uses reported tokens with hideThinkingBlock=%s", async hidden => {
+		useSettingsStore.setState({ hideThinkingBlock: hidden });
+		const store = useMessagesStore.getState();
+		store.applyEvents([
+			{ type: "message_start", message: { role: "assistant" } },
+			{
+				type: "message_update",
+				message: { role: "assistant" },
+				assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "abcdefgh" },
+			},
+		]);
+		await mount(<ThinkingBlock live />);
+		expect(container.querySelector(".omp-thinking-gauge")).toBeNull();
+		await act(async () =>
 			store.applyEvents([
-				{ type: "message_start", message: { role: "assistant" } },
 				{
 					type: "message_update",
 					message: { role: "assistant" },
-					assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: "abcdefgh" },
-				},
-			]);
-			await mount(<ThinkingBlock live />);
-			expect(container.querySelector(".omp-thinking-gauge")?.textContent).toContain("≈2 tokens");
-			await act(async () =>
-				store.applyEvents([
-					{
-						type: "message_update",
-						message: { role: "assistant" },
-						assistantMessageEvent: {
-							type: "thinking_delta",
-							contentIndex: 0,
-							delta: "!",
-							partial: { role: "assistant", usage: { output: 99, reasoningTokens: 3 } },
-						},
+					assistantMessageEvent: {
+						type: "thinking_delta",
+						contentIndex: 0,
+						delta: "!",
+						partial: { role: "assistant", usage: { output: 99, reasoningTokens: 3 } },
 					},
-				]),
-			);
-			expect(container.querySelector(".omp-thinking-gauge")?.textContent).toBe("3 tokens");
-		},
-	);
+				},
+			]),
+		);
+		expect(container.querySelector(".omp-thinking-gauge")?.textContent).toBe("3 tokens");
+	});
 
 	it("renders reasoning markdown instead of literal syntax (TUI parity)", async () => {
 		await mountExpandedThinking(HEADLINED_THINKING);

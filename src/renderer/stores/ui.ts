@@ -7,6 +7,7 @@ import { effectiveOverrides, type KeymapOverrides, sanitizeDisabled, sanitizeOve
 import {
 	readPrepaintChatWidth,
 	readPrepaintCompactDensity,
+	readPrepaintFontFamily,
 	readPrepaintFontSize,
 	readPrepaintThemeMode,
 	type ThemeMode,
@@ -196,6 +197,8 @@ interface UiStore {
 	sidecarDismissed: boolean;
 	theme: ThemeMode;
 	fontSize: number;
+	interfaceFont: string;
+	codeFont: string;
 	/** Application-wide display preferences, independent of a task's terminal configuration. */
 	compactDensity: boolean;
 	colorBlindMode: boolean;
@@ -352,6 +355,8 @@ interface UiStore {
 	dismissSidecarBanner: () => void;
 	setTheme: (theme: ThemeMode) => void;
 	setFontSize: (size: number) => void;
+	setInterfaceFont: (font: string) => void;
+	setCodeFont: (font: string) => void;
 	setNotifications: (enabled: boolean) => void;
 	setNotificationsWhenFocused: (enabled: boolean) => void;
 	setThinkingExpanded: (enabled: boolean) => void;
@@ -406,6 +411,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	settingsTab: "capabilities",
 	theme: readPrepaintThemeMode(),
 	fontSize: readPrepaintFontSize(),
+	interfaceFont: readPrepaintFontFamily("interfaceFont"),
+	codeFont: readPrepaintFontFamily("codeFont"),
 	compactDensity: readPrepaintCompactDensity(),
 	colorBlindMode: false,
 	followAgentTheme: false,
@@ -701,6 +708,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	dismissSidecarBanner: () => set({ sidecarDismissed: true }),
 	setTheme: theme => set({ theme }),
 	setFontSize: size => set({ fontSize: size }),
+	setInterfaceFont: font => set({ interfaceFont: font }),
+	setCodeFont: font => set({ codeFont: font }),
 	setNotifications: enabled => set({ notifications: enabled }),
 	setNotificationsWhenFocused: enabled => set({ notificationsWhenFocused: enabled }),
 	setThinkingExpanded: enabled => set({ thinkingExpanded: enabled }),

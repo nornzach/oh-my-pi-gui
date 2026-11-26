@@ -130,6 +130,11 @@ export function applyTerminalTheme(): void {
 	for (const view of views.values()) view.term.options.theme = theme;
 }
 
+export function applyTerminalFontFamily(fontFamily: string): void {
+	const resolved = fontFamily || "monospace";
+	for (const view of views.values()) view.term.options.fontFamily = resolved;
+}
+
 function createView(tabId: string, info: RpcTerminalInfo): TerminalView {
 	const styles = getComputedStyle(document.documentElement);
 	const term = new Terminal({
