@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { RpcResponse } from "../../../../shared/rpc-types";
 import { I18nProvider, translate } from "../../../lib/i18n";
 import { useToastStore } from "../../../stores/toast";
-import { useTodoStore } from "../../../stores/todo";
+import { todoHistoryFromMessages, useTodoStore } from "../../../stores/todo";
 import { useUiStore } from "../../../stores/ui";
 
 const { document, window, Event, HTMLElement, Element, Node } = parseHTML("<html><body></body></html>");
@@ -31,7 +31,7 @@ const setTodos: Mock<() => Promise<RpcResponse>> = vi.fn(async () => ({
 
 const { createRoot } = await import("react-dom/client");
 const { TodoDockCard } = await import("./TodoDockCard");
-const { WorkspaceDock } = await import("./WorkspaceDock");
+const { FloatingActivity, WorkspaceDock } = await import("./WorkspaceDock");
 const { WorkspaceDockFocusProvider } = await import("./WorkspaceDockFocus");
 
 let container: HTMLElement;
@@ -141,6 +141,30 @@ describe("TodoDockCard", () => {
 		expect(className).not.toContain("overflow-y-auto");
 		expect(className).not.toContain("max-h-");
 	});
+
+	it("offers completed tasks replayed from the transcript even when Core has cleared the current list", async () => {
+		useTodoStore.getState().seedHistory(
+			todoHistoryFromMessages([
+				{
+					role: "toolResult",
+					toolCallId: "saved-todos",
+					toolName: "todo",
+					content: [],
+					details: { phases: [{ name: "Review", tasks: [{ content: "Saved review task", status: "completed" }] }] },
+				},
+			]),
+		);
+		await mount(
+			<>
+				<FloatingActivity />
+				<WorkspaceDock />
+			</>,
+		);
+
+		expect(container.querySelector("aside button")?.getAttribute("aria-label")).toContain("1/1 done");
+		expect(container.querySelector("details")?.textContent).toContain("Saved review task");
+	});
+
 	it("renders every task in the focused card without a separate scroll viewport", async () => {
 		useTodoStore.getState().setPhases([
 			{

@@ -4,6 +4,7 @@ import { createScopedStoreHook } from "./session-runtime-context";
 
 export interface ToolEntry {
 	toolName: string;
+	intent?: string;
 	args: Record<string, unknown>;
 	/**
 	 * `aborted` is the terminal state of a call that never reported a result:
@@ -184,6 +185,7 @@ export const createToolsStore = () => {
 					if (!result) unanswered.push(key);
 					tools.set(key, {
 						toolName: block.name,
+						intent: block.intent,
 						args: block.arguments,
 						status: result ? (result.isError ? "error" : "done") : "aborted",
 						partialResult: null,
@@ -225,13 +227,17 @@ export const createToolsStore = () => {
 					}
 					case "message_update": {
 						const ame = event.assistantMessageEvent;
-						if (ame.type === "toolcall_delta") {
+						if (ame.type === "toolcall_start" || ame.type === "toolcall_delta") {
 							const map = writable();
 							// Delta frames carry no snapshot; a full-mode frame's `partial`
 							// already names the call from its first delta.
-							const block = Array.isArray(ame.partial?.content) ? ame.partial.content[ame.contentIndex] : null;
+							const snapshot = Array.isArray(ame.partial?.content)
+								? ame.partial.content[ame.contentIndex]
+								: null;
+							const block = ame.type === "toolcall_start" ? (ame.block ?? snapshot) : snapshot;
+							const delta = ame.type === "toolcall_delta" ? ame.delta : "";
 							let key = streamEntryKeysByIndex.get(ame.contentIndex);
-							if (block?.type === "toolCall") {
+							if (ame.type === "toolcall_delta" && block?.type === "toolCall" && block.id) {
 								key = nameStreamEntry(ame.contentIndex, block, map);
 							} else if (key === undefined) {
 								key = `\u0000omp-tool-stream:${++unnamedStreamSeq}`;
@@ -240,15 +246,20 @@ export const createToolsStore = () => {
 							}
 							const existing = map.get(key);
 							if (existing) {
-								map.set(key, { ...existing, streamingArgs: existing.streamingArgs + (ame.delta ?? "") });
+								map.set(key, {
+									...existing,
+									toolName: (block?.type === "toolCall" && block.name) || existing.toolName,
+									streamingArgs: existing.streamingArgs + delta,
+									args: block?.type === "toolCall" ? block.arguments : existing.args,
+								});
 							} else {
 								map.set(key, {
-									// Empty until `toolcall_end` names an unnamed call.
 									toolName: block?.type === "toolCall" ? block.name : "",
-									args: {},
+									args: block?.type === "toolCall" ? block.arguments : {},
+									intent: block?.type === "toolCall" ? block.intent : undefined,
 									status: "pending",
 									partialResult: null,
-									streamingArgs: ame.delta ?? "",
+									streamingArgs: delta,
 									result: null,
 									isError: false,
 									startTime: Date.now(),
@@ -256,7 +267,10 @@ export const createToolsStore = () => {
 								});
 							}
 						} else if (ame.type === "toolcall_end") {
-							nameStreamEntry(ame.contentIndex, ame.toolCall, writable());
+							const map = writable();
+							const key = nameStreamEntry(ame.contentIndex, ame.toolCall, map);
+							const entry = map.get(key);
+							if (entry) map.set(key, { ...entry, args: ame.toolCall.arguments, intent: ame.toolCall.intent });
 						}
 						break;
 					}
@@ -269,10 +283,16 @@ export const createToolsStore = () => {
 							queueExecutionKey(block.id, key);
 							const existing = map.get(key);
 							if (existing) {
-								map.set(key, { ...existing, toolName: block.name, args: block.arguments });
+								map.set(key, {
+									...existing,
+									toolName: block.name,
+									args: block.arguments,
+									intent: block.intent ?? existing.intent,
+								});
 							} else {
 								map.set(key, {
 									toolName: block.name,
+									intent: block.intent,
 									args: block.arguments,
 									status: "pending",
 									partialResult: null,
@@ -295,6 +315,7 @@ export const createToolsStore = () => {
 						runningEntryKeyByCallId.set(event.toolCallId, key);
 						map.set(key, {
 							toolName: event.toolName,
+							intent: event.intent ?? map.get(key)?.intent,
 							args: event.args,
 							status: "running",
 							partialResult: null,

@@ -7,6 +7,10 @@ export interface UiTodoTask extends TodoTask {
 	id: string;
 }
 
+export function isTodoTool(name: string | undefined): boolean {
+	return name === "todo" || name === "todowrite" || name === "todo_write" || name === "set_todos";
+}
+
 export interface UiTodoPhase extends Omit<TodoPhase, "tasks"> {
 	id: string;
 	tasks: UiTodoTask[];
@@ -73,6 +77,10 @@ function fingerprintPhases(
 	phases: readonly { name: string; tasks: readonly { content: string; status: string }[] }[],
 ): string {
 	return JSON.stringify(phases.map(phase => [phase.name, phase.tasks.map(task => [task.content, task.status])]));
+}
+
+export function sameTodoPhases(left: readonly TodoPhase[], right: readonly TodoPhase[]): boolean {
+	return fingerprintPhases(left) === fingerprintPhases(right);
 }
 
 /** Todo identity without progress — status-only changes update one transcript row. */
@@ -144,7 +152,7 @@ export function todoHistoryFromMessages(messages: readonly AgentMessage[]): Todo
 	let history: TodoSnapshot[] = [];
 	let current = fingerprintPhases([]);
 	for (const message of messages) {
-		if (message.role !== "toolResult" || message.toolName !== "todo" || message.isError) continue;
+		if (message.role !== "toolResult" || !isTodoTool(message.toolName) || message.isError) continue;
 		const phases = todoPhasesFromToolResult(message);
 		if (!phases || fingerprintPhases(phases) === current) continue;
 		history = archiveChange(history, phases, messageTimestampMs(message));
@@ -159,7 +167,7 @@ export const createTodoStore = () =>
 		setPhases: phases => {
 			const state = get();
 			const next = normalizePhases(phases);
-			if (!state.historyHydrated || fingerprintPhases(next) === fingerprintPhases(state.phases)) {
+			if (!state.historyHydrated || sameTodoPhases(next, state.phases)) {
 				set({ phases: next, historyHydrated: true });
 				return;
 			}

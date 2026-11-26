@@ -139,7 +139,7 @@ export function groupReadRows<R extends ReadGroupableRow>(rows: R[]): Array<R | 
 			kept.push(block);
 		}
 		if (kept.some(isVisibleBlock)) {
-			out.push({ kind: "message", message: { ...message, content: kept } } as R);
+			out.push({ ...row, message: { ...message, content: kept } });
 		} else if (message.usage != null && typeof message.usage === "object") {
 			// The message was fully consumed into the run (no visible content
 			// left to render a bubble) — keep its usage so a pure-read turn

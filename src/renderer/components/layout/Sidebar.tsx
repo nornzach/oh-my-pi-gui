@@ -259,9 +259,6 @@ export function Sidebar() {
 	const setFamilyOpen = (sessionPath: string, open: boolean) => {
 		setOpenFamilies(prev => ({ ...prev, [sessionPath]: open }));
 	};
-	// Deleting a session hard-deletes its transcript file, so the row and menu
-	// clicks only queue it: the dialog names the target and states the
-	// consequence before anything is removed.
 	const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 	const [renamingSessionPath, setRenamingSessionPath] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState("");
@@ -659,8 +656,13 @@ export function Sidebar() {
 
 	// A row's older files go with it: left behind, they would come back as rows.
 	const deleteRow = async (session: SessionInfo): Promise<string[]> => {
-		if (session.id === sessionId) await dropSessionNow();
-		else await deleteSession(session.path);
+		if (session.id === sessionId) {
+			const response = await dropSessionNow();
+			if ((response.data as { cancelled?: boolean } | undefined)?.cancelled) {
+				toast({ variant: "info", message: t("drop.cancelled") });
+				return [];
+			}
+		} else await deleteSession(session.path);
 		const older = [...heirs].flatMap(([path, heir]) => (heir === session.path ? [path] : []));
 		for (const path of older) {
 			// eslint-disable-next-line no-await-in-loop -- sequential, keep FS load bounded
@@ -684,6 +686,12 @@ export function Sidebar() {
 		} finally {
 			setDeleting(false);
 		}
+	};
+
+	const requestDeleteSession = (session: SessionInfo) => {
+		if (deleting) return;
+		if (useUiStore.getState().confirmSessionDelete) setPendingDelete({ kind: "session", session });
+		else void confirmDeleteSession(session);
 	};
 
 	const confirmDeleteGroup = async (group: WorkspaceGroup) => {
@@ -1125,7 +1133,7 @@ export function Sidebar() {
 								rowActionButton,
 								"hover:!bg-[var(--omp-tool-error-bg)] hover:!text-[var(--omp-error)]",
 							)}
-							onClick={() => setPendingDelete({ kind: "session", session })}
+							onClick={() => requestDeleteSession(session)}
 							title={t("sidebar.delete")}
 							type="button"
 							aria-label={t("sidebar.delete")}
@@ -2122,7 +2130,7 @@ export function Sidebar() {
 									disabled: targetBusy,
 									disabledReason: t("sidebar.menu.taskRunning"),
 									onSelect: () => {
-										setPendingDelete({ kind: "session", session: sessionMenu.session });
+										requestDeleteSession(sessionMenu.session);
 										setSessionMenu(null);
 									},
 								},

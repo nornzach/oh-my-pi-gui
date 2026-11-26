@@ -36,12 +36,6 @@ export function subagentActivity(agent: SubagentSnapshot): SubagentActivity {
 	}
 }
 
-/** Whether any agent is working (parked, idle and finished agents are not). */
-export function hasWorkingSubagent(agents: Iterable<SubagentSnapshot>): boolean {
-	for (const agent of agents) if (subagentActivity(agent) === "working") return true;
-	return false;
-}
-
 function isTurnStart(message: AgentMessage): boolean {
 	return message.role === "user" && !message.steering;
 }

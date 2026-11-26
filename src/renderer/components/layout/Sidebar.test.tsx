@@ -890,7 +890,35 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(omp.sessions.delete).toHaveBeenCalledWith("/work/alpha/one.jsonl");
 	});
 
-	it("shows a session that moved files as one row, with its pin, and deletes both files", async () => {
+	it.each(["row", "menu"])(
+		"deletes only the targeted background session from the %s when confirmation is off",
+		async source => {
+			const omp = installMockOmp(LIST);
+			seedStores();
+			const previous = useUiStore.getState().confirmSessionDelete;
+			useUiStore.setState({ confirmSessionDelete: false });
+			try {
+				await mount(<Sidebar />);
+				const row = [...document.querySelectorAll(".omp-sidebar-session-row")].find(el =>
+					el.textContent?.includes("Session /work/alpha/one"),
+				);
+				if (source === "menu") await fire(row as Element, "onContextMenu");
+				const action =
+					source === "menu"
+						? [...document.body.querySelectorAll('[role="menu"] button')].find(
+								button => button.textContent?.trim() === "Delete",
+							)
+						: row?.querySelector('[aria-label="Delete session"]');
+				await fire(action as Element, "onClick");
+				expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+				expect(omp.sessions.delete.mock.calls).toEqual([["/work/alpha/one.jsonl"]]);
+			} finally {
+				useUiStore.setState({ confirmSessionDelete: previous });
+			}
+		},
+	);
+
+	it.each(["deleted", "vetoed"])("keeps moved files and their pin together when deletion is %s", async result => {
 		const before = session("/work/alpha/before.jsonl", "/work/alpha", {
 			id: "before-id",
 			title: "Moved session",
@@ -907,6 +935,15 @@ describe("Sidebar menus and pinned ordering", () => {
 		});
 		const omp = installMockOmp([before, after]);
 		seedStores();
+		if (result === "vetoed") {
+			useSessionStore.setState({ sessionId: after.id });
+			omp.rpc.dropSession.mockResolvedValue({
+				type: "response",
+				command: "drop_session",
+				success: true,
+				data: { cancelled: true },
+			});
+		}
 		useSidebarPrefs.setState({ pinnedSessions: [before.path], hydrated: true });
 		await mount(<Sidebar />);
 
@@ -921,6 +958,12 @@ describe("Sidebar menus and pinned ordering", () => {
 			b => (b.textContent ?? "").trim() === "Delete",
 		) as unknown as Element;
 		await fire(confirm, "onClick");
+		if (result === "vetoed") {
+			expect(omp.rpc.dropSession).toHaveBeenCalledOnce();
+			expect(omp.sessions.delete).not.toHaveBeenCalled();
+			expect(useSidebarPrefs.getState().pinnedSessions).toEqual([after.path]);
+			return;
+		}
 
 		// Left on disk, the older file would come straight back as a row.
 		expect(omp.sessions.delete.mock.calls.map(call => call[0])).toEqual([after.path, before.path]);

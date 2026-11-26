@@ -26,6 +26,7 @@ export interface ToolRendererProps {
 export interface ToolCardProps {
 	toolCallId: string;
 	toolName: string;
+	intent?: string;
 	args: Record<string, unknown>;
 	/** A parent activity indicator can own animation for a live tool group. */
 	runningIndicator?: RunningIndicator;
@@ -38,7 +39,7 @@ export type RunningIndicator = "spinner" | "dot";
  * expand/collapse. The body comes from the tool registry; the tool_result
  * arrives via the tools store keyed by toolCallId.
  */
-export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinner" }: ToolCardProps) {
+export function ToolCard({ toolCallId, toolName, intent, args, runningIndicator = "spinner" }: ToolCardProps) {
 	const t = useT();
 	const entry = useToolsStore(s => s.activeTools.get(toolCallId));
 	const expandAll = useUiStore(s => s.toolsExpandAll);
@@ -67,7 +68,7 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 			? entry.streamingArgs.slice(0, 160)
 			: undefined;
 	const Renderer = getToolRenderer(toolName);
-	const summary = getToolSummary(toolName, args, entry?.result);
+	const summary = getToolSummary(toolName, entry?.args ?? args, entry?.result, entry?.intent ?? intent);
 
 	const railColor =
 		status === "error" || isError
@@ -135,7 +136,10 @@ export function ToolCard({ toolCallId, toolName, args, runningIndicator = "spinn
 					</span>
 				)}
 				{summary && (
-					<span className="omp-tool-summary min-w-0 flex-1 truncate font-mono text-omp-sm text-[var(--omp-tool-output)]">
+					<span
+						title={summary}
+						className="omp-tool-summary min-w-0 flex-1 truncate font-mono text-omp-sm text-[var(--omp-tool-output)]"
+					>
 						{summary}
 					</span>
 				)}

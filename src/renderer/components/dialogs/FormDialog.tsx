@@ -18,46 +18,54 @@ import { cx, sanitizeToolText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { forgetFormDraft, readFormDraft, writeFormDraft } from "../../stores/extension-ui";
 import { Button, Input, Modal, TextArea } from "../common";
+import { CopyButton } from "../common/CopyButton";
 
 /** One selectable row; `multi` draws a checkbox, otherwise a radio. */
 export function ChoiceRow({
 	checked,
 	multi,
 	disabled,
+	copyLabel,
 	onClick,
 	children,
 }: {
 	checked: boolean;
 	multi: boolean;
 	disabled?: boolean;
+	copyLabel: string;
 	onClick: () => void;
 	children: ReactNode;
 }) {
 	return (
-		<button
-			aria-pressed={checked}
-			className={cx(
-				"flex w-full items-start gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-(--omp-border-accent)",
-				checked
-					? "border-(--omp-border-accent) bg-(--omp-selected-bg)"
-					: "border-(--omp-border-muted) hover:border-(--omp-border-accent) hover:bg-(--omp-selected-bg)",
-				disabled && "cursor-not-allowed opacity-50",
-			)}
-			disabled={disabled}
-			onClick={onClick}
-			type="button"
-		>
-			<span
+		<div className="flex items-center gap-1">
+			<button
+				aria-pressed={checked}
 				className={cx(
-					"mt-px flex h-3.5 w-3.5 shrink-0 items-center justify-center border transition-colors",
-					multi ? "rounded-[3px]" : "rounded-full",
-					checked ? "border-(--omp-accent) text-(--omp-accent)" : "border-(--omp-border-strong) text-transparent",
+					"flex min-w-0 flex-1 items-start gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-(--omp-border-accent)",
+					checked
+						? "border-(--omp-border-accent) bg-(--omp-selected-bg)"
+						: "border-(--omp-border-muted) hover:border-(--omp-border-accent) hover:bg-(--omp-selected-bg)",
+					disabled && "cursor-not-allowed opacity-50",
 				)}
+				disabled={disabled}
+				onClick={onClick}
+				type="button"
 			>
-				{multi ? <Check size={10} strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-			</span>
-			<span className="min-w-0 flex-1">{children}</span>
-		</button>
+				<span
+					className={cx(
+						"mt-px flex h-3.5 w-3.5 shrink-0 items-center justify-center border transition-colors",
+						multi ? "rounded-[3px]" : "rounded-full",
+						checked
+							? "border-(--omp-accent) text-(--omp-accent)"
+							: "border-(--omp-border-strong) text-transparent",
+					)}
+				>
+					{multi ? <Check size={10} strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+				</span>
+				<span className="min-w-0 flex-1">{children}</span>
+			</button>
+			<CopyButton text={copyLabel} />
+		</div>
 	);
 }
 
@@ -195,6 +203,7 @@ function ChoiceFieldInput({
 			{field.options.map((option, index) => (
 				<ChoiceRow
 					checked={draft.checked.has(index)}
+					copyLabel={plainText(option.label)}
 					disabled={option.disabled}
 					key={index}
 					multi={field.multi}

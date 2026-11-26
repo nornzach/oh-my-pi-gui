@@ -354,6 +354,7 @@ export function AskQuestionsBody({
 								return (
 									<ChoiceRow
 										checked={checked}
+										copyLabel={[option.label, option.description].filter(Boolean).join("\n")}
 										key={option.label}
 										multi={question.multi ?? false}
 										onClick={() => toggleOption(questionIndex, option.label)}

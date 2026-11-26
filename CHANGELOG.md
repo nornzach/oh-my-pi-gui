@@ -2,8 +2,27 @@
 
 ## [Unreleased]
 
+### Added
+
+- Copy an ask option into a custom answer from an inline form or dialog ([#82](https://github.com/nornzach/oh-my-pi-gui/issues/82)).
+
+### Fixed
+
+- Expand a background task once to read its delivered result, without an extra line-count toggle or the agent-facing delivery instructions.
+- Background completions now use the same spacing as tool steps and show the job name once. Stopping a reply no longer repeats the generic interruption reason.
+- Dynamic view folds reasoning and tool steps as soon as answer text appears. The last line has room above the composer, with a soft fade at the scroll edge.
+- The command menu no longer competes with subagent headers for space or clicks ([#73](https://github.com/nornzach/oh-my-pi-gui/issues/73)).
+- Live reasoning follows new lines until you scroll up to read earlier text ([#79](https://github.com/nornzach/oh-my-pi-gui/issues/79)).
+- Both live reasoning views show estimated token counts and rates. Completed reasoning shows the provider's message total when available ([#80](https://github.com/nornzach/oh-my-pi-gui/issues/80)).
+- Single-session sidebar deletion honors the same confirmation preference as `/delete` ([#81](https://github.com/nornzach/oh-my-pi-gui/issues/81)).
+- Task activity stays available after work finishes and shows saved tasks and subagents when a session is reopened.
+
 ### Changed
 
+- The right activity rail lists individual agents and tasks alongside workspace context. Select an agent to open its session.
+- Keep assistant narration visible in compact conversations, show terminal operations with their targets, and apply interface spacing to reasoning and tool rows.
+- The message field starts at one line and grows with the draft, with smaller text and toolbar labels. Task activity stays on the right, and conversation jump markers sit on the left.
+- Compact conversations keep new steps folded, give reasoning its own row, and show the tool and its target in the process header.
 - Build and verify Apple Silicon and Intel installers automatically on release, with one update feed covering both architectures.
 
 ## [1.0.4] - 2026-11-24

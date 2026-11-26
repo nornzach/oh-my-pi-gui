@@ -367,13 +367,13 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 			{ type: "message_end", message: thought(4, "再确认长度的单位是毫米。") },
 		]);
 		await expect(transcript.getByText("再核对一下尺寸和单位。", { exact: true })).toBeVisible();
-		const processGroups = transcript.locator(".omp-execution-group");
+		const processGroups = transcript.locator('[data-transcript-kind="process"]');
 		const groupCount = await processGroups.count();
 		const olderGroup = processGroups.nth(groupCount - 2);
-		await olderGroup.locator(".omp-execution-group-header").click();
+		await olderGroup.locator(".omp-thinking-header").click();
 		const thinkingGroup = processGroups.nth(groupCount - 1);
 		await thinkingGroup.locator(".omp-execution-group-header").click();
-		const olderFooter = olderGroup.getByRole("button", { name: "收起过程", exact: true });
+		const olderFooter = olderGroup.getByRole("button", { name: "收起思考", exact: true });
 		const currentFooter = thinkingGroup.getByRole("button", { name: "收起过程", exact: true });
 		await expect(olderFooter).toBeVisible();
 		await expect(currentFooter).toBeVisible();
@@ -400,10 +400,12 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 				assistantMessageEvent: { type: "thinking_delta", contentIndex: 0, delta: liveThought },
 			},
 		]);
-		const nextGroup = processGroups.last();
-		await expect(nextGroup).toHaveAttribute("data-state", "running");
-		await nextGroup.locator(".omp-execution-group-header").click();
-		await expect(nextGroup.getByRole("button", { name: "收起过程", exact: true })).toBeVisible();
+		const nextGroup = transcript
+			.locator('[data-transcript-kind="streaming"], [data-transcript-kind="process"]')
+			.last();
+		await expect(nextGroup).toHaveAttribute("data-transcript-kind", "streaming");
+		await nextGroup.locator(".omp-thinking-header").click();
+		await expect(nextGroup.getByRole("button", { name: "收起思考", exact: true })).toBeVisible();
 		await sendEvents([
 			{ type: "message_end", message: liveMessage },
 			{
@@ -417,12 +419,12 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		]);
 		const finalProcessAnswer = transcript.getByText("尺寸与单位都已核对。", { exact: true });
 		await expect(finalProcessAnswer).toBeVisible();
-		await expect(nextGroup).toHaveAttribute("data-state", "complete");
-		await nextGroup.getByRole("button", { name: "收起过程", exact: true }).click();
-		await expect(nextGroup.locator(".omp-execution-group-header")).toHaveAttribute("aria-expanded", "false");
+		await expect(nextGroup).toHaveAttribute("data-transcript-kind", "process");
+		await nextGroup.getByRole("button", { name: "收起思考", exact: true }).click();
+		await expect(nextGroup.locator(".omp-thinking-header")).toHaveAttribute("aria-expanded", "false");
 		await expect(thinkingHeaders).toHaveCount(2);
 		await olderFooter.click();
-		await expect(olderGroup.locator(".omp-execution-group-header")).toHaveAttribute("aria-expanded", "false");
+		await expect(olderGroup.locator(".omp-thinking-header")).toHaveAttribute("aria-expanded", "false");
 		await expect(thinkingHeaders.nth(1)).toHaveAttribute("aria-expanded", "true");
 		await currentFooter.click();
 		await expect(thinkingHeaders).toHaveCount(0);

@@ -16,7 +16,7 @@ import { useTabsStore } from "./tabs";
 
 export type { ThemeMode };
 
-export type PanelTab = "overview" | "agents" | "btw" | "diff" | "files" | "terminal" | "browser";
+export type PanelTab = "overview" | "activity" | "agents" | "btw" | "diff" | "files" | "terminal" | "browser";
 const CLOSED_WORKSPACE_PAGES = {
 	activeToolsOpen: false,
 	agentHubOpen: false,
@@ -70,7 +70,7 @@ export type MemoryTabId = "knowledge" | "skills" | "sources";
 export const CHAT_PANEL_TABS: ReadonlySet<PanelTab> = new Set(["overview", "btw", "files"]);
 /** What the Changes view compares: the checkout, this session's edits, their timeline, or virtual artifacts. */
 export type DiffScope = "repository" | "current" | "timeline" | "artifacts";
-/** Center-dock card identifiers: todo/plan/agents render as live cards above the composer. */
+/** Cards that can be opened directly in the activity tab. */
 export type DockCardId = "todo" | "plan" | "agents";
 export type TranscriptDetail = "compact" | "full";
 /** Chat transcript & composer reading-column width (Discussion #53). */
@@ -210,7 +210,7 @@ interface UiStore {
 	autoCollapseProcess: boolean;
 	/** Provider quotas above the sidebar footer (Settings → GUI, default off). */
 	sidebarQuotas: boolean;
-	/** Ask before `/delete` (`/drop`) deletes the current session; off deletes at once (#57). */
+	/** Ask before deleting a single session from the sidebar or with `/delete` (`/drop`). */
 	confirmSessionDelete: boolean;
 	/** Transcript density: compact folds reasoning/tools; full shows every step. */
 	transcriptDetail: TranscriptDetail;
@@ -428,6 +428,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	togglePanel: () => {
 		const state = get();
 		set({
+			dockFocus: null,
 			...workspacePagePatch(null),
 			...(state.panelVisible || activeWorkspacePage(state)
 				? { panelVisible: false }
@@ -446,7 +447,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 				.tabs.find(t2 => t2.id === useTabsStore.getState().activeTabId)?.kind;
 			if (activeKind === "chat") return;
 		}
-		set({ ...workspacePagePatch(null), panelTab: tab, panelVisible: true });
+		set({ ...workspacePagePatch(null), panelTab: tab, panelVisible: true, dockFocus: null });
 	},
 	setDiffScope: scope => set({ diffScope: scope }),
 	openChanges: scope => {
@@ -481,11 +482,15 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 			dockCollapsed: { ...get().dockCollapsed, [id]: !(get().dockCollapsed[id] ?? false) },
 		}),
 	dockFocus: null,
-	focusDockCard: id =>
+	focusDockCard: id => {
+		const previous = get().dockFocus;
+		get().setPanelTab("activity");
+		if (get().panelTab !== "activity" || !get().panelVisible) return;
 		set({
 			dockCollapsed: { ...get().dockCollapsed, [id]: false },
-			dockFocus: { id, seq: (get().dockFocus?.seq ?? 0) + 1 },
-		}),
+			dockFocus: { id, seq: (previous?.seq ?? 0) + 1 },
+		});
+	},
 	openCommandPalette: () => set({ commandPaletteOpen: true }),
 	closeCommandPalette: () => set({ commandPaletteOpen: false }),
 	openModelPicker: () => set({ modelPickerOpen: true }),

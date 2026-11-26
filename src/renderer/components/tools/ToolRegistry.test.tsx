@@ -186,6 +186,13 @@ describe("tool registry coverage", () => {
 		);
 	});
 
+	it("shows the key and terminal while sending, then prefers the saved terminal title", () => {
+		const args = { action: "send", id: "pty-7", key: "enter" };
+		expect(getToolSummary("terminal", args)).toContain("enter · pty-7");
+		const savedResult = { details: { terminal: { title: "Build shell" } } };
+		expect(getToolSummary("terminal", args, savedResult)).toContain("enter · Build shell");
+	});
+
 	it("names a live call in its own header", async () => {
 		useToolsStore.getState().applyEvents([
 			{

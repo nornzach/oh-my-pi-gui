@@ -1,16 +1,16 @@
 import { Brain, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ThinkingLevel } from "../../../shared/rpc-types";
 import { STREAM_FORMAT_FLUSH_MS, useThrottledText } from "../../hooks/use-throttled-text";
 import { useDisplayPreference } from "../../lib/display-preferences";
-import { cx, durationBetween, formatTokens } from "../../lib/format";
+import { cx, durationBetween } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { MarkdownRenderer } from "../../lib/markdown";
+import { isRenderableMessageText } from "../../lib/messages";
 import {
 	formatThinkingForDisplay,
 	hasDisplayableThinking,
-	SPEED_MAX,
-	SpeedTracker,
+	reportedReasoningTokens,
 	THINKING_GLYPH_FRAMES,
 	thinkingGlyphFrameDelay,
 } from "../../lib/thinking";
@@ -18,6 +18,8 @@ import { useMessagesStore } from "../../stores/messages";
 import { useModelStore } from "../../stores/model";
 import { useUiStore } from "../../stores/ui";
 import { Collapse, CollapseButton } from "../common/Collapse";
+import { isTranscriptAtLiveEdge } from "./chat-stream-utils";
+import { ReasoningGauge } from "./ReasoningGauge";
 import { StreamingMarkdown } from "./StreamingText";
 
 export interface ThinkingBlockProps {
@@ -30,6 +32,8 @@ export interface ThinkingBlockProps {
 	endTime?: number | string;
 	/** Override the accent level; defaults to the model store's thinkingLevel. */
 	level?: ThinkingLevel;
+	messageReasoningTokens?: number;
+	disclosure?: { expanded: boolean; onExpandedChange: (expanded: boolean) => void };
 }
 
 const LEVEL_LABEL: Record<ThinkingLevel, string> = {
@@ -43,9 +47,6 @@ const LEVEL_LABEL: Record<ThinkingLevel, string> = {
 	max: "max",
 };
 
-/** Decay/refresh cadence (ms) for the live speed gauge while streaming. */
-const GAUGE_TICK_MS = 500;
-
 /**
  * Collapsible reasoning trace (TUI parity):
  * - `proseOnlyThinking` elides fenced code to a `...` placeholder and drops
@@ -53,36 +54,46 @@ const GAUGE_TICK_MS = 500;
  * - `hideThinkingBlock` suppresses the block entirely; while reasoning is
  *   still streaming, an eased starburst pulse (✻✼❉…) shows in its place,
  *   ending once text output starts or the block finalizes.
- * - While live, a speed gauge shows the reasoning-token count (buffer length)
- *   and a windowed tok/s rate observed from buffer growth, falling back to
- *   the model store's tokensPerSecond before the first observation.
  *
  * GUI extras kept: collapsed by default, word/line counts, duration badge,
  * thinking-level accent (--omp-thinking-*). Settings arrive via get_settings
  * (settings store) and re-render live on config_update.
  */
-export function ThinkingBlock({ text, live = false, startTime, endTime, level }: ThinkingBlockProps) {
+export function ThinkingBlock({
+	text,
+	live = false,
+	startTime,
+	endTime,
+	level,
+	messageReasoningTokens,
+	disclosure,
+}: ThinkingBlockProps) {
 	const t = useT();
 	// Finalized blocks must not subscribe to the live buffer: every thinking
 	// delta would re-render every mounted history block in the window.
 	const streamingThinking = useMessagesStore(s => (live ? s.streamingThinking : ""));
-	const streamingTextStarted = useMessagesStore(s => s.streamingText.length > 0);
+	const reported = useMessagesStore(s => (live ? reportedReasoningTokens(s.streamingMessage?.usage) : undefined));
+	const streamTime = useMessagesStore(s => (live ? s.streamingMessage?.timestamp : undefined));
+	const streamingTextStarted = useMessagesStore(s => live && isRenderableMessageText(s.streamingText));
 	const storeLevel = useModelStore(s => s.thinkingLevel);
-	const tokensPerSecond = useModelStore(s => s.tokensPerSecond);
 	const hideThinkingBlock = useDisplayPreference("hideThinkingBlock");
 	const proseOnly = useDisplayPreference("proseOnlyThinking");
 	const thinkingExpanded = useUiStore(s => s.thinkingExpanded);
 	const autoCollapseProcess = useUiStore(s => s.autoCollapseProcess);
-	const defaultOpen = live ? thinkingExpanded || autoCollapseProcess : thinkingExpanded && !autoCollapseProcess;
-	const [open, setOpen] = useState(defaultOpen);
+	const compact = useUiStore(s => s.transcriptDetail === "compact");
+	const defaultOpen = live && !streamingTextStarted
+		? thinkingExpanded || (!compact && autoCollapseProcess)
+		: thinkingExpanded && !autoCollapseProcess;
+	const [localOpen, setLocalOpen] = useState(defaultOpen);
+	const open = disclosure?.expanded ?? localOpen;
+	const setOpen = disclosure?.onExpandedChange ?? setLocalOpen;
 	// The Settings → GUI toggle applies to already-mounted blocks too; a manual
 	// chevron click then overrides until the pref or live state changes again.
-	useEffect(() => setOpen(defaultOpen), [defaultOpen]);
+	useEffect(() => setLocalOpen(defaultOpen), [defaultOpen]);
 
 	const content = live ? streamingThinking : (text ?? "");
-	const isLive = live && content.length > 0;
-	// Raw length still drives the live speed gauge, but formatting, word/line
-	// counts, and Markdown parse share the same bounded cadence as reply text.
+	const isLive = live && !streamingTextStarted && content.length > 0;
+	// Formatting, word/line counts, and Markdown parse share the same bounded cadence as reply text.
 	// Previously a long reasoning stream reprocessed its entire growing prefix
 	// on every 16 ms event batch, even while the block was collapsed.
 	const displayContent = useThrottledText(content, live ? STREAM_FORMAT_FLUSH_MS : 0);
@@ -96,44 +107,26 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 	// The hidden pulse mirrors the TUI: only while this block is still
 	// streaming and the model is reasoning right now — once text output starts
 	// or the block finalizes, hidden thinking renders nothing.
-	const showPulse = hideThinkingBlock && isLive && !streamingTextStarted;
+	const showPulse = hideThinkingBlock && isLive;
 
-	// ── tok/s speed gauge ─────────────────────────────────────────────────
-	// Deltas (not cumulative totals) feed the windowed tracker, so a buffer
-	// reset on a new block never produces a spike.
-	const trackerRef = useRef<SpeedTracker | null>(null);
-	if (trackerRef.current === null) trackerRef.current = new SpeedTracker();
-	const lastSampleRef = useRef<{ len: number; time: number } | null>(null);
-	const [, setGaugeTick] = useState(0);
-
-	useEffect(() => {
-		if (!isLive) {
-			lastSampleRef.current = null;
-			return;
+	const bodyRef = useRef<HTMLDivElement>(null);
+	const follow = useRef(true);
+	const lastScrollTop = useRef(0);
+	useLayoutEffect(() => {
+		const body = bodyRef.current;
+		if (!body || !isLive || !open || hideThinkingBlock) follow.current = true;
+		else if (follow.current && formatted) {
+			body.scrollTop = body.scrollHeight;
+			lastScrollTop.current = body.scrollTop;
 		}
-		const now = performance.now();
-		const last = lastSampleRef.current;
-		if (last !== null && content.length < last.len) trackerRef.current?.reset();
-		if (last !== null && content.length > last.len && now > last.time) {
-			trackerRef.current?.observe(((content.length - last.len) / (now - last.time)) * 1000, now);
-		}
-		lastSampleRef.current = { len: content.length, time: now };
-	}, [content, isLive]);
-
-	// Periodic re-render while live so the windowed rate decays during lulls.
-	useEffect(() => {
-		if (!isLive) return;
-		const timer = setInterval(() => setGaugeTick(v => v + 1), GAUGE_TICK_MS);
-		return () => clearInterval(timer);
-	}, [isLive]);
-
-	const observedRate = isLive ? (trackerRef.current?.getSpeed() ?? 0) : 0;
-	const rate = observedRate >= 0.05 ? observedRate : isLive && tokensPerSecond !== null ? tokensPerSecond : 0;
-	const showGauge = isLive && rate >= 0.05;
-	// Gray at rest, brightening toward the level accent as tok/s climbs (sqrt
-	// ease so mid-stream rates already read accent-tinted) — TUI badge lerp.
-	const ratePct = Math.round(100 * Math.sqrt(Math.min(rate, SPEED_MAX) / SPEED_MAX));
-	const rateColor = `color-mix(in srgb, var(--omp-thinking-${tokenLevel}) ${ratePct}%, var(--omp-dim))`;
+	}, [formatted, isLive, open, hideThinkingBlock]);
+	const gauge = isLive ? (
+		<ReasoningGauge key={`${streamTime}:${reported !== undefined}`} text={content} reported={reported} />
+	) : messageReasoningTokens !== undefined ? (
+		<span className="tabular-nums text-[var(--omp-dim)]">
+			{t("chat.thinking.messageTokens", { count: messageReasoningTokens.toLocaleString() })}
+		</span>
+	) : null;
 
 	// ── Hidden-thinking glyph pulse ─────────────────────────────────────────
 	const [glyphFrame, setGlyphFrame] = useState(0);
@@ -166,24 +159,16 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 					{glyph}
 				</span>
 				<span className="font-medium text-[var(--omp-muted)]">{t("chat.thinking.live")}</span>
-				{showGauge && (
-					<>
-						<span className="tabular-nums text-[var(--omp-dim)]">{formatTokens(content.length)}</span>
-						<span className="tabular-nums" style={{ color: rateColor }}>
-							{t("chat.thinking.speed", { rate: rate.toFixed(1) })}
-						</span>
-					</>
-				)}
+				{gauge}
 			</div>
 		);
 	}
 
 	if (!hasDisplayableThinking(content, formatted)) return null;
 
-	const trimmed = formatted.trim();
+	const trimmed = compact ? "" : formatted.trim();
 	const words = trimmed ? trimmed.split(/\s+/).length : 0;
-	const lines = formatted.split("\n").length;
-	const countLabel = `${t("chat.thinking.words", { count: words.toLocaleString(), plural: words === 1 ? "" : "s" })} · ${t("chat.thinking.lines", { count: lines.toLocaleString(), plural: lines === 1 ? "" : "s" })}`;
+	const lines = compact ? 0 : formatted.split("\n").length;
 
 	return (
 		<div
@@ -194,7 +179,7 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 				type="button"
 				aria-expanded={open}
 				aria-label={t(open ? "chat.thinking.hide" : "chat.thinking.show")}
-				onClick={() => setOpen(v => !v)}
+				onClick={() => setOpen(!open)}
 				className="omp-thinking-header flex w-full items-center gap-1.5 px-2 py-1 text-left text-omp-sm text-[var(--omp-muted)] transition-colors hover:bg-[var(--omp-bg-tertiary)]"
 			>
 				<ChevronRight
@@ -211,21 +196,28 @@ export function ThinkingBlock({ text, live = false, startTime, endTime, level }:
 					</span>
 				)}
 				<span className="omp-thinking-level text-[var(--omp-dim)]">{LEVEL_LABEL[resolvedLevel]}</span>
-				{showGauge && (
-					<span className="omp-thinking-gauge contents">
-						<span className="tabular-nums text-[var(--omp-dim)]">{formatTokens(content.length)}</span>
-						<span className="tabular-nums" style={{ color: rateColor }}>
-							{t("chat.thinking.speed", { rate: rate.toFixed(1) })}
-						</span>
+				{gauge}
+				{!compact && (
+					<span className="omp-thinking-count tabular-nums text-[var(--omp-dim)]">
+						{t("chat.thinking.words", { count: words.toLocaleString(), plural: words === 1 ? "" : "s" })} ·{" "}
+						{t("chat.thinking.lines", { count: lines.toLocaleString(), plural: lines === 1 ? "" : "s" })}
 					</span>
 				)}
-				<span className="omp-thinking-count tabular-nums text-[var(--omp-dim)]">{countLabel}</span>
 				{duration && (
 					<span className="omp-thinking-duration ml-auto tabular-nums text-[var(--omp-dim)]">{duration}</span>
 				)}
 			</button>
 			<Collapse open={open}>
-				<div className="omp-thinking-body max-h-64 overflow-y-auto px-3 pb-2 font-mono text-omp-sm leading-[1.45] text-[var(--omp-muted)]">
+				<div
+					ref={bodyRef}
+					onScroll={event => {
+						const body = event.currentTarget;
+						if (isTranscriptAtLiveEdge(body, 2)) follow.current = true;
+						else if (body.scrollTop < lastScrollTop.current) follow.current = false;
+						lastScrollTop.current = body.scrollTop;
+					}}
+					className="omp-thinking-body max-h-64 overflow-y-auto px-3 pb-2 font-mono text-omp-sm leading-[1.45] text-[var(--omp-muted)]"
+				>
 					{isLive ? (
 						<StreamingMarkdown content={formatted} throttle={false} />
 					) : (

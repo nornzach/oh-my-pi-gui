@@ -1,6 +1,5 @@
 /**
- * AgentsDockCard: the center-dock subagent roster. Renders only while an
- * agent is working and `display.pinnedAgents` is not off, summarizes large
+ * AgentsDockCard: the Activity drawer's subagent roster. Summarizes large
  * rosters while retaining urgent agents (or lists them all in `full`), and
  * exposes the full roster through focus mode. The workspace dock polls
  * get_subagents while a turn streams, card hidden or not (parked/idle
@@ -35,7 +34,7 @@ globals.requestAnimationFrame = (callback: () => void) => setTimeout(callback, 0
 const { createRoot } = await import("react-dom/client");
 const { AgentsDockCard } = await import("./AgentsDockCard");
 const { DockCard } = await import("./DockCard");
-const { WorkspaceDock } = await import("./WorkspaceDock");
+const { FloatingActivity } = await import("./WorkspaceDock");
 const { WorkspaceDockFocusProvider } = await import("./WorkspaceDockFocus");
 
 const getSubagents: Mock = vi.fn(async () => ({
@@ -153,29 +152,25 @@ describe("AgentsDockCard", () => {
 		expect(containerText()).toBe("");
 	});
 
-	it("hides while no agent is working and returns when one resumes", async () => {
+	it("shows restored agents immediately and counts only working agents when one resumes", async () => {
 		useSubagentsStore
 			.getState()
 			.setSnapshots([
 				snap({ id: "a1", status: "parked" }),
-				snap({ id: "a2", index: 2, status: "completed" }),
-				snap({ id: "a3", index: 3, status: "failed" }),
+				snap({ id: "a2", index: 2, agent: "saved scout", status: "completed" }),
+				snap({ id: "a3", index: 3, agent: "failed scout", status: "failed" }),
 			]);
 		await mount(<AgentsDockCard />);
-		expect(containerText()).toBe("");
+		expect(containerText()).toContain("0/3");
+		expect(containerText()).toContain("saved scout");
+		expect(containerText()).toContain("failed scout");
 
 		await act(async () => {
-			useSubagentsStore
-				.getState()
-				.setSnapshots([
-					snap({ id: "a1", status: "running" }),
-					snap({ id: "a2", index: 2, status: "completed" }),
-					snap({ id: "a3", index: 3, status: "failed" }),
-				]);
+			const store = useSubagentsStore.getState();
+			store.setSnapshots([...store.subagents.values()].map(agent => (agent.id === "a1" ? snap({}) : agent)));
 		});
-		// Back with the agent that resumed; the finished ones of other calls stay away.
-		expect(containerText()).toContain("1/1");
-		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(1);
+		expect(containerText()).toContain("1/3");
+		expect(containerText()).toContain("saved scout");
 	});
 
 	it("stays hidden while agents work when display.pinnedAgents is off", async () => {
@@ -185,7 +180,7 @@ describe("AgentsDockCard", () => {
 		expect(containerText()).toBe("");
 	});
 
-	it("lists the task call at work, not the finished agents of earlier ones", async () => {
+	it("keeps prior calls visible alongside the current call", async () => {
 		useSubagentsStore.getState().setSnapshots([
 			// An earlier task call, over: completed, failed and gone stale.
 			snap({ id: "old1", index: 1, status: "completed", agent: "earlier", parentToolCallId: "call_1" }),
@@ -199,12 +194,10 @@ describe("AgentsDockCard", () => {
 		]);
 		await mount(<AgentsDockCard />);
 
-		// Only working agents count: parked ones wait (plan/24 §4.1). The current
-		// call's finished row stays while its batch works.
-		expect(containerText()).toContain("1/4");
-		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(4);
+		expect(containerText()).toContain("1/7");
+		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(7);
 		expect(containerText()).toContain("scout");
-		expect(containerText()).not.toContain("earlier");
+		expect(containerText()).toContain("earlier");
 	});
 
 	it("shows each agent's resolved model, tokens, and cost", async () => {
@@ -264,7 +257,7 @@ describe("AgentsDockCard", () => {
 		expect(button("View all")).toBeUndefined();
 	});
 
-	it("gives the dock back to the other cards when the last working agent finishes", async () => {
+	it("keeps the focused history readable when the last agent finishes", async () => {
 		useSubagentsStore.getState().setSnapshots(largeRoster());
 		await mount(
 			<WorkspaceDockFocusProvider>
@@ -284,8 +277,9 @@ describe("AgentsDockCard", () => {
 				.getState()
 				.setSnapshots(largeRoster().map(agent => (agent.id === "a1" ? { ...agent, status: "completed" } : agent)));
 		});
-		expect(container.querySelector('section[aria-label="Agents"]')).toBeNull();
-		expect(container.querySelector('[data-testid="other-card-body"]')).not.toBeNull();
+		expect(containerText()).toContain("0/7");
+		expect(container.querySelectorAll('[role="treeitem"]')).toHaveLength(7);
+		expect(containerText()).toContain("Back to summary");
 	});
 
 	it("collapses to the header via the ui store and re-expands on focusDockCard", async () => {
@@ -321,7 +315,7 @@ describe("AgentsDockCard", () => {
 		await act(async () => {
 			root.render(
 				<I18nProvider>
-					<WorkspaceDock pollMs={25} />
+					<FloatingActivity pollMs={25} />
 				</I18nProvider>,
 			);
 		});

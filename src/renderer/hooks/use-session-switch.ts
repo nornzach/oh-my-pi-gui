@@ -21,7 +21,7 @@ import { useSubagentGraphStore } from "../stores/subagent-graph";
 
 import type { IpcSessionOwner, SessionInfo } from "../../shared/ipc-types";
 import { parseModelRestoreFailure, type SessionModelOverride } from "../../shared/model-restore";
-import type { RpcResponse } from "../../shared/rpc-types";
+import type { RpcResponse, RpcResponseSuccess } from "../../shared/rpc-types";
 import { translate } from "../lib/i18n";
 import { useComposerStore } from "../stores/composer";
 import { useExtensionUiStore } from "../stores/extension-ui";
@@ -101,7 +101,7 @@ export async function newSessionNow(): Promise<RpcResponse> {
 }
 
 /** Delete the attached idle session, then project its fresh replacement. */
-export async function dropSessionNow(): Promise<RpcResponse> {
+export async function dropSessionNow(): Promise<RpcResponseSuccess> {
 	const runtime = focusedSessionRuntime();
 	const response = await (runtime ? createTabRpc(runtime.command) : window.omp.rpc).dropSession();
 	if (!response.success) throw new Error(response.error);

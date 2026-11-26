@@ -25,6 +25,7 @@ import { editFromMessage, forkSessionFromMessageInNewTab, isRenderableMessageTex
 import { extractModelMentions, type ModelMentionChip } from "../../lib/model-mentions";
 import { PREVIEW_SCROLL_LG } from "../../lib/preview";
 import { useTabRpc } from "../../lib/tab-rpc";
+import { reportedReasoningTokens } from "../../lib/thinking";
 import { useMessagesStore } from "../../stores/messages";
 import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
@@ -37,7 +38,7 @@ import { ZoomableImage } from "../common/ImageViewer";
 import { TechnicalDetails } from "../common/TechnicalDetails";
 import { type RunningIndicator, ToolCard } from "../tools/ToolCard";
 import { CustomMessageCard, isCustomMessageCardType } from "./CustomMessageCard";
-import { ThinkingBlock } from "./ThinkingBlock";
+import { ThinkingBlock, type ThinkingBlockProps } from "./ThinkingBlock";
 import { useReadOnlyTranscript } from "./transcript-mode";
 import { UsageRow } from "./UsageRow";
 
@@ -45,6 +46,8 @@ export interface MessageBubbleProps {
 	message: AgentMessage;
 	/** Suppress per-message footer/padding inside an expanded Process group. */
 	compact?: boolean;
+	intermediate?: boolean;
+	thinkingDisclosure?: ThinkingBlockProps["disclosure"];
 	/** The timeline or process group can own the one animated running state. */
 	runningIndicator?: RunningIndicator;
 	/** Opening assistant emoji projected onto this user turn. */
@@ -80,7 +83,7 @@ function InlineImage({ image }: { image: ImageContent }) {
  * older ones are history and only say what went wrong.
  */
 /** The agent's text for a plain user abort, which adds nothing to "Stopped". */
-const GENERIC_ABORT_RE = /^(?:Request was aborted\.?|Stopped before model call)?$/;
+const GENERIC_ABORT_RE = /^(?:(?:Request was aborted|Stopped before model call|Interrupted by user)\.?)?$/i;
 
 function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats?: number }) {
 	const t = useT();
@@ -119,9 +122,9 @@ function MessageError({ message, repeats = 1 }: { message: AgentMessage; repeats
 	// A reply the user stopped is not a failure: a quiet note, with the abort
 	// reason only when it says more than that the request was aborted.
 	if (message.stopReason === "aborted") {
-		const reason = GENERIC_ABORT_RE.test(message.errorMessage ?? "") ? null : message.errorMessage;
+		const reason = GENERIC_ABORT_RE.test(message.errorMessage?.trim() ?? "") ? null : message.errorMessage;
 		return (
-			<div className="omp-message-stopped mt-2 flex min-w-0 items-center gap-2 text-omp-sm text-[var(--omp-dim)]">
+			<div className="omp-message-stopped flex min-h-(--omp-step-height) min-w-0 items-center gap-2 px-1 text-omp-sm text-[var(--omp-dim)]">
 				<Square aria-hidden size={10} className="shrink-0 fill-current" />
 				<span className="min-w-0 truncate" title={reason ?? undefined}>
 					{t("chat.stopped")}
@@ -182,6 +185,7 @@ function ToolCardWithResult({ call, runningIndicator }: { call: ToolCallContent;
 		<ToolCard
 			toolCallId={toolEntryKey(call)}
 			toolName={call.name}
+			intent={call.intent}
 			args={call.arguments}
 			runningIndicator={runningIndicator}
 		/>
@@ -407,6 +411,8 @@ function ClampedAssignment({ children }: { children: ReactNode }) {
 export const MessageBubble = memo(function MessageBubble({
 	message,
 	compact = false,
+	intermediate = false,
+	thinkingDisclosure,
 	reaction,
 	repeats,
 	runningIndicator = "spinner",
@@ -619,10 +625,20 @@ export const MessageBubble = memo(function MessageBubble({
 	// Assistant / system: render block by block.
 	const blocks: ReactNode[] = [];
 	let sawNonToolBlock = false;
+	let sawReplyContent = false;
 	let thinking: string[] = [];
+	let messageReasoningTokens = reportedReasoningTokens(message.usage);
 	const flushThinking = () => {
 		if (thinking.length === 0) return;
-		blocks.push(<ThinkingBlock key={blocks.length} text={thinking.join("\n\n")} />);
+		blocks.push(
+			<ThinkingBlock
+				key={blocks.length}
+				text={thinking.join("\n\n")}
+				messageReasoningTokens={messageReasoningTokens}
+				disclosure={thinkingDisclosure}
+			/>,
+		);
+		messageReasoningTokens = undefined;
 		thinking = [];
 		sawNonToolBlock = true;
 	};
@@ -637,6 +653,7 @@ export const MessageBubble = memo(function MessageBubble({
 			case "text": {
 				blocks.push(<MarkdownRenderer key={blocks.length} content={block.text} />);
 				sawNonToolBlock = true;
+				sawReplyContent = true;
 				break;
 			}
 			case "toolCall": {
@@ -648,6 +665,7 @@ export const MessageBubble = memo(function MessageBubble({
 			case "image": {
 				blocks.push(<InlineImage key={blocks.length} image={block} />);
 				sawNonToolBlock = true;
+				sawReplyContent = true;
 				break;
 			}
 		}
@@ -660,6 +678,8 @@ export const MessageBubble = memo(function MessageBubble({
 	// don't need the 28px hover footer plus py-3 padding. Tool-only copy would
 	// be empty; the Process disclosure owns the grouped chrome and branch point.
 	const compactChrome = compact || (!sawNonToolBlock && !message.errorMessage && !customLabel && !isSteering);
+	const hasToolCalls = content.some(block => block.type === "toolCall");
+	const showActions = !compact && !intermediate && !hasToolCalls && sawReplyContent;
 
 	return (
 		<div
@@ -667,6 +687,7 @@ export const MessageBubble = memo(function MessageBubble({
 				"group flex px-6",
 				!compactChrome && "omp-assistant-turn",
 				compactChrome && "omp-assistant-turn--compact",
+				intermediate && "omp-assistant-turn--intermediate",
 				compactChrome ? "py-1.5" : "py-3",
 			)}
 		>
@@ -684,8 +705,8 @@ export const MessageBubble = memo(function MessageBubble({
 				{(message.errorMessage || (message.role === "assistant" && message.stopReason === "aborted")) && (
 					<MessageError message={message} repeats={repeats} />
 				)}
-				<UsageRow message={message} />
-				{!compactChrome && (
+				{(!intermediate || hasToolCalls) && <UsageRow message={message} />}
+				{showActions && (
 					<div className="omp-message-actions mt-1 flex h-6 items-center gap-1 text-omp-xs tabular-nums text-[var(--omp-dim)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
 						{timestamp && <span className="me-1 font-mono">{timestamp}</span>}
 						<button

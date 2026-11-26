@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
-import { sanitizeToolText } from "../../lib/format";
+import { sanitizeToolText, shortenPath } from "../../lib/format";
+import { translate } from "../../lib/i18n";
 import { decodeXdevPayload, xdevDispatch, xdevInnerResult, xdevWriteTarget } from "../../lib/xdev";
 import { AskRenderer, askResultSummary } from "./AskRenderer";
 import { AstEditRenderer } from "./AstEditRenderer";
@@ -200,6 +201,32 @@ function firstItemContent(args: Record<string, unknown>): string {
 	return typeof first === "string" ? first : "";
 }
 
+const TERMINAL_ACTION_LABELS = new Map([
+	["list", "tools.terminal.list"],
+	["read", "tools.terminal.read"],
+	["run", "tools.terminal.run"],
+	["stop", "tools.terminal.stop"],
+	["open", "tools.terminal.open"],
+	["exec", "tools.terminal.run"],
+	["send", "tools.terminal.send"],
+	["wait", "tools.terminal.wait"],
+]);
+
+function terminalSummary(args: Record<string, unknown>, result?: unknown): string {
+	const details = result && typeof result === "object" && "details" in result ? result.details : undefined;
+	const terminal = details && typeof details === "object" && "terminal" in details ? details.terminal : undefined;
+	const label = TERMINAL_ACTION_LABELS.get(argLine(args, ["action"]));
+	const command = argLine(args, ["command", "key"]);
+	const target =
+		(terminal && typeof terminal === "object"
+			? argLine(terminal as Record<string, unknown>, ["title", "host"])
+			: "") ||
+		argLine(args, ["label", "host"]) ||
+		shortenPath(argLine(args, ["cwd"])) ||
+		argLine(args, ["id"]);
+	return [label && translate(label), command, target === command ? "" : target].filter(Boolean).join(" · ");
+}
+
 /**
  * One-line header for a collapsed card, computed from call arguments only —
  * the result may not exist yet. Lives next to the renderer table because the
@@ -215,19 +242,20 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>, result?: unknown
 	edit: editArgumentSummary,
 	apply_patch: editArgumentSummary,
 	bash: args => argLine(args, ["command", "cmd"]),
+	terminal: terminalSummary,
 	grep: args => argLine(args, ["pattern"]),
 	find: args => argLine(args, ["query"]),
 	glob: args => argLine(args, ["path", "pattern"]),
 	ast_grep: args => argLine(args, ["pat", "pattern", "query"]),
 	ast_edit: args => argLine(args, ["pat", "pattern"]),
 	lsp: args => [argLine(args, ["action"]), argLine(args, ["symbol", "file", "path"])].filter(Boolean).join(" "),
-	task: args => argLine(args, ["i", "name", "description"]),
+	task: args => argLine(args, ["i", "description", "task", "name"]),
 	todo: args => [argLine(args, ["op"]), argLine(args, ["task", "reason"])].filter(Boolean).join(" "),
 	eval: args => argLine(args, ["title", "language"]),
 	debug: args => [argLine(args, ["action"]), argLine(args, ["program", "file", "symbol"])].filter(Boolean).join(" "),
-	github: args => argLine(args, ["action", "repo", "url"]),
-	hub: args => argLine(args, ["op", "agent"]),
-	wait: () => "background activity",
+	github: args => [argLine(args, ["action"]), argLine(args, ["repo", "url"])].filter(Boolean).join(" "),
+	hub: args => [argLine(args, ["op"]), argLine(args, ["agent", "id"])].filter(Boolean).join(" "),
+	wait: () => translate("tools.coordination.waitForResult"),
 	ask: (args, result) => {
 		const question = argLine(args, ["question", "i"]) || sanitizeToolText(askFormSummary(args.html));
 		const answer = result !== undefined ? askResultSummary(result) : "";
@@ -254,10 +282,25 @@ const SUMMARIES: Record<string, (args: Record<string, unknown>, result?: unknown
 	manage_scheduled_tasks: args => [argLine(args, ["action"]), argLine(args, ["title"])].filter(Boolean).join(" "),
 };
 
-const FALLBACK_ARG_KEYS = ["path", "file", "name", "pattern", "query", "command", "action", "i", "text"] as const;
+const FALLBACK_ARG_KEYS = [
+	"description",
+	"path",
+	"file",
+	"pattern",
+	"query",
+	"command",
+	"url",
+	"target",
+	"i",
+	"name",
+	"action",
+	"text",
+] as const;
 
 /** Header text for any tool call; unknown tools fall back to their first scalar argument. */
-export function getToolSummary(name: string, args: Record<string, unknown>, result?: unknown): string {
+export function getToolSummary(name: string, args: Record<string, unknown>, result?: unknown, intent?: string): string {
 	const summary = SUMMARIES[name];
-	return clipCardText(summary ? summary(args, result) : argLine(args, FALLBACK_ARG_KEYS));
+	const target = summary?.(args, result) || argLine(args, FALLBACK_ARG_KEYS);
+	const purpose = intent ? sanitizeToolText(intent).trim().split("\n", 1)[0] : undefined;
+	return clipCardText(purpose && target && !purpose.includes(target) ? `${purpose} · ${target}` : purpose || target);
 }

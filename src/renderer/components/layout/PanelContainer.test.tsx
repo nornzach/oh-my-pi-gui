@@ -118,7 +118,7 @@ describe("PanelContainer chat tab filter", () => {
 		expect(labels).toContain("Files");
 		expect(labels).toContain("Side questions");
 		// Agents, diff, shells, and browsing need tools; todo/plan/queue live in the center dock.
-		for (const agentOnly of ["Agents", "Changes", "Terminal", "Browser"]) {
+		for (const agentOnly of ["Task activity", "Agents", "Changes", "Terminal", "Browser"]) {
 			expect(labels).not.toContain(agentOnly);
 		}
 	});
@@ -137,7 +137,7 @@ describe("PanelContainer chat tab filter", () => {
 		await mount(<PanelContainer />);
 
 		const labels = drawerTabLabels();
-		for (const visible of ["Agents", "Side questions", "Changes", "Files", "Terminal", "Browser"]) {
+		for (const visible of ["Task activity", "Agents", "Side questions", "Changes", "Files", "Terminal", "Browser"]) {
 			expect(labels).toContain(visible);
 		}
 		// Live-execution tabs moved to the center dock, logs to their own dialog.

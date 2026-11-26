@@ -4,6 +4,7 @@ import { describeProviderError } from "../../lib/errors";
 import { basename, cx, formatDuration, formatTokens, headLines, resultText } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useNowTick } from "../../lib/now-tick";
+import { useReadOnlyTranscript } from "../chat/transcript-mode";
 import { resultDetails } from "./result";
 import type { ToolRendererProps } from "./ToolCard";
 import {
@@ -241,6 +242,7 @@ function ReviewBlock({ review }: { review: ReviewResult }) {
 interface TreeCtx {
 	seen: Set<object>;
 	now: number;
+	showProgress: boolean;
 }
 
 /** A TaskToolDetails-shaped record carries a results and/or progress array. */
@@ -293,7 +295,7 @@ function NestedTaskTree({ list, depth, ctx }: { list: Record<string, unknown>[];
 							</div>
 						);
 					}
-					if (progress.length > 0) {
+					if (ctx.showProgress && progress.length > 0) {
 						return (
 							<div key={i} className="flex flex-col gap-1.5">
 								{orderProgressForDisplay(progress).map((row, j) => (
@@ -660,6 +662,7 @@ function ResultOutputPreview({ text }: { text: string }) {
 /** Task (subagent spawn): agent badge, name, status, live agent tree. */
 export function TaskRenderer({ args, result, isError, isPartial, partialResult }: ToolRendererProps) {
 	const t = useT();
+	const showProgress = useReadOnlyTranscript() !== null;
 	const agent = typeof args.agent === "string" ? args.agent : "task";
 	const name = typeof args.name === "string" ? args.name : null;
 	const description =
@@ -697,7 +700,7 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 
 	// Live rows carry elapsed times and retry countdowns — tick once a second
 	// while the call runs so they stay fresh between partial emissions.
-	const now = useNowTick(isPartial);
+	const now = useNowTick(isPartial && showProgress);
 
 	// Run-summary counts: one pass derives footer counts + request total.
 	let abortedCount = 0;
@@ -742,7 +745,7 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 	summaryParts.push(<span key="duration">{formatDuration(totalDurationMs)}</span>);
 
 	// Cycle guard for nested task trees: one set per render pass, threaded down.
-	const ctx: TreeCtx = { seen: new Set<object>(), now };
+	const ctx: TreeCtx = { seen: new Set<object>(), now, showProgress };
 
 	const markerIndex = (() => {
 		const lines = text.split("\n");
@@ -796,7 +799,7 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 				</ol>
 			)}
 
-			{!hasResults && progress.length > 0 && (
+			{showProgress && !hasResults && progress.length > 0 && (
 				<div className="flex max-h-80 flex-col gap-1.5 overflow-auto pr-0.5">
 					{orderProgressForDisplay(progress).map((row, i) => (
 						<ProgressAgentRow key={`${asString(row.id) ?? i}-${i}`} ctx={ctx} depth={0} row={row} />
@@ -809,7 +812,8 @@ export function TaskRenderer({ args, result, isError, isPartial, partialResult }
 					{orderResultsForDisplay(results).map((row, i) => (
 						<ResultAgentRow key={`${asString(row.id) ?? i}-${i}`} ctx={ctx} depth={0} row={row} />
 					))}
-					{supplemental.length > 0 &&
+					{showProgress &&
+						supplemental.length > 0 &&
 						orderProgressForDisplay(supplemental).map((row, i) => (
 							<ProgressAgentRow key={`sup-${asString(row.id) ?? i}-${i}`} ctx={ctx} depth={0} row={row} />
 						))}

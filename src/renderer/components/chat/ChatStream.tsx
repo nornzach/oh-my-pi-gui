@@ -10,7 +10,6 @@ import {
 	Languages,
 	Layers,
 	Lightbulb,
-	ListTodo,
 	PenLine,
 	RotateCw,
 	SearchCode,
@@ -18,13 +17,14 @@ import {
 	X,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { RpcQueuedMessage } from "../../../shared/rpc-types";
 import { useDisplayPreference } from "../../lib/display-preferences";
 import { describeError, describeProviderError } from "../../lib/errors";
 import { cx, formatClock } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { messageTimestampMs } from "../../lib/message-identity";
-import { abortActiveTurn, isRenderableMessageText } from "../../lib/messages";
+import { abortActiveTurn, isRenderableMessageText, messageText } from "../../lib/messages";
 import { collapsibleReadTarget, groupReadRows, type ReadGroupEntry } from "../../lib/read-group";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useMessagesStore } from "../../stores/messages";
@@ -33,7 +33,7 @@ import { useSessionStore } from "../../stores/session";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { toast } from "../../stores/toast";
-import { type TodoSnapshot, useTodoStore } from "../../stores/todo";
+import { isTodoTool } from "../../stores/todo";
 import { type ToolEntry, toolEntryKey, useToolsStore } from "../../stores/tools";
 import { TRANSCRIPT_FOCUS_TTL_MS, useTranscriptFocusStore } from "../../stores/transcript-focus";
 import { useUiStore } from "../../stores/ui";
@@ -56,7 +56,6 @@ import {
 	isVisibleTranscriptMessage,
 	locateEntryRow,
 	type MountedTranscriptRow,
-	mergeTodoSnapshots,
 	type Row,
 	shouldRePinTranscript,
 	summarizeTurnChanges,
@@ -106,6 +105,25 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	const messages = useMessagesStore(s => s.messages);
 	const liveMessages = useMessagesStore(s => s.liveMessages);
 	const displayMessages = useMemo(() => [...messages, ...liveMessages], [messages, liveMessages]);
+	const todoKeys = useMemo(
+		() =>
+			displayMessages.flatMap(message =>
+				message.role === "assistant" && Array.isArray(message.content)
+					? message.content.flatMap(block =>
+							block.type === "toolCall" && isTodoTool(block.name) ? [toolEntryKey(block)] : [],
+						)
+					: [],
+			),
+		[displayMessages],
+	);
+	const failedTodos = useToolsStore(
+		useShallow(state =>
+			todoKeys.filter(key => {
+				const entry = state.activeTools.get(key);
+				return entry?.isError || entry?.status === "aborted";
+			}),
+		),
+	);
 	const streamingMessage = useMessagesStore(s => s.streamingMessage);
 	const hasStreamingText = useMessagesStore(s => isRenderableMessageText(s.streamingText));
 	const hasStreamingThinking = useMessagesStore(s => isRenderableMessageText(s.streamingThinking));
@@ -117,6 +135,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		if (!streamingMessage) return false;
 		const streamStart = messageTimestampMs(streamingMessage);
 		for (const entry of s.activeTools.values()) {
+			if (!readOnly && isTodoTool(entry.toolName)) continue;
 			if ((entry.status === "pending" || entry.status === "running") && entry.startTime >= streamStart) {
 				return true;
 			}
@@ -160,20 +179,27 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 
 	const lastCompactionIndex = displayMessages.findLastIndex(message => message.role === "compactionSummary");
 	const hiddenCount = collapseCompacted && !preCompactionOpen && lastCompactionIndex > 0 ? lastCompactionIndex : 0;
-	const todoHistory = useTodoStore(s => s.history);
 	const historyRows = useMemo<HistoryRow[]>(() => {
-		const built = buildHistoryRows(
-			hiddenCount > 0 ? displayMessages.slice(hiddenCount) : displayMessages,
-			transcriptDetail,
-			processExpansion,
-		);
-		// Read-tool grouping (TUI parity) folds consecutive collapsible reads into
-		// one card — only in full mode; compact mode's ProcessGroup already folds
-		// ALL consecutive tool work, so a second fold would nest redundantly.
-		const grouped = transcriptDetail === "compact" ? built : (groupReadRows(built) as HistoryRow[]);
-		// Archived todo changes interleave by timestamp (transcript archive rows).
-		return mergeTodoSnapshots(grouped, todoHistory);
-	}, [displayMessages, hiddenCount, transcriptDetail, todoHistory, processExpansion]);
+		const visible = hiddenCount > 0 ? displayMessages.slice(hiddenCount) : displayMessages;
+		const todos = readOnly ? undefined : new Set(failedTodos);
+		if (transcriptDetail === "compact") return buildHistoryRows(visible, "compact", processExpansion, todos);
+		if (!autoCollapseProcess) return groupReadRows(buildHistoryRows(visible, "full", processExpansion, todos));
+		if (!isStreaming || hasStreamingText) return buildHistoryRows(visible, "compact", processExpansion, todos);
+		const boundary = visible.findLastIndex(message => {
+			if (message.role === "user") return true;
+			if (message.role !== "assistant") return false;
+			if (Array.isArray(message.content) && message.content.some(block => block.type === "toolCall")) return false;
+			return isRenderableMessageText(messageText(message));
+		});
+		const start = boundary < 0 ? 0 : boundary + (visible[boundary]?.role === "user" ? 0 : 1);
+		return [
+			...buildHistoryRows(visible.slice(0, start), "compact", processExpansion, todos),
+			...groupReadRows(buildHistoryRows(visible.slice(start), "full", processExpansion, todos)),
+		];
+	}, [
+		displayMessages, hiddenCount, transcriptDetail, processExpansion, failedTodos, readOnly,
+		autoCollapseProcess, isStreaming, hasStreamingText,
+	]);
 
 	// What the latest run changed on disk, once it has settled: closes the turn
 	// with one line leading to the review drawer. Tool events stream in at a high
@@ -199,7 +225,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		streamingMessage != null &&
 		(hasStreamingText ||
 			hasStreamingThinking ||
-			isVisibleTranscriptMessage(streamingMessage) ||
+			isVisibleTranscriptMessage(streamingMessage, !readOnly) ||
 			hasLiveToolsForStream);
 
 	// One status row for every "agent busy but nothing visible" window,
@@ -265,12 +291,16 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	const footerRef = useRef<HTMLDivElement>(null);
 	const conversationAnchors = useMemo(() => buildConversationAnchors(rows, rowKeys), [rows, rowKeys]);
 	const lastUserRowIndex = conversationAnchors.at(-1)?.rowIndex ?? -1;
-	// Auto-collapse the just-finished turn's process groups once streaming ends (#77).
 	const wasStreamingRef = useRef(isStreaming);
+	const foldedForReply = useRef(false);
 	useEffect(() => {
 		const finished = wasStreamingRef.current && !isStreaming;
 		wasStreamingRef.current = isStreaming;
-		if (!finished || !autoCollapseProcess) return;
+		const firstText = isStreaming && hasStreamingText && !foldedForReply.current;
+		const fold = firstText || (finished && !foldedForReply.current);
+		if (firstText) foldedForReply.current = true;
+		if (finished || (streamingMessage && !hasStreamingText)) foldedForReply.current = false;
+		if (!fold || !autoCollapseProcess) return;
 		setProcessExpansion(current => {
 			if (current.size === 0) return current;
 			let changed = false;
@@ -281,7 +311,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 			}
 			return changed ? next : current;
 		});
-	}, [isStreaming, autoCollapseProcess, lastUserRowIndex, rowKeys]);
+	}, [isStreaming, hasStreamingText, streamingMessage, autoCollapseProcess, lastUserRowIndex, rowKeys]);
 	const tailRowKey = rowKeys.at(-1);
 	const activeConversationIndex = useMemo(
 		() => findConversationAnchorIndex(conversationAnchors, visibleRowIndex),
@@ -341,7 +371,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 			const kind = rows[i]?.kind;
 			if (kind === "streaming") return 80;
 			if (kind === "pending" || kind === "queued" || kind === "turnChanges") return 56;
-			if (kind === "expander" || kind === "process" || kind === "todoSnapshot") return 48;
+			if (kind === "expander" || kind === "process") return 48;
 			if (kind === "message") return 72;
 			return 160;
 		},
@@ -390,8 +420,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	// fell outside the edge slack and the tail was abandoned for the rest of the run.
 	const followsTail = useCallback(
 		(el: HTMLElement) =>
-			!footerRef.current?.querySelector("[data-focused-card]") &&
-			(viewRef.current.pinned || (isTranscriptAtLiveEdge(el) && gestureTowardTailRef.current !== false)),
+			viewRef.current.pinned || (isTranscriptAtLiveEdge(el) && gestureTowardTailRef.current !== false),
 		[],
 	);
 
@@ -787,7 +816,11 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 
 	return (
 		<>
-			<div className="omp-transcript-editorial relative min-h-0 flex-1 bg-transparent">
+			<div
+				data-detail={transcriptDetail}
+				data-composer-edge={(footer !== undefined && rows.length > 0) || undefined}
+				className="omp-transcript-editorial relative min-h-0 flex-1 bg-transparent"
+			>
 				{findOpen && (
 					<TranscriptFindBar
 						current={findCurrent}
@@ -886,6 +919,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 										{row.kind === "message" ? (
 											<MessageBubble
 												message={row.message}
+												intermediate={row.intermediate}
 												reaction={row.reaction}
 												repeats={row.repeats}
 												runningIndicator="dot"
@@ -894,22 +928,17 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 											<ReadGroupCard entries={row.entries} runningIndicator="dot" usage={row.usage} />
 										) : row.kind === "process" ? (
 											<ProcessGroup
-												expanded={
-													processExpansion.get(rowKey) ??
-													(autoCollapseProcess && isStreaming && item.index > lastUserRowIndex)
-												}
+												expanded={processExpansion.get(rowKey) ?? false}
 												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
 												row={row}
 											/>
 										) : row.kind === "streaming" ? (
 											<StreamingRows
-												expanded={processExpansion.get(rowKey) ?? autoCollapseProcess}
+												expanded={processExpansion.get(rowKey) ?? false}
 												onExpandedChange={expanded => updateProcessExpanded(rowKey, expanded)}
 											/>
 										) : row.kind === "queued" ? (
 											<QueuedMessageBubble item={row.item} lane={row.lane} />
-										) : row.kind === "todoSnapshot" ? (
-											<TodoSnapshotCard entry={row.entry} />
 										) : row.kind === "turnChanges" ? (
 											<TurnChangesRow summary={row.summary} />
 										) : row.kind === "expander" ? (
@@ -945,12 +974,12 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 					<ArrowDown size={14} />
 					{t("chat.jumpToLatest")}
 				</button>
+				<ConversationNavigator
+					activeIndex={activeConversationIndex}
+					anchors={conversationAnchors}
+					onNavigate={jumpToConversation}
+				/>
 			</div>
-			<ConversationNavigator
-				activeIndex={activeConversationIndex}
-				anchors={conversationAnchors}
-				onNavigate={jumpToConversation}
-			/>
 		</>
 	);
 }
@@ -964,14 +993,26 @@ function ProcessGroup({
 	onExpandedChange: (expanded: boolean) => void;
 	row: Extract<HistoryRow, { kind: "process" }>;
 }) {
+	const only = row.messages.length === 1 ? row.messages[0] : undefined;
+	if (only && Array.isArray(only.content) && only.content.every(block => block.type === "thinking")) {
+		return <MessageBubble compact message={only} thinkingDisclosure={{ expanded, onExpandedChange }} />;
+	}
 	return (
-		<div className="ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-2">
+		<div className="omp-process-turn">
 			<ExecutionGroup
 				expanded={expanded}
 				failureCount={row.failedEvents}
 				onExpandedChange={onExpandedChange}
 				stepCount={row.stepCount}
 				toolCallIds={row.toolCallIds}
+				tool={
+					row.lastTool && {
+						id: toolEntryKey(row.lastTool),
+						name: row.lastTool.name,
+						args: row.lastTool.arguments,
+						intent: row.lastTool.intent,
+					}
+				}
 			>
 				<div className="omp-process-group">
 					{row.messages.map((message, index) => (
@@ -1011,10 +1052,15 @@ export function StreamingRows({
 	// watches the whole active set (it renders every pending/running card).
 	// Per-row isolation lives in ExecutionGroup/ToolCard.
 	const activeTools = useToolsStore(s => s.activeTools);
+	const readOnly = useReadOnlyTranscript();
 	const transcriptDetail = useUiStore(s => s.transcriptDetail);
+	const autoCollapseProcess = useUiStore(s => s.autoCollapseProcess);
+	const compact = transcriptDetail === "compact" || (autoCollapseProcess && hasText);
 	if (!streamingMessage) return null;
 	const content = Array.isArray(streamingMessage.content) ? streamingMessage.content : [];
-	const toolCalls = content.filter(block => block.type === "toolCall");
+	const toolCalls = content
+		.filter(block => block.type === "toolCall")
+		.filter(block => readOnly || !isTodoTool(block.name));
 
 	// streamingMessage.content only fills at message_end; mid-stream the live
 	// tool calls accumulate in the tools store (toolcall_delta → pending while
@@ -1026,6 +1072,7 @@ export function StreamingRows({
 	const contentIds = new Set(toolCalls.map(block => toolEntryKey(block)));
 	const liveTools: Array<{ id: string; entry: ToolEntry }> = [];
 	for (const [id, entry] of activeTools) {
+		if (!readOnly && isTodoTool(entry.toolName)) continue;
 		if (contentIds.has(id)) continue;
 		if (entry.status !== "pending" && entry.status !== "running") continue;
 		if (entry.startTime < streamStart) continue;
@@ -1033,23 +1080,24 @@ export function StreamingRows({
 	}
 
 	const hasThinking = isRenderableMessageText(streamingThinking);
-	const hasProcess = hasThinking || toolCalls.length > 0 || liveTools.length > 0;
-	const compactChrome = transcriptDetail === "compact" ? !hasText : !hasText && !hasThinking;
+	const compactChrome = compact ? !hasText : !hasText && !hasThinking;
 	const turnClass = compactChrome ? "omp-assistant-turn--compact" : "omp-assistant-turn";
+	const showThinkingSeparately = hasThinking && (hasText || toolCalls.length + liveTools.length === 0);
 
 	// Live read grouping (same predicate as the finalized path): consecutive
 	// collapsible reads fold into one ReadGroupCard even mid-turn. Compact
 	// detail keeps the same plain execution rows used by ProcessGroup.
-	const allCards: Array<{ id: string; name: string; args: Record<string, unknown> }> = [
+	const allCards = [
 		...toolCalls.map(block => ({
 			id: toolEntryKey(block),
 			name: block.name,
+			intent: block.intent,
 			args: block.arguments as Record<string, unknown>,
 		})),
-		...liveTools.map(({ id, entry }) => ({ id, name: entry.toolName, args: entry.args as Record<string, unknown> })),
+		...liveTools.map(({ id, entry }) => ({ id, name: entry.toolName, args: entry.args, intent: entry.intent })),
 	];
 	const groupedLiveCards = (() => {
-		if (transcriptDetail === "compact") return null;
+		if (compact) return null;
 		const segments: Array<
 			{ type: "group"; entries: ReadGroupEntry[] } | { type: "card"; card: (typeof allCards)[number] }
 		> = [];
@@ -1087,6 +1135,7 @@ export function StreamingRows({
 					key={segment.card.id}
 					toolCallId={segment.card.id}
 					toolName={segment.card.name}
+					intent={segment.card.intent}
 					args={segment.card.args}
 					runningIndicator="dot"
 				/>
@@ -1101,6 +1150,7 @@ export function StreamingRows({
 					key={toolEntryKey(block)}
 					toolCallId={toolEntryKey(block)}
 					toolName={block.name}
+					intent={block.intent}
 					args={block.arguments}
 					runningIndicator="dot"
 				/>
@@ -1111,7 +1161,7 @@ export function StreamingRows({
 		</>
 	);
 
-	if (transcriptDetail === "full") {
+	if (!compact) {
 		return (
 			<div className={cx("omp-streaming-turn group flex px-6", turnClass)}>
 				<div className="omp-transcript-content min-w-0">
@@ -1119,8 +1169,8 @@ export function StreamingRows({
 				    thinking deltas accumulate in the streamingThinking buffer, which
 				    ThinkingBlock reads itself when live. */}
 					{hasThinking ? <ThinkingBlock live /> : null}
-					{toolCards}
 					<StreamingText />
+					{toolCards}
 				</div>
 			</div>
 		);
@@ -1129,23 +1179,25 @@ export function StreamingRows({
 	return (
 		<div className={cx("omp-streaming-turn group flex px-6", turnClass)}>
 			<div className="omp-transcript-content min-w-0">
-				{hasProcess ? (
+				{showThinkingSeparately && (
+					<ThinkingBlock live disclosure={allCards.length === 0 ? { expanded, onExpandedChange } : undefined} />
+				)}
+				<StreamingText />
+				{allCards.length > 0 && (
 					<ExecutionGroup
 						expanded={expanded}
 						live
 						onExpandedChange={onExpandedChange}
-						stepCount={toolCalls.length + liveTools.length + (hasThinking ? 1 : 0)}
+						stepCount={allCards.length + (hasThinking && !showThinkingSeparately ? 1 : 0)}
 						toolCallIds={allCards.map(card => card.id)}
+						tool={allCards.at(-1)}
 					>
 						<div className="omp-process-group omp-process-group--live">
-							{hasThinking ? <ThinkingBlock live /> : null}
-							{toolCalls.length + liveTools.length > 0 ? <div>{toolCards}</div> : null}
+							{hasThinking && !showThinkingSeparately && <ThinkingBlock live />}
+							{toolCards}
 						</div>
 					</ExecutionGroup>
-				) : null}
-				<div className={hasProcess ? "mt-1" : undefined}>
-					<StreamingText />
-				</div>
+				)}
 			</div>
 		</div>
 	);
@@ -1403,88 +1455,6 @@ function QueuedMessageBubble({ item, lane }: { item: RpcQueuedMessage; lane: Que
 	);
 }
 
-/**
- * Archived todo state rendered inline in the transcript where the change
- * happened (todo store history). Collapses to a one-line summary; expanding
- * shows the phase/task state at that time, read-only — the live dock card
- * above the composer carries the editable current list.
- */
-function TodoSnapshotCard({ entry }: { entry: TodoSnapshot }) {
-	const t = useT();
-	const [expanded, setExpanded] = useState(false);
-	const total = entry.phases.reduce((n, phase) => n + phase.tasks.length, 0);
-	const done = entry.phases.reduce(
-		(n, phase) => n + phase.tasks.filter(task => task.status === "completed").length,
-		0,
-	);
-	const cleared = total === 0;
-
-	return (
-		<div className="ml-(--omp-editorial-inset) mr-(--omp-editorial-edge) my-1.5">
-			<button
-				aria-expanded={expanded}
-				className="omp-pressable flex items-center gap-1.5 rounded-lg border border-[var(--omp-border-muted)] px-2.5 py-1 text-omp-sm text-[var(--omp-muted)] hover:text-[var(--omp-text)]"
-				disabled={cleared}
-				onClick={() => setExpanded(value => !value)}
-				type="button"
-			>
-				<ChevronRight
-					className="omp-disclosure-chevron shrink-0 text-[var(--omp-dim)]"
-					size={11}
-					style={{ transform: expanded ? "rotate(90deg)" : undefined }}
-				/>
-				<ListTodo className="shrink-0 text-[var(--omp-dim)]" size={12} />
-				<span className="font-medium">{cleared ? t("todoSnapshot.cleared") : t("todoSnapshot.title")}</span>
-				{!cleared && (
-					<span className="tabular-nums text-[var(--omp-dim)]">{t("todoSnapshot.progress", { done, total })}</span>
-				)}
-			</button>
-			{expanded && !cleared && (
-				<div className="mt-1 ml-1 space-y-1 border-l border-[var(--omp-border-muted)] pl-3">
-					{entry.phases.map((phase, phaseIndex) => (
-						<div key={`${phase.name}-${phaseIndex}`}>
-							{entry.phases.length > 1 && (
-								<div className="py-0.5 text-omp-xs font-semibold text-[var(--omp-dim)]">{phase.name}</div>
-							)}
-							{phase.tasks.map((task, taskIndex) => (
-								<div
-									key={`${task.content}-${taskIndex}`}
-									className="flex items-center gap-1.5 py-0.5 text-omp-sm"
-								>
-									<span
-										aria-hidden
-										className={cx(
-											"h-1.5 w-1.5 shrink-0 rounded-full",
-											task.status === "completed"
-												? "bg-[var(--omp-success)]"
-												: task.status === "in_progress"
-													? "bg-[var(--omp-link)]"
-													: task.status === "abandoned"
-														? "bg-[var(--omp-error)]"
-														: "bg-[var(--omp-border)]",
-										)}
-									/>
-									<span
-										className={cx(
-											"min-w-0 flex-1 truncate",
-											task.status === "completed" || task.status === "abandoned"
-												? "text-[var(--omp-dim)] line-through"
-												: "text-[var(--omp-muted)]",
-										)}
-										title={task.content}
-									>
-										{task.content}
-									</span>
-								</div>
-							))}
-						</div>
-					))}
-				</div>
-			)}
-		</div>
-	);
-}
-
 export type { HistoryRow, Row, TimelineMarkerSeed } from "./chat-stream-utils";
 // Re-export transcript helpers for consumers/tests that import them from ChatStream.
 export {
@@ -1500,7 +1470,6 @@ export {
 	isTranscriptAtLiveEdge,
 	LIVE_EDGE_SLACK_PX,
 	locateEntryRow,
-	mergeTodoSnapshots,
 	ROW_ENTRANCE_TAIL_ROWS,
 	shouldRePinTranscript,
 	summarizeTurnChanges,

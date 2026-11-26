@@ -24,7 +24,6 @@
 	"chat.exec.python",
 	"chat.exec.shell",
 	"chat.thinking.live",
-	"chat.thinking.speed",
 	"cmd.advisor",
 	"cmd.agents",
 	"cmd.branch",

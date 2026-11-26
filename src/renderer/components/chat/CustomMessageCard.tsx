@@ -154,7 +154,7 @@ function CollapsibleText({ text, lines, className }: { text: string; lines: numb
 function CompletionRows({ children, inProcess }: { children: ReactNode; inProcess: boolean }) {
 	return (
 		<div
-			className={inProcess ? "py-0.5" : "omp-custom-turn ps-(--omp-editorial-inset) pe-(--omp-editorial-edge) py-2"}
+			className={inProcess ? undefined : "omp-completion-turn"}
 		>
 			<div className={cx("space-y-0.5", !inProcess && "omp-transcript-content")}>{children}</div>
 		</div>
@@ -165,13 +165,18 @@ function CompletionRow({
 	failed,
 	label,
 	meta,
+	hint,
 	output,
+	markdown = false,
 }: {
 	failed?: boolean;
 	label: string;
 	meta?: string;
+	hint?: string;
 	output?: string;
+	markdown?: boolean;
 }) {
+	const [open, setOpen] = useState(false);
 	const Icon = failed === undefined ? Zap : failed ? XCircle : CheckCircle2;
 	const content = (
 		<>
@@ -187,25 +192,29 @@ function CompletionRow({
 				)}
 				size={13}
 			/>
-			<span className="min-w-0 truncate text-omp-md font-medium text-[var(--omp-text)]">{label}</span>
-			{meta && <span className="min-w-0 truncate font-mono text-omp-xs text-[var(--omp-dim)]">{meta}</span>}
+			<span className="min-w-0 truncate font-medium">{label}</span>
+			{meta && <span className="shrink-0 text-omp-xs tabular-nums text-[var(--omp-muted)]">{meta}</span>}
 		</>
 	);
-	const rowClass = "flex min-h-8 w-full items-center gap-2 rounded-md px-1.5 py-1 text-left";
-	if (!output) return <div className={rowClass}>{content}</div>;
+	const rowClass = "flex min-h-(--omp-step-height) w-full items-center gap-2 rounded-md px-1 py-px text-left text-omp-sm";
+	if (!output) return <div title={hint ?? label} className={rowClass}>{content}</div>;
 	return (
-		<details className="group">
-			<summary className={cx("omp-pressable cursor-pointer list-none", rowClass)}>
+		<details onToggle={event => setOpen(event.currentTarget.open)}>
+			<summary title={hint ?? label} className={cx("omp-pressable cursor-pointer list-none hover:bg-(--omp-selected-bg)", rowClass)}>
 				{content}
 				<ChevronRight
 					aria-hidden="true"
-					className="omp-disclosure-chevron ml-auto shrink-0 text-[var(--omp-dim)] group-open:rotate-90"
+					className={cx("omp-disclosure-chevron shrink-0 text-[var(--omp-dim)]", open && "rotate-90")}
 					size={13}
 				/>
 			</summary>
-			<div className="pb-2 pl-6">
-				<CollapsibleText className="mt-0.5" lines={3} text={output} />
-			</div>
+			{open && (
+				<div className="min-w-0 pt-1 pb-2 pl-6 text-omp-sm wrap-anywhere">
+					{markdown ? <MarkdownRenderer content={output} /> : (
+						<pre className="whitespace-pre-wrap"><OutputText text={output} /></pre>
+					)}
+				</div>
+			)}
 		</details>
 	);
 }
@@ -339,10 +348,19 @@ function asyncJobs(details: Record<string, unknown> | undefined): AsyncJob[] {
  */
 function asyncJobResults(content: string, jobs: AsyncJob[]): Map<string, string> {
 	const results = new Map<string, string>();
-	const body = content.replace(/<\/?system-notice\s*>/g, "").trim();
+	const body = content.trim().replace(/^<system-notice>\s*([\s\S]*?)\s*<\/system-notice>$/, "$1").trim();
 	if (!body) return results;
-	const sectionRe = /^── Job (\S+)(?:\s+\([^)]*\))? ──\s*$/gm;
-	const matches = [...body.matchAll(sectionRe)];
+	if (jobs.length === 1) {
+		const id = jobs[0]?.jobId;
+		const text = body
+			.replace(/^Background job [^\n]+ has completed\.[ \t]*(?:\r?\n|$)(?:Resume your work using the result below\.[ \t]*(?:\r?\n|$))?/, "")
+			.trim();
+		if (id && text) results.set(id, text);
+		return results;
+	}
+	const sectionRe = /^── Job (\S+)(?:[ \t]+\([^\n]*\))? ──[ \t]*\r?$/gm;
+	const ids = new Set(jobs.map(job => job.jobId));
+	const matches = [...body.matchAll(sectionRe)].filter(match => ids.has(match[1]));
 	if (matches.length > 0) {
 		for (let i = 0; i < matches.length; i++) {
 			const match = matches[i];
@@ -354,12 +372,26 @@ function asyncJobResults(content: string, jobs: AsyncJob[]): Map<string, string>
 		}
 		return results;
 	}
-	// Single job: the first line is the notice sentence, the rest is the result.
-	const firstBreak = body.indexOf("\n");
-	const text = (firstBreak === -1 ? "" : body.slice(firstBreak + 1)).trim();
-	const onlyId = jobs.length === 1 ? jobs[0].jobId : undefined;
-	if (onlyId && text) results.set(onlyId, text);
 	return results;
+}
+
+function taskResultBody(text: string, previewLabel: string): string {
+	const envelope = /^<task-result\b[^>]*>\s*\n([\s\S]*)\n<\/task-result>(?=\s|$)([\s\S]*)$/.exec(text);
+	if (!envelope) return text;
+	const sections: string[] = [];
+	let rest = (envelope[1] ?? "").trim().replace(/^<meta\b[^>]*\/>\s*/, "");
+	while (rest) {
+		const section = /^<(error|abort-reason|output|preview|merge-summary)(?:\s[^>]*?)?>([\s\S]*?)<\/\1>(?=\s*(?:$|<(?:error|abort-reason|output|preview|merge-summary)\b))/.exec(rest);
+		if (!section) return text;
+		if (section[1] === "preview") {
+			const source = /^<preview\b[^>]*\bfull-output="([^"]+)"/.exec(rest)?.[1];
+			sections.push(source ? `${previewLabel} · ${source}` : previewLabel);
+		}
+		sections.push((section[2] ?? "").trim());
+		rest = rest.slice(section[0].length).trimStart();
+	}
+	sections.push((envelope[2] ?? "").trim());
+	return sections.filter(Boolean).join("\n\n");
 }
 
 function AsyncResultCard({ message, inProcess }: { message: AgentMessage; inProcess: boolean }) {
@@ -380,12 +412,17 @@ function AsyncResultCard({ message, inProcess }: { message: AgentMessage; inProc
 	return (
 		<CompletionRows inProcess={inProcess}>
 			{jobs.map((job, index) => {
-				const id = job.jobId ?? "unknown";
-				const meta = [
-					t("chat.custom.asyncDone"),
-					`[${job.type ?? "job"}]`,
-					job.label ? id : undefined,
-					job.durationMs != null ? formatDuration(job.durationMs) : undefined,
+				const raw = job.jobId ? results.get(job.jobId) : undefined;
+				const output = raw && job.type === "task" ? taskResultBody(raw, t("chat.context.previewTruncated")) : raw;
+				const name = job.label ?? job.jobId;
+				const label = name ?? t("chat.custom.asyncDone");
+				const meta = [name && t("subagent.status.completed"), job.durationMs != null && formatDuration(job.durationMs)]
+					.filter(Boolean)
+					.join(" · ");
+				const hint = [
+					label,
+					job.type ? `[${job.type}]` : undefined,
+					job.jobId !== label ? job.jobId : undefined,
 				]
 					.filter(Boolean)
 					.join(" · ");
@@ -393,9 +430,11 @@ function AsyncResultCard({ message, inProcess }: { message: AgentMessage; inProc
 					<CompletionRow
 						failed={false}
 						key={job.jobId ?? index}
-						label={job.label ?? id}
+						label={label}
+						hint={hint}
 						meta={meta}
-						output={job.jobId ? results.get(job.jobId) : undefined}
+						output={output}
+						markdown={job.type === "task"}
 					/>
 				);
 			})}

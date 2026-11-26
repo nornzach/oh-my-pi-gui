@@ -1,16 +1,8 @@
 /**
- * Agents dock card: the live subagent roster rendered in the center dock
- * above the composer (previously the workspace drawer's agents tab). Live
- * tree of subagent nodes with status badges, elapsed time, progress line,
+ * The Activity drawer's subagent roster: a tree of live and restored
+ * subagent nodes with status badges, elapsed time, progress line,
  * and lazily loaded transcripts (byte pagination). A List/Graph toggle in
  * the card header switches the compact spawn tree for the graphical DAG.
- *
- * The card shows only while an agent is working; `display.pinnedAgents`
- * picks hidden, a summary, or the full list. It lists only the batches still
- * at work (`liveAgentRows`): earlier finished, failed and stale agents stay
- * reachable from the drawer's Agents tab, the sidebar, and agent pages. The
- * stream-time get_subagents poll lives in the workspace dock, so a hidden
- * card cannot stall it.
  */
 
 import { Bot, ChevronRight, List, Network } from "lucide-react";
@@ -24,7 +16,7 @@ import { useMessagesStore } from "../../../stores/messages";
 import { useRuntimeTabId } from "../../../stores/session-runtime-context";
 import { useSettingsStore } from "../../../stores/settings";
 import { useSubagentsStore } from "../../../stores/subagents";
-import { hasWorkingSubagent, subagentActivity } from "../../agents/agent-activity";
+import { subagentActivity } from "../../agents/agent-activity";
 import { Badge } from "../../common";
 import { SubagentDag } from "../../panels/SubagentDag";
 import { SubagentTranscript } from "../../panels/SubagentTranscript";
@@ -41,16 +33,15 @@ import {
 	useSubagentGraphStore,
 } from "../../panels/subagent-graph";
 import { DockCard } from "./DockCard";
-import { buildAgentDockSummary, liveAgentRows } from "./dock-summary";
+import { buildAgentDockSummary } from "./dock-summary";
 import { useWorkspaceDockFocus } from "./WorkspaceDockFocus";
 
 type PanelView = "list" | "graph";
 
-/** Whether the dock shows the Agents card: an agent is working and `display.pinnedAgents` is not off. */
 export function useAgentsDockVisible(): boolean {
 	const pinnedOff = useSettingsStore(state => state.pinnedAgents === "off");
-	const working = useSubagentsStore(state => hasWorkingSubagent(state.subagents.values()));
-	return working && !pinnedOff;
+	const hasAgents = useSubagentsStore(state => state.subagents.size > 0);
+	return hasAgents && !pinnedOff;
 }
 
 const SubagentRow = memo(function SubagentRow({
@@ -213,10 +204,10 @@ export function AgentsDockCard() {
 
 	const rootToolCallIds = useMemo(() => new Set(extractTaskToolCallIds(messages)), [messages]);
 	const rows = useMemo(
-		() => liveAgentRows(buildSubagentList(agents, rootToolCallIds, toolCallOwners)),
+		() => buildSubagentList(agents, rootToolCallIds, toolCallOwners),
 		[agents, rootToolCallIds, toolCallOwners],
 	);
-	const liveIds = useMemo(() => new Set(rows.map(row => row.agent.id)), [rows]);
+	const displayedIds = useMemo(() => new Set(rows.map(row => row.agent.id)), [rows]);
 	const summary = useMemo(() => buildAgentDockSummary(rows), [rows]);
 	const displayedRows = showFull ? rows : summary.rows;
 
@@ -271,7 +262,7 @@ export function AgentsDockCard() {
 		>
 			{view === "graph" ? (
 				<div className="h-72">
-					<SubagentDag include={liveIds} />
+					<SubagentDag include={displayedIds} />
 				</div>
 			) : (
 				<div className="space-y-1.5 px-2 py-1.5" role="tree">

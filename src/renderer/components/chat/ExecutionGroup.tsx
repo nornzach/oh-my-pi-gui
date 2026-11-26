@@ -4,6 +4,7 @@ import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useToolsStore } from "../../stores/tools";
 import { Collapse, CollapseButton } from "../common/Collapse";
+import { getToolSummary } from "../tools";
 
 interface ExecutionGroupProps {
 	children: ReactNode;
@@ -14,6 +15,7 @@ interface ExecutionGroupProps {
 	onExpandedChange: (expanded: boolean) => void;
 	stepCount: number;
 	toolCallIds: readonly string[];
+	tool?: { id: string; name: string; args: Record<string, unknown>; intent?: string };
 }
 
 /**
@@ -30,6 +32,7 @@ export function ExecutionGroup({
 	onExpandedChange,
 	stepCount,
 	toolCallIds,
+	tool,
 }: ExecutionGroupProps) {
 	const t = useT();
 	// Primitive selector: encode (running, failed) so unrelated tool events —
@@ -46,6 +49,12 @@ export function ExecutionGroup({
 	});
 	const [running, toolFailures] = encoded.split(":").map(Number);
 	const failed = toolFailures + failureCount;
+	const activity = useToolsStore(s => {
+		if (!tool) return undefined;
+		const entry = s.activeTools.get(tool.id);
+		const detail = getToolSummary(tool.name, entry?.args ?? tool.args, entry?.result, entry?.intent ?? tool.intent);
+		return detail ? `${tool.name} · ${detail}` : tool.name;
+	});
 
 	const active = live || running > 0;
 	const state = active ? "running" : failed > 0 ? "failed" : "complete";
@@ -65,8 +74,13 @@ export function ExecutionGroup({
 				className="omp-execution-group-header omp-pressable flex w-full min-w-0 items-center gap-2 text-left"
 				onClick={() => onExpandedChange(!expanded)}
 				type="button"
-				aria-label={`${t("chat.process.title")}: ${summary}`}
+				aria-label={[summary, activity].filter(Boolean).join(" · ")}
 			>
+				<ChevronRight
+					aria-hidden="true"
+					className={cx("omp-disclosure-chevron shrink-0 text-[var(--omp-dim)]", expanded && "rotate-90")}
+					size={12}
+				/>
 				{active && (
 					<span aria-hidden="true" className="omp-execution-group-live-dot omp-working-dot omp-working-dot--sm" />
 				)}
@@ -86,11 +100,11 @@ export function ExecutionGroup({
 				>
 					{summary}
 				</span>
-				<ChevronRight
-					aria-hidden="true"
-					className={cx("omp-disclosure-chevron shrink-0 text-[var(--omp-dim)]", expanded && "rotate-90")}
-					size={14}
-				/>
+				{activity && (
+					<span className="min-w-0 truncate text-omp-xs text-(--omp-muted)" title={activity}>
+						{activity}
+					</span>
+				)}
 			</button>
 			<Collapse open={expanded}>
 				<div className="omp-execution-group-body">

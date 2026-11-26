@@ -1,8 +1,8 @@
 /**
  * Token Meter (#71): live throughput sampling and the session economics the
  * panel prints. The wire carries no per-delta token counts, so the live gauge
- * observes streaming-buffer character growth (the same approximation the
- * thinking gauge uses); per-turn figures come from committed message usage.
+ * observes streaming-buffer character growth. Per-turn figures come from
+ * committed message usage.
  */
 import { useEffect, useRef, useState } from "react";
 import type { AgentMessage } from "../../shared/rpc-types";

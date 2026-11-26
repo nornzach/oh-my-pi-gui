@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo } from "react";
 import type { MenuAction, MenuActionPayload, RunProgressState } from "../shared/ipc-types";
 import { nextLanguage } from "../shared/languages";
 import { AgentHoverCardLayer } from "./components/agents/AgentHoverCard";
+import { FloatingActivity } from "./components/chat/dock/WorkspaceDock";
 import { PanelErrorBoundary, Spinner, ToastStack } from "./components/common";
 import { LinkMenuHost } from "./components/common/LinkMenu";
 import { WorkspacePageContext } from "./components/common/Modal";
@@ -959,7 +960,10 @@ export function App() {
 						<ConfigWarningsBanner />
 						<UpdateBanner />
 					</div>
-					<SplitWorkspace />
+					<div className="omp-conversation-layout flex min-h-0 flex-1">
+						<SplitWorkspace />
+						{focusedRuntime && <FloatingActivity />}
+					</div>
 				</div>
 				{workspace && (
 					<div className="omp-workspace-page min-h-0 min-w-0 flex-1" data-workspace-page="">

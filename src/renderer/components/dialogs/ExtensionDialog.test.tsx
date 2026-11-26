@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { ExtensionUIRequest, ExtensionUIResponse, RpcCommand, RpcResponse } from "../../../shared/rpc-types";
+import * as format from "../../lib/format";
 import { I18nProvider } from "../../lib/i18n";
 import { useAgentPagesStore } from "../../stores/agent-pages";
 import { type ExtensionUiStore, useExtensionUiStore } from "../../stores/extension-ui";
@@ -308,6 +309,18 @@ describe("ExtensionDialog form", () => {
 });
 
 describe("ExtensionDialog askDialog", () => {
+	it("copies the option label and description without selecting or submitting the option", async () => {
+		const copy = vi.spyOn(format, "copyText").mockResolvedValue(true);
+		await mount();
+		await act(async () => showAskDialog());
+		const copyButton = buttonWithText("Copy");
+		if (!copyButton) throw new Error("missing ask option copy button");
+		await click(copyButton);
+		expect(copy).toHaveBeenCalledWith("Staging\nSafe environment");
+		expect(document.querySelector('[aria-pressed="true"]')).toBeNull();
+		expect(respondExtensionUi).not.toHaveBeenCalled();
+	});
+
 	it("returns the wire submit discriminator and renders the selected option preview", async () => {
 		await mount();
 		await act(async () => showAskDialog());

@@ -1,11 +1,4 @@
-/**
- * DockCard: shared chrome for the center-dock live cards (todo/plan/agents)
- * mounted between the transcript and the composer. Collapse state lives in
- * the ui store so it survives card unmounts (tab switches, content-driven
- * hide/show); `focusDockCard(id)` deep links expand the card and flash a
- * ring — that is how command-palette entries (todo edit, plan-review) land
- * here now that the workspace drawer no longer carries these surfaces.
- */
+/** Activity card disclosures survive unmounts; command-palette links focus a specific card. */
 
 import { ArrowLeft, ChevronRight, type LucideIcon, Maximize2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -41,11 +34,11 @@ export function DockCard({ id, icon: Icon, title, badge, actions, expandable, ch
 	const focusSeq = useUiStore(s => (s.dockFocus?.id === id ? s.dockFocus.seq : 0));
 	const [flash, setFlash] = useState(false);
 	const flashTimer = useRef<number | undefined>(undefined);
-	const seenSeq = useRef(focusSeq);
+	const seenSeq = useRef(0);
 	const detailLabel = t("dock.viewDetails", { title });
 
 	useEffect(() => {
-		if (focusSeq === seenSeq.current) return;
+		if (focusSeq === 0 || focusSeq === seenSeq.current) return;
 		seenSeq.current = focusSeq;
 		if (managed && expandable) focusCard(id);
 		else clearFocus();

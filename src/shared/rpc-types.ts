@@ -2793,6 +2793,7 @@ export type AgentSessionEvent =
  * the opt-in. A streaming tool call's id and name first arrive on `toolcall_end`.
  */
 export type AssistantMessageEvent =
+	| { type: "toolcall_start"; contentIndex: number; block?: MessageContent; partial?: AgentMessage }
 	| { type: "text_delta"; contentIndex: number; delta: string; partial?: AgentMessage }
 	| { type: "thinking_delta"; contentIndex: number; delta: string; partial?: AgentMessage }
 	| { type: "toolcall_delta"; contentIndex: number; delta: string; partial?: AgentMessage }

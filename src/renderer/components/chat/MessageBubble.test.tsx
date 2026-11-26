@@ -429,7 +429,7 @@ describe("MessageBubble noise filtering", () => {
 		expect(html).toContain("py-1.5");
 	});
 
-	it("keeps the footer on text-bearing messages", () => {
+	it("keeps copy and branch on the reply and out of intermediate tool messages", () => {
 		const mixed: AgentMessage = {
 			role: "assistant",
 			content: [
@@ -444,8 +444,14 @@ describe("MessageBubble noise filtering", () => {
 			</I18nProvider>,
 		);
 		expect(html).toContain("Fixed.");
-		expect(html).toContain("Copy message text");
-		expect(html).toContain("py-3");
+		expect(html).not.toContain("Copy message text");
+		expect(html).not.toContain("Branch from here");
+		const reply = renderToStaticMarkup(
+			<I18nProvider>
+				<MessageBubble message={{ ...mixed, content: [{ type: "text", text: "Done." }] }} />
+			</I18nProvider>,
+		);
+		expect(reply).toContain("Copy message text");
 	});
 
 	it("offers branch-to-new-tab on user and assistant messages even before legacy ids are resolved", () => {
@@ -471,6 +477,28 @@ describe("MessageBubble noise filtering", () => {
 		expect(render(user)).toContain("Branch to a new tab from here");
 		expect(render(assistant)).toContain("Branch to a new tab from here");
 		expect(render({ ...assistant, entryId: undefined })).toContain("Branch to a new tab from here");
+	});
+
+	it("shows the provider's reasoning total once across separate thinking blocks", () => {
+		const render = (usage: { output: number; reasoningTokens?: number }) =>
+			renderToStaticMarkup(
+				<I18nProvider>
+					<MessageBubble
+						message={{
+							role: "assistant",
+							content: [
+								{ type: "thinking", thinking: "Inspect." },
+								{ type: "text", text: "Interim answer." },
+								{ type: "thinking", thinking: "Verify." },
+							],
+							timestamp: at,
+							usage,
+						}}
+					/>
+				</I18nProvider>,
+			);
+		expect(render({ output: 99, reasoningTokens: 7 }).match(/7 reasoning tokens in this message/g)).toHaveLength(1);
+		expect(render({ output: 99 })).not.toContain("reasoning tokens in this message");
 	});
 
 	it("uses compact chrome for expanded process details containing reasoning and tools", () => {

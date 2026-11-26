@@ -24,13 +24,13 @@ describe("findTranscriptMatches", () => {
 			},
 		];
 		const rows = buildHistoryRows(messages, "compact");
-		const processIndex = rows.findIndex(row => row.kind === "process");
-		expect(processIndex).toBeGreaterThan(0);
+		const narrationIndex = rows.findIndex(row => row.kind === "message" && row.narration);
+		expect(narrationIndex).toBeGreaterThan(0);
 
 		expect(findTranscriptMatches(rows, "  deploy ")).toEqual([
 			{ rowIndex: 0, occurrence: 0 },
-			{ rowIndex: processIndex, occurrence: 0 },
-			{ rowIndex: processIndex, occurrence: 1 },
+			{ rowIndex: narrationIndex, occurrence: 0 },
+			{ rowIndex: narrationIndex, occurrence: 1 },
 		]);
 	});
 });

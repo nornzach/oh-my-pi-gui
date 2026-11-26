@@ -1,4 +1,14 @@
-import { Bot, Diff, FolderTree, Globe, LayoutDashboard, MessageCircleQuestion, SquareTerminal, X } from "lucide-react";
+import {
+	Bot,
+	Diff,
+	FolderTree,
+	Globe,
+	LayoutDashboard,
+	ListTodo,
+	MessageCircleQuestion,
+	SquareTerminal,
+	X,
+} from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActiveTabRouteReady } from "../../hooks/use-active-tab-route";
@@ -9,6 +19,7 @@ import { scrollStripOnWheel, useActiveChipInView } from "../../lib/strip-scroll"
 import { useActiveTabKind, useTabsStore } from "../../stores/tabs";
 import { CHAT_PANEL_TABS, type PanelTab, useUiStore } from "../../stores/ui";
 import { AgentRoster, useAgentsTabSignal } from "../agents/AgentRoster";
+import { WorkspaceDock } from "../chat/dock/WorkspaceDock";
 import { PanelErrorBoundary } from "../common";
 import { Glide } from "../common/Glide";
 import { BrowserPanel } from "../panels/BrowserPanel";
@@ -28,6 +39,7 @@ function defaultPanelWidth(viewportWidth: number): number {
 
 const TABS: { id: PanelTab; labelKey: string; icon: typeof Diff }[] = [
 	{ id: "overview", labelKey: "panel.tabs.overview", icon: LayoutDashboard },
+	{ id: "activity", labelKey: "panel.tabs.activity", icon: ListTodo },
 	{ id: "agents", labelKey: "panel.tabs.agents", icon: Bot },
 	{ id: "btw", labelKey: "panel.tabs.btw", icon: MessageCircleQuestion },
 	{ id: "diff", labelKey: "panel.tabs.diff", icon: Diff },
@@ -77,9 +89,7 @@ function InspectorTab({ label, description, icon: Icon, active, signal, onSelect
 /**
  * Review drawer: an overview of the session, what the agent changed and the
  * files it touched. Hidden by default; the bare toggle opens it on Overview,
- * while the transcript's "Review" link, a file link or /btw open their own tab. Live execution
- * state (todos, plan, subagents, queue) renders in the center dock above the
- * composer, and application logs live in their own dialog.
+ * while the activity peek, the transcript's "Review" link, a file link or /btw open their own tab.
  */
 export function PanelContainer() {
 	const t = useT();
@@ -205,6 +215,7 @@ export function PanelContainer() {
 			<div className="min-h-0 flex-1 overflow-hidden">
 				<PanelErrorBoundary key={`${activeTabId ?? "no-tab"}:${visiblePanelTab}`}>
 					{visiblePanelTab === "overview" && <OverviewPanel />}
+					{visiblePanelTab === "activity" && <WorkspaceDock />}
 					{visiblePanelTab === "agents" && <AgentRoster />}
 					{visiblePanelTab === "btw" && <BtwPanel />}
 					{visiblePanelTab === "diff" && <DiffPanel />}

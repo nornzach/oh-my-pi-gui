@@ -9,11 +9,11 @@
  * also respects a toolCount larger than the returned name list.
  */
 
-import { Check, Copy, X } from "lucide-react";
-import { useState } from "react";
-import { copyText, cx } from "../../../lib/format";
+import { X } from "lucide-react";
+import { cx } from "../../../lib/format";
 import { useT } from "../../../lib/i18n";
 import { Spinner } from "../../common";
+import { CopyButton } from "../../common/CopyButton";
 
 /** Tool names rendered before the "+N more" remainder kicks in. */
 export const MCP_TEST_SHOWN_LIMIT = 10;
@@ -34,34 +34,6 @@ export function summarizeMcpTestData(data: unknown): McpTestView {
 	const shown = names.slice(0, MCP_TEST_SHOWN_LIMIT);
 	const extra = Math.max(0, Math.max(names.length, toolCount) - shown.length);
 	return { kind: "ok", toolCount, shown, extra };
-}
-
-/** Small copy button with a transient check confirmation (CodeBlock pattern). */
-export function CopyButton({ text, className }: { text: string; className?: string }) {
-	const t = useT();
-	const [copied, setCopied] = useState(false);
-	return (
-		<button
-			aria-label={copied ? t("mcp.card.copied") : t("mcp.card.copy")}
-			className={cx(
-				"inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-omp-xs transition-colors",
-				copied ? "text-(--omp-success)" : "text-(--omp-dim) hover:text-(--omp-text)",
-				className,
-			)}
-			onClick={() => {
-				void copyText(text).then(ok => {
-					if (!ok) return;
-					setCopied(true);
-					window.setTimeout(() => setCopied(false), 1400);
-				});
-			}}
-			title={copied ? t("mcp.card.copied") : t("mcp.card.copy")}
-			type="button"
-		>
-			{copied ? <Check size={11} /> : <Copy size={11} />}
-			{copied ? t("mcp.card.copied") : t("mcp.card.copy")}
-		</button>
-	);
 }
 
 /** Red error box whose message can be copied verbatim (server-side errors). */

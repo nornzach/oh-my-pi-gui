@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { AgentMessage } from "../../../shared/rpc-types";
-import type { TodoSnapshot } from "../../stores/todo";
 import {
 	buildConversationAnchors,
 	buildHistoryRowKeys,
@@ -14,7 +13,6 @@ import {
 	isTranscriptAtLiveEdge,
 	LIVE_EDGE_SLACK_PX,
 	locateEntryRow,
-	mergeTodoSnapshots,
 	ROW_ENTRANCE_TAIL_ROWS,
 	shouldRePinTranscript,
 	summarizeTurnChanges,
@@ -50,17 +48,21 @@ const toolRun: AgentMessage[] = [
 ];
 
 describe("compact transcript rows", () => {
-	it("folds consecutive tool work into one process row and keeps the final answer visible", () => {
+	it("folds consecutive tools without hiding the narration or final answer", () => {
 		const rows = buildHistoryRows(toolRun, "compact");
-		expect(rows.map(row => row.kind)).toEqual(["process", "message"]);
+		expect(rows.map(row => row.kind)).toEqual(["message", "process", "message"]);
+		expect(rows[0]).toMatchObject({
+			intermediate: true,
+			message: { content: [{ type: "text", text: "I will inspect the source." }] },
+		});
 
-		const process = rows[0];
+		const process = rows[1];
 		if (process?.kind !== "process") throw new Error("process row missing");
 		expect(process.stepCount).toBe(2);
 		expect(process.toolNames).toEqual(["read", "write"]);
 		expect(process.messages).toHaveLength(2);
 
-		const answer = rows[1];
+		const answer = rows[2];
 		if (answer?.kind !== "message") throw new Error("final answer row missing");
 		expect(answer.message.content).toEqual([{ type: "text", text: "Implemented and verified." }]);
 	});
@@ -99,7 +101,7 @@ describe("compact transcript rows", () => {
 		).toEqual([]);
 	});
 
-	it("folds narrated phases and filler tool calls into one activity summary before the final answer", () => {
+	it("keeps narration in sequence and status events with the tools they report on", () => {
 		const rows = buildHistoryRows(
 			[
 				assistant([
@@ -139,17 +141,14 @@ describe("compact transcript rows", () => {
 			"compact",
 		);
 
-		expect(rows.map(row => row.kind)).toEqual(["process"]);
-		const process = rows[0];
+		expect(rows.map(row => row.kind)).toEqual(["message", "process", "message", "process"]);
+		const process = rows[1];
 		if (process?.kind !== "process") throw new Error("process row missing");
-		expect(process.stepCount).toBe(5);
+		expect(process.stepCount).toBe(3);
 		expect(process.failedEvents).toBe(1);
-		expect(process.toolNames).toEqual(["bash", "bash", "bash", "hub"]);
-		expect(process.messages.map(message => message.customType).filter(Boolean)).toEqual([
-			"launch-completion",
-			"async-result",
-		]);
-		expect(buildTimelineMarkers(rows)[0]?.state).toBe("error");
+		expect(process.toolNames).toEqual(["bash", "bash"]);
+		expect(buildTimelineMarkers(rows)[1]?.state).toBe("error");
+		expect(rows[3]).toMatchObject({ toolNames: ["bash", "hub"] });
 	});
 });
 
@@ -446,40 +445,30 @@ describe("conversation navigation anchors", () => {
 	});
 });
 
-describe("mergeTodoSnapshots", () => {
-	function snapshot(id: string, ts: number): TodoSnapshot {
-		return { id, ts, phases: [{ name: "Build", tasks: [{ content: "task", status: "pending" }] }] };
-	}
-
-	it("interleaves snapshots by timestamp and tails the newest changes", () => {
-		const rows = buildHistoryRows(
-			[
-				{ role: "user", content: [{ type: "text", text: "One" }], timestamp: 100 },
-				{ role: "user", content: [{ type: "text", text: "Two" }], timestamp: 300 },
-			],
-			"full",
-		);
-		const merged = mergeTodoSnapshots(rows, [snapshot("s1", 50), snapshot("s2", 200), snapshot("s3", 400)]);
-		expect(merged.map(row => row.kind)).toEqual([
-			"todoSnapshot",
-			"message",
-			"todoSnapshot",
-			"message",
-			"todoSnapshot",
-		]);
-		expect(merged.map(row => (row.kind === "todoSnapshot" ? row.entry.id : null))).toEqual([
-			"s1",
-			null,
-			"s2",
-			null,
-			"s3",
-		]);
-	});
-
-	it("passes rows through untouched when there are no snapshots", () => {
-		const rows = buildHistoryRows([assistant([{ type: "text", text: "Solo" }])], "full");
-		expect(mergeTodoSnapshots(rows, [])).toEqual(rows);
-	});
+describe("conversation activity projection", () => {
+	it.each(["compact", "full"] as const)(
+		"omits todo updates without hiding narration or failed calls in %s",
+		detail => {
+			const update = { type: "toolCall", id: "ok", name: "todo", arguments: {} } as const;
+			const failed = { ...update, id: "failed" };
+			const rows = buildHistoryRows(
+				[assistant([update]), assistant([update, { type: "text", text: "Still working" }]), assistant([failed])],
+				detail,
+				undefined,
+				new Set(["failed"]),
+			);
+			expect(rows).toHaveLength(2);
+			expect(rows[0]).toMatchObject({
+				kind: "message",
+				message: { content: [{ type: "text", text: "Still working" }] },
+			});
+			expect(
+				detail === "compact"
+					? rows[1]?.kind === "process" && rows[1].toolCallIds
+					: rows[1]?.kind === "message" && rows[1].message.content,
+			).toEqual(detail === "compact" ? ["failed"] : [failed]);
+		},
+	);
 
 	it("keeps ask tool calls outside collapsed process groups in compact mode (#78)", () => {
 		const rows = buildHistoryRows(
@@ -626,11 +615,11 @@ describe("locating a message to open at", () => {
 		{ ...assistant([{ type: "text", text: "It needs the hardened runtime." }]), entryId: "a2" },
 	];
 
-	it("finds a message's own row, or the folded group that has to open to show it", () => {
+	it("locates a narrated tool message at its first visible fragment", () => {
 		const compact = buildHistoryRows(transcript, "compact");
 		expect(locateEntryRow(compact, "u1")).toEqual({ index: 0, kind: "message" });
-		expect(locateEntryRow(compact, "a1")).toEqual({ index: 1, kind: "process" });
-		expect(locateEntryRow(compact, "a2")).toEqual({ index: 2, kind: "message" });
+		expect(locateEntryRow(compact, "a1")).toEqual({ index: 1, kind: "message" });
+		expect(locateEntryRow(compact, "a2")).toEqual({ index: 3, kind: "message" });
 
 		const full = buildHistoryRows(transcript, "full");
 		expect(locateEntryRow(full, "a1")?.kind).toBe("message");

@@ -17,11 +17,17 @@ import { useAgentPagesStore } from "../../stores/agent-pages";
 import { useSessionStore } from "../../stores/session";
 import { SessionRuntimeProvider } from "../../stores/session-runtime-context";
 import { ensureTabRuntime } from "../../stores/tab-runtime";
-import { type SplitAxis, type SplitPlacement, tabDisplayTitle, useTabsStore } from "../../stores/tabs";
+import {
+	type SplitAxis,
+	type SplitPlacement,
+	tabDisplayTitle,
+	useActiveTabKind,
+	useTabsStore,
+} from "../../stores/tabs";
 import { AgentBeside } from "../agents/AgentBeside";
 import { AgentPage } from "../agents/AgentPage";
 import { ChatStream } from "../chat/ChatStream";
-import { WorkspaceDock } from "../chat/dock/WorkspaceDock";
+import { QueueDockChip } from "../chat/dock/QueueDockChip";
 import { InputArea } from "./InputArea";
 import { useComposerFiles } from "./use-composer-files";
 
@@ -191,6 +197,7 @@ function SessionPaneBody({ tabId, label }: { tabId: string; label: string }) {
 
 function SessionConversation() {
 	const { attachFiles, readOnly } = useComposerFiles();
+	const showQueue = useActiveTabKind() !== "chat";
 	const [draggingFiles, setDraggingFiles] = useState(false);
 	return (
 		<div
@@ -223,7 +230,7 @@ function SessionConversation() {
 				requestAnimationFrame(() => composer?.focus());
 			}}
 		>
-			<ChatStream footer={<WorkspaceDock />} />
+			<ChatStream footer={showQueue && <QueueDockChip />} />
 			<InputArea />
 		</div>
 	);

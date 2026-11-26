@@ -1,20 +1,17 @@
-/**
- * ChatStream pure helpers: transcript row construction, todo snapshot
- * interleaving, and timeline marker derivation. Extracted verbatim from
- * ChatStream.tsx so the renderer keeps only its UI and state wiring.
- */
+/** ChatStream row construction and timeline marker derivation. */
 
 import type { AgentMessage, MessageContent, RpcQueuedMessage } from "../../../shared/rpc-types";
 import { messageIdentity, messageTimestampMs } from "../../lib/message-identity";
 import { isRenderableMessageText, messageText, splitReaction } from "../../lib/messages";
 import type { ReadGroupEntry, ReadGroupUsage } from "../../lib/read-group";
 import type { QueueLane } from "../../stores/queue";
-import type { TodoSnapshot } from "../../stores/todo";
+import { isTodoTool } from "../../stores/todo";
 import { type ToolEntry, toolEntryKey } from "../../stores/tools";
 import type { TranscriptDetail } from "../../stores/ui";
 import { isCompletionMessage, launchCompletionFailureCount } from "./completion-events";
 
 interface ProcessMeta {
+	lastTool?: Extract<MessageContent, { type: "toolCall" }>;
 	stepCount: number;
 	failedEvents: number;
 	toolCallIds: string[];
@@ -45,12 +42,15 @@ const CONVERSATION_PREVIEW_LIMIT = 180;
 export const LIVE_EDGE_SLACK_PX = 24;
 
 /** True at the live edge, within the tail-following slack. */
-export function isTranscriptAtLiveEdge(metrics: {
-	scrollHeight: number;
-	scrollTop: number;
-	clientHeight: number;
-}): boolean {
-	return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight < LIVE_EDGE_SLACK_PX;
+export function isTranscriptAtLiveEdge(
+	metrics: {
+		scrollHeight: number;
+		scrollTop: number;
+		clientHeight: number;
+	},
+	slack = LIVE_EDGE_SLACK_PX,
+): boolean {
+	return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight < slack;
 }
 
 /** Direction of the reader's last viewport gesture: `true` toward the tail, `false`
@@ -155,10 +155,16 @@ export function locateEntryRow(
 }
 
 export type HistoryRow =
-	| { kind: "message"; message: AgentMessage; reaction?: string; repeats?: number }
+	| {
+			kind: "message";
+			message: AgentMessage;
+			reaction?: string;
+			repeats?: number;
+			intermediate?: boolean;
+			narration?: boolean;
+	  }
 	| { kind: "readGroup"; entries: ReadGroupEntry[]; usage?: ReadGroupUsage[] }
-	| ({ kind: "process"; messages: AgentMessage[] } & ProcessMeta)
-	| { kind: "todoSnapshot"; entry: TodoSnapshot };
+	| ({ kind: "process"; messages: AgentMessage[] } & ProcessMeta);
 
 /** What one run changed on disk: distinct files and their line totals. */
 export interface TurnChangeSummary {
@@ -217,7 +223,7 @@ function transcriptRowBaseKey(row: Row): string {
 		case "queued":
 			return `queued-${row.item.id}`;
 		case "message":
-			return `message-${messageKey(row.message)}`;
+			return `${row.narration ? "narration" : "message"}-${messageKey(row.message)}`;
 		case "process":
 			// Compact mode may replace one live assistant row with a process row,
 			// or split it into process + answer rows. Key the first finalized row
@@ -225,8 +231,6 @@ function transcriptRowBaseKey(row: Row): string {
 			return `message-${messageKey(row.messages[0]!)}`;
 		case "readGroup":
 			return `read-${row.entries.map(entry => entry.toolKey).join("-")}`;
-		case "todoSnapshot":
-			return `todo-snapshot-${row.entry.id}`;
 		case "streaming":
 			// message_start and message_end carry the same assistant identity.
 			// Reusing it prevents the virtualizer from replacing one huge measured
@@ -349,7 +353,7 @@ function isBareError(message: AgentMessage): boolean {
  * invisible toolResult row at 128px was the remaining source of blank bands
  * between cards; its content already lives in the matching ToolCard.
  */
-export function isVisibleTranscriptMessage(message: AgentMessage): boolean {
+export function isVisibleTranscriptMessage(message: AgentMessage, hideTodoCalls = false): boolean {
 	if (message.role === "toolResult") return false;
 	if ((message.role === "custom" || message.role === "hookMessage") && message.display === false) return false;
 	if (
@@ -372,6 +376,7 @@ export function isVisibleTranscriptMessage(message: AgentMessage): boolean {
 			case "thinking":
 				return isRenderableMessageText(block.thinking);
 			case "toolCall":
+				return !hideTodoCalls || !isTodoTool(block.name);
 			case "image":
 				return true;
 		}
@@ -401,6 +406,7 @@ function summarizeProcess(messages: AgentMessage[]): ProcessMeta {
 	let failedEvents = 0;
 	const toolCallIds: string[] = [];
 	const toolNames: string[] = [];
+	let lastTool: ProcessMeta["lastTool"];
 	for (const message of messages) {
 		failedEvents += launchCompletionFailureCount(message);
 		for (const block of messageContent(message)) {
@@ -408,9 +414,10 @@ function summarizeProcess(messages: AgentMessage[]): ProcessMeta {
 			if (block.type !== "toolCall") continue;
 			toolCallIds.push(toolEntryKey(block));
 			toolNames.push(block.name);
+			lastTool = block;
 		}
 	}
-	return { stepCount: thinkingCount + toolCallIds.length, failedEvents, toolCallIds, toolNames };
+	return { stepCount: thinkingCount + toolCallIds.length, failedEvents, toolCallIds, toolNames, lastTool };
 }
 
 /**
@@ -423,6 +430,7 @@ export function buildHistoryRows(
 	messages: AgentMessage[],
 	detail: TranscriptDetail,
 	preservedProcessStarts?: Pick<ReadonlySet<string>, "has">,
+	visibleTodoCalls?: ReadonlySet<string>,
 ): HistoryRow[] {
 	const rows: HistoryRow[] = [];
 	let processMessages: AgentMessage[] = [];
@@ -439,6 +447,13 @@ export function buildHistoryRows(
 		// Keep an explicitly opened live phase in place when it finalizes.
 		if (preservedProcessStarts?.has(`message-${messageKey(incoming)}`)) flushProcess();
 		let message = incoming;
+		const ranTools = message.role === "assistant" && messageContent(message).some(block => block.type === "toolCall");
+		if (visibleTodoCalls && message.role === "assistant" && Array.isArray(message.content)) {
+			const content = message.content.filter(
+				block => block.type !== "toolCall" || !isTodoTool(block.name) || visibleTodoCalls.has(toolEntryKey(block)),
+			);
+			if (content.length !== message.content.length) message = { ...message, content };
+		}
 		if (message.role === "assistant") {
 			if (reactionTargetIndex !== undefined) {
 				const split = splitMessageReaction(message);
@@ -480,7 +495,7 @@ export function buildHistoryRows(
 				rows[rows.length - 1] = { kind: "message", message, repeats: (previous.repeats ?? 1) + 1 };
 				continue;
 			}
-			rows.push({ kind: "message", message });
+			rows.push({ kind: "message", message, intermediate: ranTools || undefined });
 			if (message.role === "user") reactionTargetIndex = rows.length - 1;
 			continue;
 		}
@@ -489,13 +504,21 @@ export function buildHistoryRows(
 		const hasAskTool = message.content.some(block => block.type === "toolCall" && block.name === "ask");
 		const hasImage = message.content.some(block => block.type === "image");
 		if (hasToolCall && !hasImage && !hasAskTool) {
-			// Text accompanying a tool call is intermediate narration. Keep every
-			// narrated phase in the same disclosure until the API delivers the final
-			// answer, so a long run leaves one activity summary instead of a stack of
-			// nearly identical completed rows. Ask tool calls stay visible outside
-			// the folded process group so the user's choices and custom answers
-			// remain part of the readable conversation (#78).
-			processMessages.push(message);
+			let start = 0;
+			for (const [index, block] of message.content.entries()) {
+				if (block.type !== "text" || !isRenderableMessageText(block.text)) continue;
+				if (index > start) processMessages.push({ ...message, content: message.content.slice(start, index) });
+				flushProcess();
+				rows.push({
+					kind: "message",
+					message: { ...message, content: [block] },
+					intermediate: true,
+					narration: true,
+				});
+				start = index + 1;
+			}
+			const tail = start > 0 ? { ...message, content: message.content.slice(start) } : message;
+			if (isVisibleTranscriptMessage(tail)) processMessages.push(tail);
 			continue;
 		}
 
@@ -510,48 +533,16 @@ export function buildHistoryRows(
 			};
 			if (isVisibleTranscriptMessage(coreMessage)) {
 				flushProcess();
-				rows.push({ kind: "message", message: coreMessage });
+				rows.push({ kind: "message", message: coreMessage, intermediate: ranTools || undefined });
 			}
 			continue;
 		}
 
 		flushProcess();
-		rows.push({ kind: "message", message });
+		rows.push({ kind: "message", message, intermediate: ranTools || undefined });
 	}
 	flushProcess();
 	return rows;
-}
-
-/**
- * Interleave archived todo snapshots into finalized history by timestamp:
- * each snapshot lands after the last row at or before its change time, and
- * leftovers (changes newer than every message) tail the history. Rows
- * without a reliable timestamp (read groups) never flush snapshots.
- */
-export function mergeTodoSnapshots(rows: readonly HistoryRow[], snapshots: readonly TodoSnapshot[]): HistoryRow[] {
-	if (snapshots.length === 0) return rows as HistoryRow[];
-	const out: HistoryRow[] = [];
-	let next = 0;
-	for (const row of rows) {
-		const ts =
-			row.kind === "message"
-				? messageTimestampMs(row.message)
-				: row.kind === "process" && row.messages.length > 0
-					? messageTimestampMs(row.messages[0]!)
-					: undefined;
-		if (ts !== undefined) {
-			while (next < snapshots.length && (snapshots[next]?.ts ?? 0) < ts) {
-				out.push({ kind: "todoSnapshot", entry: snapshots[next]! });
-				next++;
-			}
-		}
-		out.push(row);
-	}
-	while (next < snapshots.length) {
-		out.push({ kind: "todoSnapshot", entry: snapshots[next]! });
-		next++;
-	}
-	return out;
 }
 
 /**

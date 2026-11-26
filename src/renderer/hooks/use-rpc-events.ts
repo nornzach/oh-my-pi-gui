@@ -62,7 +62,7 @@ import { useSettingsStore } from "../stores/settings";
 import { SUBAGENT_SUBSCRIPTION_LEVEL, useSubagentsStore } from "../stores/subagents";
 import { isTabClosed, useTabsStore, visibleTabIds } from "../stores/tabs";
 import { useToastStore } from "../stores/toast";
-import { todoPhasesFromToolResult, useTodoStore } from "../stores/todo";
+import { isTodoTool, todoPhasesFromToolResult, useTodoStore } from "../stores/todo";
 import { useToolsStore } from "../stores/tools";
 import { useUiStore } from "../stores/ui";
 
@@ -402,7 +402,7 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 							break;
 						}
 						case "tool_execution_end": {
-							if (event.toolName !== "todo" || event.isError) break;
+							if (!isTodoTool(event.toolName) || event.isError) break;
 							const phases = todoPhasesFromToolResult(event.result);
 							if (phases) useTodoStore.getState().setPhases(phases);
 							break;

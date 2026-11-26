@@ -614,6 +614,26 @@ if (process.argv.includes("stats")) {
 									{
 										kind: "field",
 										field: {
+											kind: "choice",
+											name: "strategy",
+											label: [],
+											multi: false,
+											other: true,
+											select: false,
+											required: false,
+											options: [
+												{
+													value: "internal-blue",
+													label: [{ text: "Blue" }, { text: " environment", style: "strong" }],
+													checked: false,
+													disabled: false,
+												},
+											],
+										},
+									},
+									{
+										kind: "field",
+										field: {
 											kind: "text",
 											name: "target",
 											type: "text",
@@ -633,6 +653,26 @@ if (process.argv.includes("stats")) {
 				}
 				if (command.message === "fixture dock") {
 					dockVisible = true;
+					state.todoPhases = [
+						{ name: "Release", tasks: [{ content: "Review the workflow", status: "in_progress" }] },
+					];
+					messages.push(
+						{
+							role: "assistant",
+							timestamp: Date.now(),
+							content: [
+								{ type: "text", text: "Checking the release." },
+								{ type: "toolCall", id: "record-task", name: "todo", arguments: { op: "init" } },
+							],
+						},
+						{
+							role: "toolResult",
+							toolCallId: "record-task",
+							toolName: "todo",
+							details: { phases: state.todoPhases },
+							content: [],
+						},
+					);
 					localBuiltin();
 					break;
 				}

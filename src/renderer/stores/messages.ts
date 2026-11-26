@@ -1,6 +1,7 @@
 import { createStore } from "zustand/vanilla";
 import type { AgentMessage, AgentSessionEvent, MessagesPage } from "../../shared/rpc-types";
 import { isStrippedCopyOf, messageIdentity, sameMessageContent } from "../lib/message-identity";
+import { reportedReasoningTokens } from "../lib/thinking";
 import { createScopedStoreHook } from "./session-runtime-context";
 
 /**
@@ -270,6 +271,15 @@ export const createMessagesStore = () =>
 						break;
 					case "message_update": {
 						const update = event.assistantMessageEvent;
+						const usage = update.partial?.usage ?? ("usage" in event.message ? event.message.usage : undefined);
+						const reported = reportedReasoningTokens(usage);
+						if (
+							streamingMessage &&
+							reported !== undefined &&
+							reported !== reportedReasoningTokens(streamingMessage.usage)
+						) {
+							streamingMessage = { ...streamingMessage, usage };
+						}
 						if (update.type === "text_delta") streamingText += update.delta;
 						else if (update.type === "thinking_delta") streamingThinking += update.delta;
 						break;

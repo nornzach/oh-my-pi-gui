@@ -321,19 +321,6 @@ export function InputArea() {
 		};
 	}, [status, sessionId, runtimeTabId, rpc]);
 
-	// Auto-grow the textarea to fit its content (up to ~40% of the session pane; one line while empty).
-	useEffect(() => {
-		const el = textareaRef.current;
-		if (!el) return;
-		el.style.height = "0px";
-		const paneHeight = el.closest<HTMLElement>(".omp-session-pane")?.clientHeight ?? window.innerHeight;
-		const maxHeight = text.length === 0 ? 24 : paneHeight * 0.4;
-		el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
-		// An empty composer is one line tall. In a narrow pane the placeholder
-		// wraps past it, which would otherwise surface a scrollbar in an empty box.
-		el.style.overflowY = text.length === 0 ? "hidden" : "";
-	}, [text]);
-
 	useCompletionMenu({
 		text,
 		filePaths,
@@ -908,7 +895,7 @@ export function InputArea() {
 						data-working={isStreaming}
 						style={modeColor ? { borderColor: modeColor } : undefined}
 					>
-						<div className="px-4 pb-1 pt-3">
+						<div className="px-3.5 pt-2">
 							{submissionUncertain && (
 								<div
 									role="alert"
@@ -1005,7 +992,7 @@ export function InputArea() {
 								onKeyDown={handleKeyDown}
 								onClick={() => setMenu(null)}
 								onPaste={handlePaste}
-								rows={2}
+								rows={1}
 								placeholder={
 									prediction
 										? prediction
@@ -1017,7 +1004,7 @@ export function InputArea() {
 													? t("input.placeholder.chat")
 													: t("input.placeholder.idle")
 								}
-								className="max-h-[40vh] min-h-[44px] w-full resize-none bg-transparent text-omp-xl leading-[1.5] text-[var(--omp-text)] outline-none placeholder:truncate placeholder:text-[var(--omp-dim)]"
+								className="block max-h-[40cqh] min-h-[1lh] w-full resize-none bg-transparent text-omp-sm leading-[1.5] text-[var(--omp-text)] outline-none [field-sizing:content] placeholder-shown:h-[1lh] placeholder-shown:overflow-hidden placeholder:truncate placeholder:text-omp-xs placeholder:text-[var(--omp-dim)]"
 							/>
 						</div>
 
@@ -1038,7 +1025,7 @@ export function InputArea() {
 						<div
 							ref={composerToolbarRef}
 							aria-busy={!routeReady}
-							className="omp-composer-toolbar flex h-11 min-w-0 items-center gap-1 px-2 pb-2 pt-1"
+							className="omp-composer-toolbar flex h-9 min-w-0 items-center gap-1 px-2 pb-1"
 							inert={!routeReady}
 						>
 							{/* Left: what goes into the message and how the run is configured.

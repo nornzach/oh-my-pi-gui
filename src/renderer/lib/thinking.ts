@@ -3,11 +3,17 @@
  * (packages/coding-agent/src/utils/thinking-display.ts +
  * modes/components/assistant-message.ts) so the GUI's ThinkingBlock matches
  * the terminal rendering: prose-only fence elision, comment-noise filtering,
- * the hidden-thinking glyph pulse, and the windowed tok/s speed gauge.
+ * and the hidden-thinking glyph pulse.
  *
  * The TUI memoizes formatThinkingForDisplay module-wide; the GUI instead
  * memoizes per component (useMemo), so these functions stay pure.
  */
+
+export function reportedReasoningTokens(usage: unknown): number | undefined {
+	if (!usage || typeof usage !== "object" || !("reasoningTokens" in usage)) return undefined;
+	const count = usage.reasoningTokens;
+	return typeof count === "number" && Number.isSafeInteger(count) && count >= 0 ? count : undefined;
+}
 
 /** Empty if the text is only dots/ellipsis/whitespace (placeholder blocks). */
 export function canonicalizeThinking(text: string | null | undefined): string {
@@ -163,11 +169,8 @@ export const SPEED_MAX = 200;
 
 /**
  * Streaming-speed gauge (TUI SpeedTracker port). Accumulates instantaneous
- * tok/s observations and reports their windowed average — smoothing the jumpy
- * per-delta numbers. Fed with deltas (not cumulative totals), so a fresh
- * block restarting its count at zero never produces a spike. The GUI observes
- * thinking-buffer character growth (the wire carries no per-delta reasoning
- * token count), so its unit is an approximation of reasoning tok/s.
+ * rate observations and reports their windowed average. The Token Meter
+ * supplies streaming-buffer growth in characters per second.
  */
 export class SpeedTracker {
 	#observations: Array<{ time: number; rate: number }> = [];
@@ -179,7 +182,7 @@ export class SpeedTracker {
 		}
 	}
 
-	/** Record one instantaneous tok/s reading, clamped to {@link SPEED_MAX} so a
+	/** Record one instantaneous reading, clamped to {@link SPEED_MAX} so a
 	 *  single oversized delta (e.g. a batched reflow tick) can't poison the
 	 *  windowed average. Non-finite/negative rates ignored. */
 	observe(rate: number, now = performance.now()): void {

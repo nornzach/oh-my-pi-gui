@@ -131,6 +131,27 @@ function block(message: AgentMessage) {
 }
 
 describe("tools store delta-mode streaming", () => {
+	it("names a tool from the opening frame and attaches the target to that same card before execution", () => {
+		const store = createToolsStore();
+		store.getState().applyEvents([
+			messageStart,
+			{
+				type: "message_update",
+				message: { role: "assistant" },
+				assistantMessageEvent: {
+					type: "toolcall_start",
+					contentIndex: 0,
+					block: { type: "toolCall", id: "", name: "read", arguments: {} },
+				},
+			},
+			argsDelta('{"path":'),
+		]);
+		expect([...store.getState().activeTools.values()].map(entry => entry.toolName)).toEqual(["read"]);
+		store.getState().applyEvents([callEnd("read:0")]);
+		expect([...store.getState().activeTools.keys()]).toEqual(["read:0"]);
+		expect(store.getState().activeTools.get("read:0")?.args).toEqual({ path: "read:0.ts" });
+	});
+
 	it("streams an unnamed call's args, then names and runs it on one card", () => {
 		const store = createToolsStore();
 		store.getState().applyEvents([messageStart, argsDelta('{"path":'), argsDelta('"a.ts"}')]);
