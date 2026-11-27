@@ -150,6 +150,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "paste.largeMenuThreshold paste 粘贴 阈值",
 	},
 	{
+		id: "chatImagePopup",
+		labelKey: "settings.gui.chatImagePopup",
+		aliases: "image preview popup attachment sidebar 图片 附件 弹窗 预览 侧栏",
+	},
+	{
 		id: "linkOpenMode",
 		labelKey: "settings.gui.linkOpenMode",
 		aliases: "linkOpenMode link browser external panel 链接 浏览器 外链 打开方式 ссылки браузер",

@@ -71,7 +71,7 @@ function InlineImage({ image }: { image: ImageContent }) {
 		<ZoomableImage
 			src={src}
 			alt={t("chat.attachedImage")}
-			onOpen={() => useUiStore.getState().openImagePreview(src, t("chat.attachedImage"))}
+			onOpenInPanel={() => useUiStore.getState().openImagePreview(src, t("chat.attachedImage"))}
 			className="my-1 max-h-48 max-w-64 rounded-md border border-[var(--omp-border-muted)] object-contain"
 		/>
 	);

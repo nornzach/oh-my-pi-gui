@@ -1953,6 +1953,7 @@ export const zh: Record<string, string> = {
 	"settings.gui.collapseLargePastes": "长文本粘贴折叠为标记",
 	"settings.gui.collapseLargePastesDesc":
 		"粘贴超过 10 行或 1000 字符时折叠为 [Paste #N] 标记；关闭后直接在输入框中原样展开",
+	"settings.gui.chatImagePopup": "对话和输入框中的图片使用弹窗预览，而不是文件侧栏",
 	"settings.gui.askInline": "ask 表单内联显示在对话中",
 	"settings.gui.askInlineDesc":
 		"把 agent 的提问表单内联显示在对应会话末尾而不再弹窗，连续追问与后台会话同样保持内联等待",

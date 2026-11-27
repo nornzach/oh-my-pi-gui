@@ -175,8 +175,9 @@ export function FloatingActivity({ pollMs }: { pollMs?: number }) {
 	const model = useModelStore(state => state.model);
 	const plan = useSessionStore(state => state.planModeEnabled);
 	const goal = useSessionStore(state => state.goal);
-	if (panelVisible || isChat || (!phases.length && !lastSavedTodo && !reminder && !agentsVisible && !plan && !goal))
-		return null;
+	const hasSessionInfo = Boolean(cwd || model || sessionName);
+	const hasActivity = Boolean(phases.length || lastSavedTodo || reminder || agentsVisible || plan || goal);
+	if (panelVisible || isChat || (!hasSessionInfo && !hasActivity)) return null;
 	const activeTasks = phases.flatMap(phase => phase.tasks);
 	const tasks = phases.length ? activeTasks : (lastSavedTodo?.phases.flatMap(phase => phase.tasks) ?? []);
 	const done = tasks.filter(task => task.status === "completed").length;

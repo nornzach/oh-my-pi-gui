@@ -2013,6 +2013,7 @@ export const en: Record<string, string> = {
 	"settings.gui.collapseLargePastes": "Collapse long pastes into markers",
 	"settings.gui.collapseLargePastesDesc":
 		"Turn pasted text over 10 lines or 1,000 characters into a compact [Paste #N] marker; turn off to insert text verbatim",
+	"settings.gui.chatImagePopup": "Open chat and composer images in a popup instead of the Files panel",
 	"settings.gui.askInline": "Show ask forms inline in the chat",
 	"settings.gui.askInlineDesc":
 		"Render the agent's question form at the end of its own conversation instead of popping a modal, including follow-up questions and background sessions",

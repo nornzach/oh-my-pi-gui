@@ -19,7 +19,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { LoginProvider, ModelInfo } from "../../../shared/rpc-types";
-import { applyModelInfo, hydrateSession } from "../../hooks/use-rpc-events";
+import { applyModelInfo, hydrateTabSession, refreshModelState } from "../../hooks/use-rpc-events";
 import { describeProviderError } from "../../lib/errors";
 import { cx, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -283,10 +283,11 @@ export function ModelPicker() {
 			// the switch that emits no model_changed at all — re-picking the current
 			// model is a server-side no-op, so the event channel can never heal a
 			// stale label.
-			if (tabId) applyModelInfo(response.data, tabId);
-			// Compaction rewrote the transcript — rehydrate so the chat and the
-			// context bar reflect the compacted session, not just the new model.
-			if (overContext) await hydrateSession();
+			if (tabId) {
+				applyModelInfo(response.data, tabId);
+				if (overContext) await hydrateTabSession(tabId);
+				else void refreshModelState(tabId);
+			}
 			dismiss();
 		} catch (cause) {
 			toast({ variant: "error", title: t("modelPicker.failed"), message: String(cause) });

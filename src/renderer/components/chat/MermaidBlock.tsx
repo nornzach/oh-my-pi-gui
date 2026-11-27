@@ -287,7 +287,14 @@ interface MermaidImageProps {
 function MermaidImage({ svg, alt }: MermaidImageProps) {
 	const [url] = useState(() => URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })));
 	useEffect(() => () => URL.revokeObjectURL(url), [url]);
-	return <ZoomableImage src={url} alt={alt} className="mx-auto block h-auto max-w-full" />;
+	return (
+		<ZoomableImage
+			src={url}
+			alt={alt}
+			className="mx-auto block h-auto max-w-full"
+			viewerBackground="var(--omp-code-bg)"
+		/>
+	);
 }
 
 export interface MermaidBlockProps {

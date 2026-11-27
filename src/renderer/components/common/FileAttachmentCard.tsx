@@ -1,9 +1,12 @@
 import { File, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { previewFile } from "../../lib/file-actions";
+import { activateFileLink, previewFile } from "../../lib/file-actions";
 import { basename } from "../../lib/format";
 import { useT } from "../../lib/i18n";
+import { resolvePath } from "../../lib/path-resolver";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { useFileImagePopup } from "./ImageViewer";
+import { showPathMenu } from "./LinkMenu";
 
 export function FileAttachmentCard({
 	path,
@@ -18,6 +21,7 @@ export function FileAttachmentCard({
 }) {
 	const t = useT();
 	const tabId = useRuntimeTabId();
+	const popup = useFileImagePopup(path);
 	const [thumb, setThumb] = useState<{ path: string; url: string } | null>(null);
 	useEffect(() => {
 		let cancelled = false;
@@ -35,7 +39,16 @@ export function FileAttachmentCard({
 		<div className="group relative w-36 max-w-full min-w-0 shrink-0" data-file-attachment>
 			<button
 				className="omp-pressable block w-full overflow-hidden rounded-lg border border-(--omp-border-muted) text-left hover:border-(--omp-border-accent)"
-				onClick={() => previewFile(path)}
+				onClick={event => {
+					if (event.metaKey || event.ctrlKey) {
+						void resolvePath(path, tabId).then(resolved => {
+							if (resolved) activateFileLink({ path }, resolved, true);
+						});
+					} else if (popup.open) void popup.open();
+					else previewFile(path);
+				}}
+				onContextMenu={event => showPathMenu(event, path, tabId)}
+				aria-haspopup={popup.open ? "dialog" : undefined}
 				title={path}
 				type="button"
 			>
@@ -48,6 +61,7 @@ export function FileAttachmentCard({
 				</span>
 				<span className="block truncate px-2 py-1.5 text-omp-xs font-medium text-(--omp-text)">{name}</span>
 			</button>
+			{popup.viewer}
 			{onRemove && (
 				<button
 					aria-label={t("input.removeFileAttachment", { name })}

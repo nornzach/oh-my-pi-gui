@@ -9,7 +9,14 @@ import { createPortal } from "react-dom";
 import { useOverlayPresence } from "../../hooks/use-overlay-presence";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
-import { DIALOG_OVERLAY_Z, handOffRestoreTarget, isTopmostDialog, registerDialogLayer } from "./dialog-layer";
+import {
+	DIALOG_FOCUSABLE,
+	DIALOG_OVERLAY_Z,
+	handOffRestoreTarget,
+	isTopmostDialog,
+	registerDialogLayer,
+	trapDialogTab,
+} from "./dialog-layer";
 
 export type ModalSize = "sm" | "md" | "lg" | "full" | "picker";
 
@@ -23,9 +30,6 @@ const SIZE_CLASSES: Record<ModalSize, string> = {
 	full: "omp-dialog-size-full",
 	picker: "omp-dialog-size-picker",
 };
-
-const FOCUSABLE =
-	'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface ModalProps {
 	open: boolean;
@@ -157,7 +161,7 @@ function OverlayModal({
 		// Preserve a caller-autofocused control inside the new dialog, but never
 		// leave focus on its trigger or on a dialog now covered by this one.
 		if (!(active instanceof HTMLElement && panel?.contains(active))) {
-			const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
+			const first = panel?.querySelector<HTMLElement>(DIALOG_FOCUSABLE);
 			(first ?? panel)?.focus();
 		}
 
@@ -180,22 +184,7 @@ function OverlayModal({
 				onCloseRef.current();
 				return;
 			}
-			if (event.key !== "Tab" || !panel) return;
-			const items = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)];
-			if (items.length === 0) {
-				event.preventDefault();
-				panel.focus();
-				return;
-			}
-			const firstEl = items[0];
-			const lastEl = items[items.length - 1];
-			if (event.shiftKey && document.activeElement === firstEl) {
-				event.preventDefault();
-				lastEl.focus();
-			} else if (!event.shiftKey && document.activeElement === lastEl) {
-				event.preventDefault();
-				firstEl.focus();
-			}
+			trapDialogTab(event, panel);
 		};
 
 		document.addEventListener("keydown", onKeyDown, true);

@@ -48,21 +48,17 @@ const toolRun: AgentMessage[] = [
 ];
 
 describe("compact transcript rows", () => {
-	it("folds consecutive tools without hiding the narration or final answer", () => {
+	it("folds tool narration with its calls and leaves the final answer outside", () => {
 		const rows = buildHistoryRows(toolRun, "compact");
-		expect(rows.map(row => row.kind)).toEqual(["message", "process", "message"]);
-		expect(rows[0]).toMatchObject({
-			intermediate: true,
-			message: { content: [{ type: "text", text: "I will inspect the source." }] },
-		});
+		expect(rows.map(row => row.kind)).toEqual(["process", "message"]);
 
-		const process = rows[1];
+		const process = rows[0];
 		if (process?.kind !== "process") throw new Error("process row missing");
 		expect(process.stepCount).toBe(2);
 		expect(process.toolNames).toEqual(["read", "write"]);
-		expect(process.messages).toHaveLength(2);
+		expect(process.messages).toEqual([toolRun[0], toolRun[2]]);
 
-		const answer = rows[2];
+		const answer = rows[1];
 		if (answer?.kind !== "message") throw new Error("final answer row missing");
 		expect(answer.message.content).toEqual([{ type: "text", text: "Implemented and verified." }]);
 	});
@@ -141,14 +137,13 @@ describe("compact transcript rows", () => {
 			"compact",
 		);
 
-		expect(rows.map(row => row.kind)).toEqual(["message", "process", "message", "process"]);
-		const process = rows[1];
+		expect(rows.map(row => row.kind)).toEqual(["process"]);
+		const process = rows[0];
 		if (process?.kind !== "process") throw new Error("process row missing");
-		expect(process.stepCount).toBe(3);
+		expect(process.stepCount).toBe(5);
 		expect(process.failedEvents).toBe(1);
-		expect(process.toolNames).toEqual(["bash", "bash"]);
-		expect(buildTimelineMarkers(rows)[1]?.state).toBe("error");
-		expect(rows[3]).toMatchObject({ toolNames: ["bash", "hub"] });
+		expect(process.toolNames).toEqual(["bash", "bash", "bash", "hub"]);
+		expect(buildTimelineMarkers(rows)[0]?.state).toBe("error");
 	});
 });
 
@@ -615,11 +610,11 @@ describe("locating a message to open at", () => {
 		{ ...assistant([{ type: "text", text: "It needs the hardened runtime." }]), entryId: "a2" },
 	];
 
-	it("locates a narrated tool message at its first visible fragment", () => {
+	it("locates folded tool narration in the disclosure that can reveal it", () => {
 		const compact = buildHistoryRows(transcript, "compact");
 		expect(locateEntryRow(compact, "u1")).toEqual({ index: 0, kind: "message" });
-		expect(locateEntryRow(compact, "a1")).toEqual({ index: 1, kind: "message" });
-		expect(locateEntryRow(compact, "a2")).toEqual({ index: 3, kind: "message" });
+		expect(locateEntryRow(compact, "a1")).toEqual({ index: 1, kind: "process" });
+		expect(locateEntryRow(compact, "a2")).toEqual({ index: 2, kind: "message" });
 
 		const full = buildHistoryRows(transcript, "full");
 		expect(locateEntryRow(full, "a1")?.kind).toBe("message");

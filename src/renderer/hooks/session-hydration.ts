@@ -10,7 +10,7 @@ import type {
 	RpcVibeModeState,
 } from "../../shared/rpc-types";
 import { type MessagesStore, mergeFetchedTranscript, useMessagesStore } from "../stores/messages";
-import { useModelStore } from "../stores/model";
+import { type ModelStore, useModelStore } from "../stores/model";
 import { type QueueStore, useQueueStore } from "../stores/queue";
 import { type SessionStore, useSessionStore } from "../stores/session";
 import {
@@ -103,15 +103,20 @@ export async function refreshSessionState(tabId = useTabsStore.getState().active
 	}
 }
 
+const modelRefreshVersions = new WeakMap<SessionRuntime, number>();
+
 /** Re-sync the model-derived stores after a model switch, ignoring event churn. */
 export async function refreshModelState(tabId = useTabsStore.getState().activeTabId): Promise<void> {
 	if (!tabId) return;
 	const runtime = isTabClosed(tabId) ? sessionRuntime(tabId) : ensureTabRuntime(tabId);
 	if (!runtime) return;
+	const version = (modelRefreshVersions.get(runtime) ?? 0) + 1;
+	modelRefreshVersions.set(runtime, version);
 	const sessionId = sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().sessionId;
 	try {
 		const res = await runtime.command({ type: "get_state" });
 		if (
+			modelRefreshVersions.get(runtime) !== version ||
 			sessionRuntime(tabId) !== runtime ||
 			sessionRuntimeStore<SessionStore>(tabId, "session")?.getState().sessionId !== sessionId ||
 			!res.success ||
@@ -463,6 +468,8 @@ export async function hydrateTabSession(tabId: string, fallbackName?: string): P
 		// background, whose frames would otherwise stay silent on return.
 		// Idempotent server-side.
 		void runtime.command({ type: "set_subagent_subscription", level: SUBAGENT_SUBSCRIPTION_LEVEL });
+	} else if (!sessionRuntimeStore<ModelStore>(tabId, "model")?.getState().model) {
+		void refreshModelState(tabId);
 	}
 
 	if (messagesResult.status === "fulfilled" && messagesResult.value.success) {

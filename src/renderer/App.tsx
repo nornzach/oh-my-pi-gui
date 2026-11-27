@@ -272,6 +272,7 @@ export function App() {
 				"linkOpenMode",
 				"collapseLargePastes",
 				"askInline",
+				"chatImagePopup",
 				"panelTab",
 			] as const) {
 				if (next[key] !== previous[key]) changedPreferences.add(key);
@@ -293,7 +294,7 @@ export function App() {
 						theme: selection === "system" ? "system" : resolveThemeSelection(selection).scheme,
 					});
 				}
-				for (const key of ["compactDensity", "colorBlindMode", "followAgentTheme"] as const) {
+				for (const key of ["compactDensity", "colorBlindMode", "followAgentTheme", "chatImagePopup"] as const) {
 					if (typeof prefs[key] === "boolean" && !changedPreferences.has(key))
 						useUiStore.setState({ [key]: prefs[key] });
 				}

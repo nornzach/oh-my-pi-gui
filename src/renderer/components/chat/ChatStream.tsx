@@ -143,6 +143,10 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		return false;
 	});
 	const isStreaming = useSessionStore(s => s.isStreaming);
+	const hasStreamingReply =
+		hasStreamingText &&
+		!hasLiveToolsForStream &&
+		!(Array.isArray(streamingMessage?.content) && streamingMessage.content.some(block => block.type === "toolCall"));
 	const awaitingModelSince = useSessionStore(s => s.awaitingModelSince);
 	const retryInfo = useSessionStore(s => s.retryInfo);
 	const compactionInfo = useSessionStore(s => s.compactionInfo);
@@ -184,7 +188,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		const todos = readOnly ? undefined : new Set(failedTodos);
 		if (transcriptDetail === "compact") return buildHistoryRows(visible, "compact", processExpansion, todos);
 		if (!autoCollapseProcess) return groupReadRows(buildHistoryRows(visible, "full", processExpansion, todos));
-		if (!isStreaming || hasStreamingText) return buildHistoryRows(visible, "compact", processExpansion, todos);
+		if (!isStreaming || hasStreamingReply) return buildHistoryRows(visible, "compact", processExpansion, todos);
 		const boundary = visible.findLastIndex(message => {
 			if (message.role === "user") return true;
 			if (message.role !== "assistant") return false;
@@ -205,7 +209,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 		readOnly,
 		autoCollapseProcess,
 		isStreaming,
-		hasStreamingText,
+		hasStreamingReply,
 	]);
 
 	// What the latest run changed on disk, once it has settled: closes the turn
@@ -303,10 +307,10 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 	useEffect(() => {
 		const finished = wasStreamingRef.current && !isStreaming;
 		wasStreamingRef.current = isStreaming;
-		const firstText = isStreaming && hasStreamingText && !foldedForReply.current;
+		const firstText = isStreaming && hasStreamingReply && !foldedForReply.current;
 		const fold = firstText || (finished && !foldedForReply.current);
 		if (firstText) foldedForReply.current = true;
-		if (finished || (streamingMessage && !hasStreamingText)) foldedForReply.current = false;
+		if (finished || !hasStreamingReply) foldedForReply.current = false;
 		if (!fold || !autoCollapseProcess) return;
 		setProcessExpansion(current => {
 			if (current.size === 0) return current;
@@ -318,7 +322,7 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 			}
 			return changed ? next : current;
 		});
-	}, [isStreaming, hasStreamingText, streamingMessage, autoCollapseProcess, lastUserRowIndex, rowKeys]);
+	}, [isStreaming, hasStreamingReply, autoCollapseProcess, lastUserRowIndex, rowKeys]);
 	const tailRowKey = rowKeys.at(-1);
 	const activeConversationIndex = useMemo(
 		() => findConversationAnchorIndex(conversationAnchors, visibleRowIndex),
@@ -1062,7 +1066,6 @@ export function StreamingRows({
 	const readOnly = useReadOnlyTranscript();
 	const transcriptDetail = useUiStore(s => s.transcriptDetail);
 	const autoCollapseProcess = useUiStore(s => s.autoCollapseProcess);
-	const compact = transcriptDetail === "compact" || (autoCollapseProcess && hasText);
 	if (!streamingMessage) return null;
 	const content = Array.isArray(streamingMessage.content) ? streamingMessage.content : [];
 	const toolCalls = content
@@ -1087,9 +1090,11 @@ export function StreamingRows({
 	}
 
 	const hasThinking = isRenderableMessageText(streamingThinking);
+	const hasTools = toolCalls.length + liveTools.length > 0;
+	const compact = transcriptDetail === "compact" || (autoCollapseProcess && hasText && !hasTools);
 	const compactChrome = compact ? !hasText : !hasText && !hasThinking;
 	const turnClass = compactChrome ? "omp-assistant-turn--compact" : "omp-assistant-turn";
-	const showThinkingSeparately = hasThinking && (hasText || toolCalls.length + liveTools.length === 0);
+	const showThinkingSeparately = hasThinking && !hasTools;
 
 	// Live read grouping (same predicate as the finalized path): consecutive
 	// collapsible reads fold into one ReadGroupCard even mid-turn. Compact
@@ -1189,7 +1194,7 @@ export function StreamingRows({
 				{showThinkingSeparately && (
 					<ThinkingBlock live disclosure={allCards.length === 0 ? { expanded, onExpandedChange } : undefined} />
 				)}
-				<StreamingText />
+				{!hasTools && <StreamingText />}
 				{allCards.length > 0 && (
 					<ExecutionGroup
 						expanded={expanded}
@@ -1201,6 +1206,7 @@ export function StreamingRows({
 					>
 						<div className="omp-process-group omp-process-group--live">
 							{hasThinking && !showThinkingSeparately && <ThinkingBlock live />}
+							<StreamingText />
 							{toolCards}
 						</div>
 					</ExecutionGroup>

@@ -269,6 +269,7 @@ afterEach(async () => {
 	useTabsStore.getState().reset();
 	useUiStore.getState().closeComposerEditor();
 	useUiStore.getState().closeFilePreview();
+	useUiStore.setState({ chatImagePopup: true });
 	setWindowWidth(1200);
 	vi.restoreAllMocks();
 });
@@ -969,7 +970,8 @@ describe("InputArea file attachments", () => {
 });
 
 describe("InputArea pasted images", () => {
-	it("opens a pasted image in the right preview without removing it", async () => {
+	it.each([true, false])("previews a pasted image without removing it (popup: %s)", async popup => {
+		useUiStore.setState({ chatImagePopup: popup, panelVisible: false, filePreviewImage: null });
 		useComposerStore.getState().setImages([
 			{
 				content: { type: "image", data: "abc", mimeType: "image/png" },
@@ -985,7 +987,10 @@ describe("InputArea pasted images", () => {
 		await click(image);
 		await flush();
 
-		expect(useUiStore.getState().filePreviewImage?.src).toBe("data:image/png;base64,abc");
+		expect(document.querySelector('[role="dialog"][data-image-viewer] img')?.getAttribute("src")).toBe(
+			popup ? "data:image/png;base64,abc" : undefined,
+		);
+		expect(useUiStore.getState().panelVisible).toBe(!popup);
 		expect(document.querySelector('img[alt="attachment 1"]')).not.toBeNull();
 		expect(document.querySelector('button[title="Remove"]')).not.toBeNull();
 	});

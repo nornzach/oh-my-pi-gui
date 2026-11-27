@@ -582,7 +582,7 @@ function RemoteMarkdownImage({ src, alt }: { src: string; alt: string }) {
 					setDataUrl(null);
 					setState("failed");
 				}}
-				onOpen={() => useUiStore.getState().openImagePreview(dataUrl, label)}
+				onOpenInPanel={() => useUiStore.getState().openImagePreview(dataUrl, label)}
 			/>
 		);
 	}
@@ -643,7 +643,7 @@ function LocalMarkdownImage({ path: imagePath, alt, title }: { path: string; alt
 			alt={alt}
 			title={title ?? alt}
 			className={MARKDOWN_IMAGE_CLASS}
-			onOpen={() => previewFile(path)}
+			onOpenInPanel={() => previewFile(path)}
 		/>
 	);
 }
@@ -671,7 +671,9 @@ function MarkdownImage({ src, alt, title, ...props }: ComponentPropsWithoutRef<"
 			alt={altText}
 			title={title}
 			className={MARKDOWN_IMAGE_CLASS}
-			onOpen={() => useUiStore.getState().openImagePreview(classified.src, altText || t("chat.attachedImage"))}
+			onOpenInPanel={() =>
+				useUiStore.getState().openImagePreview(classified.src, altText || t("chat.attachedImage"))
+			}
 		/>
 	);
 }

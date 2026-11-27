@@ -161,7 +161,6 @@ export type HistoryRow =
 			reaction?: string;
 			repeats?: number;
 			intermediate?: boolean;
-			narration?: boolean;
 	  }
 	| { kind: "readGroup"; entries: ReadGroupEntry[]; usage?: ReadGroupUsage[] }
 	| ({ kind: "process"; messages: AgentMessage[] } & ProcessMeta);
@@ -223,7 +222,7 @@ function transcriptRowBaseKey(row: Row): string {
 		case "queued":
 			return `queued-${row.item.id}`;
 		case "message":
-			return `${row.narration ? "narration" : "message"}-${messageKey(row.message)}`;
+			return `message-${messageKey(row.message)}`;
 		case "process":
 			// Compact mode may replace one live assistant row with a process row,
 			// or split it into process + answer rows. Key the first finalized row
@@ -504,21 +503,7 @@ export function buildHistoryRows(
 		const hasAskTool = message.content.some(block => block.type === "toolCall" && block.name === "ask");
 		const hasImage = message.content.some(block => block.type === "image");
 		if (hasToolCall && !hasImage && !hasAskTool) {
-			let start = 0;
-			for (const [index, block] of message.content.entries()) {
-				if (block.type !== "text" || !isRenderableMessageText(block.text)) continue;
-				if (index > start) processMessages.push({ ...message, content: message.content.slice(start, index) });
-				flushProcess();
-				rows.push({
-					kind: "message",
-					message: { ...message, content: [block] },
-					intermediate: true,
-					narration: true,
-				});
-				start = index + 1;
-			}
-			const tail = start > 0 ? { ...message, content: message.content.slice(start) } : message;
-			if (isVisibleTranscriptMessage(tail)) processMessages.push(tail);
+			processMessages.push(message);
 			continue;
 		}
 

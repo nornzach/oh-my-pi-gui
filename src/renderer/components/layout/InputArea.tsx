@@ -57,6 +57,7 @@ import { ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
 import { COLUMN_SLIDEUP_Z } from "../common/dialog-layer";
 import { FileAttachmentCard } from "../common/FileAttachmentCard";
 import { ZoomableImage } from "../common/ImageViewer";
+import { Kbd } from "../common/Kbd";
 import { AdvisorBadge } from "./AdvisorBadge";
 import { ApprovalControl } from "./ApprovalControl";
 import { ChatContextBar } from "./ChatContextBar";
@@ -895,7 +896,7 @@ export function InputArea() {
 						data-working={isStreaming}
 						style={modeColor ? { borderColor: modeColor } : undefined}
 					>
-						<div className="px-3.5 pt-2">
+						<div className="relative px-3.5 pt-2">
 							{submissionUncertain && (
 								<div
 									role="alert"
@@ -918,7 +919,7 @@ export function InputArea() {
 											<ZoomableImage
 												src={image.preview}
 												alt={t("input.attachmentAlt", { index: index + 1 })}
-												onOpen={() =>
+												onOpenInPanel={() =>
 													useUiStore.getState().openImagePreview(image.preview, t("chat.attachedImage"))
 												}
 												className="h-[6.25rem] w-28 max-w-full rounded-lg border border-(--omp-border-muted) object-cover"
@@ -1004,18 +1005,25 @@ export function InputArea() {
 													? t("input.placeholder.chat")
 													: t("input.placeholder.idle")
 								}
-								className="block max-h-[40cqh] min-h-[1lh] w-full resize-none bg-transparent text-omp-sm leading-[1.5] text-[var(--omp-text)] outline-none [field-sizing:content] placeholder-shown:h-[1lh] placeholder-shown:overflow-hidden placeholder:truncate placeholder:text-omp-xs placeholder:text-[var(--omp-dim)]"
+								aria-description={prediction ? t("input.prediction.hint") : undefined}
+								className={cx(
+									"block max-h-[40cqh] min-h-[1lh] w-full resize-none bg-transparent text-omp-md leading-[1.5] text-[var(--omp-text)] outline-none [field-sizing:content] placeholder-shown:h-[1lh] placeholder-shown:overflow-hidden placeholder:truncate placeholder:text-omp-xs placeholder:text-[var(--omp-dim)]",
+									prediction && "placeholder:opacity-0",
+								)}
 							/>
+							{prediction && (
+								<div
+									aria-hidden="true"
+									className="pointer-events-none absolute inset-x-3.5 bottom-0 flex h-[1lh] select-none items-center gap-1.5 text-omp-md leading-[1.5] text-(--omp-dim)"
+								>
+									<span className="truncate text-omp-xs">{prediction}</span>
+									<Kbd className="leading-none">⇥ Tab</Kbd>
+								</div>
+							)}
 						</div>
 
 						{dictation.view && (
 							<DictationStrip view={dictation.view} onDone={dictation.stop} onCancel={dictation.cancel} />
-						)}
-
-						{prediction && (
-							<div className="omp-composer-prediction-hint px-3.5 pb-1 text-omp-sm text-[var(--omp-dim)]">
-								{t("input.prediction.hint")}
-							</div>
 						)}
 
 						{argHint && (

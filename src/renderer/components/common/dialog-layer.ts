@@ -22,6 +22,21 @@ export const DIALOG_OVERLAY_Z = "z-[120]";
  */
 export const COLUMN_SLIDEUP_Z = "z-30";
 
+export const DIALOG_FOCUSABLE =
+	'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+export function trapDialogTab(event: KeyboardEvent, dialog: HTMLElement | null): void {
+	if (event.key !== "Tab" || !dialog) return;
+	const items = dialog.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE);
+	const first = items[0];
+	const last = items[items.length - 1];
+	const active = document.activeElement;
+	if (!first || active === dialog || !dialog.contains(active) || active === (event.shiftKey ? first : last)) {
+		event.preventDefault();
+		((event.shiftKey ? last : first) ?? dialog).focus();
+	}
+}
+
 // Where each dialog sends focus back to when it closes.
 const restoreTargets = new WeakMap<HTMLElement, HTMLElement | null>();
 

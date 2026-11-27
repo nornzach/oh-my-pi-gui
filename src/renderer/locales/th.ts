@@ -1961,6 +1961,7 @@ export const th: Record<string, string> = {
 	"settings.gui.collapseLargePastes": "ย่อข้อความวางขนาดยาวเป็นมาร์กเกอร์",
 	"settings.gui.collapseLargePastesDesc":
 		"ย่อข้อความที่วางเกิน 10 บรรทัดหรือ 1,000 อักขระเป็นมาร์กเกอร์ [Paste #N] ปิดเพื่อวางข้อความเต็มตามเดิม",
+	"settings.gui.chatImagePopup": "เปิดรูปในแชตและช่องพิมพ์ในป๊อปอัปแทนแผงไฟล์",
 	"settings.gui.askInline": "แสดงฟอร์ม ask ในแชต",
 	"settings.gui.askInlineDesc": "แสดงฟอร์มคำถามของเอเจนต์ท้ายบทสนทนาของแท็บนั้นแทนโมดัล รวมถึงคำถามต่อเนื่องและแท็บที่อยู่เบื้องหลัง",
 	"settings.gui.linkOpenMode": "คลิกซ้ายที่ลิงก์เพื่อเปิดใน",

@@ -25,7 +25,7 @@ import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
 import { Button, Input, Modal, Spinner } from "../common";
 import { ApprovalDialog } from "./ApprovalDialog";
-import { ChoiceRow, FormDialog } from "./FormDialog";
+import { ChoiceRow, CustomAnswerInput, FormDialog } from "./FormDialog";
 
 /** The `open_url` request a sign-in prompt says it belongs to. */
 function signInOwner(request: ExtensionUIRequest): string | undefined {
@@ -386,11 +386,7 @@ export function AskQuestionsBody({
 									<MarkdownRenderer content={option.preview!} />
 								</div>
 							))}
-						<Input
-							onChange={event => setCustom(questionIndex, event.target.value)}
-							placeholder={t("extDialog.ask.customPlaceholder")}
-							value={answer?.custom ?? ""}
-						/>
+						<CustomAnswerInput onChange={value => setCustom(questionIndex, value)} value={answer?.custom ?? ""} />
 						<Input
 							onChange={event => setNote(questionIndex, event.target.value)}
 							placeholder={t("extDialog.ask.notePlaceholder")}

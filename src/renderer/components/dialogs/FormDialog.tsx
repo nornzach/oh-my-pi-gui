@@ -48,7 +48,17 @@ export function ChoiceRow({
 					disabled && "cursor-not-allowed opacity-50",
 				)}
 				disabled={disabled}
-				onClick={onClick}
+				onClick={event => {
+					const selection = window.getSelection?.();
+					if (
+						event.detail > 0 &&
+						selection &&
+						!selection.isCollapsed &&
+						event.currentTarget.contains(selection.anchorNode)
+					)
+						return;
+					onClick();
+				}}
 				type="button"
 			>
 				<span
@@ -62,10 +72,24 @@ export function ChoiceRow({
 				>
 					{multi ? <Check size={10} strokeWidth={3} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
 				</span>
-				<span className="min-w-0 flex-1">{children}</span>
+				<span className="min-w-0 flex-1 select-text">{children}</span>
 			</button>
 			<CopyButton text={copyLabel} />
 		</div>
+	);
+}
+
+export function CustomAnswerInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+	const t = useT();
+	return (
+		<TextArea
+			autoComplete="off"
+			className="max-h-48 [field-sizing:content]"
+			onChange={event => onChange(event.target.value)}
+			placeholder={t("extDialog.ask.customPlaceholder")}
+			rows={1}
+			value={value}
+		/>
 	);
 }
 
@@ -281,7 +305,6 @@ function ChoiceFieldInput({
 	error: string | undefined;
 	onChange: (draft: ChoiceDraft) => void;
 }) {
-	const t = useT();
 	const toggle = (index: number) => {
 		if (!field.multi) {
 			onChange({ checked: new Set([index]), other: "" });
@@ -314,14 +337,11 @@ function ChoiceFieldInput({
 				</ChoiceRow>
 			))}
 			{field.other && (
-				<Input
-					autoComplete="off"
-					onChange={event => {
-						const other = event.target.value;
+				<CustomAnswerInput
+					onChange={other => {
 						// Single choice: typing an answer replaces the picked option.
 						onChange({ other, checked: !field.multi && other.trim() !== "" ? new Set() : draft.checked });
 					}}
-					placeholder={t("extDialog.ask.customPlaceholder")}
 					value={draft.other}
 				/>
 			)}

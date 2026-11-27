@@ -6,6 +6,7 @@
  */
 import { type CSSProperties, type ReactNode, useMemo } from "react";
 import type { IpcResolvedPath } from "../../../shared/ipc-types";
+import { isSessionOutputPath } from "../../../shared/session-output";
 import { activateFileLink } from "../../lib/file-actions";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
@@ -13,6 +14,7 @@ import { type FileTarget, parseFileTarget } from "../../lib/link-targets";
 import { browserPanelAvailable, openLink } from "../../lib/open-link";
 import { useResolvedPath } from "../../lib/path-resolver";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { useFileImagePopup } from "./ImageViewer";
 import { LINK_MODIFIER, showLinkMenu } from "./LinkMenu";
 
 function selectingText(): boolean {
@@ -72,29 +74,37 @@ export function FileLink({
 	const t = useT();
 	const folder = resolved?.kind === "directory";
 	const shown = `${resolved?.absolutePath ?? target.path}${target.line ? `:${target.line}` : ""}`;
+	const internal = isSessionOutputPath(target.path);
+	const popup = useFileImagePopup(internal ? target.path : (resolved?.absolutePath ?? target.path));
+	const open = (modifier: boolean) => {
+		if (!modifier && !folder && (!internal || resolved) && popup.open) void popup.open();
+		else activateFileLink(target, resolved, modifier);
+	};
 	return (
-		// A span, not a button: link text stays selectable like the prose around it.
-		<span
-			role="link"
-			tabIndex={0}
-			title={`${shown}\n${t(folder ? "links.folderHint" : "links.fileHint", { mod: LINK_MODIFIER })}`}
-			onClick={event => {
-				event.preventDefault();
-				event.stopPropagation();
-				if (selectingText()) return;
-				activateFileLink(target, resolved, event.metaKey || event.ctrlKey);
-			}}
-			onKeyDown={event => {
-				if (event.key !== "Enter") return;
-				event.preventDefault();
-				event.stopPropagation();
-				activateFileLink(target, resolved, event.metaKey || event.ctrlKey);
-			}}
-			onContextMenu={event => showLinkMenu(event, { kind: "path", target, resolved })}
-			className={cx("cursor-pointer", className)}
-		>
-			{children}
-		</span>
+		<>
+			<span
+				role="link"
+				tabIndex={0}
+				title={`${shown}\n${t(folder ? "links.folderHint" : "links.fileHint", { mod: LINK_MODIFIER })}`}
+				onClick={event => {
+					event.preventDefault();
+					event.stopPropagation();
+					if (selectingText()) return;
+					open(event.metaKey || event.ctrlKey);
+				}}
+				onKeyDown={event => {
+					if (event.key !== "Enter") return;
+					event.preventDefault();
+					event.stopPropagation();
+					open(event.metaKey || event.ctrlKey);
+				}}
+				onContextMenu={event => showLinkMenu(event, { kind: "path", target, resolved })}
+				className={cx("cursor-pointer", className)}
+			>
+				{children}
+			</span>
+			{popup.viewer}
+		</>
 	);
 }
 

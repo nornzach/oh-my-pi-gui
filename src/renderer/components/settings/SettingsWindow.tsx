@@ -336,6 +336,7 @@ export function SettingsWindow() {
 	const tabWidth = useUiStore(state => state.tabWidth);
 	const tabRows = useUiStore(state => state.tabRows);
 	const linkOpenMode = useUiStore(state => state.linkOpenMode);
+	const chatImagePopup = useUiStore(state => state.chatImagePopup);
 	const collapseLargePastes = useUiStore(state => state.collapseLargePastes);
 	const askInline = useUiStore(state => state.askInline);
 	const sidecarStatus = useSessionStore(state => state.status);
@@ -584,6 +585,8 @@ export function SettingsWindow() {
 	const applyLinkOpenMode = (next: typeof linkOpenMode) => {
 		void saveGuiPreference("linkOpenMode", next, () => useUiStore.getState().setLinkOpenMode(next));
 	};
+	const applyChatImagePopup = (next: boolean) =>
+		saveGuiPreference("chatImagePopup", next, () => useUiStore.setState({ chatImagePopup: next }));
 	const applyCollapseLargePastes = (next: boolean) => {
 		return saveGuiPreference("collapseLargePastes", next, () => useUiStore.getState().setCollapseLargePastes(next));
 	};
@@ -1385,7 +1388,7 @@ export function SettingsWindow() {
 														</div>
 
 														<div id="setting-gui-interfaceFont" className="scroll-mt-4 pt-3">
-															<div className="omp-settings-row flex items-center justify-between gap-4">
+															<div className="omp-settings-row grid grid-cols-[minmax(0,1fr)_minmax(8rem,40%)] items-center gap-4">
 																<div className="min-w-0">
 																	<div className="text-omp-md font-medium text-(--omp-text)">
 																		{t("settings.gui.interfaceFont")}
@@ -1396,7 +1399,7 @@ export function SettingsWindow() {
 																</div>
 																<Input
 																	aria-label={t("settings.gui.interfaceFont")}
-																	className="w-52 max-w-[45%]"
+																	compact
 																	maxLength={120}
 																	onBlur={event =>
 																		saveFontFamilyPreference(
@@ -1413,7 +1416,7 @@ export function SettingsWindow() {
 														</div>
 
 														<div id="setting-gui-codeFont" className="scroll-mt-4 pt-3">
-															<div className="omp-settings-row flex items-center justify-between gap-4">
+															<div className="omp-settings-row grid grid-cols-[minmax(0,1fr)_minmax(8rem,40%)] items-center gap-4">
 																<div className="min-w-0">
 																	<div className="text-omp-md font-medium text-(--omp-text)">
 																		{t("settings.gui.codeFont")}
@@ -1424,7 +1427,7 @@ export function SettingsWindow() {
 																</div>
 																<Input
 																	aria-label={t("settings.gui.codeFont")}
-																	className="w-52 max-w-[45%]"
+																	compact
 																	maxLength={120}
 																	onBlur={event =>
 																		saveFontFamilyPreference("codeFont", event.currentTarget.value)
@@ -1586,6 +1589,14 @@ export function SettingsWindow() {
 																]}
 																value={linkOpenMode}
 															/>
+															<div id="setting-gui-chatImagePopup" className="scroll-mt-4">
+																<Toggle
+																	className="omp-settings-row"
+																	checked={chatImagePopup}
+																	label={t("settings.gui.chatImagePopup")}
+																	onChange={applyChatImagePopup}
+																/>
+															</div>
 														</div>
 
 														<div className="pt-2">

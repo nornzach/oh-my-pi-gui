@@ -24,7 +24,7 @@ describe("findTranscriptMatches", () => {
 			},
 		];
 		const rows = buildHistoryRows(messages, "compact");
-		const narrationIndex = rows.findIndex(row => row.kind === "message" && row.narration);
+		const narrationIndex = rows.findIndex(row => row.kind === "process");
 		expect(narrationIndex).toBeGreaterThan(0);
 
 		expect(findTranscriptMatches(rows, "  deploy ")).toEqual([

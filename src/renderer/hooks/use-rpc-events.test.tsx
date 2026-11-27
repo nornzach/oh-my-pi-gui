@@ -421,6 +421,28 @@ describe("useRpcEvents thinking selection sync", () => {
 });
 
 describe("useRpcEvents model switch sync", () => {
+	it("recovers the default model and its reasoning levels after the first state read fails", async () => {
+		const { commandForTab } = installTabRoutedMockOmp();
+		const tabId = "t-model-recover";
+		seedReadyTab(tabId);
+		const original = commandForTab.getMockImplementation()!;
+		let first = true;
+		commandForTab.mockImplementation(async (target, command) => {
+			if (command.type !== "get_state") return original(target, command);
+			if (first) {
+				first = false;
+				throw new Error("initial state unavailable");
+			}
+			return settledState({ model: { provider: "fixture", id: "default" }, availableThinkingLevels: ["high"] });
+		});
+		await hydrateTabSession(tabId);
+		await flush();
+		expect(sessionRuntimeStore<ModelStore>(tabId, "model")?.getState()).toMatchObject({
+			model: { provider: "fixture", id: "default" },
+			availableThinkingLevels: ["high"],
+		});
+	});
+
 	it("lands a model switch whose get_state races a trailing event from the same batch", async () => {
 		const { emitTabBatch, commandForTab } = installTabRoutedMockOmp();
 		useTabsStore.setState({

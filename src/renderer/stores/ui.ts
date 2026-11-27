@@ -227,6 +227,7 @@ interface UiStore {
 	collapseLargePastes: boolean;
 	/** Show the agent's ask form inline in the transcript instead of as a modal (#74). */
 	askInline: boolean;
+	chatImagePopup: boolean;
 	/** Expand/collapse-all signal for tool cards (⌃O); `seq` bumps per toggle so cards re-sync their local state. */
 	toolsExpandAll: { expanded: boolean; seq: number };
 	toggleSidebar: () => void;
@@ -429,6 +430,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	linkOpenMode: "panel",
 	collapseLargePastes: true,
 	askInline: false,
+	chatImagePopup: true,
 	toggleSidebar: () => set({ sidebarVisible: !get().sidebarVisible }),
 	// The bare toggle (title bar, shortcut) opens on Overview; links that open the
 	// drawer for a reason (Review, a file, /btw) go through setPanelTab instead.

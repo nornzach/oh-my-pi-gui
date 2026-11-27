@@ -76,11 +76,9 @@ export function ExecutionGroup({
 				type="button"
 				aria-label={[summary, activity].filter(Boolean).join(" · ")}
 			>
-				<ChevronRight
-					aria-hidden="true"
-					className={cx("omp-disclosure-chevron shrink-0 text-[var(--omp-dim)]", expanded && "rotate-90")}
-					size={12}
-				/>
+				<span aria-hidden="true" className="omp-execution-group-disclosure grid shrink-0 place-items-center">
+					<ChevronRight className={cx("omp-disclosure-chevron", expanded && "rotate-90")} size={12} />
+				</span>
 				{active && (
 					<span aria-hidden="true" className="omp-execution-group-live-dot omp-working-dot omp-working-dot--sm" />
 				)}
@@ -101,7 +99,10 @@ export function ExecutionGroup({
 					{summary}
 				</span>
 				{activity && (
-					<span className="min-w-0 truncate text-omp-xs text-(--omp-muted)" title={activity}>
+					<span
+						className="omp-execution-group-activity min-w-0 truncate text-omp-xs text-(--omp-muted)"
+						title={activity}
+					>
 						{activity}
 					</span>
 				)}

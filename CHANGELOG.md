@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-11-28
+
+### Changed
+
+- Open images in the conversation and composer in a zoomable popup by default. Switch back to the Files panel in GUI settings; right-click a file attachment to open it with its default app ([#88](https://github.com/nornzach/oh-my-pi-gui/issues/88)).
+- Suggested replies now show a small inline Tab keycap instead of a separate instruction below the input.
+
+### Fixed
+
+- The desktop app can host and join collaboration rooms again ([#91](https://github.com/nornzach/oh-my-pi-gui/issues/91)).
+- Collaboration rooms closed by the relay can be reopened with a fresh invitation.
+- Images linked from a Markdown file preview open in the Files panel, and full-window image previews keep keyboard focus on their controls.
+- Long custom Ask answers wrap and grow, and you can select part of an option without choosing it ([#90](https://github.com/nornzach/oh-my-pi-gui/issues/90), [#82](https://github.com/nornzach/oh-my-pi-gui/issues/82)).
+- Font settings show the full placeholder, option labels fit their buttons, and typed chat drafts are easier to read ([#87](https://github.com/nornzach/oh-my-pi-gui/issues/87)).
+- Zoomed Mermaid diagrams retain their theme background ([#86](https://github.com/nornzach/oh-my-pi-gui/issues/86)).
+- Keep intermediate explanations with their tool calls in the collapsed process, separate from the final reply.
+- Give collapsed process summaries more room before the reply and keep the step status readable beside long commands.
+- Show the right-hand activity rail as soon as a session has a workspace, model, or title, without waiting for a task or subagent.
+- Recover the composer’s model and reasoning levels after an interrupted startup state read or a manual model selection that emits no change event.
+
 ## [1.0.5] - 2026-11-27
 
 ### Added

@@ -275,6 +275,7 @@ test("real bundled sidecar persists settings and sessions and serves every stats
 		await readme.click();
 		await preview.getByRole("button", { name: "Diagram", exact: true }).click();
 		await expect(preview.locator('img[alt="diagram.png"]')).toBeVisible();
+		await expect(page.locator("[data-image-viewer]")).toHaveCount(0);
 		await expect(tree).toBeVisible();
 		const rightPanel = page.locator(".omp-inspector");
 		const resizeHandle = page.getByRole("separator", { name: "Resize right panel" });

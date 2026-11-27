@@ -9,19 +9,25 @@
 import { Maximize, Minus, Plus, X } from "lucide-react";
 import {
 	type ComponentPropsWithoutRef,
+	createContext,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
+	useContext,
 	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { cx } from "../../lib/format";
+import { describeError } from "../../lib/errors";
+import { basename, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
-import { DIALOG_OVERLAY_Z, isTopmostDialog, registerDialogLayer } from "./dialog-layer";
+import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { toast } from "../../stores/toast";
+import { useUiStore } from "../../stores/ui";
+import { DIALOG_OVERLAY_Z, isTopmostDialog, registerDialogLayer, trapDialogTab } from "./dialog-layer";
 
 const MAX_SCALE = 8;
 /** Room the fitted image leaves around itself, in CSS pixels. */
@@ -29,31 +35,65 @@ const FIT_MARGIN = 48;
 /** Pointer travel that turns a press on the image into a drag instead of a click. */
 const DRAG_SLOP = 4;
 
+export const FilePreviewImageContext = createContext(false);
+
+export function useFileImagePopup(path: string) {
+	const t = useT();
+	const tabId = useRuntimeTabId();
+	const inFilePreview = useContext(FilePreviewImageContext);
+	const enabled = useUiStore(state => state.chatImagePopup) && !inFilePreview;
+	const [image, setImage] = useState<{ path: string; tabId: string | null; src: string } | null>(null);
+	const open = async () => {
+		try {
+			const result = await window.omp.fs.readImage(path, tabId ?? undefined);
+			if (result.ok && result.dataUrl) setImage({ path, tabId, src: result.dataUrl });
+			else
+				toast({
+					variant: "error",
+					title: t(result.tooLarge ? "filesPanel.imageTooLarge" : "markdown.imageFailed"),
+					message: path,
+				});
+		} catch (error) {
+			toast({ variant: "error", title: t("markdown.imageFailed"), message: describeError(error) });
+		}
+	};
+	return {
+		open: enabled && /\.(?:png|jpe?g|webp|gif|svg|avif|bmp|ico)$/i.test(path) ? open : undefined,
+		viewer: image && image.path === path && image.tabId === tabId && (
+			<ImageViewer src={image.src} alt={basename(path)} onClose={() => setImage(null)} />
+		),
+	};
+}
+
 /** An `<img>` that opens a preview on click, Enter or Space. */
 export function ZoomableImage({
 	className,
 	onClick,
 	onKeyDown,
-	onOpen,
+	onOpenInPanel,
+	viewerBackground,
 	...props
 }: ComponentPropsWithoutRef<"img"> & {
-	onOpen?: () => void;
+	onOpenInPanel?: () => void;
+	viewerBackground?: string;
 }) {
 	const t = useT();
+	const inFilePreview = useContext(FilePreviewImageContext);
+	const popup = (useUiStore(state => state.chatImagePopup) && !inFilePreview) || !onOpenInPanel;
 	const [open, setOpen] = useState(false);
 	const src = typeof props.src === "string" ? props.src : undefined;
 	const show = (event: ReactMouseEvent<HTMLImageElement> | ReactKeyboardEvent<HTMLImageElement>) => {
 		// The image may sit inside a clickable row or bubble: the click is the viewer's.
 		event.stopPropagation();
 		event.preventDefault();
-		if (onOpen) onOpen();
+		if (!popup && onOpenInPanel) onOpenInPanel();
 		else setOpen(true);
 	};
 	return (
 		<>
 			<img
 				{...props}
-				aria-haspopup={onOpen ? undefined : "dialog"}
+				aria-haspopup={popup ? "dialog" : undefined}
 				className={cx(className, src && "cursor-zoom-in")}
 				onClick={event => {
 					onClick?.(event);
@@ -67,7 +107,9 @@ export function ZoomableImage({
 				tabIndex={src ? 0 : undefined}
 				title={props.title ?? (src ? t("imageViewer.open") : undefined)}
 			/>
-			{open && src && <ImageViewer alt={props.alt ?? ""} onClose={() => setOpen(false)} src={src} />}
+			{open && src && (
+				<ImageViewer alt={props.alt ?? ""} background={viewerBackground} onClose={() => setOpen(false)} src={src} />
+			)}
 		</>
 	);
 }
@@ -86,7 +128,17 @@ function fitScale(natural: Size | null, view: Size): number {
 	);
 }
 
-export function ImageViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+export function ImageViewer({
+	src,
+	alt,
+	onClose,
+	background,
+}: {
+	src: string;
+	alt: string;
+	onClose: () => void;
+	background?: string;
+}) {
 	const t = useT();
 	const overlayRef = useRef<HTMLDivElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -149,15 +201,18 @@ export function ImageViewer({ src, alt, onClose }: { src: string; alt: string; o
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				onCloseRef.current();
+				return;
 			}
+			trapDialogTab(event, overlay);
 		};
 		window.addEventListener("resize", onResize);
 		document.addEventListener("keydown", onKey, true);
 		return () => {
 			window.removeEventListener("resize", onResize);
 			document.removeEventListener("keydown", onKey, true);
+			const wasTopmost = isTopmostDialog(overlay);
 			unregister();
-			restore?.focus();
+			if (wasTopmost) restore?.focus();
 		};
 	}, []);
 
@@ -253,11 +308,15 @@ export function ImageViewer({ src, alt, onClose }: { src: string; alt: string; o
 					onPointerDown={onPointerDown}
 					onPointerMove={onPointerMove}
 					src={src}
-					style={
-						natural
+					style={{
+						backgroundColor: background,
+						...(natural
 							? { width: natural.width * scale, height: natural.height * scale }
-							: { maxWidth: `calc(100vw - ${FIT_MARGIN * 2}px)`, maxHeight: `calc(100vh - ${FIT_MARGIN * 2}px)` }
-					}
+							: {
+									maxWidth: `calc(100vw - ${FIT_MARGIN * 2}px)`,
+									maxHeight: `calc(100vh - ${FIT_MARGIN * 2}px)`,
+								}),
+					}}
 				/>
 			</div>
 			<div className="omp-image-viewer-tools absolute top-3 flex items-center gap-1 rounded-xl bg-black/60 p-1 text-omp-sm text-white/80">

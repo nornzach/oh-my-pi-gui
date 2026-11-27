@@ -34,7 +34,7 @@ import { useRuntimeTabId } from "../../stores/session-runtime-context";
 import { useUiStore } from "../../stores/ui";
 import { Button, Spinner } from "../common";
 import { ConfirmDialog } from "../common/ConfirmDialog";
-import { ZoomableImage } from "../common/ImageViewer";
+import { FilePreviewImageContext, ZoomableImage } from "../common/ImageViewer";
 import { showPathMenu } from "../common/LinkMenu";
 import { type TreeNode, TreeView } from "../common/TreeView";
 import { PathLink } from "../tools/PathLink";
@@ -524,10 +524,12 @@ export function FilesPanel() {
 							<DelimitedTable content={previewDraft ?? activePreview.content ?? ""} path={filePreviewPath} />
 						) : formattedPreview ? (
 							<div ref={setPreviewContent} className="mx-auto max-w-3xl px-5 py-4 text-omp-md text-(--omp-text)">
-								<MarkdownRenderer
-									content={previewDraft ?? activePreview.content ?? ""}
-									sourcePath={filePreviewPath}
-								/>
+								<FilePreviewImageContext.Provider value={true}>
+									<MarkdownRenderer
+										content={previewDraft ?? activePreview.content ?? ""}
+										sourcePath={filePreviewPath}
+									/>
+								</FilePreviewImageContext.Provider>
 								{previewDraft === undefined && activePreview.truncated && (
 									<div className="mt-3 text-omp-xs text-(--omp-dim)">
 										{t("filesPanel.truncated", { kb: PREVIEW_MAX_BYTES / 1000 })}

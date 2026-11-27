@@ -510,6 +510,7 @@
 	--omp-reply-pad: 6px;
 	--omp-step-pad: 3px;
 	--omp-step-height: 28px;
+	--omp-process-gap: 8px;
 	--omp-reply-leading: 1.65;
 }
 
@@ -517,6 +518,7 @@
 	--omp-reply-pad: 3px;
 	--omp-step-pad: 1px;
 	--omp-step-height: 22px;
+	--omp-process-gap: 5px;
 	--omp-reply-leading: 1.48;
 }
 
@@ -808,6 +810,10 @@
 	padding-block: var(--omp-step-pad) !important;
 }
 
+.omp-transcript-editorial .omp-process-turn:has(.omp-execution-group-header[aria-expanded="false"]) {
+	padding-block-end: calc(var(--omp-step-pad) + var(--omp-process-gap)) !important;
+}
+
 .omp-execution-group {
 	overflow: visible;
 	border: 0;
@@ -825,19 +831,34 @@
 	color: var(--omp-text);
 }
 
-/* The summary reads as one phrase with its disclosure chevron right after it
-   ("Ran 3 commands ›"), not a full-width row with the chevron at the far edge. */
 .omp-transcript-editorial .omp-execution-group-header {
 	width: auto;
-	max-width: 100%;
+	max-width: min(100%, 36rem);
 }
 
 .omp-transcript-editorial .omp-execution-group-header .omp-execution-group-summary {
-	flex: 0 1 auto;
+	flex: 0 0 auto;
+	max-width: 100%;
 }
 
-.omp-transcript-editorial .omp-execution-group-header:hover .omp-execution-group-summary {
-	color: var(--omp-text);
+.omp-transcript-editorial .omp-execution-group-header:has(.omp-execution-group-activity) .omp-execution-group-summary {
+	max-width: 65%;
+}
+
+.omp-execution-group-disclosure {
+	color: var(--omp-muted);
+}
+
+.omp-transcript-editorial .omp-execution-group-disclosure {
+	width: 16px;
+	height: 16px;
+	border-radius: 4px;
+	background: var(--omp-selected-bg);
+}
+
+.omp-transcript-editorial .omp-execution-group-activity {
+	border-inline-start: 1px solid var(--omp-border-muted);
+	padding-inline-start: 8px;
 }
 
 .omp-execution-group-body {
@@ -851,6 +872,11 @@
 
 .omp-transcript-editorial .omp-execution-group-summary {
 	font-size: var(--text-omp-sm);
+	font-weight: 550;
+}
+
+.omp-transcript-editorial .omp-execution-group[data-state="complete"] > button .omp-execution-group-summary {
+	color: var(--omp-text-secondary);
 }
 
 .omp-goal-dock {
@@ -2293,13 +2319,12 @@
    stays quiet.
    ============================================================================ */
 
-/* A finished or running step group reads as a quiet chip, not loose text. */
 .omp-transcript-editorial .omp-execution-group-header {
 	min-height: var(--omp-step-height);
-	padding: 1px 4px;
+	padding: 1px 8px 1px 6px;
 	border: 1px solid var(--omp-border-muted);
-	border-radius: 9999px;
-	background: color-mix(in srgb, var(--omp-text) 2.5%, transparent);
+	border-radius: 7px;
+	background: transparent;
 	transition:
 		background-color var(--omp-motion-fast) var(--omp-ease),
 		border-color var(--omp-motion-fast) var(--omp-ease),
@@ -2321,18 +2346,8 @@
 	background: var(--omp-selected-bg);
 }
 
-.omp-transcript-editorial[data-detail="compact"] .omp-execution-group-header {
-	border: 0;
-	border-radius: 4px;
-	background: transparent;
-}
-
-.omp-transcript-editorial[data-detail="compact"] .omp-execution-group-header:hover {
-	background: var(--omp-selected-bg);
-}
-
 .omp-transcript-editorial[data-detail="compact"] .omp-execution-group-body {
-	margin: 0 0 0 9px;
+	margin: 3px 0 0 15px;
 	padding-inline-start: 10px;
 	border-left: 1px solid var(--omp-border-muted);
 }

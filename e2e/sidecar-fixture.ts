@@ -195,6 +195,11 @@ if (process.argv.includes("stats")) {
 		planModeEnabled: false,
 		agentsPaused: false,
 	};
+	if (process.env.OMP_GUI_TEST_NO_DEFAULT_MODEL) {
+		state.model = null;
+		state.thinkingLevel = undefined;
+		state.availableThinkingLevels = [];
+	}
 	let queue: { id: string; text: string; lane: string }[] = [];
 	let securityMode = "disabled";
 	let streamTimer: Timer | null = null;
@@ -231,6 +236,16 @@ if (process.argv.includes("stats")) {
 		const ok = (data: unknown = {}) =>
 			write({ type: "response", id: command.id, command: command.type, success: true, data });
 		switch (command.type) {
+			case "set_model":
+				state.model = model;
+				state.availableThinkingLevels = ["low", "medium", "high"];
+				ok(model);
+				break;
+			case "set_thinking_level":
+				state.thinkingConfigured = command.level;
+				state.thinkingLevel = command.level === "auto" ? "medium" : command.level;
+				ok({ thinkingConfigured: state.thinkingConfigured, thinkingLevel: state.thinkingLevel });
+				break;
 			case "get_state":
 				ok(state);
 				break;

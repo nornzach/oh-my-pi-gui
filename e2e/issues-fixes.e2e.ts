@@ -70,6 +70,7 @@ test.beforeEach(async () => {
 		PI_PROFILE: "",
 		OMP_BUNDLED_OMP: fixture,
 		OMP_GUI_TEST_RECORD: record,
+		...(test.info().title.startsWith("Model recovery:") && { OMP_GUI_TEST_NO_DEFAULT_MODEL: "1" }),
 		OMP_GUI_TEST_STATS_BINARY: path.resolve("resources/omp"),
 	};
 	Reflect.deleteProperty(env, "ELECTRON_RUN_AS_NODE");
@@ -148,11 +149,36 @@ async function verifyCopyOption(form: Locator) {
 		}),
 	);
 	const draft = form.getByPlaceholder(/custom|own|other/i);
+	const option = form.getByRole("button", { name: "Blue environment" });
+	const word = await option.evaluate(element => {
+		const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+		for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+			if (node.textContent !== "Blue") continue;
+			const range = document.createRange();
+			range.setStart(node, 0);
+			range.setEnd(node, 4);
+			const { left, right, top, height } = range.getBoundingClientRect();
+			return { left, right, middle: top + height / 2 };
+		}
+		throw new Error("Option label missing");
+	});
+	await page.mouse.move(word.left + 1, word.middle);
+	await page.mouse.down();
+	await page.mouse.move(word.right - 1, word.middle, { steps: 8 });
+	await page.mouse.up();
+	const selectedText = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	expect(selectedText.trim().length).toBeGreaterThan(0);
+	expect("Blue environment").toContain(selectedText);
+	expect(selectedText).not.toBe("Blue environment");
+	await expect(option).toHaveAttribute("aria-pressed", "false");
+	const initialHeight = (await draft.boundingBox())!.height;
+	await draft.fill("A long answer with enough words to wrap across multiple lines in this form. ".repeat(8));
+	expect((await draft.boundingBox())!.height).toBeGreaterThan(initialHeight);
 	await draft.fill("canary");
 	await form.getByRole("button", { name: "Copy", exact: true }).click();
 	await expect(page.locator("body")).toHaveAttribute("data-copied-option", "Blue environment");
 	await expect(draft).toHaveValue("canary");
-	await expect(form.getByRole("button", { name: "Blue environment" })).toHaveAttribute("aria-pressed", "false");
+	await expect(option).toHaveAttribute("aria-pressed", "false");
 }
 
 test("#74 an ask form answers inline while the conversation stays on screen", async () => {
@@ -259,6 +285,100 @@ async function rendererEvents() {
 		);
 }
 
+test("Model recovery: manual selection restores reasoning without a model change event", async () => {
+	const thinking = page.getByTitle(/^Thinking:/);
+	await thinking.click();
+	await expect(page.getByText("The current model does not support reasoning.")).toBeVisible();
+	await page.keyboard.press("Escape");
+	await page.locator("[data-model-picker-trigger]:visible").click();
+	await page.getByRole("textbox", { name: "Search models" }).fill("local-fixture");
+	await page.getByRole("option", { name: /Local fixture/ }).click();
+	await thinking.click();
+	await page.getByRole("menuitemradio", { name: /^High\b/ }).click();
+	await expect(thinking).toHaveAttribute("title", /Thinking: High/);
+	await expect.poll(async () => (await recorded("set_thinking_level")).at(-1)?.level).toBe("high");
+});
+
+test("#88 composer and transcript images open full-window without switching the inspector", async () => {
+	const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
+	const file = path.join(profile, "project", "chart.png");
+	await fs.writeFile(file, Buffer.from(png, "base64"));
+	await page.locator('.omp-composer-box input[type="file"]').setInputFiles(file);
+	const viewer = page.locator('[role="dialog"][data-image-viewer]');
+	async function verifyPopup(trigger: Locator) {
+		await trigger.click();
+		await expect(viewer).toBeVisible();
+		await expect(viewer.locator("img")).toHaveAttribute("src", `data:image/png;base64,${png}`);
+		await expect(page.locator('[data-inspector="closed"]')).toBeVisible();
+		const close = viewer.getByRole("button", { name: "Close", exact: true });
+		await expect(close).toBeFocused();
+		await page.keyboard.press("Tab");
+		await expect(viewer.getByRole("button", { name: /^Zoom in\b/ })).toBeFocused();
+		await page.keyboard.press("Shift+Tab");
+		await expect(close).toBeFocused();
+		await page.keyboard.press("Escape");
+		await expect(viewer).toHaveCount(0);
+	}
+	await verifyPopup(page.locator("[data-composer-attachments] img"));
+	const emit = await rendererEvents();
+	await emit([
+		{
+			type: "message_end",
+			message: {
+				role: "assistant",
+				timestamp: Date.now(),
+				content: [{ type: "text", text: "![Saved chart](chart.png)\n\n[Original file](chart.png)" }],
+			},
+		},
+	]);
+	await verifyPopup(page.getByRole("button", { name: "Saved chart" }));
+	await verifyPopup(page.getByRole("link", { name: "Original file" }));
+});
+
+test("#86 zoomed Mermaid keeps its light canvas", async () => {
+	await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+	const emit = await rendererEvents();
+	await emit([
+		{
+			type: "message_end",
+			message: {
+				role: "assistant",
+				timestamp: Date.now(),
+				content: [{ type: "text", text: "```mermaid\ngraph TD\nA[Start] --> B[Finish]\n```" }],
+			},
+		},
+	]);
+	const diagram = page.getByRole("button", { name: /diagram/i });
+	const canvas = await diagram.evaluate(element => getComputedStyle(element.parentElement!).backgroundColor);
+	await diagram.click();
+	await expect(page.locator("[data-image-viewer] img")).toHaveCSS("background-color", canvas);
+	await page.keyboard.press("Escape");
+	await expect(page.locator("[data-image-viewer]")).toHaveCount(0);
+});
+
+test("#87 font placeholders and conversation detail labels fit their settings controls", async () => {
+	await page.getByRole("button", { name: "Settings", exact: true }).click();
+	const settings = page.getByRole("dialog");
+	await settings.getByPlaceholder("Search settings…").fill("Interface font");
+	await settings.getByRole("button", { name: /^Interface font\b/ }).click();
+	for (const name of ["Interface font", "Code font"]) {
+		const field = settings.getByRole("textbox", { name, exact: true });
+		await expect(field).toBeVisible();
+		expect(
+			await field.evaluate(element => {
+				const input = element as HTMLInputElement;
+				const style = getComputedStyle(input);
+				const canvas = document.createElement("canvas").getContext("2d")!;
+				canvas.font = `${style.fontSize} ${style.fontFamily}`;
+				const availableWidth = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+				return availableWidth - canvas.measureText(input.placeholder).width;
+			}),
+		).toBeGreaterThan(0);
+	}
+	const compact = settings.getByRole("button", { name: "Compact (recommended)", exact: true });
+	expect(await compact.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
 test("#79 live reasoning follows its own tail until the reader scrolls up", async () => {
 	const emit = await rendererEvents();
 	const delta = (text: string): AgentSessionEvent => ({
@@ -327,6 +447,67 @@ test("#79 live reasoning follows its own tail until the reader scrolls up", asyn
 	await group.screenshot({ path: "test-results/compact-tool-header.png", animations: "disabled" });
 });
 
+test("dynamic view folds both narrated tool rounds when the first answer text arrives", async () => {
+	const emit = await rendererEvents();
+	await page.locator("[data-view-controls-trigger]").click();
+	await page.locator('[data-process-preset="balanced"]').click();
+	await page.keyboard.press("Escape");
+	const start = Date.now();
+	const answer = { role: "assistant", timestamp: start + 3 } as const;
+	await emit([
+		{ type: "agent_start" },
+		...["Inspect the schema.", "Check the generated mappings."].map(
+			(text, index): AgentSessionEvent => ({
+				type: "message_end",
+				message: {
+					role: "assistant",
+					timestamp: start + index,
+					content: [
+						{ type: "thinking", thinking: "Check the evidence." },
+						{ type: "text", text },
+						{
+							type: "toolCall",
+							id: `inspect-${index}`,
+							name: "bash",
+							arguments: { command: `npm test -- ${"packages/renderer/test/conversation.test.ts ".repeat(18)}` },
+						},
+					],
+				},
+			}),
+		),
+	]);
+	const narration = page.getByText("Inspect the schema.", { exact: true });
+	await expect(narration).toBeVisible();
+	const conclusion = "The schema is complete.";
+	await emit([
+		{ type: "message_start", message: answer },
+		{
+			type: "message_update",
+			message: answer,
+			assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: conclusion },
+		},
+	]);
+	const group = page.locator(".omp-execution-group-header");
+	await expect(page.getByText(conclusion, { exact: true })).toBeVisible();
+	await expect(group).toHaveAttribute("aria-expanded", "false");
+	await expect(narration).toBeHidden();
+	await emit([{ type: "message_end", message: { ...answer, content: [{ type: "text", text: conclusion }] } }]);
+	await expect(group).toHaveAttribute("aria-expanded", "false");
+	const answerText = page.locator('[data-transcript-kind="message"]').getByText(conclusion, { exact: true });
+	await expect
+		.poll(async () => {
+			const summaryBox = await group.boundingBox();
+			const answerBox = await answerText.boundingBox();
+			return summaryBox && answerBox ? answerBox.y - summaryBox.y - summaryBox.height : 0;
+		})
+		.toBeGreaterThanOrEqual(8);
+	expect(await group.getByRole("status").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+	await group.click();
+	await expect(narration).toBeVisible();
+	await expect(page.getByText("Check the generated mappings.", { exact: true })).toBeVisible();
+	await expect(answerText).toBeVisible();
+});
+
 test("tool narration stays readable and the spacing control compacts actual transcript rows", async () => {
 	const emit = await rendererEvents();
 	await emit([
@@ -352,9 +533,10 @@ test("tool narration stays readable and the spacing control compacts actual tran
 	]);
 	const narration = page.getByText("The build is ready to continue.", { exact: true });
 	const group = page.locator(".omp-execution-group-header");
-	await expect(narration).toBeVisible();
+	await expect(narration).toBeHidden();
 	await expect(group).toContainText("Wait for command · pty-7");
 	await group.click();
+	await expect(narration).toBeVisible();
 	const send = page.locator(".omp-tool-header").filter({ hasText: "Send input" });
 	const wait = page.locator(".omp-tool-header").filter({ hasText: "Wait for command" });
 	await expect(send).toContainText("enter · pty-7");
@@ -377,8 +559,11 @@ test("tool narration stays readable and the spacing control compacts actual tran
 });
 
 test("#73 activity moves between the right edge and drawer without covering the composer menu", async () => {
-	await command("fixture dock");
 	const peek = page.getByRole("complementary", { name: "Task activity" });
+	await expect(peek.getByText("Audit session", { exact: true })).toBeVisible();
+	await expect(peek.getByText("project", { exact: true })).toBeVisible();
+	await expect(peek.getByText("Local fixture", { exact: true })).toBeVisible();
+	await command("fixture dock");
 	const inspector = page.locator(".omp-inspector");
 	const transcript = page.locator(".omp-transcript-canvas");
 	await expect(peek).toContainText("Review the workflow");
