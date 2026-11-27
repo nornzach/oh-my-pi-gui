@@ -74,7 +74,7 @@ jobs:
           hdiutil verify "${dmg[0]}"
           mount=$(mktemp -d)
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" "${dmg[0]}"
-          trap 'hdiutil detach "$mount"' EXIT
+          trap 'hdiutil detach "$mount" || hdiutil detach -force "$mount"' EXIT
           app="$mount/omp.app"
           codesign --verify --deep --strict "$app"
           lipo "$app/Contents/MacOS/omp" -verify_arch '${{ matrix.machine }}'
