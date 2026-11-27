@@ -77,8 +77,8 @@ jobs:
           trap 'hdiutil detach "$mount" || hdiutil detach -force "$mount"' EXIT
           app="$mount/omp.app"
           codesign --verify --deep --strict "$app"
-          lipo "$app/Contents/MacOS/omp" -verify_arch '${{ matrix.machine }}'
-          lipo "$app/Contents/Resources/omp" -verify_arch '${{ matrix.machine }}'
+          test "$(lipo -archs "$app/Contents/MacOS/omp")" = '${{ matrix.machine }}'
+          test "$(lipo -archs "$app/Contents/Resources/omp")" = '${{ matrix.machine }}'
           bun scripts/smoke-sidecar.mjs "$app/Contents/Resources/omp"
       - uses: actions/upload-artifact@v4
         with:
