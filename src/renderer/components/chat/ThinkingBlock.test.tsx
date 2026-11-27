@@ -117,6 +117,12 @@ describe("ThinkingBlock", () => {
 		expect(container.querySelector(".omp-thinking-gauge")?.textContent).toBe("3 tokens");
 	});
 
+	it("leaves no thinking row after hidden reasoning completes, even with reported usage", async () => {
+		useSettingsStore.setState({ hideThinkingBlock: true });
+		await mount(<ThinkingBlock text="Reasoning" messageReasoningTokens={7} />);
+		expect(container.querySelector(".omp-thinking-block")).toBeNull();
+	});
+
 	it("renders reasoning markdown instead of literal syntax (TUI parity)", async () => {
 		await mountExpandedThinking(HEADLINED_THINKING);
 

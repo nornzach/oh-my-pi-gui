@@ -339,12 +339,12 @@ test("tool narration stays readable and the spacing control compacts actual tran
 				content: [
 					{ type: "thinking", thinking: "Use the build shell to finish the task." },
 					{ type: "text", text: "The build is ready to continue." },
-				{
-					type: "toolCall",
-					id: "send",
-					name: "terminal",
-					arguments: { action: "send", key: "enter", id: "pty-7" },
-				},
+					{
+						type: "toolCall",
+						id: "send",
+						name: "terminal",
+						arguments: { action: "send", key: "enter", id: "pty-7" },
+					},
 					{ type: "toolCall", id: "wait", name: "terminal", arguments: { action: "wait", id: "pty-7" } },
 				],
 			},
@@ -382,14 +382,14 @@ test("#73 activity moves between the right edge and drawer without covering the 
 	const inspector = page.locator(".omp-inspector");
 	const transcript = page.locator(".omp-transcript-canvas");
 	await expect(peek).toContainText("Review the workflow");
-	await expect(peek.getByRole("button")).toHaveAccessibleName(/1 subagent running.*fixture scout/);
+	await expect(peek.getByRole("button", { name: /fixture scout.*Working/i })).toBeVisible();
 	await expect(transcript).toContainText("Checking the release.");
 	await expect(transcript).not.toContainText("Review the workflow");
 	await expect(
 		transcript.locator('.omp-tool-card, .omp-execution-group, [data-transcript-kind="todoSnapshot"]'),
 	).toHaveCount(0);
 	await page.screenshot({ path: "test-results/activity-floating.png", scale: "css", animations: "disabled" });
-	await peek.getByRole("button").click();
+	await peek.getByRole("button", { name: /^Task activity/ }).click();
 	await expect(peek).toHaveCount(0);
 	await expect(inspector.getByRole("button", { name: "Task activity", exact: true })).toHaveAttribute(
 		"aria-pressed",

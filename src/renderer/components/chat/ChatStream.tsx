@@ -197,8 +197,15 @@ function SessionTranscript({ footer }: { footer?: ReactNode }) {
 			...groupReadRows(buildHistoryRows(visible.slice(start), "full", processExpansion, todos)),
 		];
 	}, [
-		displayMessages, hiddenCount, transcriptDetail, processExpansion, failedTodos, readOnly,
-		autoCollapseProcess, isStreaming, hasStreamingText,
+		displayMessages,
+		hiddenCount,
+		transcriptDetail,
+		processExpansion,
+		failedTodos,
+		readOnly,
+		autoCollapseProcess,
+		isStreaming,
+		hasStreamingText,
 	]);
 
 	// What the latest run changed on disk, once it has settled: closes the turn

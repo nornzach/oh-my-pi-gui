@@ -86,7 +86,11 @@ function isSpans(value: unknown): value is ExtensionFormSpan[] {
 			span =>
 				isRecord(span) &&
 				typeof span.text === "string" &&
-				(span.style === undefined || span.style === "code" || span.style === "strong" || span.style === "em"),
+				(span.style === undefined ||
+					span.style === "code" ||
+					span.style === "strong" ||
+					span.style === "em" ||
+					span.style === "mark"),
 		)
 	);
 }
@@ -181,6 +185,13 @@ function Spans({ spans }: { spans: ExtensionFormSpan[] }) {
 				}
 				if (span.style === "strong") return <strong key={index}>{text}</strong>;
 				if (span.style === "em") return <em key={index}>{text}</em>;
+				if (span.style === "mark") {
+					return (
+						<mark className="rounded-sm bg-(--omp-selected-bg) px-0.5 text-inherit" key={index}>
+							{text}
+						</mark>
+					);
+				}
 				return <span key={index}>{text}</span>;
 			})}
 		</>

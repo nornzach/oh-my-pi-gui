@@ -1749,7 +1749,7 @@ export type ExtensionAskDialogResult = ExtensionAskDialogSubmitResult | Extensio
 
 export interface ExtensionFormSpan {
 	text: string;
-	style?: "code" | "strong" | "em";
+	style?: "code" | "strong" | "em" | "mark";
 }
 export interface ExtensionFormChoiceField {
 	kind: "choice";

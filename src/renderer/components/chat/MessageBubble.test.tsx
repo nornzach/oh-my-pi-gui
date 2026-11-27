@@ -360,26 +360,45 @@ describe("MessageBubble completion events", () => {
 		expect(html).not.toContain("omp-custom-turn");
 	});
 
-	it("keeps background output behind one native disclosure row", () => {
-		const html = renderToStaticMarkup(
-			<I18nProvider>
-				<MessageBubble
-					message={{
-						role: "custom",
-						customType: "async-result",
-						content: "<system-notice>Background job bg-7 has completed.\nBUILD_OUTPUT</system-notice>",
-						details: { jobs: [{ jobId: "bg-7", type: "bash", label: "bun run build" }] },
-						display: true,
-						timestamp: "2026-08-20T00:00:00.000Z",
-					}}
-				/>
-			</I18nProvider>,
-		);
-		expect(html).toContain("bun run build");
-		expect(html).toContain("Background job completed");
-		expect(html).toContain("<details");
-		expect(html).not.toContain("<details open");
-		expect(html).toContain("BUILD_OUTPUT");
+	it("reveals background output only after expanding its native disclosure row", async () => {
+		const container = document.createElement("div");
+		document.body.appendChild(container);
+		const root = createRoot(container);
+		try {
+			await act(async () => {
+				root.render(
+					<I18nProvider>
+						<MessageBubble
+							message={{
+								role: "custom",
+								customType: "async-result",
+								content:
+									"<system-notice>Background job bg-7 has completed.\nResume your work using the result below.\nBUILD_OUTPUT</system-notice>",
+								details: { jobs: [{ jobId: "bg-7", type: "bash", label: "bun run build" }] },
+								display: true,
+								timestamp: "2026-08-20T00:00:00.000Z",
+							}}
+						/>
+					</I18nProvider>,
+				);
+			});
+
+			const details = container.querySelector("details");
+			expect(details).not.toBeNull();
+			expect(container.textContent).toContain("bun run build");
+			expect(container.textContent).not.toContain("BUILD_OUTPUT");
+			await act(async () => {
+				if (!details) throw new Error("missing background output disclosure");
+				details.open = true;
+				details.dispatchEvent(new Event("toggle"));
+			});
+			expect(container.textContent).toContain("BUILD_OUTPUT");
+			expect(container.textContent).not.toContain("Background job");
+			expect(container.textContent).not.toContain("Resume your work");
+		} finally {
+			await act(async () => root.unmount());
+			container.remove();
+		}
 	});
 });
 
@@ -479,7 +498,7 @@ describe("MessageBubble noise filtering", () => {
 		expect(render({ ...assistant, entryId: undefined })).toContain("Branch to a new tab from here");
 	});
 
-	it("shows the provider's reasoning total once across separate thinking blocks", () => {
+	it("shows only the provider's reasoning count, once across separate thinking blocks", () => {
 		const render = (usage: { output: number; reasoningTokens?: number }) =>
 			renderToStaticMarkup(
 				<I18nProvider>
@@ -492,13 +511,20 @@ describe("MessageBubble noise filtering", () => {
 								{ type: "thinking", thinking: "Verify." },
 							],
 							timestamp: at,
+							duration: 1000,
 							usage,
 						}}
 					/>
 				</I18nProvider>,
 			);
-		expect(render({ output: 99, reasoningTokens: 7 }).match(/7 reasoning tokens in this message/g)).toHaveLength(1);
-		expect(render({ output: 99 })).not.toContain("reasoning tokens in this message");
+		const gauges = (usage: { output: number; reasoningTokens?: number }) =>
+			Array.from(
+				parseHTML(render(usage)).document.querySelectorAll(".omp-thinking-gauge"),
+				node => node.textContent,
+			);
+		expect(gauges({ output: 99, reasoningTokens: 7 })).toEqual(["7 tokens"]);
+		expect(gauges({ output: 99 })).toEqual([]);
+		expect(gauges({ output: 99, reasoningTokens: 0 })).toEqual(["0 tokens"]);
 	});
 
 	it("uses compact chrome for expanded process details containing reasoning and tools", () => {

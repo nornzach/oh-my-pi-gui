@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-11-27
+
 ### Added
 
 - Copy an ask option into a custom answer from an inline form or dialog ([#82](https://github.com/nornzach/oh-my-pi-gui/issues/82)).
@@ -17,10 +19,12 @@
 - Single-session sidebar deletion honors the same confirmation preference as `/delete` ([#81](https://github.com/nornzach/oh-my-pi-gui/issues/81)).
 - Task activity stays available after work finishes and shows saved tasks and subagents when a session is reopened.
 - Incomplete extension form payloads show a recoverable error instead of crashing the window ([#84](https://github.com/nornzach/oh-my-pi-gui/issues/84)).
+- Structured extension forms render inline `<mark>` highlights from the bundled agent.
 - Linux releases include an RPM package for Fedora-compatible distributions ([#83](https://github.com/nornzach/oh-my-pi-gui/issues/83)).
 
 ### Changed
 
+- Update the bundled agent to OMP Core 19.2.1 ([Core source](https://github.com/nornzach/oh-my-pi/commit/70a2c82fd617848114362f2e0f4904c40e0600e0)).
 - The right activity rail lists individual agents and tasks alongside workspace context. Select an agent to open its session.
 - Keep assistant narration visible in compact conversations, show terminal operations with their targets, and apply interface spacing to reasoning and tool rows.
 - The message field starts at one line and grows with the draft, with smaller text and toolbar labels. Task activity stays on the right, and conversation jump markers sit on the left.

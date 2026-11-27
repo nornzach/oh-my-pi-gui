@@ -249,6 +249,26 @@ describe("ExtensionDialog form", () => {
 		});
 	});
 
+	it("accepts and renders marked spans from parsed form HTML", async () => {
+		await mount();
+		await act(async () => {
+			useExtensionUiStore.getState().pushRequest({
+				type: "extension_ui_request",
+				id: "marked-form",
+				method: "form",
+				sections: [
+					{
+						title: [{ text: "Review " }, { text: "carefully", style: "mark" }],
+						blocks: [],
+					},
+				],
+			});
+		});
+
+		expect(document.querySelector('[role="alert"]')).toBeNull();
+		expect(document.querySelector("mark")?.textContent).toBe("carefully");
+	});
+
 	const showForm = async () => {
 		await act(async () => {
 			useExtensionUiStore.getState().pushRequest({

@@ -64,4 +64,3 @@ describe("dock summaries", () => {
 		expect(summary).toMatchObject({ totalCount: 8, hiddenCount: 3 });
 	});
 });
-

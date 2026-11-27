@@ -150,7 +150,9 @@ describe("TodoDockCard", () => {
 					toolCallId: "saved-todos",
 					toolName: "todo",
 					content: [],
-					details: { phases: [{ name: "Review", tasks: [{ content: "Saved review task", status: "completed" }] }] },
+					details: {
+						phases: [{ name: "Review", tasks: [{ content: "Saved review task", status: "completed" }] }],
+					},
 				},
 			]),
 		);
