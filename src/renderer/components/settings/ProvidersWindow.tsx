@@ -646,7 +646,7 @@ export function ProvidersWindow({ pollMs = 2_500 }: { pollMs?: number }) {
 				open={pendingLogout !== null}
 				title={t("providers.logoutTitle", { provider: pendingLogout?.name ?? "" })}
 				message={t("providers.logoutBody", { provider: pendingLogout?.name ?? "" })}
-				warning={t("providers.logoutWarning")}
+				warning={t("providers.logoutWarning", { provider: pendingLogout?.name ?? "" })}
 				confirmLabel={t("providers.logoutConfirm")}
 				busy={pendingLogout !== null && busyProvider === pendingLogout.id}
 				onCancel={() => setPendingLogout(null)}

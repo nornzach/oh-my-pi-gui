@@ -30,6 +30,7 @@ import type {
 	RunWorktree,
 	TaskConfig,
 } from "../../shared/scheduler-types";
+import { TASK_RUN_FAILURE } from "../../shared/scheduler-types";
 import {
 	classifyRunError,
 	MIN_ROUND_MS,
@@ -508,7 +509,7 @@ export async function executeRun(input: RunInput, deps: RunnerDeps): Promise<Run
 		else if (end?.kind === "rejected") {
 			throw new RunStop("failed", end.message, classifyRunError({ message: end.message }));
 		} else if (end?.kind === "result" && end.status === "error") {
-			const facts = end.error ?? { message: "The run ended with an error" };
+			const facts = end.error ?? { message: TASK_RUN_FAILURE.failed };
 			throw new RunStop("failed", facts.message, classifyRunError(facts));
 		} else if (end?.kind === "result" && end.status === "aborted") {
 			throw new RunStop("failed", "The agent aborted the run");

@@ -278,7 +278,7 @@ function spawnWindow(cwd?: string, pendingSessionPath?: string, kind?: SessionKi
 		target.cwd,
 		win,
 		undefined,
-		undefined,
+		pendingSessionPath,
 		target.kind,
 		undefined,
 		target.fresh,

@@ -9,37 +9,75 @@ import { useTabRpc } from "../../../lib/tab-rpc";
 
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { RpcPrCreateResult, RpcPrDraftResult } from "../../../../shared/rpc-types";
-import { useGitStatus } from "../../../hooks/use-git-status";
+import type { RpcGitStatus, RpcPrCreateResult, RpcPrDraftResult } from "../../../../shared/rpc-types";
 import { useT } from "../../../lib/i18n";
 import { usePrCenterStore } from "../../../stores/pr-center";
 import { useSessionStore } from "../../../stores/session";
 import { toast } from "../../../stores/toast";
 import { Button, Input, Modal, TextArea } from "../../common";
 
+const drafts = new Map<string, { title: string; body: string; draft: boolean }>();
+
 export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+	const cwd = useSessionStore(state => state.cwd);
+	const repo = usePrCenterStore(state => state.repo);
+	if (!open || !repo?.available) return null;
+	const scope = JSON.stringify([cwd, repo.repo, repo.defaultBranch]);
+	return <OpenPrDialog key={scope} scope={scope} base={repo.defaultBranch ?? undefined} onClose={onClose} />;
+}
+
+function OpenPrDialog({ scope, base, onClose }: { scope: string; base?: string; onClose: () => void }) {
+	const t = useT();
+	const rpc = useTabRpc();
+	const [head, setHead] = useState<string | null>();
+	useEffect(() => {
+		let current = true;
+		void rpc.getGitStatus().then(
+			response => {
+				if (current)
+					setHead(response.success ? ((response.data as RpcGitStatus | undefined)?.branch ?? null) : null);
+			},
+			() => {
+				if (current) setHead(null);
+			},
+		);
+		return () => {
+			current = false;
+		};
+	}, [rpc]);
+	if (head === undefined)
+		return (
+			<Modal open onClose={onClose} title={t("prCenter.createTitle")} size="lg">
+				<p role="status">{t("common.loading")}</p>
+			</Modal>
+		);
+	const draftKey = JSON.stringify([scope, head]);
+	return <PrForm key={draftKey} draftKey={draftKey} head={head ?? undefined} base={base} onClose={onClose} />;
+}
+
+function PrForm({
+	draftKey,
+	head,
+	base,
+	onClose,
+}: {
+	draftKey: string;
+	head?: string;
+	base?: string;
+	onClose: () => void;
+}) {
 	const tabRpc = useTabRpc();
 	const t = useT();
 	const sidecarReady = useSessionStore(state => state.status) === "ready";
-	const repo = usePrCenterStore(state => state.repo);
-	const { status: git } = useGitStatus();
-	const [title, setTitle] = useState("");
-	const [body, setBody] = useState("");
-	const [draft, setDraft] = useState(true);
+	const [fields, setFields] = useState(() => drafts.get(draftKey) ?? { title: "", body: "", draft: true });
+	const { title, body, draft } = fields;
+	const edit = (patch: Partial<typeof fields>) => {
+		const next = { ...fields, ...patch };
+		drafts.set(draftKey, next);
+		setFields(next);
+	};
 	const [drafting, setDrafting] = useState(false);
 	const [creating, setCreating] = useState(false);
-
-	useEffect(() => {
-		if (!open) return;
-		setTitle("");
-		setBody("");
-		setDraft(true);
-		setDrafting(false);
-		setCreating(false);
-	}, [open]);
-
-	const head = git?.branch ?? undefined;
-	const base = repo?.available ? (repo.defaultBranch ?? undefined) : undefined;
 
 	const aiDraft = async () => {
 		if (!sidecarReady || drafting) return;
@@ -53,8 +91,7 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 			// pr_draft success arm carries RpcPrDraftResult — one named assertion home.
 			const result = response.data as RpcPrDraftResult | undefined;
 			if (result) {
-				setTitle(result.title);
-				setBody(result.body);
+				edit({ title: result.title, body: result.body });
 			}
 		} catch (error) {
 			toast({ variant: "error", title: t("prCenter.draftFailed"), message: String(error) });
@@ -64,7 +101,7 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 	};
 
 	const submit = async () => {
-		if (!sidecarReady || !title.trim() || creating) return;
+		if (!sidecarReady || !title.trim() || creating || drafting) return;
 		setCreating(true);
 		try {
 			const response = await tabRpc.prCreate({ title: title.trim(), body, base, head, draft });
@@ -78,6 +115,7 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 				void window.omp.system.openExternal(result.url);
 			}
 			void usePrCenterStore.getState().refresh();
+			drafts.delete(draftKey);
 			onClose();
 		} catch (error) {
 			toast({ variant: "error", title: t("prCenter.createFailed"), message: String(error) });
@@ -87,7 +125,14 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 	};
 
 	return (
-		<Modal open={open} onClose={onClose} title={t("prCenter.createTitle")} size="lg">
+		<Modal
+			open
+			onClose={() => {
+				if (!creating && !drafting) onClose();
+			}}
+			title={t("prCenter.createTitle")}
+			size="lg"
+		>
 			<form
 				className="flex flex-col gap-3"
 				onSubmit={event => {
@@ -104,13 +149,14 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 							label={t("prCenter.titleLabel")}
 							placeholder={t("prCenter.titlePlaceholder")}
 							value={title}
-							onChange={event => setTitle(event.target.value)}
+							disabled={creating || drafting}
+							onChange={event => edit({ title: event.target.value })}
 							maxLength={120}
 							autoFocus
 						/>
 					</div>
 					<Button
-						disabled={!sidecarReady}
+						disabled={!sidecarReady || creating}
 						loading={drafting}
 						onClick={() => void aiDraft()}
 						title={!sidecarReady ? t("common.notConnected") : undefined}
@@ -124,24 +170,34 @@ export function PrCreateDialog({ open, onClose }: { open: boolean; onClose: () =
 					label={t("prCenter.bodyLabel")}
 					placeholder={t("prCenter.bodyPlaceholder")}
 					value={body}
-					onChange={event => setBody(event.target.value)}
+					disabled={creating || drafting}
+					onChange={event => edit({ body: event.target.value })}
 					rows={10}
 				/>
 				<label className="flex cursor-pointer items-center gap-2 text-omp-md text-(--omp-text)">
 					<input
 						type="checkbox"
 						checked={draft}
-						onChange={event => setDraft(event.target.checked)}
+						disabled={creating || drafting}
+						onChange={event => edit({ draft: event.target.checked })}
 						className="accent-(--omp-accent)"
 					/>
 					{t("prCenter.asDraft")}
 				</label>
 				<div className="flex justify-end gap-2">
-					<Button type="button" variant="ghost" onClick={onClose}>
-						{t("common.cancel")}
+					<Button
+						type="button"
+						variant="ghost"
+						disabled={creating || drafting}
+						onClick={() => {
+							drafts.delete(draftKey);
+							onClose();
+						}}
+					>
+						{t(drafts.has(draftKey) ? "filesPanel.discard" : "common.cancel")}
 					</Button>
 					<Button
-						disabled={!sidecarReady || title.trim().length === 0}
+						disabled={!sidecarReady || drafting || title.trim().length === 0}
 						loading={creating}
 						title={!sidecarReady ? t("common.notConnected") : undefined}
 						type="submit"

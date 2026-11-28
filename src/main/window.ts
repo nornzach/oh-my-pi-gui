@@ -433,12 +433,13 @@ export class WindowManager {
 	 * opening an already-attached session foregrounds its owner window
 	 * instead of spawning a duplicate). False when unknown or destroyed.
 	 */
-	focusWindowById(id: number): boolean {
+	focusWindowById(id: number, tabId: string, folderId?: string): boolean {
 		const record = this.#records.get(id);
 		if (!record || record.win.isDestroyed()) return false;
 		if (record.win.isMinimized()) record.win.restore();
 		record.win.show();
 		record.win.focus();
+		record.win.webContents.send(IPC_EVENTS.MENU_ACTION, { action: "reveal-tab", tabId, folderId });
 		return true;
 	}
 

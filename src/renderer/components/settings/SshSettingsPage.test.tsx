@@ -115,7 +115,10 @@ describe("SshSettingsPage", () => {
 		});
 
 		expect(sshManage).not.toHaveBeenCalled();
-		expect(document.body.textContent ?? "").toContain(translate("ssh.deleteTitle", { name: "builder" }));
+		expect(document.querySelector('[role="dialog"]')).toBeNull();
+		const confirm = document.querySelector('aside [role="group"]');
+		expect(confirm?.getAttribute("aria-label")).toBe(translate("ssh.deleteTitle", { name: "builder" }));
+		expect(confirm?.textContent).toContain("build.example.com");
 	});
 
 	it("removes the host once the confirmation is accepted", async () => {

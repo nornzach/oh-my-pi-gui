@@ -510,6 +510,7 @@
 	--omp-reply-pad: 6px;
 	--omp-step-pad: 3px;
 	--omp-step-height: 28px;
+	--omp-step-inline-pad: 4px;
 	--omp-process-gap: 8px;
 	--omp-reply-leading: 1.65;
 }
@@ -918,7 +919,7 @@
 
 .omp-transcript-editorial .omp-tool-header {
 	min-height: var(--omp-step-height);
-	padding: 1px 4px;
+	padding: 1px var(--omp-step-inline-pad);
 	border-radius: 5px;
 	font-size: var(--text-omp-sm);
 }
@@ -1195,21 +1196,11 @@
 }
 
 .omp-transcript-editorial .omp-read-group {
-	position: relative;
-	padding: 4px var(--omp-editorial-edge) 6px var(--omp-editorial-inset) !important;
+	padding-block: var(--omp-step-pad);
 }
 
-.omp-transcript-editorial .omp-read-group-header {
-	min-height: 26px;
-	border: 0 !important;
-	border-radius: 0;
-	background: transparent !important;
-	padding: 3px 0;
-	font-size: calc(var(--gui-font-size, 15px) * 13 / 15);
-}
-
-.omp-transcript-editorial .omp-read-group-header:hover {
-	background: transparent !important;
+.omp-transcript-editorial .omp-read-group:not([data-inset]) {
+	padding-inline: var(--omp-editorial-inset) var(--omp-editorial-edge);
 }
 
 .omp-transcript-editorial .omp-read-group-body {
@@ -1236,7 +1227,7 @@
 	width: auto;
 	max-width: 100%;
 	border-radius: 8px;
-	padding: 1px 4px;
+	padding: 1px var(--omp-step-inline-pad);
 	font-size: var(--text-omp-sm);
 	transition: background-color var(--omp-motion-fast) var(--omp-ease);
 }
@@ -1306,6 +1297,18 @@
 .omp-transcript-editorial .omp-assistant-turn--compact > .min-w-0 > .markdown-body {
 	font-size: var(--text-omp-md);
 	line-height: 1.5;
+}
+
+.omp-transcript-editorial
+	:is(.omp-assistant-turn--intermediate, .omp-process-group > .omp-assistant-turn--compact)
+	> .omp-transcript-content
+	> .markdown-body,
+.omp-transcript-editorial
+	:is(.omp-streaming-turn--with-tools > .omp-transcript-content, .omp-process-group--live)
+	> .omp-streaming {
+	min-height: var(--omp-step-height);
+	padding: var(--omp-step-pad) var(--omp-step-inline-pad);
+	align-content: center;
 }
 
 /* Reasoning stays visually subordinate to the assistant response. */
@@ -1615,6 +1618,16 @@
 .omp-composer-box:focus-within {
 	border-color: var(--omp-input-focus-border);
 	box-shadow: var(--omp-shadow-md);
+}
+
+.omp-composer-text, .omp-composer-prediction {
+	font-size: calc(var(--text-omp-md) * var(--composer-font-scale));
+}
+.omp-composer-text {
+	min-height: min(calc(var(--composer-rows) * 1lh), 40cqh);
+}
+.omp-composer-text::placeholder, .omp-composer-prediction > span:first-child {
+	font-size: calc(var(--text-omp-xs) * var(--composer-font-scale));
 }
 
 /* Dictation line: sits in the composer between the text and the toolbar while the

@@ -2,8 +2,7 @@
  * Language switcher: compact globe button with an explicit language menu.
  * Reads and persists the active language through useLang()
  * (localStorage LANG_KEY inside I18nProvider), so no extra wiring is needed —
- * mount it anywhere under the provider. Rendered label shows the CURRENT
- * language autonym ("EN" / "中文"), matching OS-language-picker convention.
+ * the tooltip and the menu identify the current language.
  *
  * Mount point: the sidebar footer.
  */
@@ -33,15 +32,11 @@ export function LangSwitcher({ className }: LangSwitcherProps) {
 				}}
 				aria-haspopup="menu"
 				aria-expanded={anchor !== null}
-				title={t("lang.switch")}
+				title={`${t("lang.switch")} (${languageDetails(lang).name})`}
 				aria-label={t("lang.switch")}
-				className={cx(
-					"no-drag omp-pressable flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2 text-omp-md font-medium text-[var(--omp-muted)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]",
-					className,
-				)}
+				className={cx("no-drag", className)}
 			>
-				<Globe size={16} />
-				<span>{languageDetails(lang).short}</span>
+				<Globe aria-hidden="true" size={15} strokeWidth={1.75} />
 			</button>
 			{anchor && (
 				<ContextMenu

@@ -21,6 +21,7 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 	const t = useT();
 	const close = useUiStore(s => s.closeHotkeys);
 	const overrides = useEffectiveKeymapOverrides();
+	const shiftEnterToSend = useUiStore(state => state.shiftEnterToSend);
 	const [query, setQuery] = useState("");
 
 	// Stays mounted through its exit animation, so every open starts from a clean filter.
@@ -33,7 +34,7 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 		const off = t("hotkeys.off").toLowerCase();
 		return SHORTCUT_SECTIONS.map(section => ({
 			section,
-			rows: shortcutSectionRows(section)
+			rows: shortcutSectionRows(section, shiftEnterToSend)
 				.map(
 					(row): ResolvedRow =>
 						row.kind === "entry"
@@ -46,7 +47,7 @@ export function HotkeysDialog({ open }: { open: boolean }) {
 				)
 				.filter(row => !q || row.label.toLowerCase().includes(q) || (row.keys || off).toLowerCase().includes(q)),
 		})).filter(group => group.rows.length > 0);
-	}, [query, t, overrides]);
+	}, [query, t, overrides, shiftEnterToSend]);
 
 	const customize = () => {
 		close();

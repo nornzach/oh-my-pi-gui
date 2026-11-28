@@ -9,6 +9,7 @@
 
 import { useAgentPagesStore } from "../stores/agent-pages";
 import { useSessionStore } from "../stores/session";
+import { useSessionFolders } from "../stores/session-folders";
 import { type SessionTab, useTabsStore } from "../stores/tabs";
 import { useUiStore } from "../stores/ui";
 import { tabSignalPresentation } from "./tab-signal";
@@ -35,6 +36,10 @@ export type TabCloseOutcome = "closed" | "worktree-prompt" | "armed" | "window" 
 export function performTabClose(tab: SessionTab): TabCloseOutcome {
 	const ui = useUiStore.getState();
 	ui.cancelCloseTab();
+	if (useSessionFolders.getState().folders.length > 0) {
+		void useTabsStore.getState().closeFolderTab(tab.id);
+		return "closed";
+	}
 	if (tab.worktree) {
 		ui.openWorktreeClosePrompt(tab.id);
 		return "worktree-prompt";
@@ -56,6 +61,7 @@ export function closeActiveTab(): TabCloseOutcome {
 		pages.close(target.id, page);
 		return "page";
 	}
+	if (useSessionFolders.getState().folders.length > 0) return performTabClose(target);
 	if (tabs.length <= 1) {
 		window.close();
 		return "window";

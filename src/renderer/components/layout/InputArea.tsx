@@ -15,7 +15,7 @@ import {
 	X,
 	Zap,
 } from "lucide-react";
-import type { ClipboardEvent, KeyboardEvent } from "react";
+import type { ClipboardEvent, CSSProperties, KeyboardEvent } from "react";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AvailableCommand, ImageContent } from "../../../shared/rpc-types";
@@ -106,6 +106,10 @@ export function InputArea() {
 	/** Agent `paste.largeMenuThreshold` setting: line count that triggers the paste menu. */
 	const pasteMenuThreshold = useDisplayPreference("pasteMenuThreshold");
 	const collapseLargePastes = useUiStore(s => s.collapseLargePastes);
+	const composerRows = useUiStore(state => state.composerRows);
+	const composerFontScale = useUiStore(state => state.composerFontScale);
+	const shiftEnterToSend = useUiStore(s => s.shiftEnterToSend);
+	const sendKey = shiftEnterToSend ? "Shift+Enter" : "Enter";
 	/** Agent `emojiAutocomplete` setting: emoji popup/inline/submit expansion. */
 	const emojiAutocomplete = useDisplayPreference("emojiAutocomplete");
 
@@ -698,7 +702,7 @@ export function InputArea() {
 				}
 			}
 		}
-		if (e.key === "Enter" && !e.shiftKey) {
+		if (e.key === "Enter" && (isFollowUpSend(e) ? !e.shiftKey : e.shiftKey === shiftEnterToSend)) {
 			e.preventDefault();
 			// While dictating, Enter finishes the capture for review instead of sending; before
 			// recording begins (or while finishing) there is nothing to finish yet.
@@ -947,79 +951,89 @@ export function InputArea() {
 									))}
 								</div>
 							)}
-							<textarea
-								readOnly={collabReadOnly}
-								ref={textareaRef}
-								autoCapitalize="sentences"
-								autoCorrect="on"
-								spellCheck
-								value={text}
-								onChange={event => {
-									useInputHistoryStore.getState().resetNav();
-									const value = event.target.value;
-									// TUI parity (custom-editor.ts:1001-1007): the moment the buffer
-									// becomes exactly the queue prefix, a newline starts the list body.
-									if (value === "->" || value === "=>") {
-										setText(`${value}\n`);
-										return;
-									}
-									setText(value);
-									// Emoji inline replace (TUI parity): `:name:` fires on the closing
-									// colon, emoticons fire on a trailing space/tab/newline.
-									if (emojiAutocomplete) {
-										const caret = event.target.selectionStart ?? value.length;
-										const before = value.slice(0, caret);
-										void tryEmojiInlineReplace(before).then(hit => {
-											if (!hit) return;
-											const el = textareaRef.current;
-											if (!el) return;
-											// Stale-check: the user typed on meanwhile.
-											const currentBefore = el.value.slice(0, el.selectionStart ?? el.value.length);
-											if (currentBefore !== before) return;
-											const nextText =
-												before.slice(0, before.length - hit.replaceLen) +
-												hit.insert +
-												el.value.slice(before.length);
-											setText(nextText);
-											requestAnimationFrame(() => {
-												const target = textareaRef.current;
-												if (!target) return;
-												const nextCaret = before.length - hit.replaceLen + hit.insert.length;
-												target.setSelectionRange(nextCaret, nextCaret);
-											});
-										});
-									}
-								}}
-								onKeyDown={handleKeyDown}
-								onClick={() => setMenu(null)}
-								onPaste={handlePaste}
-								rows={1}
-								placeholder={
-									prediction
-										? prediction
-										: status !== "ready"
-											? t("input.placeholder.connecting")
-											: isStreaming
-												? t("input.placeholder.streaming", { chord: FOLLOW_UP_CHORD })
-												: isChat
-													? t("input.placeholder.chat")
-													: t("input.placeholder.idle")
+							<div
+								className="relative"
+								style={
+									{
+										"--composer-font-scale": composerFontScale / 100,
+										"--composer-rows": composerRows,
+									} as CSSProperties
 								}
-								aria-description={prediction ? t("input.prediction.hint") : undefined}
-								className={cx(
-									"block max-h-[40cqh] min-h-[1lh] w-full resize-none bg-transparent text-omp-md leading-[1.5] text-[var(--omp-text)] outline-none [field-sizing:content] placeholder-shown:h-[1lh] placeholder-shown:overflow-hidden placeholder:truncate placeholder:text-omp-xs placeholder:text-[var(--omp-dim)]",
-									prediction && "placeholder:opacity-0",
+							>
+								<textarea
+									readOnly={collabReadOnly}
+									ref={textareaRef}
+									autoCapitalize="sentences"
+									autoCorrect="on"
+									spellCheck
+									value={text}
+									onChange={event => {
+										useInputHistoryStore.getState().resetNav();
+										const value = event.target.value;
+										// TUI parity (custom-editor.ts:1001-1007): the moment the buffer
+										// becomes exactly the queue prefix, a newline starts the list body.
+										if (value === "->" || value === "=>") {
+											setText(`${value}\n`);
+											return;
+										}
+										setText(value);
+										// Emoji inline replace (TUI parity): `:name:` fires on the closing
+										// colon, emoticons fire on a trailing space/tab/newline.
+										if (emojiAutocomplete) {
+											const caret = event.target.selectionStart ?? value.length;
+											const before = value.slice(0, caret);
+											void tryEmojiInlineReplace(before).then(hit => {
+												if (!hit) return;
+												const el = textareaRef.current;
+												if (!el) return;
+												// Stale-check: the user typed on meanwhile.
+												const currentBefore = el.value.slice(0, el.selectionStart ?? el.value.length);
+												if (currentBefore !== before) return;
+												const nextText =
+													before.slice(0, before.length - hit.replaceLen) +
+													hit.insert +
+													el.value.slice(before.length);
+												setText(nextText);
+												requestAnimationFrame(() => {
+													const target = textareaRef.current;
+													if (!target) return;
+													const nextCaret = before.length - hit.replaceLen + hit.insert.length;
+													target.setSelectionRange(nextCaret, nextCaret);
+												});
+											});
+										}
+									}}
+									onKeyDown={handleKeyDown}
+									onClick={() => setMenu(null)}
+									onPaste={handlePaste}
+									rows={1}
+									placeholder={
+										prediction
+											? prediction
+											: status !== "ready"
+												? t("input.placeholder.connecting")
+												: isStreaming
+													? t("input.placeholder.streaming", { chord: FOLLOW_UP_CHORD })
+													: isChat
+														? t("input.placeholder.chat")
+														: t("input.placeholder.idle")
+									}
+									aria-description={prediction ? t("input.prediction.hint") : undefined}
+									className={cx(
+										"omp-composer-text block max-h-[40cqh] w-full resize-none bg-transparent leading-[1.5] text-[var(--omp-text)] outline-none [field-sizing:content] placeholder-shown:h-[1lh] placeholder-shown:overflow-hidden placeholder:truncate placeholder:text-[var(--omp-dim)]",
+										prediction && "placeholder:opacity-0",
+									)}
+								/>
+								{prediction && (
+									<div
+										aria-hidden="true"
+										className="omp-composer-prediction pointer-events-none absolute inset-x-0 top-0 flex h-[1lh] select-none items-center gap-1.5 leading-[1.5] text-(--omp-dim)"
+									>
+										<span className="truncate">{prediction}</span>
+										<Kbd className="leading-none">⇥ Tab</Kbd>
+									</div>
 								)}
-							/>
-							{prediction && (
-								<div
-									aria-hidden="true"
-									className="pointer-events-none absolute inset-x-3.5 bottom-0 flex h-[1lh] select-none items-center gap-1.5 text-omp-md leading-[1.5] text-(--omp-dim)"
-								>
-									<span className="truncate text-omp-xs">{prediction}</span>
-									<Kbd className="leading-none">⇥ Tab</Kbd>
-								</div>
-							)}
+							</div>
 						</div>
 
 						{dictation.view && (
@@ -1279,9 +1293,11 @@ export function InputArea() {
 											dictating ||
 											!hasDraft
 										}
-										aria-label={followUpHeld ? t("input.sendFollowUp") : t("input.send")}
+										aria-label={followUpHeld ? t("input.sendFollowUp") : t("input.send", { sendKey })}
 										title={
-											isStreaming ? t("input.sendStreaming", { chord: FOLLOW_UP_CHORD }) : t("input.send")
+											isStreaming
+												? t("input.sendStreaming", { chord: FOLLOW_UP_CHORD, sendKey })
+												: t("input.send", { sendKey })
 										}
 										className={cx("omp-send-button", followUpHeld && "omp-send-button--follow-up")}
 									>

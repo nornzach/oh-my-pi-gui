@@ -1,19 +1,35 @@
 import type { Language } from "../../../shared/languages";
 import { RU_SCHEMA_OPTION_TEXT } from "./schema-option-ru";
+import { TH_SCHEMA_OPTION_TEXT } from "./schema-option-th";
 import { ZH_SCHEMA_OPTION_TEXT } from "./schema-option-zh";
 import { RU_GROUP_TITLES, RU_SETTINGS } from "./schema-ru";
+import { TH_GROUP_TITLES, TH_SETTINGS } from "./schema-th";
 import { ZH_GROUP_TITLES, ZH_SETTINGS } from "./schema-zh";
 
+export const schemaTranslations = {
+	en: undefined,
+	ru: { settings: RU_SETTINGS, groups: RU_GROUP_TITLES, options: RU_SCHEMA_OPTION_TEXT },
+	th: { settings: TH_SETTINGS, groups: TH_GROUP_TITLES, options: TH_SCHEMA_OPTION_TEXT },
+	zh: { settings: ZH_SETTINGS, groups: ZH_GROUP_TITLES, options: ZH_SCHEMA_OPTION_TEXT },
+} satisfies Record<Language, unknown>;
+
 export function settingTranslation(language: Language, path: string) {
-	return language === "ru" ? RU_SETTINGS[path] : language === "zh" ? ZH_SETTINGS[path] : undefined;
+	return schemaTranslations[language]?.settings[path];
+}
+
+export function settingSearchText(path: string): string {
+	return Object.values(schemaTranslations)
+		.map(locale => {
+			const entry = locale?.settings[path];
+			return entry ? `${entry.label ?? ""} ${entry.description ?? ""}` : "";
+		})
+		.join(" ");
 }
 
 export function schemaGroupTitle(language: Language, title: string): string {
-	const titles = language === "ru" ? RU_GROUP_TITLES : language === "zh" ? ZH_GROUP_TITLES : undefined;
-	return titles?.[title] ?? title;
+	return schemaTranslations[language]?.groups[title] ?? title;
 }
 
 export function schemaOptionText(language: Language, text: string): string {
-	const options = language === "ru" ? RU_SCHEMA_OPTION_TEXT : language === "zh" ? ZH_SCHEMA_OPTION_TEXT : undefined;
-	return options?.[text] ?? text;
+	return schemaTranslations[language]?.options[text] ?? text;
 }

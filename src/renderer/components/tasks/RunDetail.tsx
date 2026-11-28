@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { RunReport, TaskRun } from "../../../shared/scheduler-types";
-import { describeProviderError } from "../../lib/errors";
 import { basename, cx, formatClock, formatCost, formatDuration, formatTokens } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { InlineMarkdown } from "../../lib/inline-markdown";
@@ -26,7 +25,7 @@ import { useSchedulerStore } from "../../stores/scheduler";
 import { useTabsStore } from "../../stores/tabs";
 import { Badge, Button, Spinner } from "../common";
 import { TechnicalDetails } from "../common/TechnicalDetails";
-import { runDotClass, runDuration, runOutcome, summaryLine } from "./task-format";
+import { runDotClass, runDuration, runErrorText, runOutcome, summaryLine } from "./task-format";
 
 export function RunOutcomeBadge({ run }: { run: TaskRun }) {
 	const t = useT();
@@ -59,7 +58,7 @@ export function RunRow({
 	const finding = run.report?.summary
 		? summaryLine(run.report.summary)
 		: run.error
-			? describeProviderError(run.error.message)
+			? runErrorText(t, run.error.message)
 			: undefined;
 	const headline = title ?? finding;
 	const fileCount = Math.max(run.changedFiles.length, run.report?.changes.length ?? 0);
@@ -301,12 +300,12 @@ export function RunDetail({ run, taskTitle, actions }: { run: TaskRun; taskTitle
 							{t(`tasks.run.errorKind.${run.error.kind}`)}
 						</p>
 						<p className="mt-0.5 text-omp-md break-words whitespace-pre-wrap text-(--omp-muted)">
-							{describeProviderError(run.error.message)}
+							{runErrorText(t, run.error.message)}
 						</p>
 						<TechnicalDetails
 							className="mt-1.5"
 							raw={run.error.message}
-							shown={describeProviderError(run.error.message)}
+							shown={runErrorText(t, run.error.message)}
 						/>
 					</div>
 				</div>

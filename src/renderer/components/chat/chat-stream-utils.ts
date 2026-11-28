@@ -470,7 +470,11 @@ export function buildHistoryRows(
 		// Completion notifications are transport events inside the current run,
 		// not semantic phase boundaries. Keep them with the tools they report on;
 		// an out-of-band completion with no active run remains a standalone row.
-		if (detail === "compact" && processMessages.length > 0 && isCompletionMessage(message)) {
+		if (
+			detail === "compact" &&
+			processMessages.length > 0 &&
+			(isCompletionMessage(message) || message.customType === "async-notify")
+		) {
 			processMessages.push(message);
 			continue;
 		}

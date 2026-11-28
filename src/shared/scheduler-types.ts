@@ -18,6 +18,12 @@ export type TaskNotify = "always" | "on_change" | "on_failure";
 export type TaskState = "active" | "paused" | "disabled" | "archived";
 export type TaskDisabledReason = "failure_streak" | "blocked_config";
 
+export const TASK_RUN_FAILURE = {
+	interrupted: "omp closed or crashed while this run was in progress",
+	removed: "The task no longer exists",
+	failed: "The run ended with an error",
+} as const;
+
 /**
  * How far one run goes (see shared/task-depth.ts): `check` one pass, `goal`
  * until the work is done and checked, `research` at least `rounds` rounds,

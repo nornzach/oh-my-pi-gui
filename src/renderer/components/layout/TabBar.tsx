@@ -16,6 +16,7 @@ import {
 	Check,
 	ChevronDown,
 	Columns2,
+	FolderPlus,
 	GitBranch,
 	GitBranchPlus,
 	MessageCircle,
@@ -46,6 +47,7 @@ import { saveGuiPreference } from "../../lib/display-preferences";
 import { basename, cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { actionChords, KEYMAP_ACTION_BY_ID, onEscape } from "../../lib/keymap";
+import { startFolderDrag } from "../../lib/session-folder-drag";
 import { sessionHasContent } from "../../lib/session-title";
 import { scrollStripOnWheel } from "../../lib/strip-scroll";
 import { type LiveTabRuntime, performTabClose, tabNeedsCloseConfirm } from "../../lib/tab-close";
@@ -59,6 +61,7 @@ import type { QueueStore } from "../../stores/queue";
 import { useQueueStore } from "../../stores/queue";
 import type { SessionStore } from "../../stores/session";
 import { useSessionStore } from "../../stores/session";
+import { folderTabs, useSessionFolders } from "../../stores/session-folders";
 import { sessionRuntimeStore } from "../../stores/session-runtime-context";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import {
@@ -75,6 +78,7 @@ import {
 import { type TabWidth, useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
 import { AgentPageChips } from "../agents/AgentPageChips";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor, type ContextMenuItem } from "../common/ContextMenu";
+import { AddToSessionFolders, type FolderPicker, SessionFolderSwitcher } from "./SessionFolders";
 import { type TabSearchEntry, TabSearchMenu } from "./TabSearchMenu";
 
 /** Auto-cancel window for the armed close confirm (injectable for tests). */
@@ -137,7 +141,8 @@ function TabChip({
 }) {
 	const t = useT();
 	const switchTab = useTabsStore(s => s.switchTab);
-	const closable = useTabsStore(s => s.tabs.length > 1);
+	const folderMode = useSessionFolders(s => s.folders.length > 0);
+	const closable = useTabsStore(s => s.tabs.length > 1) || folderMode;
 	// The active tab's live stream state sharpens the signal between status pushes.
 	const activeRuntime = useSessionStore(s =>
 		active ? s.isStreaming || s.isCompacting || s.isBackgroundCompacting : false,
@@ -166,6 +171,7 @@ function TabChip({
 			onDragStart={(event: ReactDragEvent<HTMLDivElement>) => {
 				event.dataTransfer.effectAllowed = "move";
 				event.dataTransfer.setData("application/x-omp-tab", tab.id);
+				if (folderMode) startFolderDrag(event.dataTransfer, { tabId: tab.id });
 				window.dispatchEvent(new CustomEvent("omp:tab-drag", { detail: { tabId: tab.id } }));
 			}}
 			onDragEnd={() => window.dispatchEvent(new CustomEvent("omp:tab-drag", { detail: { tabId: null } }))}
@@ -322,12 +328,16 @@ function PairChip({
 export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?: number }) {
 	const t = useT();
 	const { sessions } = useSessionList("global");
-	const tabs = useTabsStore(s => s.tabs);
+	const allTabs = useTabsStore(s => s.tabs);
+	const folders = useSessionFolders();
+	const folderMode = folders.folders.length > 0;
+	const tabs = useMemo(() => folderTabs(allTabs, folders), [allTabs, folders]);
 	const activeTabId = useTabsStore(s => s.activeTabId);
 	const groups = useTabsStore(s => s.groups);
 	const split = useTabsStore(s => s.split);
 	const groupAliases = useSidebarPrefs(s => s.groupAliases);
 	const closeTab = useTabsStore(s => s.closeTab);
+	const closeFolderTab = useTabsStore(s => s.closeFolderTab);
 	const openTab = useTabsStore(s => s.openTab);
 	const splitTab = useTabsStore(s => s.splitTab);
 	const unsplit = useTabsStore(s => s.unsplit);
@@ -352,6 +362,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 	const armCloseTab = useUiStore(s => s.armCloseTab);
 	const cancelCloseTab = useUiStore(s => s.cancelCloseTab);
 	const [tabMenu, setTabMenu] = useState<{ anchor: ContextMenuAnchor; tabId: string } | null>(null);
+	const [folderPicker, setFolderPicker] = useState<FolderPicker | null>(null);
 	/** The all-tabs list ("switch"), or the partner picker for one tab's "Split with…". */
 	const [searchMenu, setSearchMenu] = useState<{ anchor: ContextMenuAnchor; pairWith: string | null } | null>(null);
 	const [dragTabId, setDragTabId] = useState<string | null>(null);
@@ -526,14 +537,17 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 	};
 
 	const closeTabs = async (ids: readonly string[]) => {
+		const folder = useSessionFolders.getState().active;
 		for (const id of ids) {
+			if (useSessionFolders.getState().active !== folder) return;
 			// Sequential close preserves the store's active-neighbor routing and
 			// single-tab floor while the list shrinks.
-			await closeTab(id);
+			await closeFolderTab(id);
 		}
 	};
 
 	const closeAllTabs = async (target: SessionTab) => {
+		if (folderMode) return closeTabs(tabs.map(tab => tab.id));
 		await closeTabs(tabs.filter(tab => tab.id !== target.id).map(tab => tab.id));
 		const replacement = await openTab({ cwd: target.cwd, kind: target.kind });
 		if (replacement) await closeTab(target.id);
@@ -546,7 +560,8 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 		streaming: liveStreaming,
 		compacting: liveCompacting,
 	};
-	const protectedFromBatchClose = (tab: SessionTab) => tab.worktree != null || tabNeedsCloseConfirm(tab, liveRuntime);
+	const protectedFromBatchClose = (tab: SessionTab) =>
+		!folderMode && (tab.worktree != null || tabNeedsCloseConfirm(tab, liveRuntime));
 	const actionTabId = activeTabId ?? tabs[0]?.id;
 
 	/** Reorder drop wiring for one chip (a pair's frame): drop before or after it. */
@@ -610,7 +625,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 			paired={paired}
 			dropProps={dropProps}
 			confirmingClose={armedCloseTab?.tabId === tab.id}
-			closeNeedsConfirm={tabNeedsCloseConfirm(tab, liveRuntime)}
+			closeNeedsConfirm={!folderMode && tabNeedsCloseConfirm(tab, liveRuntime)}
 			onArmClose={() => armCloseTab(tab.id)}
 			onConfirmClose={() => confirmClose(tab.id)}
 			onCancelClose={cancelCloseTab}
@@ -674,6 +689,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 					multiRow ? "min-h-11 items-start py-1.5" : "h-11 items-center",
 				)}
 			>
+				<SessionFolderSwitcher />
 				{/* Only the chips scroll: the tab actions and "+" stay pinned at the end,
 				    reachable however many tabs are open. */}
 				<div
@@ -776,6 +792,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 					}}
 				/>
 			)}
+			{folderPicker && <AddToSessionFolders {...folderPicker} onClose={() => setFolderPicker(null)} />}
 			{tabMenu &&
 				(() => {
 					const target = tabs.find(tab => tab.id === tabMenu.tabId);
@@ -783,7 +800,7 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 					if (!target || unitIndex < 0) return null;
 					const left = units.slice(0, unitIndex).flatMap(unit => unit.tabs);
 					const right = units.slice(unitIndex + 1).flatMap(unit => unit.tabs);
-					const targetPair = groupOf(groups, target.id);
+					const targetPair = units[unitIndex].group;
 					const closeItems = (ids: readonly string[]) => {
 						setTabMenu(null);
 						void closeTabs(ids);
@@ -814,6 +831,15 @@ export function TabBar({ confirmCloseMs = CONFIRM_CLOSE_MS }: { confirmCloseMs?:
 							void splitTab(target.id, entry.placement);
 						},
 					}));
+					items.unshift({
+						id: "tab-add-folder",
+						label: t("folders.add"),
+						icon: FolderPlus,
+						onSelect: () => {
+							setFolderPicker({ anchor: tabMenu.anchor, source: { tabId: target.id } });
+							setTabMenu(null);
+						},
+					});
 					items.push({
 						id: "split-with",
 						label: t("tabs.menu.splitWith"),

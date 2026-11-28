@@ -5,7 +5,14 @@
  */
 import { describe, expect, it } from "vitest";
 import type { InsightsDay, RunReport, TaskRun } from "../../../shared/scheduler-types";
-import { groupHistory, summaryLine, trimLeadingEmptyDays } from "./task-format";
+import { zh } from "../../locales/zh";
+import { groupHistory, runErrorText, summaryLine, trimLeadingEmptyDays } from "./task-format";
+
+it("localizes stored scheduler failures while preserving external diagnostics", () => {
+	const translate = (key: string) => zh[key];
+	expect(runErrorText(translate, "The task no longer exists")).toBe("此任务已不存在。");
+	expect(runErrorText(translate, "Custom worker rejected this input")).toBe("Custom worker rejected this input");
+});
 
 function run(id: string, fields: Partial<TaskRun> = {}): TaskRun {
 	return {

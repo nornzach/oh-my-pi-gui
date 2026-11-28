@@ -57,6 +57,10 @@ test.beforeEach(async () => {
 				autoCollapseProcess: true,
 				thinkingExpanded: true,
 			}),
+			...(test.info().title.startsWith("Read alignment:") && {
+				transcriptDetail: "full",
+				autoCollapseProcess: false,
+			}),
 			sidebar: { registeredWorkspaces: [emptyProject] },
 		}),
 	);
@@ -207,6 +211,35 @@ test("#74 an ask form answers inline while the conversation stays on screen", as
 	await expect
 		.poll(async () => (await recorded("extension_ui_response")).filter(item => item.cancelled === true))
 		.toHaveLength(1);
+});
+
+test("display switches align with ordinary settings before and after restoring the terminal value", async () => {
+	await page.getByRole("button", { name: "Settings", exact: true }).click();
+	const settings = page.getByRole("dialog");
+	await settings.getByPlaceholder("Search settings…").fill("Show usage for each response");
+	await settings.getByRole("button", { name: /^Show usage for each response/ }).click();
+	const tracks = settings.locator("#setting-gui-display .omp-switch-track");
+	const reference = settings.locator("#setting-gui-askInline .omp-switch-track");
+	const checkAlignment = async () => {
+		const right = await reference.evaluate(node => node.getBoundingClientRect().right);
+		await expect(tracks).toHaveCount(8);
+		const edges = await tracks.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().right));
+		for (const edge of edges) expect(Math.abs(edge - right)).toBeLessThan(1);
+	};
+	const row = settings.locator("#setting-gui-showTokenUsage");
+	const toggle = row.getByRole("switch");
+	const restore = row.getByRole("button", { name: "Use terminal setting", exact: true });
+	const inherited = await toggle.getAttribute("aria-checked");
+	await expect(restore).toHaveCount(0);
+	await checkAlignment();
+	await toggle.click();
+	await expect(toggle).toHaveAttribute("aria-checked", inherited === "true" ? "false" : "true");
+	await expect(restore).toBeVisible();
+	await checkAlignment();
+	await restore.click();
+	await expect(restore).toHaveCount(0);
+	await expect(toggle).toHaveAttribute("aria-checked", inherited!);
+	await checkAlignment();
 });
 
 test("#74 turning the preference off brings the modal back", async () => {
@@ -447,6 +480,25 @@ test("#79 live reasoning follows its own tail until the reader scrolls up", asyn
 	await group.screenshot({ path: "test-results/compact-tool-header.png", animations: "disabled" });
 });
 
+test("background job notifications stay inside the process on delivery and after reload", async () => {
+	await command("fixture background notification");
+	for (const reload of [false, true]) {
+		if (reload) await page.reload();
+		const transcript = page.locator(".omp-transcript-canvas");
+		await expect(transcript.getByText("Local fixture reply", { exact: true })).toBeVisible();
+		const process = transcript.locator(".omp-execution-group-header");
+		await expect(process).toHaveAttribute("aria-expanded", "false");
+		const notice = transcript.locator("summary").filter({ hasText: "Background job output · bg_1" });
+		await expect(notice).not.toBeVisible();
+		await process.click();
+		await expect(notice).toBeVisible();
+		await expect(transcript).not.toContainText("building arm64 DMG");
+		await notice.click();
+		await expect(transcript.getByText("building arm64 DMG", { exact: true })).toBeVisible();
+		await expect(transcript).not.toContainText(/async-notify|INTERNAL_BUILD_COMMAND|PRIVATE_MATCH_PATTERN/);
+	}
+});
+
 test("dynamic view folds both narrated tool rounds when the first answer text arrives", async () => {
 	const emit = await rendererEvents();
 	await page.locator("[data-view-controls-trigger]").click();
@@ -508,6 +560,52 @@ test("dynamic view folds both narrated tool rounds when the first answer text ar
 	await expect(answerText).toBeVisible();
 });
 
+test("Read alignment: single, grouped, and live reads use the same tool row columns", async () => {
+	const emit = await rendererEvents();
+	const timestamp = Date.now();
+	await emit([
+		{ type: "agent_start" },
+		{
+			type: "message_end",
+			message: {
+				role: "assistant",
+				timestamp,
+				content: [
+					{ type: "toolCall", id: "read-one", name: "read", arguments: { path: "src/types.ts:280-360" } },
+					{ type: "toolCall", id: "bash-between", name: "bash", arguments: { command: "ls src" } },
+					{ type: "toolCall", id: "read-two", name: "read", arguments: { path: "src/config.ts:1-20" } },
+					{ type: "toolCall", id: "read-three", name: "read", arguments: { path: "src/config.ts:21-40" } },
+				],
+			},
+		},
+		{ type: "message_start", message: { role: "assistant", timestamp: timestamp + 1 } },
+		{ type: "tool_execution_start", toolCallId: "read-live", toolName: "read", args: { path: "src/live.ts" } },
+	]);
+
+	const headers = page.locator(".omp-tool-header");
+	const single = headers.filter({ hasText: "src/types.ts:280-360" });
+	const group = headers.filter({ hasText: "src/config.ts" });
+	const live = headers.filter({ hasText: "src/live.ts" });
+	const shell = headers.filter({ hasText: "ls src" });
+	await expect(group).toContainText("(2)");
+	await expect(live).toBeVisible();
+	const shellBox = (await shell.boundingBox())!;
+	const labelBox = (await single.getByText("Read", { exact: true }).boundingBox())!;
+	const summaryBox = (await single.getByText("src/types.ts:280-360", { exact: true }).boundingBox())!;
+	for (const [row, summary] of [
+		[single, "src/types.ts:280-360"],
+		[group, "src/config.ts"],
+		[live, "src/live.ts"],
+	] as const) {
+		const rowBox = (await row.boundingBox())!;
+		expect(rowBox.x).toBeCloseTo(shellBox.x, 0);
+		expect(rowBox.width).toBeCloseTo(shellBox.width, 0);
+		expect(rowBox.height).toBeCloseTo(shellBox.height, 0);
+		expect((await row.getByText("Read", { exact: true }).boundingBox())!.x).toBeCloseTo(labelBox.x, 0);
+		expect((await row.getByText(summary, { exact: true }).boundingBox())!.x).toBeCloseTo(summaryBox.x, 0);
+	}
+});
+
 test("tool narration stays readable and the spacing control compacts actual transcript rows", async () => {
 	const emit = await rendererEvents();
 	await emit([
@@ -519,7 +617,7 @@ test("tool narration stays readable and the spacing control compacts actual tran
 				timestamp: Date.now(),
 				content: [
 					{ type: "thinking", thinking: "Use the build shell to finish the task." },
-					{ type: "text", text: "The build is ready to continue." },
+					{ type: "text", text: "The build is ready to continue.  \nNext, send `Enter`." },
 					{
 						type: "toolCall",
 						id: "send",
@@ -531,7 +629,7 @@ test("tool narration stays readable and the spacing control compacts actual tran
 			},
 		},
 	]);
-	const narration = page.getByText("The build is ready to continue.", { exact: true });
+	const narration = page.locator(".markdown-body p").filter({ hasText: "The build is ready to continue." });
 	const group = page.locator(".omp-execution-group-header");
 	await expect(narration).toBeHidden();
 	await expect(group).toContainText("Wait for command · pty-7");
@@ -541,14 +639,31 @@ test("tool narration stays readable and the spacing control compacts actual tran
 	const wait = page.locator(".omp-tool-header").filter({ hasText: "Wait for command" });
 	await expect(send).toContainText("enter · pty-7");
 	await expect(page.locator(".omp-message-actions")).toHaveCount(0);
+	const narrationSpacing = async () => {
+		const [textBox, thinkingBox, toolBox] = await Promise.all([
+			narration.boundingBox(),
+			page.locator(".omp-thinking-block").boundingBox(),
+			send.boundingBox(),
+		]);
+		if (!textBox || !thinkingBox || !toolBox) throw new Error("Process details must be visible");
+		const above = textBox.y - thinkingBox.y - thinkingBox.height;
+		const below = toolBox.y - textBox.y - textBox.height;
+		expect(above).toBeCloseTo(below, 0);
+		expect(textBox.x).toBeCloseTo((await send.locator(".omp-tool-status-icon").boundingBox())!.x, 0);
+		return below;
+	};
 	const trigger = page.locator("[data-view-controls-trigger]");
 	await trigger.click();
 	await page.locator('[data-density-option="comfortable"]').click();
 	const comfortableHeight = await send.evaluate(element => element.getBoundingClientRect().height);
+	const comfortableNarrationGap = await narrationSpacing();
 	await page.locator('[data-density-option="tight"]').click();
 	await expect
 		.poll(() => send.evaluate(element => element.getBoundingClientRect().height))
 		.toBeLessThan(comfortableHeight);
+	const tightNarrationGap = await narrationSpacing();
+	expect(tightNarrationGap).toBeGreaterThanOrEqual(1);
+	expect(tightNarrationGap).toBeLessThan(comfortableNarrationGap);
 	await page.keyboard.press("Escape");
 	const sendBox = await send.boundingBox();
 	const waitBox = await wait.boundingBox();
@@ -556,6 +671,34 @@ test("tool narration stays readable and the spacing control compacts actual tran
 	expect(gap).toBeGreaterThanOrEqual(0);
 	expect(gap).toBeLessThan(3);
 	await page.screenshot({ path: "test-results/transcript-tool-spacing.png", scale: "css", animations: "disabled" });
+	await trigger.click();
+	await page.locator('[data-process-preset="detailed"]').click();
+	await expect(group).toHaveCount(0);
+	expect(await narrationSpacing()).toBeGreaterThanOrEqual(1);
+});
+
+test("switching sessions restores each inspector tab and its closed state", async () => {
+	const inspector = page.locator(".omp-inspector");
+	const review = page.locator(".omp-review-toggle");
+	const sessions = page.getByRole("tablist", { name: "Session tabs" }).getByRole("tab");
+	const browser = inspector.getByRole("button", { name: "Browser", exact: true });
+	const files = inspector.getByRole("button", { name: "Files", exact: true });
+	await review.click();
+	await browser.click();
+	await page.getByRole("button", { name: "New Agent Tab", exact: true }).click();
+	await expect(sessions).toHaveCount(2);
+	await expect(inspector).toHaveCount(0);
+	await review.click();
+	await files.click();
+	await sessions.first().click();
+	await expect(browser).toHaveAttribute("aria-pressed", "true");
+	await sessions.last().click();
+	await expect(files).toHaveAttribute("aria-pressed", "true");
+	await inspector.getByTitle("Close panel").click();
+	await sessions.first().click();
+	await expect(browser).toHaveAttribute("aria-pressed", "true");
+	await sessions.last().click();
+	await expect(inspector).toHaveCount(0);
 });
 
 test("#73 activity moves between the right edge and drawer without covering the composer menu", async () => {
@@ -601,6 +744,54 @@ test("#73 activity moves between the right edge and drawer without covering the 
 	expect(errors).toEqual([]);
 });
 
+test("#92 changing the send key leaves Enter for multiline input", async () => {
+	await page.getByRole("button", { name: "Settings", exact: true }).click();
+	const settings = page.getByRole("dialog");
+	await settings.getByText("Keyboard shortcuts", { exact: true }).first().click();
+	await settings.getByRole("button", { name: "Shift+Enter", exact: true }).click();
+	await expect.poll(() => page.evaluate(() => window.omp.prefs.get("shiftEnterToSend"))).toBe(true);
+	await page.keyboard.press("Escape");
+	await page.reload();
+	const composer = page.getByRole("textbox", { name: /Ask omp/ });
+	await composer.fill("first line");
+	await composer.press("Enter");
+	await expect(composer).toHaveValue("first line\n");
+	await composer.pressSequentially("second line");
+	await composer.press("Shift+Enter");
+	await expect
+		.poll(async () => (await recorded("prompt")).map(item => item.message))
+		.toContain("first line\nsecond line");
+});
+
+test("#88 text attachments preview by default and can open in the system app", async () => {
+	const file = path.join(profile, "project", "notes.txt");
+	await fs.writeFile(file, "Attachment preview contents");
+	await command(`Review @"${file}"`);
+	const card = page.locator("[data-file-attachment]").getByRole("button", { name: "notes.txt" });
+	await card.click();
+	const inspector = page.locator(".omp-inspector");
+	await expect(inspector.getByText("Attachment preview contents", { exact: true }).first()).toBeVisible();
+	await inspector.getByTitle("Close panel").click();
+	await page.getByRole("button", { name: "Settings", exact: true }).click();
+	const settings = page.getByRole("dialog");
+	await settings.getByPlaceholder("Search settings…").fill("Open text files in");
+	await settings.getByRole("button", { name: /^Open text files in/ }).click();
+	await settings.getByRole("button", { name: "Open in default app", exact: true }).click();
+	await expect.poll(() => page.evaluate(() => window.omp.prefs.get("externalTextFiles"))).toBe(true);
+	await page.keyboard.press("Escape");
+	const invoked = app!.evaluate(({ shell }) => {
+		const opened = Promise.withResolvers<string>();
+		shell.openPath = async target => {
+			opened.resolve(target);
+			return "";
+		};
+		return opened.promise;
+	});
+	await card.click();
+	expect(await invoked).toBe(file);
+	await expect(inspector).toHaveCount(0);
+});
+
 test("the composer grows from one line with wrapped or multiline drafts and shrinks on clear", async () => {
 	const composer = page.locator(".omp-composer-box textarea");
 	const height = () => composer.evaluate(node => node.getBoundingClientRect().height);
@@ -614,4 +805,41 @@ test("the composer grows from one line with wrapped or multiline drafts and shri
 	expect(await composer.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
 	await composer.fill("");
 	await expect.poll(async () => Math.abs((await height()) - line)).toBeLessThan(1);
+});
+
+test("composer height and typography can be adjusted independently and survive reload", async () => {
+	const composer = page.locator(".omp-composer-box textarea");
+	const metrics = () =>
+		composer.evaluate(node => ({
+			font: Number.parseFloat(getComputedStyle(node).fontSize),
+			hint: Number.parseFloat(getComputedStyle(node, "::placeholder").fontSize),
+			rows: Math.round(node.clientHeight / Number.parseFloat(getComputedStyle(node).lineHeight)),
+		}));
+	const baseline = await metrics();
+	const openSettings = async () => {
+		await page.getByRole("button", { name: "Settings", exact: true }).click();
+		const settings = page.getByRole("dialog");
+		await settings.getByPlaceholder("Search settings…").fill("Composer starting height");
+		await settings.getByRole("button", { name: /^Composer starting height/ }).click();
+		return settings;
+	};
+	let settings = await openSettings();
+	await settings.getByTitle("Composer starting height (lines) +1", { exact: true }).click();
+	await expect.poll(metrics).toEqual({ ...baseline, rows: 2 });
+	await settings.getByTitle("Composer text size +10%", { exact: true }).click();
+	const larger = { font: baseline.font * 1.1, hint: baseline.hint * 1.1 };
+	await page.keyboard.press("Escape");
+	await expect.poll(async () => (await metrics()).hint).toBeCloseTo(larger.hint);
+	await page.reload();
+	await expect.poll(async () => (await metrics()).font).toBeCloseTo(larger.font);
+	await expect.poll(async () => (await metrics()).rows).toBe(2);
+	await composer.fill("one\ntwo\nthree\nfour");
+	await expect.poll(async () => (await metrics()).rows).toBe(4);
+	await composer.fill("");
+	await expect.poll(async () => (await metrics()).rows).toBe(2);
+	settings = await openSettings();
+	await settings.getByRole("group", { name: "Composer starting height (lines)" }).getByTitle("Reset (1)").click();
+	await settings.getByRole("group", { name: "Composer text size" }).getByTitle("Reset (100%)").click();
+	await page.keyboard.press("Escape");
+	await expect.poll(metrics).toEqual(baseline);
 });

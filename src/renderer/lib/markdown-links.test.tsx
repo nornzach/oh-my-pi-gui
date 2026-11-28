@@ -90,10 +90,17 @@ afterEach(async () => {
 	delete ompWindow.omp;
 	clearPathResolutionCache();
 	useTabsStore.getState().reset();
-	useUiStore.setState({ filePreviewPath: null, filePreviewLine: null });
+	useUiStore.setState({ filePreviewPath: null, filePreviewLine: null, externalTextFiles: false });
 });
 
 describe("inline code paths", () => {
+	it("opens a resolved text link in the system app instead of changing the preview when configured", async () => {
+		useUiStore.setState({ externalTextFiles: true });
+		await render("See `src/app.ts:12`.");
+		await act(async () => click(host.querySelector('[role="link"]')));
+		expect(openPath).toHaveBeenCalledWith("/work/src/app.ts");
+		expect(useUiStore.getState().filePreviewPath).toBeNull();
+	});
 	it("resolves a relative path beside the markdown file being previewed", async () => {
 		await render("See `app.ts:12`.", "src/README.md");
 		const link = host.querySelector('[role="link"]');

@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { activateFileLink } from "../../lib/file-actions";
+import { activateFileLink, prefersExternalTextFile } from "../../lib/file-actions";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useResolvedPath } from "../../lib/path-resolver";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { useUiStore } from "../../stores/ui";
 import { LINK_MODIFIER, showLinkMenu } from "../common/LinkMenu";
 
 /**
@@ -32,9 +33,17 @@ export function PathLink({
 	const t = useT();
 	const tabId = useRuntimeTabId();
 	const resolved = useResolvedPath(path || null, tabId);
+	const externalText = prefersExternalTextFile(
+		path,
+		useUiStore(state => state.externalTextFiles),
+	);
 	if (!path) return <span className={className}>{children}</span>;
 	const folder = resolved?.kind === "directory";
-	const hint = external ? null : t(folder ? "links.folderHint" : "links.fileHint", { mod: LINK_MODIFIER });
+	const hint = external
+		? null
+		: t(folder ? "links.folderHint" : externalText ? "links.openWithDefaultApp" : "links.fileHint", {
+				mod: LINK_MODIFIER,
+			});
 
 	return (
 		<button

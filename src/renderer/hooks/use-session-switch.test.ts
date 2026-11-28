@@ -477,6 +477,8 @@ describe("switchSessionNow F-OWN owner guard", () => {
 		expect(useUiStore.getState().modelRestorePrompt).toEqual({
 			session: session("/sessions/x.jsonl"),
 			missingModel: "gone/model-x",
+			originTabId: "t0",
+			originSessionId: useSessionStore.getState().sessionId,
 		});
 		expect(useToastStore.getState().toasts).toEqual([]);
 		expect(useSessionStore.getState().switchPending).toBeNull();

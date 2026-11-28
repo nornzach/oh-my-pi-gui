@@ -6,12 +6,21 @@
 import { languageDetails } from "../../../shared/languages";
 import { describeSchedule, nextFires } from "../../../shared/schedule";
 import type { RunState, TaskDepth, TaskDraft, TaskRun, TaskSchedule, TaskState } from "../../../shared/scheduler-types";
+import { TASK_RUN_FAILURE } from "../../../shared/scheduler-types";
 import { DEFAULT_TASK_DEPTH } from "../../../shared/task-depth";
+import { describeProviderError } from "../../lib/errors";
 import { formatClock } from "../../lib/format";
 import { getCurrentLanguage } from "../../lib/i18n";
 import type { BadgeVariant } from "../common";
 
 export type Translate = (key: string, params?: Record<string, string | number>) => string;
+
+export function runErrorText(t: Translate, message: string): string {
+	for (const [kind, original] of Object.entries(TASK_RUN_FAILURE)) {
+		if (message === original) return t(`tasks.run.failure.${kind}`);
+	}
+	return describeProviderError(message);
+}
 
 export const DEFAULT_TASK_TIMEOUT_MS = 30 * 60_000;
 

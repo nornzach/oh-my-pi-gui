@@ -1,5 +1,142 @@
 // Russian labels/descriptions for backend enum values.
 export const RU_SCHEMA_OPTION_TEXT: Readonly<Record<string, string>> = {
+	"Google Antigravity (Gemini, Claude, GPT-OSS)": "Google Antigravity (Gemini, Claude, GPT-OSS)",
+	"Google Antigravity is paused: Google's terms do not allow third-party sign-in and Google has suspended accounts that used it (see #18341). Use GEMINI_API_KEY (AI Studio) or google-vertex instead.":
+		"Google Antigravity приостановлен: Условия Google не позволяют входу через третьих сторон, и Google приостановил аккаунты, использовавшие его (см. #18341). Используйте GEMINI_API_KEY (AI Studio) или google-vertex вместо этого.",
+	"Smart when the judge role resolves to a native TypeSafe jev model, else Always":
+		"Эффективно, когда роль судьи решается на нативный TypeSafe jev-модель, в противном случае всегда",
+	Static: "Статическое",
+	"No animation": "Нет анимации",
+	"80 ms": "80 ms",
+	"12.5 frames/s": "12,5 кадров/с",
+	"250 ms": "250 ms",
+	"4 frames/s": "4 кадра/сек.",
+	"1 s": "1 s",
+	"1 frame/s": "1 кадр/с",
+	"30 fps": "30 fps",
+	"15 fps": "15 fps",
+	"4 fps": "4 fps",
+	"Quiet, for many panes": "Тихо, для многих элементов",
+	"1 fps": "1 fps",
+	Minimum: "Минимум",
+	"Every animation at its own setting (default)": "Каждая анимация имеет свои настройки (по умолчанию).",
+	Reduced: "Уменьшен",
+	"Spinners at 250 ms, no shimmer, no blink/fade":
+		"Перемотки через 250 мс, без свечения, без мерцающих/плавных изменений",
+	"Static spinners and title, no shimmer, no blink/fade":
+		"Статические вращатели и заголовок, без свечения, без мерцающих/плавного изменения цвета",
+	"Do not show the mode; a command being typed still shows with Vim Show Command":
+		"Не показывайте режим; команду, вводимую, все равно отображается в Vim Show Command",
+	Insert: "Вставить",
+	"Type right away; Escape for Normal mode": "Сразу вводите тип; нажмите Esc для режима Normal",
+	Normal: "Обычное",
+	"Start on Vim commands; i, a, o and the like to type": "Начинайте с команд Vim; i, a, o и подобных для ввода текста",
+	Apple: "Apple",
+	"macOS dictionary completions": "Дискретные завершения macOS",
+	"This Directory": "Этот директорий",
+	"Only sessions saved for this directory": "Только сессии сохранены для этого директора",
+	"Repository Worktrees": "Репозиторий Worktrees",
+	"Also include sessions from sibling worktrees": "Также включите сессии из братьев рабочих деревьев",
+	"Keep the system awake while the agent is running a turn (macOS `caffeinate -i`)":
+		"Оставьте систему активной во время выполнения агентом тура (macOS `caffeinate -i`)",
+	"Classify each task and report the decision, and whether Escalate would plan on another model, without arming prewalk":
+		"Классифицируйте каждую задачу и сообщите о решении, а также указать, планирует ли Escalate использовать другую модель, без применения оружия.",
+	Escalate: "Перенести на более высокий уровень",
+	"Like On, but plan on the Prewalk planning model (prewalk.from) first: a confidently front-loaded task moves there before setup and hands off from it; the next task starts back where this one started. When the planning model is already active, this is On, except that '@initial' then has nothing to hand back to":
+		"Как и On, но сначала планируйте использование модели планирования Prewalk (prewalk.from): задача, выполненная уверенно заранее, перемещается туда до установки и отдается оттуда; следующая задача начинается там, где началась предыдущая. Когда модель планирования уже активна, это является On, только @initial больше не может что-либо вернуть.",
+	"Prefer concise responses (default)": "Предпочтение — краткие ответы (по умолчанию).",
+	"Balance brevity and detail": "Баланс краткости и детализации",
+	"Lowest-latency serving; OpenAI API preview access, or Codex and relay models that advertise it":
+		"Сервис с минимальным задержкой; доступ к предварительному API OpenAI, или модели Codex и relay, которые его рекламируют.",
+	"Standard lanes": "Стандартные полосы",
+	"Fast lanes (`-fast`/`-priority`/`-lightning`) where a model has one":
+		"Быстрые пути (`-fast`/`-priority`/`-lightning`) — там модель имеет один",
+	"Use Codex model defaults": "Используйте стандартные настройки модели Codex",
+	"Disable WebSockets for OpenAI Codex models": "Выключить WebSockets для моделей OpenAI Codex",
+	"Long (1h+)": "Длинный (1 час+):",
+	"Longer TTL where supported (Anthropic/Bedrock 1h, OpenAI GPT-5.6+ Responses 12h); pricier writes, only warmed during active runs":
+		"Длиннее TTL, если это возможно (Anthropic/Bedrock – 1 час, OpenAI GPT-5.6+ – ответы – 12 часов); более дорогие записи, доступны только во время активных выполнения.",
+	"Harper (American female)": "Харпер (американка)",
+	"Hadley (American female)": "Хадли (американка)",
+	"Delia (American female)": "Delia (американская женщина)",
+	"Everly (American female)": "Everly (американская женщина)",
+	"Easton (American male)": "Истон (американец-мужчина)",
+	"Preston (American male)": "Престон (американец-мужчина)",
+	"Miles (American male)": "Майлз (американский мужчина)",
+	"Trevor (American male)": "Тревор (американец-мужчина)",
+	"Maeve (British female)": "Мэйв (британская женщина)",
+	"Bryony (British female)": "Бриони (британская женщина)",
+	"Edwin (British male)": "Эдвин (британский мужчина)",
+	"Hugh (British male)": "Хью (британский мужчина)",
+	"0.8×": "0.8×",
+	"0.9×": "0.9×",
+	"1.1×": "1.1×",
+	"1.2×": "1.2×",
+	"1.3×": "1.3×",
+	"Priority: local > parallel > firecrawl > jina": "Приоритет: локальный > параллельный > firecrawl > jina",
+	"In-process reader engine (always available)": "Игровой движок чтения в процесе (всегда доступен)",
+	"Every note continues the run.": "Каждая нота продолжает процесс запуска.",
+	"Concerns and blockers continue the run. Default.":
+		"Проблемы и блокирующие факторы продолжают процесс. Параметры по умолчанию.",
+	"Only blockers continue the run.": "Только блокирующие элементы продолжают выполнение.",
+	"Use provider-native server compaction (OpenAI Responses compact, Anthropic compaction beta, including on Bedrock) when the active route supports it":
+		"Используйте компактирование сервера, предусмотренное провайдером (OpenAI Responses compact, Anthropic compaction beta, включая Bedrock), если активный маршрут поддерживает это.",
+	"Filter only with a native judge backend; otherwise inject every recalled memory":
+		"Фильтруйте только с использованием бэкенд-модуля нативного судьи; в противном случае внедните каждую вызванную память.",
+	"Filter with whichever model the judge role resolves to; an on-device judge may answer only some memories in time":
+		"Фильтр использует тот модель, к которой решается роль судьи; судья на устройстве может отвечать только на некоторые воспоминания в определенный момент.",
+	"Never filter; inject every recalled memory":
+		"Никогда не фильтровать; вставьте каждую вызванную отмену выпуска память",
+	magic: "магия",
+	"Ask and remember": "Спросить и запомнить",
+	"Ask before reading or writing a file, with answers that remember the file or its folder for this session or every session; require confirmation for exec tools.":
+		"Запросьте предварительно перед чтением или записью файла, с ответами, которые сохраняют файл или его папку для этой или каждой сессии; требуется подтверждение для инструментов выполнения.",
+	"Never nudge mid-run": "Никогда не вмешиваться во время выполнения",
+	Capped: "Capped",
+	"Nudge after 12 edits or commands, at most twice until the todo list changes or you send a message":
+		"Несколько подсказок после 12 правок или команд, максимум два раза, до тех пор, пока список задач не изменится или пока вы не отправите сообщение.",
+	Backoff: "Пауза",
+	"Keep nudging with a doubling gap: after 12, 24, 48, 96, then every 192 edits or commands":
+		"Продолжайте нагнетать, используя разрыв в двойном увеличении: после 12, 24, 48, 96, затем каждые 192 правки или команды.",
+	"Enable when the first usable judge is native": "Включите, когда первый пригодный судьер — нативный.",
+	Fallback: "Альтернативный вариант",
+	"Background first; a call whose background route is unavailable briefly brings the target forward, then returns focus to your app (on macOS even if you kept typing). The agent may also ask for takeover on a call":
+		"Сначала фон; вызов с недоступным маршрутом фона на мгновение перемещает целевой объект вперед, затем возвращает фокус в вашу приложение (даже на macOS, даже если вы продолжаете вводить текст). Агент также может запросить перехват вызова.",
+	Foreground: "Передний фон",
+	"omp, never the agent, decides: take over input to a window already in front of you, and a call whose background route is unavailable; stay in the background otherwise":
+		"omp, никогда не агент, решает: принять ввод из окна, уже перед вами, и вызов, для которого не доступен фоновый маршрут; в противном случае оставаться в фоне.",
+	"omp, never the agent, decides: take over every window and element input call, bringing the target forward for that call and then returning focus to your app":
+		"omp, никогда не агент, решает: захватить каждый вызов ввода окна и элемента, привлечь цель к этому вызову, а затем вернуть фокус в ваш приложение",
+	"Never take over: a call whose background route is unavailable fails, and the agent's own takeover, raise, activating open, desktop input and macOS menus (context menus, popup and menu buttons; they take your keyboard while open) are refused too":
+		"Никогда не выполняйте захват: вызов, у которого отсутствует доступ к фоновому маршруту, не может быть выполнен, а также отклоняется захват агента, повышение, активация открытого экрана, ввод на десктопе и меню macOS (контекстные меню, всплывающие окна и кнопки меню; они захватывают вашу клавиатуру во время открытия).",
+	"All Commands": "Все команды",
+	"Inline help for every mounted command.": "Встроенное помощь для каждого подключенного команды.",
+	"Inline built-in help; MCP and extension help on demand.":
+		"Встроенное внутреннее помощь; помощь по MCP и расширениям по требованию.",
+	"List every command; run `--help` on demand.": "Перечислите все команды; по необходимости выполните `--help`.",
+	"Isolated subagents and `/wt` use ovnfs checkouts when ovnfs is found; otherwise (and for other worktrees) the PAL picks the best available backend":
+		"Изолированные подагенты и `/wt` используют checkouts ovnfs, когда найден ovnfs; в противном случае (и для других worktrees) PAL выбирает лучший доступный backend.",
+	"Force Remove": "Принудительное удаление",
+	"Remove every worktree without asking, even with uncommitted changes. Uncommitted work, gitignored files (e.g. `.env`), and commits only on a detached HEAD are lost; new commits on the branch are kept":
+		"Удаляйте каждый рабочий дерево без запроса, даже с некоммитированными изменениями. Некоммитированная работа, файлы, отфильтрованные git (например, `.env`), а также коммиты только на отделенной головке исходят; новые коммиты на ветке сохраняются.",
+	"Main thread only": "Только главный поток",
+	"Up to 1 worker": "До 1 рабочего",
+	"Up to 2 workers": "До 2 рабочих лиц",
+	"Up to 4 workers": "До 4 рабочих лиц",
+	"Up to 8 workers": "До 8 рабочих",
+	"IDA Pro when an install with idalib is found, otherwise Ghidra; never Binary Ninja":
+		"IDA Pro – при поиске установки с idalib; в противном случае – Ghidra; никогда не Binary Ninja",
+	Ghidra: "Ghidra",
+	"Ghidra via PyGhidra; provisions Ghidra 12.2, a JDK 25 and PyGhidra on first analysis when not installed":
+		"Ghidra через PyGhidra; требования Ghidra 12.2, JDK 25 и PyGhidra при первом анализе, если они не установлены",
+	"IDA Pro": "IDA Pro",
+	"IDA Pro via idalib; analysis disabled when no install is found":
+		"IDA Pro через idalib; анализ отключен, если не найдено установки",
+	"Binary Ninja": "Binary Ninja",
+	"Binary Ninja via its headless Python API (needs a headless-capable licence); never chosen by Auto; analysis disabled when no install is found":
+		"Binary Ninja через свою безхенд Python API (требуется лицензия, поддерживающая работу безхенд-режим); никогда не выбирается Auto; анализ отключен, когда не найдено установки.",
+	"Executable metadata only; analysis disabled": "Только метаданные исполняемого файла; анализ отключен",
+	med: "med",
 	"0": "0",
 	"1": "1",
 	"2": "2",

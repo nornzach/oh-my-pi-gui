@@ -395,8 +395,13 @@ export const BUILT_IN_SHORTCUTS: readonly BuiltInShortcut[] = [
 /** A section's rows in display order: leading built-in keys, its shortcuts, then the rest. */
 export function shortcutSectionRows(
 	section: ShortcutSectionId,
+	shiftEnterToSend = false,
 ): ({ kind: "entry"; entry: ShortcutEntry } | { kind: "builtIn"; row: BuiltInShortcut })[] {
-	const builtIn = BUILT_IN_SHORTCUTS.filter(row => row.section === section);
+	const builtIn = BUILT_IN_SHORTCUTS.filter(row => row.section === section).map(row => {
+		if (shiftEnterToSend && row.labelKey === "hotkeys.row.send") return { ...row, keys: "⇧Enter" };
+		if (shiftEnterToSend && row.labelKey === "hotkeys.row.newline") return { ...row, keys: "Enter" };
+		return row;
+	});
 	return [
 		...builtIn.filter(row => row.first).map(row => ({ kind: "builtIn" as const, row })),
 		...SHORTCUT_ENTRIES.filter(entry => entry.group === section).map(entry => ({ kind: "entry" as const, entry })),

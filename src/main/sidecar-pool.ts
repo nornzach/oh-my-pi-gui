@@ -76,6 +76,7 @@ function forwardToWindow(win: BrowserWindow, channel: string, data: unknown): vo
 interface PoolEntry {
 	sidecar: SidecarManager;
 	tabId: string;
+	folderTabId?: string;
 	win: BrowserWindow;
 	/** win.webContents.id, cached at acquire — safe to read after the window is destroyed. */
 	winId: number;
@@ -151,6 +152,7 @@ export class SidecarPool {
 	#activeByWindow = new Map<number, string>();
 	/** Window → the one or two tabs whose full event streams are rendered. */
 	#visibleByWindow = new Map<number, Set<string>>();
+	#folderByWindow = new Map<number, string>();
 	/** Window → its split pairs (gui#30): each pair is shown whenever either tab is. */
 	#groupsByWindow = new Map<number, IpcTabGroup[]>();
 	/** Session file → owning tab/window (F-OWN double-attach guard). */
@@ -247,6 +249,7 @@ export class SidecarPool {
 		placeholder = false,
 		deferStart = false,
 		title?: string,
+		folderTabId?: string,
 	): SidecarManager | null {
 		try {
 			const sidecar = this.#factory(cwd, kind, fresh);
@@ -255,6 +258,7 @@ export class SidecarPool {
 				tabId,
 				win,
 				winId: win.webContents.id,
+				folderTabId,
 				kind,
 				placeholder,
 				worktree,
@@ -272,7 +276,7 @@ export class SidecarPool {
 			// deferred tab registers too: it owns that file the moment it exists,
 			// which is what makes "open this session elsewhere" refuse-or-focus.
 			if (sessionPath) this.#registerSessionFile(entry, sessionPath);
-			if (!deferStart && !this.#activeByWindow.has(entry.winId)) {
+			if (!deferStart && !this.#visibleByWindow.has(entry.winId)) {
 				this.#activeByWindow.set(entry.winId, entry.tabId);
 				this.#visibleByWindow.set(entry.winId, new Set([entry.tabId]));
 				this.#syncFullWiring(entry.winId);
@@ -655,6 +659,7 @@ export class SidecarPool {
 		// No tab left anywhere (a macOS app idling in the dock): nothing to be warm for.
 		if (this.#entries.size === 0) this.#discardSpare();
 		if (![...this.#entries].some(candidate => candidate.winId === entry.winId)) {
+			this.#folderByWindow.delete(entry.winId);
 			this.#activeByWindow.delete(entry.winId);
 			this.#visibleByWindow.delete(entry.winId);
 			this.#groupsByWindow.delete(entry.winId);
@@ -683,6 +688,7 @@ export class SidecarPool {
 	entryForWindow(win: BrowserWindow): PoolEntry | undefined {
 		const active = this.#byTabId.get(this.#activeByWindow.get(win.webContents.id) ?? "");
 		if (active && active.win === win) return active;
+		if (this.#visibleByWindow.get(win.webContents.id)?.size === 0) return undefined;
 		for (const entry of this.#entries) {
 			if (entry.win === win) return entry;
 		}
@@ -724,9 +730,10 @@ export class SidecarPool {
 		focusedTabId: string,
 		visibleTabIds: readonly string[],
 		groups?: readonly IpcTabGroup[],
+		folderId?: string,
 	): boolean {
 		const ids = [...new Set(visibleTabIds)];
-		if (ids.length < 1 || ids.length > 2 || !ids.includes(focusedTabId)) return false;
+		if (ids.length === 0 ? focusedTabId !== "" : ids.length > 2 || !ids.includes(focusedTabId)) return false;
 		for (const tabId of ids) {
 			const entry = this.#byTabId.get(tabId);
 			if (!entry || entry.win !== win) return false;
@@ -734,7 +741,9 @@ export class SidecarPool {
 		const winId = win.webContents.id;
 		const nextGroups = groups ? this.#ownGroups(win, groups) : (this.#groupsByWindow.get(winId) ?? []);
 		if (ids.length === 2 && !nextGroups.some(group => ids.every(tabId => groupHas(group, tabId)))) return false;
-		this.#activeByWindow.set(winId, focusedTabId);
+		if (typeof folderId === "string" && folderId.length <= 64) this.#folderByWindow.set(winId, folderId);
+		if (focusedTabId) this.#activeByWindow.set(winId, focusedTabId);
+		else this.#activeByWindow.delete(winId);
 		this.#visibleByWindow.set(winId, new Set(ids));
 		if (nextGroups.length > 0) this.#groupsByWindow.set(winId, nextGroups);
 		else this.#groupsByWindow.delete(winId);
@@ -850,14 +859,20 @@ export class SidecarPool {
 	 * only main-observable carriers of the file path; session_info_update
 	 * itself carries just the id). Null unregisters (fresh unsaved session).
 	 */
-	noteSessionFile(tabId: string, sessionFile: string | null): void {
+	noteSessionFile(tabId: string, sessionFile: string | null, sessionId?: string): void {
 		const entry = this.#byTabId.get(tabId);
 		if (!entry) return;
 		const previous = entry.sessionFile;
+		const previousId = entry.sessionId;
+		if (sessionId) entry.sessionId = sessionId;
 		if (sessionFile) this.#registerSessionFile(entry, sessionFile);
 		else this.#unregisterSessionFile(entry);
-		if (entry.sessionFile !== previous) {
-			forwardToWindow(entry.win, IPC_EVENTS.TAB_STATUS, tabStatusPayload(entry));
+		if (entry.sessionFile !== previous || entry.sessionId !== previousId) {
+			const status = tabStatusPayload(entry);
+			if (previous && sessionFile && previous !== sessionFile && sessionId && sessionId === previousId) {
+				status.relocatedFrom = previous;
+			}
+			forwardToWindow(entry.win, IPC_EVENTS.TAB_STATUS, status);
 			this.#notifyWindowTabsChanged(entry.win);
 		}
 	}
@@ -927,6 +942,7 @@ export class SidecarPool {
 		for (const entry of this.#entries) {
 			if (entry.win !== win) continue;
 			const tab = tabStatusPayload(entry);
+			if (tabs.length === 0) tab.windowFolderId = this.#folderByWindow.get(entry.winId);
 			if (entry.tabId === activeTabId) tab.active = true;
 			if (visibleTabIds?.has(entry.tabId)) tab.visible = true;
 			const group = groups.find(candidate => groupHas(candidate, entry.tabId));
@@ -971,10 +987,12 @@ export class SidecarPool {
 		});
 		return {
 			version: TAB_LAYOUT_VERSION,
+			folderId: this.#folderByWindow.get(win.webContents.id),
 			activeIndex,
 			tabs: entries.map(entry => {
 				const descriptor: PersistedTabDescriptor = { cwd: entry.sidecar.cwd, kind: entry.kind };
 				if (entry.sessionFile) descriptor.sessionPath = entry.sessionFile;
+				else descriptor.folderTabId = entry.folderTabId ?? entry.tabId;
 				if (entry.worktree) descriptor.worktree = entry.worktree;
 				if (entry.placeholder) descriptor.placeholder = true;
 				// Written even when the live title is null, so a cleared title
@@ -1013,6 +1031,10 @@ export class SidecarPool {
 					tab.placeholder === true,
 					true,
 					tab.title,
+					tab.folderTabId &&
+						![...this.#entries].some(entry => (entry.folderTabId ?? entry.tabId) === tab.folderTabId)
+						? tab.folderTabId
+						: undefined,
 				);
 				if (!sidecar) continue;
 				restoredCount++;
@@ -1033,7 +1055,13 @@ export class SidecarPool {
 				// Routing the view is what spawns the shown tabs: the active tab,
 				// with its partner when it is one of a pair.
 				const shown = groups.find(group => groupHas(group, activeTabId));
-				this.setTabView(win, activeTabId, shown ? [shown.firstTabId, shown.secondTabId] : [activeTabId], groups);
+				this.setTabView(
+					win,
+					activeTabId,
+					shown ? [shown.firstTabId, shown.secondTabId] : [activeTabId],
+					groups,
+					layout.folderId,
+				);
 			}
 		} finally {
 			this.#restoringWindows.delete(winId);
@@ -1058,6 +1086,7 @@ export class SidecarPool {
 		this.#byTabId.clear();
 		this.#activeByWindow.clear();
 		this.#visibleByWindow.clear();
+		this.#folderByWindow.clear();
 		this.#groupsByWindow.clear();
 		this.#sessionOwners.clear();
 		this.#requestOwners.clear();
@@ -1099,6 +1128,7 @@ function tabStatusPayload(entry: PoolEntry): IpcTabStatusPayload {
 		payload.compacting = entry.compacting === true || entry.manualCompaction === "foreground";
 	}
 	if (entry.sessionId !== undefined) payload.sessionId = entry.sessionId;
+	if (entry.folderTabId) payload.folderTabId = entry.folderTabId;
 	if (entry.title !== undefined) payload.title = entry.title;
 	if (entry.worktree !== undefined) payload.worktree = entry.worktree;
 	// Once a tab has had an outcome to show, keep sending it (null = cleared)

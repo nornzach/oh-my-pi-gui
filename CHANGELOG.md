@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+### Added
+
+- Sidebar folder icons show a pulsing dot while a session in the folder or one of its subfolders is running.
+- Adjust the composer’s starting height and text size independently in Appearance & typography.
+- Choose Enter or Shift+Enter to send messages in Keyboard shortcuts ([#92](https://github.com/nornzach/oh-my-pi-gui/issues/92)).
+- Choose whether clicking a text file previews it in the Files panel or opens it with the system default app ([#88](https://github.com/nornzach/oh-my-pi-gui/issues/88)).
+- Group sessions from any workspace in nested folders, share session shortcuts between folders, and switch between independent tab strips while work continues in the background.
+- Drag a tab or sidebar session onto a sidebar folder, or hover over the top folder switcher to drop into its menu. Right-click either source to add it to several folders at once.
+- Create and rename folders in the sidebar, and use `/rename` to edit the session title in place. Confirm individual folder, session, scheduled task, SSH host and theme deletions beside their controls.
+
+### Changed
+
+- Sidebar selection and footer controls now use consistent icon buttons; hover over the globe to see the current language.
+- Create a folder and file the selected sessions or tab directly from “Add to folders”, even before the first folder exists.
+- Continue a recent session directly from an empty folder tab strip, and choose a single destination folder without an extra confirmation. Multi-folder selection remains available.
+- Distinguish the sidebar action for finding a session from the one that searches individual messages.
+- If a session's saved model is unavailable and no current model is set, choose an available model to open that session directly.
+
+### Fixed
+
+- Search settings by their displayed Thai titles. Core settings, tool process details, and scheduled task failures now use the selected language, and sign-out warnings show the provider name.
+
+- Background output notifications stay in the process view and expand to show just the matching logs, not internal commands or notification rules.
+- Align conversation and desktop display switches with the other settings and label the action that restores the terminal setting.
+- Switching conversations restores each conversation’s right panel, including whether it was closed and whether it showed Browser, Files or another view.
+- Return to the current folder from a tool page, keep the Plugins page when visiting catalog settings, and preserve scheduled task and pull request drafts when dismissing their editors in the same window.
+- Prevent opening stale conversation search results while a query or workspace changes, and retry a failed search in place.
+- Align single reads and grouped reads with other tool rows in the transcript.
+- Give progress narration the same inset and density-aware spacing as surrounding tool steps.
+- Quit an idle application on the first request, including when restoring multiple windows on the next launch.
+
 ## [1.0.6] - 2026-11-28
 
 ### Changed

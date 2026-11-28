@@ -26,6 +26,7 @@ import { basename, cx, formatClock, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { useSessionStore } from "../../stores/session";
+import { folderMembership, orderedFolders, useSessionFolders } from "../../stores/session-folders";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { useUiStore } from "../../stores/ui";
 import { Kbd, Spinner } from "../common";
@@ -75,7 +76,8 @@ function SearchPanel() {
 	const [scope, setScope] = useState<Scope>(loadScope);
 	const [response, setResponse] = useState<ConversationSearchResponse | null>(null);
 	/** The query and scope the shown response answers. */
-	const [answered, setAnswered] = useState<{ query: string; scope: Scope } | null>(null);
+	const [answered, setAnswered] = useState<{ query: string; project: string | null } | null>(null);
+	const [retry, setRetry] = useState(0);
 	const [failed, setFailed] = useState(false);
 	const [slow, setSlow] = useState(false);
 	const [activeIndex, setActiveIndex] = useState(0);
@@ -87,6 +89,8 @@ function SearchPanel() {
 
 	const effectiveScope: Scope = cwd ? scope : "all";
 	const trimmed = query.trim();
+	const project = effectiveScope === "project" ? cwd : null;
+	const stale = answered?.query !== trimmed || answered.project !== project;
 
 	// Dialog layer, focus in on open and back out on close, Tab kept inside.
 	useEffect(() => {
@@ -123,6 +127,7 @@ function SearchPanel() {
 	// asked again until the index has caught up. An empty query asks only how
 	// much is searchable, so the footer says so from the moment the dialog opens.
 	useEffect(() => {
+		void retry;
 		const mine = ++seq.current;
 		let poll: number | undefined;
 		let spinner: number | undefined;
@@ -136,12 +141,12 @@ function SearchPanel() {
 		}
 		const run = () => {
 			window.omp.sessions
-				.searchConversations(trimmed, effectiveScope === "project" ? cwd : null)
+				.searchConversations(trimmed, project)
 				.then(next => {
 					if (mine !== seq.current) return;
 					clearTimeout(spinner);
 					setResponse(next);
-					setAnswered({ query: trimmed, scope: effectiveScope });
+					setAnswered({ query: trimmed, project });
 					setFailed(false);
 					setSlow(false);
 					if (next.indexing) poll = window.setTimeout(run, INDEXING_POLL_MS);
@@ -159,7 +164,7 @@ function SearchPanel() {
 			clearTimeout(spinner);
 			clearTimeout(poll);
 		};
-	}, [trimmed, effectiveScope, cwd]);
+	}, [trimmed, project, retry]);
 
 	// Results only ever answer the query on screen; an empty query lists recents.
 	const results = trimmed ? (response?.results ?? []) : [];
@@ -171,7 +176,7 @@ function SearchPanel() {
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset only when what is being answered changes
 	useEffect(() => {
 		setActiveIndex(0);
-	}, [answered?.query, answered?.scope, showingRecent]);
+	}, [answered?.query, answered?.project, showingRecent]);
 	useEffect(() => {
 		setActiveIndex(current => Math.min(current, Math.max(0, itemCount - 1)));
 	}, [itemCount]);
@@ -185,18 +190,28 @@ function SearchPanel() {
 		inputRef.current?.focus();
 	};
 
+	const folders = useSessionFolders(state => state.folders);
+	const activeFolder = useSessionFolders(state => state.active);
+	const [folderChoices, setFolderChoices] = useState<Record<string, string>>({});
+	const folderPaths = useMemo(
+		() => new Map(orderedFolders(folders).map(({ folder, path }) => [folder.id, path])),
+		[folders],
+	);
+	const membership = folderMembership(folders);
 	const openHit = useCallback(
 		(item: FlatHit, newTab: boolean) => {
+			if (stale || failed) return;
 			// Saved before closing: the dialog unmounts with it.
 			rememberSearch(recent, trimmed);
 			close();
-			openConversationHit(item, { newTab, currentCwd: cwd });
+			openConversationHit(item, { newTab, currentCwd: cwd, folderId: folderChoices[item.result.path] });
 		},
-		[close, cwd, recent, trimmed],
+		[close, cwd, folderChoices, recent, trimmed, stale, failed],
 	);
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
 		if (isImeKeyEvent(event)) return;
+		if ((event.target as HTMLElement | null)?.tagName === "SELECT" && event.key !== "Escape") return;
 		switch (event.key) {
 			case "ArrowDown":
 				event.preventDefault();
@@ -227,7 +242,6 @@ function SearchPanel() {
 	};
 
 	const projectName = (path: string) => aliases[path] ?? (basename(path) || path);
-	const stale = answered !== null && (answered.query !== trimmed || answered.scope !== effectiveScope);
 	const indexing = response?.indexing ?? null;
 
 	let flatIndex = -1;
@@ -243,6 +257,7 @@ function SearchPanel() {
 					active ? "bg-(--omp-selected-bg)" : "hover:bg-(--omp-bg-tertiary)",
 				)}
 				data-search-index={index}
+				disabled={stale || failed}
 				key={`${item.result.path}:${item.hit.entryId}`}
 				onClick={(event: ReactMouseEvent) => openHit(item, event.metaKey || event.ctrlKey)}
 				onMouseMove={() => setActiveIndex(index)}
@@ -279,36 +294,71 @@ function SearchPanel() {
 		);
 	};
 
-	const renderSession = (result: ConversationSearchResult) => (
-		<section className="mb-1.5" key={result.path}>
-			<div className="flex items-center gap-1.5 px-2.5 pt-2 pb-0.5">
-				{result.kind === "chat" && <MessageSquare className="shrink-0 text-(--omp-dim)" size={11} />}
-				<span className="min-w-0 truncate text-omp-xs font-semibold text-(--omp-text-secondary)">
-					{result.title ?? t("search.untitled")}
-				</span>
-				{effectiveScope === "all" && result.cwd && (
-					<span className="min-w-0 shrink truncate text-omp-xxs text-(--omp-dim)" title={result.cwd}>
-						{projectName(result.cwd)}
+	const renderSession = (result: ConversationSearchResult) => {
+		const memberships = membership.get(result.path) ?? [];
+		return (
+			<section className="mb-1.5" key={result.path}>
+				<div className="flex items-center gap-1.5 px-2.5 pt-2 pb-0.5">
+					{result.kind === "chat" && <MessageSquare className="shrink-0 text-(--omp-dim)" size={11} />}
+					<span className="min-w-0 truncate text-omp-xs font-semibold text-(--omp-text-secondary)">
+						{result.title ?? t("search.untitled")}
 					</span>
-				)}
-				<span className="ml-auto shrink-0 text-omp-xxs text-(--omp-dim)">
-					{formatTimeAgo(new Date(result.modified).toISOString())}
-				</span>
-			</div>
-			{result.hits.map(hit => renderHit({ result, hit }))}
-			{result.more > 0 && (
-				<div className="px-2.5 pb-0.5 pl-9 text-omp-xxs text-(--omp-dim)">
-					{t("search.more", { count: result.more, plural: result.more === 1 ? "" : "es" })}
+					{effectiveScope === "all" && result.cwd && (
+						<span className="min-w-0 shrink truncate text-omp-xxs text-(--omp-dim)" title={result.cwd}>
+							{projectName(result.cwd)}
+						</span>
+					)}
+					{memberships.length > 1 ? (
+						<select
+							aria-label={t("folders.searchPath")}
+							className="max-w-[35%] truncate rounded border border-(--omp-border) bg-(--omp-bg-elevated) px-1 text-omp-xxs text-(--omp-muted)"
+							value={
+								folderChoices[result.path] ??
+								(memberships.includes(activeFolder) ? activeFolder : memberships[0])
+							}
+							onChange={event => setFolderChoices({ ...folderChoices, [result.path]: event.target.value })}
+						>
+							{memberships.map(id => (
+								<option key={id} value={id}>
+									{folderPaths.get(id)}
+								</option>
+							))}
+						</select>
+					) : (
+						memberships[0] && (
+							<span
+								className="max-w-[35%] truncate text-omp-xxs text-(--omp-dim)"
+								title={folderPaths.get(memberships[0])}
+							>
+								{folderPaths.get(memberships[0])}
+							</span>
+						)
+					)}
+					<span className="ml-auto shrink-0 text-omp-xxs text-(--omp-dim)">
+						{formatTimeAgo(new Date(result.modified).toISOString())}
+					</span>
 				</div>
-			)}
-		</section>
-	);
+				{result.hits.map(hit => renderHit({ result, hit }))}
+				{result.more > 0 && (
+					<div className="px-2.5 pb-0.5 pl-9 text-omp-xxs text-(--omp-dim)">
+						{t("search.more", { count: result.more, plural: result.more === 1 ? "" : "es" })}
+					</div>
+				)}
+			</section>
+		);
+	};
 
 	const body = (() => {
+		if (failed)
+			return (
+				<EmptyState
+					title={t("search.failed")}
+					action={{ label: t("common.retry"), run: () => setRetry(value => value + 1) }}
+				/>
+			);
 		if (response?.unavailable) {
 			return <EmptyState title={t("search.unavailable")} detail={t("search.unavailableDetail")} />;
 		}
-		if (failed) return <EmptyState title={t("search.failed")} />;
 		if (!trimmed) {
 			if (recent.length === 0) return <EmptyState title={t("search.emptyTitle")} detail={t("search.emptyDetail")} />;
 			return (

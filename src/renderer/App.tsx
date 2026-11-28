@@ -28,7 +28,6 @@ import { LogsDialog } from "./components/dialogs/LogsDialog";
 import { ModelPicker } from "./components/dialogs/ModelPicker";
 import { ModelRestoreDialog } from "./components/dialogs/ModelRestoreDialog";
 import { PlanApprovalDialog } from "./components/dialogs/PlanApprovalDialog";
-import { RenameSessionDialog } from "./components/dialogs/RenameSessionDialog";
 import { SessionInfoDialog } from "./components/dialogs/SessionInfoDialog";
 import { SessionPickerDialog } from "./components/dialogs/SessionPickerDialog";
 import { SessionSwitchDialog } from "./components/dialogs/SessionSwitchDialog";
@@ -41,6 +40,7 @@ import { WorktreeCloseDialog } from "./components/dialogs/WorktreeCloseDialog";
 import { WorktreeDialog } from "./components/dialogs/WorktreeDialog";
 import { ConfigWarningsBanner } from "./components/layout/ConfigWarningsBanner";
 import { PanelContainer } from "./components/layout/PanelContainer";
+import { EmptyFolderView } from "./components/layout/SessionFolders";
 import { Sidebar } from "./components/layout/Sidebar";
 import { SidecarBanner } from "./components/layout/SidecarBanner";
 import { SplitWorkspace } from "./components/layout/SplitWorkspace";
@@ -58,6 +58,7 @@ import { useSidebarRecency } from "./hooks/use-sidebar-recency";
 import { useTraySync } from "./hooks/use-tray-sync";
 import { useWorkspaceSurfaces } from "./hooks/use-workspace-surfaces";
 import { restartSidecarFromGui, retryFailedTurn, runSessionCommand } from "./lib/command-registry";
+import { validComposerSize } from "./lib/composer-size";
 import {
 	hydrateDisplayPreferences,
 	readDisplayPreference,
@@ -97,6 +98,7 @@ import { openHandoffDialog } from "./stores/fork-handoff";
 import { useModelStore } from "./stores/model";
 import { useSchedulerStore } from "./stores/scheduler";
 import { useSessionStore } from "./stores/session";
+import { useSessionFolders } from "./stores/session-folders";
 import { SessionRuntimeProvider } from "./stores/session-runtime-context";
 import { useSettingsStore } from "./stores/settings";
 import { useTabRuntime } from "./stores/tab-runtime";
@@ -242,6 +244,7 @@ export function App() {
 	const providerConfigEdit = useUiStore(s => s.providerConfigEdit);
 	const closeProviderConfig = useUiStore(s => s.closeProviderConfig);
 	const activeTabId = useTabsStore(s => s.activeTabId);
+	const emptyFolderView = useSessionFolders(state => state.folders.length > 0) && !activeTabId;
 	const activeTabStatus = useTabsStore(s => s.tabs.find(tab => tab.id === s.activeTabId)?.status);
 	const themeSidecarReady = activeTabStatus === "ready" || activeTabStatus === "running";
 	const { lang, setLang } = useLang();
@@ -257,6 +260,8 @@ export function App() {
 				"colorBlindMode",
 				"followAgentTheme",
 				"fontSize",
+				"composerRows",
+				"composerFontScale",
 				"interfaceFont",
 				"codeFont",
 				"notifications",
@@ -273,6 +278,8 @@ export function App() {
 				"collapseLargePastes",
 				"askInline",
 				"chatImagePopup",
+				"shiftEnterToSend",
+				"externalTextFiles",
 				"panelTab",
 			] as const) {
 				if (next[key] !== previous[key]) changedPreferences.add(key);
@@ -294,12 +301,23 @@ export function App() {
 						theme: selection === "system" ? "system" : resolveThemeSelection(selection).scheme,
 					});
 				}
-				for (const key of ["compactDensity", "colorBlindMode", "followAgentTheme", "chatImagePopup"] as const) {
+				for (const key of [
+					"compactDensity",
+					"colorBlindMode",
+					"followAgentTheme",
+					"chatImagePopup",
+					"shiftEnterToSend",
+					"externalTextFiles",
+				] as const) {
 					if (typeof prefs[key] === "boolean" && !changedPreferences.has(key))
 						useUiStore.setState({ [key]: prefs[key] });
 				}
 				if (typeof prefs.fontSize === "number" && !changedPreferences.has("fontSize")) {
 					useUiStore.setState({ fontSize: prefs.fontSize });
+				}
+				for (const key of ["composerRows", "composerFontScale"] as const) {
+					const value = prefs[key];
+					if (validComposerSize(key, value) && !changedPreferences.has(key)) useUiStore.setState({ [key]: value });
 				}
 				if (typeof prefs.interfaceFont === "string" && !changedPreferences.has("interfaceFont")) {
 					useUiStore.setState({ interfaceFont: normalizeFontFamily(prefs.interfaceFont) });
@@ -639,6 +657,7 @@ export function App() {
 				// Don't abort when an overlay/dropdown already consumed this Escape to
 				// dismiss itself (its handler ran first + preventDefault).
 				if (
+					(useSessionFolders.getState().folders.length === 0 || useTabsStore.getState().activeTabId) &&
 					acceptsActiveTabEvents() &&
 					!event.defaultPrevented &&
 					!overlayOpen &&
@@ -710,6 +729,17 @@ export function App() {
 	useEffect(() => {
 		const run = async (action: MenuAction, payload?: MenuActionPayload) => {
 			const ui = useUiStore.getState();
+			if (action === "reveal-tab" && payload?.tabId) {
+				const tabs = useTabsStore.getState();
+				const tab = tabs.tabs.find(entry => entry.id === payload.tabId);
+				if (tab) {
+					ui.returnToConversation();
+					if (tab.sessionPath && useSessionFolders.getState().folders.length > 0)
+						await tabs.openTab({ sessionPath: tab.sessionPath, folderId: payload.folderId });
+					else await tabs.switchTab(tab.id);
+				}
+				return;
+			}
 			if (action === "toggle-sidebar") {
 				ui.toggleSidebar();
 				return;
@@ -984,7 +1014,7 @@ export function App() {
 						<UpdateBanner />
 					</div>
 					<div className="omp-conversation-layout flex min-h-0 flex-1">
-						<SplitWorkspace />
+						{emptyFolderView ? <EmptyFolderView /> : <SplitWorkspace />}
 						{focusedRuntime && <FloatingActivity />}
 					</div>
 				</div>
@@ -1014,7 +1044,6 @@ export function App() {
 			<LinkMenuHost />
 			<FirstRunOnboardingDialog />
 			<ModelPicker />
-			<RenameSessionDialog />
 			<WorktreeDialog />
 			<WorktreeCloseDialog />
 			<SessionPickerDialog />
@@ -1049,9 +1078,5 @@ export function App() {
 			<AgentHoverCardLayer />
 		</div>
 	);
-	return focusedRuntime ? (
-		<SessionRuntimeProvider runtime={focusedRuntime}>{surface}</SessionRuntimeProvider>
-	) : (
-		surface
-	);
+	return <SessionRuntimeProvider runtime={focusedRuntime}>{surface}</SessionRuntimeProvider>;
 }

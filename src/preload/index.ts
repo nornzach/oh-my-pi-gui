@@ -361,8 +361,8 @@ const api: OmpApi = {
 			if (switched) activeTabId = tabId;
 			return switched;
 		},
-		setView: async (focusedTabId: string, visibleTabIds: string[], groups?: IpcTabGroup[]) => {
-			const payload: IpcSetTabViewPayload = { focusedTabId, visibleTabIds, groups };
+		setView: async (focusedTabId: string, visibleTabIds: string[], groups?: IpcTabGroup[], folderId?: string) => {
+			const payload: IpcSetTabViewPayload = { focusedTabId, visibleTabIds, groups, folderId };
 			const switched = (await ipcRenderer.invoke(IPC_COMMANDS.SET_TAB_VIEW, payload)) as boolean;
 			if (switched) activeTabId = focusedTabId;
 			return switched;

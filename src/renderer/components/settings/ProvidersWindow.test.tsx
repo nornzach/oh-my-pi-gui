@@ -442,6 +442,7 @@ describe("ProvidersWindow", () => {
 		});
 		expect(logout).not.toHaveBeenCalled();
 		expect(text()).toContain(translate("providers.logoutTitle", { provider: "anthropic" }));
+		expect(text()).toContain(translate("providers.logoutWarning", { provider: "anthropic" }));
 
 		// Backing out of the prompt leaves the provider signed in.
 		await act(async () => {

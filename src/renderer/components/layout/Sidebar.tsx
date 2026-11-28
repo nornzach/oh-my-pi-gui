@@ -48,6 +48,7 @@ import {
 	X,
 } from "lucide-react";
 import {
+	Fragment,
 	type DragEvent as ReactDragEvent,
 	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
@@ -68,6 +69,7 @@ import { basename, cx, formatTimeAgo } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { isImeKeyEvent } from "../../lib/ime";
 import { compileKeymap, KEYMAP_ACTIONS, onEscape } from "../../lib/keymap";
+import { startFolderDrag } from "../../lib/session-folder-drag";
 import { sessionDisplayTitle } from "../../lib/session-title";
 import {
 	buildSessionTree,
@@ -84,6 +86,7 @@ import { pickWorkspaceDirectory } from "../../lib/workspace-dirs";
 import { useAgentPagesStore } from "../../stores/agent-pages";
 import { useSchedulerStore } from "../../stores/scheduler";
 import { useSessionStore } from "../../stores/session";
+import { DEFAULT_FOLDER, folderMembership, tabFolderKey, useSessionFolders } from "../../stores/session-folders";
 import { sessionRuntime } from "../../stores/session-runtime-context";
 import { useSidebarPrefs } from "../../stores/sidebar-prefs";
 import { usePendingSkillReviews } from "../../stores/skill-review";
@@ -100,9 +103,11 @@ import { Button } from "../common";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { anchorFromEvent, ContextMenu, type ContextMenuAnchor } from "../common/ContextMenu";
 import { Glide } from "../common/Glide";
+import { InlineConfirm } from "../common/InlineConfirm";
 import { LangSwitcher } from "../common/LangSwitcher";
 import { ProjectSettingsDialog } from "../dialogs/ProjectSettingsDialog";
 import { useUnreadNoticeCount } from "./NotificationBell";
+import { AddToSessionFolders, type FolderPicker, SessionFolderTree } from "./SessionFolders";
 import { SidebarQuotas } from "./SidebarQuotas";
 
 const STATUS_COLOR: Record<SessionInfo["status"], string> = {
@@ -189,6 +194,9 @@ const workspaceNameCollator = new Intl.Collator(undefined, { numeric: true, sens
 export function Sidebar() {
 	const tabRpc = useTabRpc();
 	const t = useT();
+	const folders = useSessionFolders(state => state.folders);
+	const activeFolder = useSessionFolders(state => state.active);
+	const [addToFolders, setAddToFolders] = useState<FolderPicker | null>(null);
 	const keymapOverrides = useEffectiveKeymapOverrides();
 	const workspacePage = useUiStore(activeWorkspacePage);
 	// The chords bound to each action, as the user configured them (none when turned off).
@@ -337,10 +345,28 @@ export function Sidebar() {
 	} = useSessionList("global");
 	// A string, so a tab's other changes don't recompute the list.
 	const openSessionKeys = tabs.flatMap(tab => [tab.sessionPath ?? [], tab.sessionId ?? []]).join("\n");
-	const { sessions, heirs } = useMemo(() => {
+	const { sessions: allSessions, heirs } = useMemo(() => {
 		const open = new Set(openSessionKeys.split("\n"));
 		return listedSessions(sessionFiles, session => open.has(session.path) || open.has(session.id));
 	}, [openSessionKeys, sessionFiles]);
+	const sessions = useMemo(() => {
+		if (folders.length === 0) return allSessions;
+		const membership = folderMembership(folders);
+		return allSessions.filter(session =>
+			activeFolder === DEFAULT_FOLDER
+				? !membership.has(session.path)
+				: membership.get(session.path)?.includes(activeFolder),
+		);
+	}, [activeFolder, allSessions, folders]);
+	useEffect(() => {
+		setSelection(null);
+		selectionAnchor.current = null;
+		return useSessionFolders.subscribe((next, previous) => {
+			if (next.active === previous.active) return;
+			setSelection(null);
+			selectionAnchor.current = null;
+		});
+	}, []);
 	const prefsHydrated = useSidebarPrefs(s => s.hydrated);
 	useEffect(() => {
 		if (prefsHydrated) useSidebarPrefs.getState().inheritSessions(heirs);
@@ -374,7 +400,7 @@ export function Sidebar() {
 	// A child session follows its root's project or projectless group and
 	// goes into Archived with an archived ancestor. Archiving a session takes its
 	// family along instead of leaving the children behind as top-level rows.
-	const parentOf = useMemo(() => sessionParents(sessions), [sessions]);
+	const parentOf = useMemo(() => sessionParents(allSessions), [allSessions]);
 	const familyRoot = useCallback(
 		(session: SessionInfo) => {
 			let root = session;
@@ -433,7 +459,7 @@ export function Sidebar() {
 			list.push(session);
 			byCwd.set(groupCwd, list);
 		}
-		for (const project of registeredWorkspaces) {
+		for (const project of activeFolder === DEFAULT_FOLDER ? registeredWorkspaces : []) {
 			if (project !== defaultWorkspace && !byCwd.has(project)) byCwd.set(project, []);
 		}
 		const result: WorkspaceGroup[] = [...byCwd.entries()].map(([groupCwd, groupSessions]) => ({
@@ -461,6 +487,7 @@ export function Sidebar() {
 		});
 		return result;
 	}, [
+		activeFolder,
 		defaultWorkspace,
 		familyRoot,
 		groupAliases,
@@ -474,6 +501,7 @@ export function Sidebar() {
 	]);
 	function isCollapsedGroup(groupCwd: string): boolean {
 		if (groupCwd in collapsed) return collapsed[groupCwd] === true;
+		if (activeFolder !== DEFAULT_FOLDER) return false;
 		// Default: current workspace expanded, others collapsed (Codex-style).
 		return groupCwd !== cwd;
 	}
@@ -613,10 +641,15 @@ export function Sidebar() {
 		const tab = tabForSession(session);
 		if (tab && useAgentPagesStore.getState().shown[tab.id]) {
 			useAgentPagesStore.getState().show(tab.id, null);
-			return;
 		}
 		if (session.id === sessionId) return;
 		void openSessionFromSidebar(session);
+	};
+	const removeFolderReference = (session: SessionInfo) => {
+		useSessionFolders.getState().remove(session.path, activeFolder);
+		const tabs = useTabsStore.getState();
+		const tab = tabs.tabs.find(entry => tabFolderKey(entry) === session.path);
+		void tabs.refreshFolderView().then(() => tab && tabs.releaseUnreferencedTab(tab.id));
 	};
 	const startNew = () => {
 		useUiStore.getState().returnToConversation();
@@ -830,7 +863,6 @@ export function Sidebar() {
 	const renderSessionRow = (spec: SessionRowSpec) => {
 		// Sessions open in a tab list this turn's agents under them (plan/24 §3.1).
 		const tab = tabForSession(spec.session);
-		if (!tab) return sessionRowElement(spec, null);
 		const level = Math.min(spec.depth, 6);
 		const layout = {
 			offset: level * 14,
@@ -838,9 +870,26 @@ export function Sidebar() {
 			trunk: spec.expanded && spec.childCount > 0,
 		};
 		return (
-			<SessionAgentsScope key={spec.session.path} layout={layout} sessionKey={spec.session.path} tabId={tab.id}>
-				{agents => sessionRowElement(spec, agents)}
-			</SessionAgentsScope>
+			<Fragment key={spec.session.path}>
+				{tab ? (
+					<SessionAgentsScope layout={layout} sessionKey={spec.session.path} tabId={tab.id}>
+						{agents => sessionRowElement(spec, agents)}
+					</SessionAgentsScope>
+				) : (
+					sessionRowElement(spec, null)
+				)}
+				{pendingDelete?.kind === "session" && pendingDelete.session.path === spec.session.path && (
+					<InlineConfirm
+						title={t("sidebar.deleteConfirm")}
+						message={t("sidebar.deleteMessage", {
+							name: sessionDisplayTitle(spec.session, t("sidebar.untitled")),
+						})}
+						busy={deleting}
+						onCancel={() => setPendingDelete(null)}
+						onConfirm={() => void confirmDeleteSession(spec.session)}
+					/>
+				)}
+			</Fragment>
 		);
 	};
 
@@ -938,6 +987,12 @@ export function Sidebar() {
 			<div
 				key={session.path}
 				role="button"
+				draggable={folders.length > 0 && !renaming}
+				onDragStart={event =>
+					startFolderDrag(event.dataTransfer, {
+						paths: selected ? selectedSessions.map(entry => entry.path) : [session.path],
+					})
+				}
 				data-pair-key={pair?.key}
 				data-pair-hover={(pair && !inPairFrame && hoveredPair === pair.key) || undefined}
 				onMouseEnter={pair && !inPairFrame ? () => setHoveredPair(pair.key) : undefined}
@@ -1520,6 +1575,7 @@ export function Sidebar() {
 					)}
 				</div>
 
+				<SessionFolderTree />
 				<div className="flex h-7 shrink-0 items-center ps-4 pe-2.5">
 					<span className="min-w-0 flex-1 truncate text-omp-xs font-medium text-[var(--omp-dim)]">
 						{t("sidebar.projects")}
@@ -1560,18 +1616,18 @@ export function Sidebar() {
 					<button
 						type="button"
 						data-sidebar-select
+						aria-label={t("sidebar.bulk.select")}
 						aria-pressed={selecting}
 						onClick={() => (selecting ? endSelection() : startSelection([]))}
 						title={t("sidebar.bulk.selectHint")}
 						className={cx(
-							"omp-pressable flex h-6 items-center gap-1 rounded-md px-1.5 text-omp-xs",
+							"omp-pressable flex size-6 shrink-0 items-center justify-center rounded-md",
 							selecting
 								? "bg-[var(--omp-selected-bg)] text-[var(--omp-text)]"
 								: "text-[var(--omp-dim)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]",
 						)}
 					>
 						<ListChecks aria-hidden="true" size={13} />
-						{t("sidebar.bulk.select")}
 					</button>
 				</div>
 
@@ -1740,6 +1796,22 @@ export function Sidebar() {
 						</button>
 						<button
 							type="button"
+							title={t("folders.add")}
+							aria-label={t("folders.add")}
+							onClick={event => {
+								const rect = event.currentTarget.getBoundingClientRect();
+								setAddToFolders({
+									anchor: { x: rect.left, y: rect.bottom + 3 },
+									source: { paths: selectedSessions.map(session => session.path) },
+								});
+							}}
+							disabled={selectedSessions.length === 0}
+							className={cx(utilityButton, "disabled:pointer-events-none disabled:opacity-40")}
+						>
+							<FolderPlus size={15} strokeWidth={1.75} />
+						</button>
+						<button
+							type="button"
 							data-sidebar-bulk-archive
 							onClick={() => archiveSelection(!allSelectedArchived)}
 							disabled={selectedSessions.length === 0}
@@ -1782,18 +1854,16 @@ export function Sidebar() {
 				<SidebarQuotas />
 
 				{/* Footer: app-level controls that are not tied to a session. */}
-				{/* A container so a narrow sidebar folds Settings to its icon instead of cutting the word. */}
-				<div className="@container flex h-11 shrink-0 items-center gap-0.5 border-t border-[var(--omp-border-muted)] px-2 text-omp-md">
+				<div className="flex h-11 shrink-0 items-center gap-0.5 border-t border-[var(--omp-border-muted)] px-2">
 					<button
 						type="button"
 						data-sidebar-settings
 						onClick={() => useUiStore.getState().openSettings()}
 						title={t("titlebar.settings")}
 						aria-label={t("titlebar.settings")}
-						className="omp-pressable flex h-7 min-w-0 items-center gap-2 rounded-md px-2 text-omp-md text-[var(--omp-text-secondary)] hover:bg-[var(--omp-selected-bg)] hover:text-[var(--omp-text)]"
+						className={utilityButton}
 					>
-						<Settings aria-hidden="true" size={15} strokeWidth={1.75} className="shrink-0" />
-						<span className="truncate @max-[14em]:hidden">{t("titlebar.settings")}</span>
+						<Settings aria-hidden="true" size={15} strokeWidth={1.75} />
 					</button>
 					<div className="flex-1" />
 					<button
@@ -1805,7 +1875,7 @@ export function Sidebar() {
 					>
 						<Palette size={15} strokeWidth={1.75} />
 					</button>
-					<LangSwitcher className="h-7 max-h-7 rounded-md px-1.5 text-omp-sm [&_svg]:size-[14px]" />
+					<LangSwitcher className={utilityButton} />
 				</div>
 				<div
 					role="separator"
@@ -2068,6 +2138,35 @@ export function Sidebar() {
 									},
 								},
 								{
+									id: "session-add-folder",
+									label: t("folders.add"),
+									icon: FolderPlus,
+									onSelect: () => {
+										setAddToFolders({
+											anchor: sessionMenu.anchor,
+											source: {
+												paths: selection?.has(sessionMenu.session.path)
+													? selectedSessions.map(entry => entry.path)
+													: [sessionMenu.session.path],
+											},
+										});
+										setSessionMenu(null);
+									},
+								},
+								...(activeFolder === DEFAULT_FOLDER
+									? []
+									: [
+											{
+												id: "session-remove-folder",
+												label: t("folders.remove"),
+												icon: X,
+												onSelect: () => {
+													removeFolderReference(sessionMenu.session);
+													setSessionMenu(null);
+												},
+											},
+										]),
+								{
 									id: "session-rename",
 									label: t("sidebar.rename"),
 									icon: Pencil,
@@ -2139,8 +2238,9 @@ export function Sidebar() {
 					);
 				})()}
 
+			{addToFolders && <AddToSessionFolders {...addToFolders} onClose={() => setAddToFolders(null)} />}
 			<ConfirmDialog
-				open={pendingDelete !== null}
+				open={pendingDelete?.kind === "group" || pendingDelete?.kind === "selection"}
 				title={
 					pendingDelete?.kind === "group"
 						? t("sidebar.deleteGroupConfirm")
@@ -2161,10 +2261,6 @@ export function Sidebar() {
 						})
 					) : pendingDelete?.kind === "selection" ? (
 						t("sidebar.bulk.deleteMessage", { count: pendingDelete.sessions.length })
-					) : pendingDelete?.kind === "session" ? (
-						t("sidebar.deleteMessage", {
-							name: sessionDisplayTitle(pendingDelete.session, t("sidebar.untitled")),
-						})
 					) : (
 						""
 					)
@@ -2178,7 +2274,6 @@ export function Sidebar() {
 				onConfirm={() => {
 					if (pendingDelete?.kind === "group") void confirmDeleteGroup(pendingDelete.group);
 					else if (pendingDelete?.kind === "selection") void confirmDeleteSelection(pendingDelete.sessions);
-					else if (pendingDelete) void confirmDeleteSession(pendingDelete.session);
 				}}
 				onCancel={() => setPendingDelete(null)}
 			/>

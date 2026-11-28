@@ -23,7 +23,7 @@ globals.IS_REACT_ACT_ENVIRONMENT = true;
 Object.assign(window, { innerWidth: 1280, innerHeight: 900 });
 
 interface TestElement {
-	textContent: string | null;
+	getAttribute: (name: string) => string | null;
 	remove: () => void;
 	appendChild: (child: TestElement) => void;
 	dispatchEvent: (event: object) => boolean;
@@ -100,7 +100,7 @@ describe("LangSwitcher", () => {
 			await act(async () => {
 				receive?.("ru");
 			});
-			expect(document.querySelector("button")?.textContent).toContain("RU");
+			expect(document.querySelector("button")?.getAttribute("title")).toContain("Русский");
 			expect(store["omp.lang"]).toBe("ru");
 			expect(document.documentElement.lang).toBe("ru");
 			expect(writes).toEqual([]);
@@ -115,7 +115,7 @@ describe("LangSwitcher", () => {
 	it("offers every language and selects Russian and Chinese explicitly", async () => {
 		await mountSwitcher();
 		const button = document.querySelector("button") as unknown as TestElement;
-		expect(button.textContent).toContain("EN");
+		expect(button.getAttribute("title")).toContain("English");
 
 		await act(async () => {
 			button.dispatchEvent(new Event("click", { bubbles: true, cancelable: true }));
@@ -126,7 +126,7 @@ describe("LangSwitcher", () => {
 		await act(async () => {
 			choices[1].dispatchEvent(new Event("click", { bubbles: true }));
 		});
-		expect(button.textContent).toContain("RU");
+		expect(button.getAttribute("title")).toContain("Русский");
 		expect(document.documentElement.lang).toBe("ru");
 		expect(document.querySelector('[role="menu"]')).toBeNull();
 
@@ -137,13 +137,13 @@ describe("LangSwitcher", () => {
 		await act(async () => {
 			document.querySelectorAll('[role="menuitem"]')[2].dispatchEvent(new Event("click", { bubbles: true }));
 		});
-		expect(button.textContent).toContain("中文");
+		expect(button.getAttribute("title")).toContain("中文");
 	});
 
 	it.each([
 		["zh", "中文"],
-		["ru", "RU"],
-		["th", "TH"],
+		["ru", "Русский"],
+		["th", "ไทย"],
 	])("rehydrates the persisted language %s", async (language, label) => {
 		// I18nProvider reads the LANG_KEY at mount; install a stub store first.
 		const store: Record<string, string> = { "omp.lang": language };
@@ -158,7 +158,7 @@ describe("LangSwitcher", () => {
 		};
 		try {
 			await mountSwitcher();
-			expect(document.querySelector("button")?.textContent).toContain(label);
+			expect(document.querySelector("button")?.getAttribute("title")).toContain(label);
 		} finally {
 			delete globals.localStorage;
 		}
@@ -194,7 +194,7 @@ describe("LangSwitcher", () => {
 		};
 		try {
 			await mountSwitcher();
-			expect(document.querySelector("button")?.textContent).toContain("中文");
+			expect(document.querySelector("button")?.getAttribute("title")).toContain("中文");
 			expect(writes).toEqual([]);
 		} finally {
 			delete bridgeWindow.omp;

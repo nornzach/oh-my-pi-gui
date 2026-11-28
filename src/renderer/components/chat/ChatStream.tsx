@@ -1093,7 +1093,10 @@ export function StreamingRows({
 	const hasTools = toolCalls.length + liveTools.length > 0;
 	const compact = transcriptDetail === "compact" || (autoCollapseProcess && hasText && !hasTools);
 	const compactChrome = compact ? !hasText : !hasText && !hasThinking;
-	const turnClass = compactChrome ? "omp-assistant-turn--compact" : "omp-assistant-turn";
+	const turnClass = cx(
+		compactChrome ? "omp-assistant-turn--compact" : "omp-assistant-turn",
+		hasTools && "omp-streaming-turn--with-tools",
+	);
 	const showThinkingSeparately = hasThinking && !hasTools;
 
 	// Live read grouping (same predicate as the finalized path): consecutive

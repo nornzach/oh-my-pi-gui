@@ -70,7 +70,7 @@ export function installQuitGuard(
 		if (asking) return;
 		const risk = quitRisk();
 		if (!quitNeedsConfirmation(risk)) {
-			requestQuit();
+			setImmediate(() => requestQuit());
 			return;
 		}
 		asking = true;

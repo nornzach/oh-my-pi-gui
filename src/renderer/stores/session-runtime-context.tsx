@@ -148,7 +148,7 @@ export function allSessionRuntimes(): SessionRuntime[] {
 	return [...runtimes.values()];
 }
 
-export function SessionRuntimeProvider({ runtime, children }: { runtime: SessionRuntime; children: ReactNode }) {
+export function SessionRuntimeProvider({ runtime, children }: { runtime: SessionRuntime | null; children: ReactNode }) {
 	return <SessionRuntimeContext.Provider value={runtime}>{children}</SessionRuntimeContext.Provider>;
 }
 

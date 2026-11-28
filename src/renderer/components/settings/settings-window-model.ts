@@ -1,5 +1,6 @@
 import type { SettingProvenance } from "../../../shared/rpc-types";
 import { GUI_DISPLAY_BOOL_FIELDS, GUI_DISPLAY_LEGACY_PATHS } from "../../lib/display-preferences";
+import { localizedLabels } from "../../lib/i18n";
 import type { TabItem } from "../common";
 import { GENERAL_SCHEMA_TABS, GUI_TAB_ID, isSettingSupportedInGui } from "./settings-schema-utils";
 
@@ -155,6 +156,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "image preview popup attachment sidebar 图片 附件 弹窗 预览 侧栏",
 	},
 	{
+		id: "externalTextFiles",
+		labelKey: "settings.gui.textFileOpenMode",
+		aliases: "text file attachment external default app preview sidebar 文本 文件 附件 默认程序 侧栏 预览",
+	},
+	{
 		id: "linkOpenMode",
 		labelKey: "settings.gui.linkOpenMode",
 		aliases: "linkOpenMode link browser external panel 链接 浏览器 外链 打开方式 ссылки браузер",
@@ -167,6 +173,16 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "compactDensity colorBlindMode compact density color blind 紧凑 密度 色盲",
 	},
 	{ id: "fontSize", labelKey: "settings.gui.fontSize", aliases: "fontSize font size 字号 字体" },
+	{
+		id: "composerRows",
+		labelKey: "settings.gui.composerRows",
+		aliases: "composer input height size lines 输入框 高度 行数 大小",
+	},
+	{
+		id: "composerFontScale",
+		labelKey: "settings.gui.composerFontScale",
+		aliases: "composer input font size placeholder 输入框 字体 字号 缩放",
+	},
 	{
 		id: "interfaceFont",
 		labelKey: "settings.gui.interfaceFont",
@@ -240,3 +256,11 @@ export const GUI_SETTING_SEARCH_ITEMS = [
 		aliases: "launchProfiles launch systemPrompt profile sessionDir 启动 参数 工作区",
 	},
 ] as const;
+
+export function matchesGuiSettingSearch(item: (typeof GUI_SETTING_SEARCH_ITEMS)[number], query: string): boolean {
+	return [item.id, ...localizedLabels(item.labelKey), item.aliases]
+		.join(" ")
+		.normalize("NFKC")
+		.toLowerCase()
+		.includes(query.normalize("NFKC").trim().toLowerCase());
+}

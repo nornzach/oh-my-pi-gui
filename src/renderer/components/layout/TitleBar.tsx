@@ -91,7 +91,9 @@ export function TitleBar() {
 	const projectAlias = useSidebarPrefs(s => s.groupAliases[cwd]);
 	const projectName = !isChat && cwd ? (projectAlias ?? (basename(cwd) || cwd)) : t("titlebar.openProject");
 
-	const [editingName, setEditingName] = useState(false);
+	const renameRequested = useUiStore(state => state.renameDialogOpen);
+	const [nameTarget, setNameTarget] = useState<{ tabId: string | null; sessionId: string } | null>(null);
+	const editingName = nameTarget !== null && nameTarget.tabId === tabId && nameTarget.sessionId === sessionId;
 	const [workspaceOpen, setWorkspaceOpen] = useState(false);
 	const [actionsMenu, setActionsMenu] = useState<ContextMenuAnchor | null>(null);
 	const [meterAnchor, setMeterAnchor] = useState<{ x: number; y: number } | null>(null);
@@ -109,7 +111,23 @@ export function TitleBar() {
 	const prevSessionRef = useRef<string | null>(null);
 
 	useEffect(() => {
-		if (editingName) nameInputRef.current?.select();
+		if (!renameRequested) return;
+		useUiStore.getState().closeRenameDialog();
+		if (status !== "ready") {
+			toast({ variant: "warning", message: t("sidecar.notResponding") });
+			return;
+		}
+		setDraft(sessionName ?? "");
+		setNameTarget({ tabId, sessionId });
+	}, [renameRequested, status, tabId, sessionId, sessionName, t]);
+	useEffect(() => {
+		if (!editingName && nameTarget) setNameTarget(null);
+	}, [editingName, nameTarget]);
+	useEffect(() => {
+		if (editingName) {
+			nameInputRef.current?.focus();
+			nameInputRef.current?.select();
+		}
 	}, [editingName]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the settled transcript and the snapshot pulse both refresh the cost figures even when the session ID is stable.
@@ -194,8 +212,8 @@ export function TitleBar() {
 
 	const commitName = () => {
 		const name = draft.trim();
-		setEditingName(false);
-		if (!name || name === displayName) return;
+		setNameTarget(null);
+		if (!editingName || !name || name === displayName || status !== "ready") return;
 		const originSession = sessionRuntimeStore<SessionStore>(tabId, "session") ?? useSessionStore;
 		const originId = originSession.getState().sessionId;
 		void tabRpc
@@ -395,13 +413,15 @@ export function TitleBar() {
 				{editingName ? (
 					<input
 						ref={nameInputRef}
+						aria-label={t("rename.label")}
+						maxLength={120}
 						value={draft}
 						onChange={event => setDraft(event.target.value)}
 						onBlur={commitName}
 						onKeyDown={event => {
 							if (isImeKeyEvent(event)) return;
 							if (event.key === "Enter") commitName();
-							onEscape(event, () => setEditingName(false));
+							onEscape(event, () => setNameTarget(null));
 						}}
 						className="min-w-0 max-w-56 rounded-lg border border-[var(--omp-input-focus-border)] bg-[var(--omp-input-bg)] px-2.5 py-1.5 text-omp-lg font-medium text-[var(--omp-text)] outline-none"
 					/>
@@ -415,7 +435,7 @@ export function TitleBar() {
 								return;
 							}
 							setDraft(sessionName ?? "");
-							setEditingName(true);
+							setNameTarget({ tabId, sessionId });
 						}}
 						className={cx(
 							"omp-pressable min-w-0 max-w-72 truncate rounded-lg px-2 py-1.5 text-omp-lg hover:bg-[var(--omp-selected-bg)]",

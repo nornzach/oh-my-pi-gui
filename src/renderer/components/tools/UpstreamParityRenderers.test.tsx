@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 import { act, type ReactElement } from "react";
 import type { Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../lib/i18n";
 
 const { document, window, Event, HTMLElement, Element, Node } = parseHTML("<html><body></body></html>");
@@ -41,6 +41,32 @@ afterEach(async () => {
 });
 
 describe("omp 17.3.5 renderer parity", () => {
+	it("localizes process policy while leaving its working path unchanged", async () => {
+		vi.stubGlobal("localStorage", { getItem: () => "zh" });
+		try {
+			await mount(
+				<HubRenderer
+					args={{ op: "describe" }}
+					result={{
+						content: [],
+						details: {
+							spec: {
+								cwd: "/tmp/my-service",
+								pty: true,
+								persist: false,
+								restart: "on-failure",
+								detached: true,
+							},
+						},
+					}}
+				/>,
+			);
+			expect(container.textContent).toContain("工作目录：/tmp/my-service");
+			expect(container.textContent).toContain("伪终端：开 · 重启：失败时 · 持久化：关 · 已分离");
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 	it("renders an image block returned by a PDF page read", async () => {
 		await mount(
 			<ReadRenderer

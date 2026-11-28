@@ -195,6 +195,24 @@ if (process.argv.includes("stats")) {
 		planModeEnabled: false,
 		agentsPaused: false,
 	};
+	const folderGate = process.env.OMP_GUI_TEST_FOLDER_GATE;
+	const loadFolderSession = (file: string) => {
+		const lines = fs.readFileSync(file, "utf8").trim().split("\n");
+		const [title, header, ...entries] = lines.map(line => JSON.parse(line));
+		state.sessionFile = file;
+		state.sessionName = title.title;
+		state.sessionId = header.id;
+		state.cwd = header.cwd;
+		if (count === 0) {
+			messages.length = 0;
+			for (const entry of entries) messages.push({ ...entry.message, entryId: entry.id });
+		}
+		state.messageCount = messages.length;
+	};
+	const resumeFile = process.argv.includes("--session")
+		? process.argv[process.argv.indexOf("--session") + 1]
+		: undefined;
+	if (folderGate && resumeFile) loadFolderSession(resumeFile);
 	if (process.env.OMP_GUI_TEST_NO_DEFAULT_MODEL) {
 		state.model = null;
 		state.thinkingLevel = undefined;
@@ -248,6 +266,21 @@ if (process.argv.includes("stats")) {
 				break;
 			case "get_state":
 				ok(state);
+				break;
+			case "switch_session":
+				if (command.sessionPath === process.env.OMP_GUI_TEST_RESTORE && !command.modelId) {
+					write({
+						type: "response",
+						id: command.id,
+						command: command.type,
+						success: false,
+						error: "Could not restore model fixture/retired",
+					});
+					break;
+				}
+				if (command.modelId === model.id && command.provider === model.provider) state.model = model;
+				if (folderGate) loadFolderSession(command.sessionPath);
+				ok();
 				break;
 			case "get_messages":
 			case "get_transcript":
@@ -389,6 +422,12 @@ if (process.argv.includes("stats")) {
 				break;
 			case "get_git_status":
 				ok({ isRepo: false, branch: null, staged: 0, unstaged: 0, untracked: 0 });
+				break;
+			case "pr_repo":
+				ok({ available: true, repo: "fixture/local", defaultBranch: "main" });
+				break;
+			case "pr_list":
+				ok([]);
 				break;
 			case "get_active_tools":
 				ok({ tools: [] });
@@ -722,7 +761,25 @@ if (process.argv.includes("stats")) {
 				messages.push(user);
 				write({ type: "agent_start" });
 				write({ type: "message_end", message: user });
-				if (command.message === "fixture stream") {
+				if (command.message === "fixture folder background" && folderGate) {
+					streamTimer = setInterval(() => {
+						if (!fs.existsSync(folderGate)) return;
+						if (streamTimer) clearInterval(streamTimer);
+						streamTimer = null;
+						const answer: AgentMessage = {
+							role: "assistant",
+							content: [{ type: "text", text: "Completed in the background" }],
+							timestamp: Date.now(),
+							entryId: crypto.randomUUID(),
+							stopReason: "stop",
+						};
+						messages.push(answer);
+						state.messageCount = messages.length;
+						state.isStreaming = false;
+						write({ type: "message_end", message: answer });
+						write({ type: "agent_end", messages: [answer], isTerminal: true });
+					}, 30);
+				} else if (command.message === "fixture stream") {
 					const answer: AgentMessage = {
 						role: "assistant",
 						content: [],
@@ -756,6 +813,44 @@ if (process.argv.includes("stats")) {
 						options: ["Approve", "Deny"],
 					});
 				} else if (command.message !== "fixture running") {
+					if (command.message === "fixture background notification") {
+						const batch: AgentMessage[] = [
+							{
+								role: "assistant",
+								entryId: crypto.randomUUID(),
+								timestamp: Date.now(),
+								content: [
+									{ type: "toolCall", id: "build-arm", name: "bash", arguments: { command: "build desktop" } },
+								],
+							},
+							{
+								role: "custom",
+								customType: "async-notify",
+								entryId: crypto.randomUUID(),
+								timestamp: Date.now(),
+								display: true,
+								content:
+									"<system-notice>Background job bg_1 (INTERNAL_BUILD_COMMAND) is still running. Its output matched /PRIVATE_MATCH_PATTERN/: building arm64 DMG</system-notice>",
+								details: {
+									reports: [
+										{
+											id: "bg_1",
+											type: "bash",
+											pattern: "PRIVATE_MATCH_PATTERN",
+											lines: ["building arm64 DMG"],
+											omitted: 0,
+											running: true,
+											stopped: false,
+										},
+									],
+								},
+							},
+						];
+						for (const message of batch) {
+							messages.push(message);
+							write({ type: "message_end", message });
+						}
+					}
 					const answer: AgentMessage = {
 						role: "assistant",
 						content: [

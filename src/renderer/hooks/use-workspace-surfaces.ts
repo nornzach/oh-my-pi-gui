@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { applyBrowserState, forgetTabBrowser, useBrowserStore } from "../stores/browser";
+import { connectSessionInspector } from "../stores/session-inspector";
 import { useTabsStore } from "../stores/tabs";
 import {
 	applyTerminalTheme,
@@ -17,6 +18,7 @@ import { useUiStore } from "../stores/ui";
  * `pty: true` command waiting for input, or a page it just opened.
  */
 export function useWorkspaceSurfaces(): void {
+	useEffect(connectSessionInspector, []);
 	useEffect(() => {
 		const events = window.omp?.events;
 		if (typeof events?.onTerminalFrame !== "function" || typeof events.onBrowserState !== "function") return;

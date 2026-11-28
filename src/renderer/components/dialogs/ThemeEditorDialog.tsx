@@ -37,7 +37,8 @@ import {
 import { loadCustomThemes, useCustomThemesStore } from "../../stores/custom-themes";
 import { toast } from "../../stores/toast";
 import { useUiStore } from "../../stores/ui";
-import { Button, ConfirmDialog, Input, Modal } from "../common";
+import { Button, Input, Modal } from "../common";
+import { InlineConfirm } from "../common/InlineConfirm";
 
 const SELECT_CLASS =
 	"w-full rounded-lg border border-(--omp-input-border) bg-(--omp-input-bg) px-3 py-[7px] text-omp-lg text-(--omp-text) transition-colors duration-150 hover:border-(--omp-border-strong) focus:border-(--omp-input-focus-border) focus:outline-none";
@@ -550,11 +551,22 @@ export function ThemeEditorDialog() {
 					</div>
 				</div>
 				<div className="sticky bottom-0 flex items-center gap-2 border-t border-(--omp-border-muted) bg-(--omp-modal-bg) px-5 py-3">
-					{editing?.theme && (
-						<Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)} disabled={saving}>
-							<Trash2 size={13} />
-							{t("themeEditor.delete")}
-						</Button>
+					{confirmDelete && editing?.theme ? (
+						<InlineConfirm
+							title={t("themeEditor.deleteTitle", { name: editing.theme.label })}
+							message={t("themeEditor.deleteMessage", { file: editing.fileName })}
+							confirmLabel={t("themeEditor.delete")}
+							busy={saving}
+							onConfirm={() => void remove()}
+							onCancel={() => setConfirmDelete(false)}
+						/>
+					) : (
+						editing?.theme && (
+							<Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)} disabled={saving}>
+								<Trash2 size={13} />
+								{t("themeEditor.delete")}
+							</Button>
+						)
 					)}
 					<span role="status" className="min-w-0 flex-1 text-omp-sm text-(--omp-warning)">
 						{discardArmed && t("themeEditor.discardArmed")}
@@ -567,15 +579,6 @@ export function ThemeEditorDialog() {
 					</Button>
 				</div>
 			</Modal>
-			<ConfirmDialog
-				open={confirmDelete}
-				title={t("themeEditor.deleteTitle", { name: editing?.theme?.label ?? "" })}
-				message={t("themeEditor.deleteMessage", { file: editing?.fileName ?? "" })}
-				confirmLabel={t("themeEditor.delete")}
-				busy={saving}
-				onConfirm={() => void remove()}
-				onCancel={() => setConfirmDelete(false)}
-			/>
 		</>
 	);
 }

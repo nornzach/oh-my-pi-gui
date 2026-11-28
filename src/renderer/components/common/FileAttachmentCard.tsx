@@ -1,10 +1,11 @@
 import { File, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { activateFileLink, previewFile } from "../../lib/file-actions";
+import { activateFileLink, prefersExternalTextFile, previewFile } from "../../lib/file-actions";
 import { basename } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { resolvePath } from "../../lib/path-resolver";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { useUiStore } from "../../stores/ui";
 import { useFileImagePopup } from "./ImageViewer";
 import { showPathMenu } from "./LinkMenu";
 
@@ -45,7 +46,9 @@ export function FileAttachmentCard({
 							if (resolved) activateFileLink({ path }, resolved, true);
 						});
 					} else if (popup.open) void popup.open();
-					else previewFile(path);
+					else if (prefersExternalTextFile(path, useUiStore.getState().externalTextFiles)) {
+						void resolvePath(path, tabId).then(resolved => activateFileLink({ path }, resolved, false));
+					} else previewFile(path);
 				}}
 				onContextMenu={event => showPathMenu(event, path, tabId)}
 				aria-haspopup={popup.open ? "dialog" : undefined}

@@ -413,6 +413,25 @@ describe("SidecarPool tabs", () => {
 		expect(pool.setActiveTab(fw.win, "nope")).toBe(false);
 	});
 
+	it("parking the window for an empty folder keeps the run and its status updates alive", () => {
+		const { pool, sidecars } = fakePool();
+		const fw = fakeWindow(1);
+		pool.acquire("/a", fw.win, "tab-a");
+		const [sidecar] = sidecars;
+		sidecar?.emitAgentEvents(["agent_start"]);
+		expect(pool.setTabView(fw.win, "", [])).toBe(true);
+		expect(pool.sidecarForWindow(fw.win)).toBeNull();
+		expect(pool.sidecarForTab(fw.win, "tab-a")).toBe(sidecar);
+		pool.acquire("/b", fw.win, "tab-b");
+		expect(pool.sidecarForWindow(fw.win)).toBeNull();
+		fw.sent.length = 0;
+		sidecar?.emitAgentEvents(["agent_end"]);
+		expect(fw.sentTo(IPC_EVENTS.EVENTS_BATCH)).toHaveLength(0);
+		expect(fw.sentTo(IPC_EVENTS.TAB_STATUS)).toHaveLength(1);
+		expect(pool.setActiveTab(fw.win, "tab-a")).toBe(true);
+		expect(pool.sidecarForWindow(fw.win)).toBe(sidecar);
+	});
+
 	it("forwards a shown pair's two sessions, keeps pairs in the background, and persists them all", () => {
 		const { pool, sidecars } = fakePool();
 		const fw = fakeWindow(1);
@@ -653,7 +672,7 @@ describe("SidecarPool tabs", () => {
 			activeIndex: 1,
 			tabs: [
 				{ cwd: "/agent", kind: "agent", sessionPath: "/sessions/a.jsonl" },
-				{ cwd: "/chat", kind: "chat" },
+				{ cwd: "/chat", kind: "chat", folderTabId: pool.tabsForWindow(fw.win)[1]?.tabId },
 			],
 			groups: [{ axis: "rows", firstIndex: 0, secondIndex: 1, ratio: 0.6 }],
 		});

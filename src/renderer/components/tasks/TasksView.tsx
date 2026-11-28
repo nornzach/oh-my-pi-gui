@@ -9,8 +9,9 @@ import type { ScheduledTask, SchedulerInsights, TaskRevision, TaskRun } from "..
 import { cx, formatClock, formatCost, formatDuration, formatPercent, shortenPath } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { useSchedulerStore } from "../../stores/scheduler";
-import { Badge, Button, ConfirmDialog } from "../common";
+import { Badge, Button } from "../common";
 import { Collapse } from "../common/Collapse";
+import { InlineConfirm } from "../common/InlineConfirm";
 import { DayChart } from "./InsightsView";
 import { RunDetail, RunRow } from "./RunDetail";
 import {
@@ -364,6 +365,18 @@ function TaskDetail({ task, runs }: { task: ScheduledTask; runs: TaskRun[] }) {
 				</div>
 			</header>
 
+			{confirmDelete && task.state === "archived" && (
+				<InlineConfirm
+					message={t("tasks.detail.deleteMessage", { title: task.title })}
+					onCancel={() => setConfirmDelete(false)}
+					onConfirm={() => {
+						setConfirmDelete(false);
+						void store.remove(task.id);
+					}}
+					title={t("tasks.detail.deleteTitle")}
+					warning={t("tasks.detail.deleteWarning")}
+				/>
+			)}
 			<TaskStats runs={runs} task={task} />
 
 			<section className="rounded-xl border border-(--omp-border-muted) px-4 py-3">
@@ -463,18 +476,6 @@ function TaskDetail({ task, runs }: { task: ScheduledTask; runs: TaskRun[] }) {
 					</ul>
 				</section>
 			)}
-
-			<ConfirmDialog
-				message={t("tasks.detail.deleteMessage", { title: task.title })}
-				onCancel={() => setConfirmDelete(false)}
-				onConfirm={() => {
-					setConfirmDelete(false);
-					void store.remove(task.id);
-				}}
-				open={confirmDelete}
-				title={t("tasks.detail.deleteTitle")}
-				warning={t("tasks.detail.deleteWarning")}
-			/>
 		</div>
 	);
 }
@@ -564,7 +565,9 @@ export function TasksView({ onNew }: { onNew: () => void }) {
 				)}
 			</aside>
 			<div className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
-				{selected ? <TaskDetail runs={runsByTask.get(selected.id) ?? []} task={selected} /> : null}
+				{selected ? (
+					<TaskDetail key={selected.id} runs={runsByTask.get(selected.id) ?? []} task={selected} />
+				) : null}
 			</div>
 		</div>
 	);

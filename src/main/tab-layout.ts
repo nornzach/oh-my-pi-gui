@@ -7,6 +7,7 @@ export const MAX_PERSISTED_TITLE = 120;
 
 export interface PersistedTabDescriptor {
 	cwd: string;
+	folderTabId?: string;
 	sessionPath?: string;
 	kind: SessionKind;
 	worktree?: IpcTabWorktree;
@@ -30,6 +31,7 @@ export interface PersistedTabGroup {
 
 export interface PersistedTabLayout {
 	version: typeof TAB_LAYOUT_VERSION;
+	folderId?: string;
 	tabs: PersistedTabDescriptor[];
 	activeIndex: number;
 	groups?: PersistedTabGroup[];
@@ -131,6 +133,12 @@ export function sanitizePersistedTabLayout(
 
 		const descriptor: PersistedTabDescriptor = { cwd, kind };
 		if (sessionPath) descriptor.sessionPath = sessionPath;
+		else if (
+			!storedSessionPath &&
+			typeof candidate.folderTabId === "string" &&
+			/^[0-9a-f]{16}$/.test(candidate.folderTabId)
+		)
+			descriptor.folderTabId = candidate.folderTabId;
 		const worktree = parseWorktree(candidate.worktree);
 		if (worktree) descriptor.worktree = worktree;
 		const legacyEmptyStartupChat =
@@ -184,6 +192,7 @@ export function sanitizePersistedTabLayout(
 
 	return {
 		version: TAB_LAYOUT_VERSION,
+		...(typeof value.folderId === "string" && value.folderId.length <= 64 ? { folderId: value.folderId } : {}),
 		tabs: effective.map(entry => entry.descriptor),
 		activeIndex,
 		...(groups.length > 0 ? { groups } : {}),

@@ -45,6 +45,7 @@ import { launchCompletionDaemons } from "./completion-events";
 const CARD_TYPES: Record<string, true> = {
 	advisor: true,
 	"async-result": true,
+	"async-notify": true,
 	command: true,
 	"launch-completion": true,
 	"lsp-late-diagnostic": true,
@@ -67,6 +68,8 @@ export function CustomMessageCard({ message, inProcess = false }: { message: Age
 			return <AdvisorCard message={message} />;
 		case "async-result":
 			return <AsyncResultCard inProcess={inProcess} message={message} />;
+		case "async-notify":
+			return <AsyncNotifyCard inProcess={inProcess} message={message} />;
 		case "command":
 			return <CommandOutputCard message={message} />;
 		case "launch-completion":
@@ -412,6 +415,32 @@ function taskResultBody(text: string, previewLabel: string): string {
 	}
 	sections.push((envelope[2] ?? "").trim());
 	return sections.filter(Boolean).join("\n\n");
+}
+
+function AsyncNotifyCard({ message, inProcess }: { message: AgentMessage; inProcess: boolean }) {
+	const t = useT();
+	const reports: unknown = resultDetails(message)?.reports;
+	const rows = Array.isArray(reports)
+		? reports.flatMap((report: unknown, index: number) => {
+				if (!report || typeof report !== "object" || !("id" in report) || !str(report.id)) return [];
+				const lines =
+					"lines" in report && Array.isArray(report.lines)
+						? report.lines.filter((line: unknown): line is string => typeof line === "string")
+						: [];
+				const omitted = "omitted" in report && num(report.omitted);
+				if (omitted && omitted > 0) lines.push(t("input.paste.moreLines", { count: omitted }));
+				if ("stopped" in report && report.stopped === true) lines.push(t("chat.custom.notificationsStopped"));
+				const label = t(
+					"type" in report && report.type === "service" ? "chat.custom.serviceOutput" : "chat.custom.jobOutput",
+				);
+				return [<CompletionRow key={index} label={`${label} · ${str(report.id)}`} output={lines.join("\n")} />];
+			})
+		: [];
+	return (
+		<CompletionRows inProcess={inProcess}>
+			{rows.length ? rows : <CompletionRow label={t("chat.custom.jobOutput")} />}
+		</CompletionRows>
+	);
 }
 
 function AsyncResultCard({ message, inProcess }: { message: AgentMessage; inProcess: boolean }) {

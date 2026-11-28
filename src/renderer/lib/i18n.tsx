@@ -11,6 +11,10 @@ export type Lang = Language;
 const LOCALES: Record<Lang, Locale> = { en, ru, th, zh };
 const LANG_KEY = "omp.lang";
 
+export function localizedLabels(key: string): string[] {
+	return Object.values(LOCALES).map(locale => locale[key] ?? "");
+}
+
 function readStoredLanguage(): Lang | undefined {
 	try {
 		const stored = localStorage.getItem(LANG_KEY);

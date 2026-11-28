@@ -11,6 +11,10 @@
 
 /** Section headings declared in the schema's TAB_GROUPS. */
 export const ZH_GROUP_TITLES: Record<string, string> = {
+	Find: "查找",
+	Disassembler: "反汇编器",
+	Ghidra: "Ghidra",
+	"Binary Ninja": "Binary Ninja",
 	Theme: "主题",
 	"Status Line": "状态栏",
 	Display: "显示",
@@ -76,6 +80,279 @@ export const ZH_GROUP_TITLES: Record<string, string> = {
 
 /** Per-setting row text, keyed by schema setting path. */
 export const ZH_SETTINGS: Record<string, { label: string; description?: string }> = {
+	"auth.unpausedProviders": {
+		label: "重新启用的服务商",
+		description:
+			"重新启用已暂停的服务商，恢复登录、令牌刷新及已保存凭据的使用。每一项都列出了重新启用时需要接受的账号风险。此设置不能由项目指定。",
+	},
+	"terminal.programStatus": {
+		label: "程序状态 (OSC 7501)",
+		description: "通过 OSC 7501 向终端标签指示器和代理收件箱报告代理状态：工作中、等待输入、已完成或失败。",
+	},
+	"tui.colorfulMarkdown": {
+		label: "彩色 Markdown",
+		description:
+			"用主题的 ANSI 色板区分各级标题、粗斜体、行内代码和表头。关闭后，标题统一用一种颜色，粗体和斜体不额外着色。",
+	},
+	"tui.renderSvg": { label: "渲染 SVG 图形", description: "允许代理用 SVG 绘图，并在支持图像的终端中直接显示。" },
+	"tui.renderEmbeds": {
+		label: "显示嵌入的图片和网页",
+		description:
+			"允许代理用 <img> 显示图片、用 <iframe> 显示网页。支持图像的终端会加载并直接显示这些内容，包括远程地址。",
+	},
+	"tui.autoGraph": {
+		label: "为数值表格自动绘图",
+		description: "在支持图像的终端中，用主题色在代理回复的数值表格下方绘制图表。",
+	},
+	"tui.spinnerInterval": {
+		label: "加载动画帧间隔（毫秒）",
+		description: "加载动画的帧间隔，以毫秒计，终端标题中的动画也适用。0 表示静止；留空则遵循界面动效设置。",
+	},
+	"tui.maxFps": {
+		label: "每秒最大帧数",
+		description: "限制 TUI（包括流式文本）的重绘帧率。键盘输入仍以 30 fps 回显，以保证当前输入窗格响应及时。",
+	},
+	"tui.showLinkUrl": {
+		label: "显示链接地址",
+		description: "在 Markdown 链接文字后用括号显示目标 URL。关闭时，仅当终端支持点击链接文字才隐藏地址。",
+	},
+	"tui.motion": {
+		label: "界面动效",
+		description:
+			"统一控制加载动画、流光、闪烁和淡入淡出，不影响流式文本。流式文本的帧率单独设置；显式指定的加载动画帧间隔优先。",
+	},
+	"display.subagentLivePreview": {
+		label: "子代理实时预览",
+		description: "在每行的下方显示每个固定子代理当前的（或最新的）工具调用。",
+	},
+	"display.shellVisualization": {
+		label: "Shell 可视化",
+		description: "用交互式执行视图显示 Bash 命令，而不只显示命令文本。",
+	},
+	"display.advisorCollapsedLines": {
+		label: "顾问卡片折叠时的行数",
+		description: "折叠的顾问卡片在标题下最多显示多少行内容。0 表示不截断；可用工具输出开关展开。",
+	},
+	"tui.vimShowCommand": {
+		label: "在状态栏显示 Vim 命令",
+		description:
+			"在状态栏显示尚未输完的 Vim 命令，如输入 15dd 的最后一个 d 之前显示 15d。即使隐藏模式指示器也会显示。",
+	},
+	"tui.vimYankToClipboard": {
+		label: "Vim 复制操作同步至剪贴板",
+		description:
+			'在 Vim 中，yank 操作也会复制到系统剪贴板，就像在具有 clipboard=unnamed 的 Vim 中一样。关闭：只有 "+y 和 "*y 有效。',
+	},
+	"tui.vimStartMode": {
+		label: "Vim 启动模式",
+		description: "设置启动时、每次发送消息后及对话框输入时使用的初始 Vim 模式。",
+	},
+	"input.bareExitOnEmptySession": {
+		label: "空会话时直接退出",
+		description: "发送首条消息前，如果输入仅为 `exit`、`quit` 或 `q`（不区分大小写），则直接退出，不把它发给模型。",
+	},
+	"input.bareSlashCommands": {
+		label: "允许省略命令前的斜杠",
+		description:
+			"如果仅输入命令名称且没有前置 `/` 符号（例如 `model`、`compact`），则执行该斜杠命令；当会话包含消息后，按两次 Enter 键以确认。",
+	},
+	"composer.predictionAlternatives": {
+		label: "备选输入预测",
+		description:
+			"一次请求最多返回四个不同的输入建议，按可能性排序。淡色预览显示第一个与草稿匹配的建议。插入后再按 ⇥ 可切换其他建议；请求次数不变，只会多生成少量 token。",
+	},
+	"update.auto": { label: "自动更新", description: "在启动时在后台安装 omp 更新；下次启动将运行新版本。" },
+	"pty.notify": { label: "控制台通知", description: "当交互式控制台（bash `pty`）正在等待你输入时发出通知。" },
+	"session.worktreeScope": {
+		label: "恢复会话时的工作树范围",
+		description: "选择恢复会话时，“当前文件夹”是否也包含同一仓库其他工作树中的会话。",
+	},
+	expandThinkingBlocks: {
+		label: "展开思维块",
+		description: "在回合结束时，保持已完成的思考块展开状态，而不是将其折叠。",
+	},
+	encourageEdits: {
+		label: "要求使用编辑工具",
+		description: "需要文件编辑工具进行编辑，并禁止使用 sed/perl/python 进行编辑",
+	},
+	"tier.devin": {
+		label: "Devin 服务等级",
+		description:
+			"Devin 请求的处理等级。设为 `priority` 时，若模型有快速通道，则使用相应的模型标识（`-fast`、`-priority` 或 `-lightning`）。这与对 Devin 模型使用 `/fast` 相同。",
+	},
+	"retry.rateLimitWalksChain": {
+		label: "限流时切换到备用模型",
+		description:
+			"即使当前回合的推理由受限流的模型签名，也允许沿 retry.fallbackChains 切换模型。默认关闭：先重试原模型，达到 retry.maxRetries 后才进入回退链。",
+	},
+	"providers.openaiResponsesWebsockets": {
+		label: "OpenAI Responses 的 WebSocket 连接",
+		description: "为目录中支持此功能的标准 Responses 模型启用 WebSocket。模型或请求显式设为 false 时仍会禁用。",
+	},
+	"live.endpoint": {
+		label: "实时语音服务地址",
+		description:
+			"用于实时语音的 OpenAI Realtime WebRTC 兼容服务器的基础 URL（例如 http://127.0.0.1:8080/v1），而非 Codex；为空则使用 Codex",
+	},
+	"live.apiKey": {
+		label: "实时语音服务 API 密钥",
+		description: "只发送给实时语音服务的 Bearer 密钥。可填写密钥本身、环境变量名或 !command。",
+	},
+	"providers.webKeyless": {
+		label: "无密钥网络服务",
+		description:
+			"允许网页搜索和链接读取在未配置凭据时使用第三方服务：Parallel、Exa、Firecrawl、Keenable、Perplexity、Jina 阅读器，以及 Startpage、DuckDuckGo、Ecosia、Google、Mojeek、Hacker News 等抓取来源。关闭后只使用你已配置的服务。",
+	},
+	"mnemopi.recallRelevance": {
+		label: "检查 Mnemopi 召回记忆的相关性",
+		description: "在注入自动召回的记忆前，让评判模型逐条检查其是否与当前任务相关。",
+	},
+	"mnemopi.embeddingQueryPrefix": {
+		label: "Mnemopi 向量查询前缀",
+		description:
+			"生成向量前添加到召回查询前的文本，适用于 Qwen3-Embedding、E5 等指令微调模型。已存记忆的向量不加此前缀。",
+	},
+	"mnemopi.embeddingInputType": {
+		label: "Mnemopi 向量输入类型",
+		description:
+			"在向量 API 请求中附带 input_type：召回用 query，保存记忆用 passage。NVIDIA NIM 的非对称嵌入模型需要此参数。",
+	},
+	"edit.magic.model": {
+		label: "Magic 编辑模式的模型",
+		description: "模型选择器或角色别名 (@slow)，用于应用 magic-mode 更改的模型，空值 = smol 角色",
+	},
+	"tools.restrictedFolders": {
+		label: "受限文件夹",
+		description:
+			'这些文件夹及其子目录内的读取、写入、编辑、搜索和命令执行一律需要明确批准，不受审批模式或已记住的授权影响。命令按运行目录匹配。使用 JSON 路径列表，例如 ["~/secrets"]。',
+	},
+	"todo.midRunNudges": {
+		label: "执行期间的待办更新提醒",
+		description: "代理在长回合中持续修改内容时，提醒它更新待办列表的频率。",
+	},
+	"todo.backend": { label: "待办事项存储方式", description: "用于镜像待办列表的扩展程序；Native 仅将其保留在会话中" },
+	"find.verifyModel": {
+		label: "搜索结果验证模型",
+		description:
+			"验证 find 搜索命中的段落时，优先使用此模型（如 openrouter/liquid/d1-ultra），再尝试评判模型。文件名和概要仍由评判模型排序。留空则验证也使用评判模型。",
+	},
+	"commit.enabled": {
+		label: "选择性提交",
+		description: "启用 commit 的 eval 辅助代码和 /commit 命令：只提交当前代理及其子代理编写的行。",
+	},
+	"computer.takeover": {
+		label: "接管键盘和鼠标",
+		description: "决定窗口输入何时从后台操作切换为接管实际鼠标和键盘；按 Esc 可停止接管。",
+	},
+	"out.enabled": {
+		label: "回合中途回复",
+		description:
+			"允许代理在任务中途通过 out:// 输出回复而不结束当前回合。未设置时，交互式 TUI 默认开启；打印、RPC 和 ACP 模式默认关闭。",
+	},
+	"async.printWake": {
+		label: "后台作业完成时唤醒打印模式",
+		description:
+			"打印模式（-p、--mode json）处理完最后一条提示后，如果还有后台作业，则等待并在同一会话中用每个作业的结果开启新回合。没有待处理的作业或结果时退出。关闭后，处理完提示即退出并取消仍在运行的作业。",
+	},
+	"tools.commands": {
+		label: "工具命令",
+		description:
+			"将可按需发现的低频工具挂载为 bash 命令，通过 `--help` 查看用法，不再随每次请求附上工具定义。没有 bash 工具或关闭此选项时，所有已启用的工具仍直接提供给模型。",
+	},
+	"tools.commandDocs": {
+		label: "系统提示词中的工具命令帮助",
+		description:
+			"选择哪些工具命令的 `--help` 帮助要写入系统提示词。选择“仅内置工具”时写入核心工具的帮助，MCP 和扩展工具的帮助按需读取。",
+	},
+	"tools.commandInline": {
+		label: "额外内嵌帮助的工具命令",
+		description:
+			"当工具命令文档设为“仅内置工具”时，也写入名称匹配以下 glob 模式的动态命令帮助，例如 mcp__context_mode_*。“仅目录”模式忽略此设置。",
+	},
+	"tools.commandNotices": {
+		label: "工具命令挂载通知",
+		description: "MCP 或扩展工具作为命令挂载或卸载时显示通知。无论是否通知，模型都会在下一条提示中获知变更。",
+	},
+	"bash.reapBackground": {
+		label: "清理后台进程",
+		description:
+			"代理停止时，提醒它还有由 `cmd &` 或 `nohup` 启动的后台进程。会话结束时终止以 `&` 启动且未注册为服务的进程。RPC 模式下关闭。",
+	},
+	"bash.allowedEnvVars": {
+		label: "Bash允许的环境变量",
+		description:
+			"按 bash.patterns 的允许规则匹配命令时，允许放在命令前的 KEY=VALUE 环境变量名。必须填写完整名称，不支持通配符；值不受限制。只应列出无害的构建或测试变量。允许 PATH、LD_PRELOAD、BASH_ENV、*_RUNNER 或 *_WRAPPER 等会改变执行行为的变量，就相当于允许执行任意命令。",
+	},
+	"ovnfs.path": {
+		label: "ovnfs 可执行文件",
+		description:
+			"ovnfs 可执行文件的位置；留空则在 PATH 中查找 `ovnfs`。可用时，独立副本使用写时复制的检出目录，创建时间约一秒，与目录大小无关。系统提示会让代理优先使用这种方式。`isolation.backend` 为 auto 时，允许隔离的子代理使用它代替原生克隆，`/wt` 也改用它而非关联工作树。",
+	},
+	"task.workerThreads": {
+		label: "子代理工作线程",
+		description:
+			"子代理可用的最大工作线程数。并发数不超过 8 时均在主线程运行；达到 9 时增加一个工作线程，此后每翻倍再增加一个（18、36、72）。工作线程没有活跃子代理满一分钟后退出。设为 0 时全部使用主线程。",
+	},
+	"extensionHandlers.modeControl": {
+		label: "允许扩展切换模式",
+		description:
+			"允许扩展通过 ctx.sessionModes.set() 进入和退出 plan、vibe、goal 或 loop 模式。关闭后仍可读取模式状态。",
+	},
+	"extensionRenderers.assistantText": {
+		label: "扩展自定义回复显示",
+		description:
+			"允许扩展功能改变助手回复的样式，可以重新绘制回复内容，并能够响应其自身链接的点击；会话、导出内容和模型上下文则保持原有回复不变。",
+	},
+	"extensionRenderers.transcriptPresenters": {
+		label: "扩展自定义对话记录显示",
+		description: "允许扩展将工具调用等对话记录完整显示、缩为一行或隐藏，不改变会话记录、导出内容或模型上下文。",
+	},
+	"disassembler.backend": {
+		label: "反汇编器",
+		description:
+			"选择 read 的分析选择器及 eval 的 dsm 命名空间使用的后端。直接读取可执行文件只显示元数据。自动模式优先使用已安装的 IDA Pro，否则使用 Ghidra（首次分析时下载）；Binary Ninja 仅在明确选中时使用。",
+	},
+	"disassembler.maxOpen": {
+		label: "最大打开数据库数",
+		description:
+			"每个项目可同时打开的数据库数。每个数据库在 omp ps 中列为一个 disasm 单元，标明后端与二进制文件。达到上限再打开时，淘汰一个无引用的空闲数据库。用完请关闭保留的 dsm 句柄。",
+	},
+	"disassembler.idleCloseSec": {
+		label: "空闲关闭超时时间",
+		description:
+			"无引用的数据库空闲超过指定秒数后自动保存并关闭（0 表示永不关闭）。有 dsm 句柄引用的数据库保持打开。重新打开会重置 exec 命名空间。",
+	},
+	"ghidra.installDir": {
+		label: "Ghidra 安装目录",
+		description:
+			"Ghidra 12 或更新版本的安装目录，须包含 Ghidra/application.properties。留空时依次尝试 $GHIDRA_INSTALL_DIR、Homebrew，最后下载到 ~/.omp/ghidra。",
+	},
+	"ghidra.python": {
+		label: "Ghidra 的 Python 解释器",
+		description: "能够导入 pyghidra 的 Python 解释器；空配置则使用由安装包中的 wheels 构建的托管 venv。",
+	},
+	"binja.installDir": {
+		label: "Binary Ninja 安装目录",
+		description:
+			"Binary Ninja 核心库所在目录，或 macOS 的 .app 应用包。留空时依次尝试 $BN_INSTALL_DIR、Binary Ninja 用户目录的 lastrun 文件和默认安装位置。",
+	},
+	"binja.python": {
+		label: "Binary Ninja 的 Python 解释器",
+		description: "能从安装目录的 python 子目录加载 Binary Ninja API 的 Python 3 解释器。留空则自动检测。",
+	},
+	"mcp.shared": {
+		label: "共享 MCP 服务器",
+		description:
+			"通过守护进程运行 MCP 服务，让多个 omp 实例共用每个服务的进程和工具目录缓存。需要维持会话状态的服务仍按实例单独运行；无法共享时回退到私有服务。",
+	},
+	"mcp.idleStopMinutes": {
+		label: "空闲时停止 MCP 服务",
+		description: "共享 MCP 服务连续空闲多少分钟后停止。收到下一个请求时会自动重启。",
+	},
+	"spotlight.experiment.enabled": {
+		label: "聚焦实验",
+		description: "用 Stencil Spotlight 整理工具输出并为 find 结果排序，将整理后的每条结果记入会话。",
+	},
 	"providers.openai-codex.codeMode": {
 		label: "Codex 代码模式",
 		description: "通过 eval 使用代码模式模型；其他会话工具由 eval 调用。自动模式跟随模型目录的能力标记。",
@@ -360,7 +637,11 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 	},
 
 	// ── interaction ─────────────────────────────────────────────────────────
-	autoResume: { label: "自动恢复", description: "自动恢复当前目录中最近的会话" },
+	autoResume: {
+		label: "自动恢复",
+		description:
+			"自动恢复当前目录中最近的会话。如果无法恢复原模型且未启用模型回退，交互式启动时会提示并开始新会话，不载入原会话历史。",
+	},
 	"power.sleepPrevention": {
 		label: "防止睡眠",
 		description: "在活动会话期间防止 macOS 睡眠。每个等级是累积的——它会叠加所有更低等级的标志。",
@@ -1569,7 +1850,8 @@ export const ZH_SETTINGS: Record<string, { label: string; description?: string }
 	},
 	"composer.tokenRate": {
 		label: "生成速率显示",
-		description: "在标题栏用量区显示平滑的每秒 token 生成速率，并在回合之间保持可见。",
+		description:
+			"在会话标题旁的工作状态行或原生输入栏的思考级别后显示每秒生成的 token 数。输入栏在回合之间保留上次读数。速率先按流式输出估算，消息完成后按服务商计费的输出 token 数校正。",
 	},
 	"display.pinnedAgents": {
 		label: "固定代理列表",

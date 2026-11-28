@@ -5,6 +5,7 @@
  */
 import type { ConversationHit, ConversationSearchResult, SessionInfo } from "../../shared/ipc-types";
 import { requestSessionSwitch } from "../hooks/use-session-switch";
+import { useSessionFolders } from "../stores/session-folders";
 import { useTabsStore } from "../stores/tabs";
 import { useTranscriptFocusStore } from "../stores/transcript-focus";
 
@@ -75,14 +76,20 @@ function sessionInfoFor(result: ConversationSearchResult): SessionInfo {
  */
 export function openConversationHit(
 	{ result, hit }: FlatHit,
-	options: { newTab: boolean; currentCwd: string | null },
+	options: { newTab: boolean; currentCwd: string | null; folderId?: string },
 ): void {
 	useTranscriptFocusStore.getState().focus(result.path, hit.entryId);
-	if (options.newTab || !options.currentCwd || options.currentCwd !== result.cwd) {
+	if (
+		useSessionFolders.getState().folders.length > 0 ||
+		options.newTab ||
+		!options.currentCwd ||
+		options.currentCwd !== result.cwd
+	) {
 		void useTabsStore.getState().openTab({
 			cwd: result.cwd || undefined,
 			sessionPath: result.path,
 			kind: result.kind ?? "agent",
+			...(options.folderId ? { folderId: options.folderId } : {}),
 		});
 		return;
 	}

@@ -27,6 +27,7 @@ import type {
 	TaskSaveResult,
 	TaskState,
 } from "../../shared/scheduler-types";
+import { TASK_RUN_FAILURE } from "../../shared/scheduler-types";
 import {
 	DEFAULT_LIMITS,
 	draftProblems,
@@ -116,7 +117,7 @@ export class Scheduler {
 				...run,
 				state: "unknown",
 				endedAt: now,
-				error: { message: "omp closed or crashed while this run was in progress", kind: "other" },
+				error: { message: TASK_RUN_FAILURE.interrupted, kind: "other" },
 			});
 		}
 		const lastAlive = Number(store.getMeta("heartbeat") ?? "") || null;
@@ -578,7 +579,7 @@ export class Scheduler {
 				...queued,
 				state: "blocked_config",
 				endedAt: this.#deps.now(),
-				error: { message: "The task no longer exists", kind: "config" },
+				error: { message: TASK_RUN_FAILURE.removed, kind: "config" },
 			});
 			return;
 		}

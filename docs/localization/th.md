@@ -4,11 +4,11 @@ Thai extends the existing English/Russian/Chinese localization. The globe opens 
 
 ## Translation surfaces
 
-- `src/renderer/locales/th.ts`: all English UI keys (currently 4,129).
+- `src/renderer/locales/th.ts`: translations for the renderer's English UI keys.
 - `src/main/native-th.ts`: application/browser menus, native dialogs, update errors, and tray labels.
 - `src/shared/languages.ts`: supported language IDs, names and formatting locales.
 
-Settings-schema localization (`schema-th.ts` / `schema-option-th.ts`) is **not provided yet**; settings titles and descriptions fall back to English until translated.
+`schema-th.ts` and `schema-option-th.ts` translate the bundled Core's setting labels, descriptions, group headings, and option text. Paths, option values and user content are unchanged. When updating Core, run `bun scripts/check-localized-schema.ts resources/omp` to check the actual bundled schema in all supported locales.
 
 User messages, model output, tool output, system instructions, code, paths, configuration identifiers and model/provider names are not translated. Built-in starter cards and approval/revision templates are localized like the existing Chinese/Russian interfaces, preserving their intent and parameters. Unknown future strings fall back to English; update the translation before shipping them.
 

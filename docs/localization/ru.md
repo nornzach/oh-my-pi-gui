@@ -28,4 +28,4 @@ Run `bunx vitest run src/renderer/locales/ru.test.ts src/renderer/lib/i18n-langu
 
 Run the full suite, `bun run check:types`, `bun run build`, and Biome on touched files. Tests default to English independently of the OS; localization cases select their own language. Some pre-existing POSIX process fixtures require Linux/macOS and cannot execute on Windows. Verify packaged Windows behavior separately in an isolated profile.
 
-When the bundled Core changes, run `bun scripts/check-russian-schema.ts <sidecar-path>`. Translate added keys/options, review terminology, and inspect screens for clipping. A saved language preference survives normal updates using the same application profile; the new binary must also contain Russian.
+When the bundled Core changes, run `bun scripts/check-localized-schema.ts <sidecar-path>`. Translate added keys/options, review terminology, and inspect screens for clipping. A saved language preference survives normal updates using the same application profile; the new binary must also contain Russian.

@@ -39,7 +39,7 @@ import {
 	retireComposerPrediction,
 	runFinishedWithReply,
 } from "../lib/composer-prediction";
-import { describeError, describeProviderError } from "../lib/errors";
+import { describeProviderError } from "../lib/errors";
 import { formatClock } from "../lib/format";
 import { translate } from "../lib/i18n";
 import { normalizeLoopUpdate } from "../lib/loop-mode";
@@ -760,19 +760,6 @@ export function useRpcEvents(heartbeatMs = 15_000): void {
 					try {
 						const runtime = sessionRuntime(statusTabId);
 						const command = runtime?.command ?? activeTabCommand;
-						// A window opened "in new window" for a specific session
-						// switches to it BEFORE hydrating, so the first transcript
-						// it pulls is the target session, not the fresh empty one.
-						const pending = isFocused() ? await window.omp.sessions.consumePendingOpen() : null;
-						if (pending) {
-							const sw = await command({ type: "switch_session", sessionPath: pending });
-							if (!sw.success) {
-								useToastStore.getState().push({
-									variant: "error",
-									message: translate("events.sessionOpenFailed", { error: describeError(sw.error) }),
-								});
-							}
-						}
 						const res = await command({ type: "get_state" });
 						if (runtime && sessionRuntime(statusTabId) !== runtime) return;
 						if (!res.success) {

@@ -120,6 +120,34 @@ afterEach(async () => {
 });
 
 describe("ConversationSearchDialog", () => {
+	it("does not open a hit from the previous query before the next answer arrives", async () => {
+		await type("notarize");
+		await act(async () => reactProps(input()).onChange?.({ target: { value: "release" } }));
+		await press("Enter", { metaKey: true });
+		const staleHit = container.querySelector("[data-search-index='0']");
+		expect(staleHit?.hasAttribute("disabled")).toBe(true);
+		expect(openTab).not.toHaveBeenCalled();
+		expect(useUiStore.getState().conversationSearchOpen).toBe(true);
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(200);
+		});
+		await press("Enter", { metaKey: true });
+		expect(openTab).toHaveBeenCalledTimes(1);
+	});
+
+	it("retries a failed query in place without retyping it", async () => {
+		search.mockRejectedValueOnce(new Error("index unavailable"));
+		await type("notarize");
+		const retry = [...container.querySelectorAll("button")].find(button => button.textContent === "Retry");
+		await act(async () => reactProps(retry ?? null).onClick?.({}));
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(200);
+		});
+		expect(search).toHaveBeenCalledTimes(2);
+		expect(search).toHaveBeenLastCalledWith("notarize", HERE);
+		await press("Enter", { metaKey: true });
+		expect(openTab).toHaveBeenCalledTimes(1);
+	});
 	it("searches this project by default and all projects once switched", async () => {
 		await type("  notarize ");
 		expect(search).toHaveBeenLastCalledWith("notarize", HERE);

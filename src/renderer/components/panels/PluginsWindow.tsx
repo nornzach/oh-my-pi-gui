@@ -97,7 +97,6 @@ export function PluginsWindow() {
 	};
 
 	const openInSettings = (tab: "marketplaces" | "plugins"): void => {
-		close();
 		useUiStore.getState().openSettings(`resources:${tab}`);
 	};
 

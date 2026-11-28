@@ -48,6 +48,14 @@ import {
 } from "./plan-approval";
 import { type SessionStore, useSessionStore } from "./session";
 import {
+	DEFAULT_FOLDER,
+	folderMembership,
+	folderTabs,
+	syncSessionFolders,
+	tabFolderKey,
+	useSessionFolders,
+} from "./session-folders";
+import {
 	deleteSessionRuntime,
 	focusedRuntimeTabId,
 	sessionRuntimeStore,
@@ -61,6 +69,7 @@ import { useUiStore } from "./ui";
 
 export interface SessionTab {
 	id: string;
+	folderTabId?: string;
 	cwd: string;
 	status: TabStatus;
 	/** Automatic transcript compaction is in flight in this tab's sidecar. */
@@ -139,6 +148,8 @@ let routedVisibleTabIds: readonly string[] = [];
 
 /** The split pairs main last accepted, keyed like groupsKey(). */
 let routedGroupsKey = "[]";
+let routedFolder: string | undefined;
+let requestedFolder: string | undefined;
 
 function groupsKey(groups: readonly SplitLayout[]): string {
 	return JSON.stringify(groups.map(group => [group.axis, group.firstTabId, group.secondTabId, group.ratio]));
@@ -156,11 +167,21 @@ function routeTabView(focusedTabId: string, visibleTabIds: string[], groups: rea
 	}
 	routedVisibleTabIds = [...visibleTabIds];
 	const key = groupsKey(groups);
+	const folders = useSessionFolders.getState();
+	const folder = folders.folders.length ? folders.active : undefined;
+	requestedFolder = folder;
 	const request = routingChain.then(async () => {
 		// Main keeps the pairs it already has, so a plain focus change names the tab alone.
-		if (visibleTabIds.length === 1 && key === routedGroupsKey) return window.omp.tabs.setActive(focusedTabId);
-		const routed = await window.omp.tabs.setView(focusedTabId, visibleTabIds, [...groups]);
-		if (routed) routedGroupsKey = key;
+		if (visibleTabIds.length === 1 && key === routedGroupsKey && folder === routedFolder)
+			return window.omp.tabs.setActive(focusedTabId);
+		const routed =
+			folder || routedFolder
+				? await window.omp.tabs.setView(focusedTabId, visibleTabIds, [...groups], folder ?? DEFAULT_FOLDER)
+				: await window.omp.tabs.setView(focusedTabId, visibleTabIds, [...groups]);
+		if (routed) {
+			routedGroupsKey = key;
+			routedFolder = folder;
+		}
 		return routed;
 	});
 	routingChain = request.then(
@@ -346,7 +367,12 @@ export interface TabsStore {
 		worktree?: IpcTabWorktree;
 		/** Opened from the sidebar: marks the tab `browsing`. */
 		browsing?: boolean;
+		folderId?: string;
 	}) => Promise<string | null>;
+	refreshFolderView: () => Promise<void>;
+	selectFolder: (id: string) => Promise<void>;
+	closeFolderTab: (id: string) => Promise<void>;
+	releaseUnreferencedTab: (id: string) => Promise<void>;
 	/** Set a tab's `browsing` mark: the sidebar switched it in place, or a turn started in it. */
 	setBrowsing: (id: string, browsing: boolean) => void;
 	/** Focus this tab, with its partner beside it when it is one of a pair. */
@@ -371,22 +397,67 @@ export interface TabsStore {
 }
 
 export const useTabsStore = create<TabsStore>()((set, get) => {
+	let folderVersion = 0;
+	const targetTab = (tabs: SessionTab[], activeTabId: string | null) => {
+		const folders = useSessionFolders.getState();
+		const candidates = folderTabs(tabs, folders);
+		const preferred = folders.views[folders.active]?.focused;
+		return (
+			candidates.find(tab => tabFolderKey(tab) === preferred)?.id ??
+			candidates.find(tab => tab.id === activeTabId)?.id ??
+			candidates[0]?.id ??
+			null
+		);
+	};
+	const splitInFolder = (id: string | null, groups: SplitLayout[], tabs: SessionTab[]) => {
+		const split = groupOf(groups, id);
+		const folders = useSessionFolders.getState();
+		if (!split || folders.folders.length === 0) return split;
+		const shown = folderTabs(tabs, folders);
+		return shown.some(tab => tab.id === split.firstTabId) && shown.some(tab => tab.id === split.secondTabId)
+			? split
+			: null;
+	};
+	const bindTab = (tab: SessionTab, preferred: string, assign: boolean, focus = true): string => {
+		const folders = useSessionFolders.getState();
+		const key = tabFolderKey(tab);
+		let memberships = folderMembership(folders.folders).get(key) ?? [];
+		const valid = folders.folders.some(folder => folder.id === preferred);
+		if (assign && valid && !memberships.includes(preferred)) {
+			folders.add([key], [preferred]);
+			memberships = [...memberships, preferred];
+		}
+		const target = memberships.includes(preferred) ? preferred : (memberships[0] ?? DEFAULT_FOLDER);
+		folders.show(target, key, focus);
+		return target;
+	};
 	/**
 	 * Show `id` — with its partner when `groups` pairs it — and make `groups`
 	 * the window's pairs. Every focus and pairing change goes through here.
 	 */
-	const showView = async (id: string, groups: SplitLayout[]): Promise<void> => {
+	const showView = async (id: string | null, groups: SplitLayout[]): Promise<void> => {
 		const state = get();
-		if (!state.tabs.some(tab => tab.id === id)) return;
-		const split = groupOf(groups, id);
-		const visible = split ? [split.firstTabId, split.secondTabId] : [id];
+		const target = state.tabs.find(tab => tab.id === id);
+		if (id && !target) return;
+		const folders = useSessionFolders.getState();
+		const split = splitInFolder(id, groups, state.tabs);
+		if (
+			id === state.activeTabId &&
+			split === state.split &&
+			groups === state.groups &&
+			(folders.folders.length ? folders.active : undefined) === requestedFolder
+		)
+			return;
+		if (target && folders.folders.length > 0) folders.focus(folders.active, tabFolderKey(target));
+		const visible = split ? [split.firstTabId, split.secondTabId] : id ? [id] : [];
 		const previouslyVisible = visibleTabIds(state);
 		const focusChanged = id !== state.activeTabId;
 		const version = ++switchVersion;
 		for (const tabId of visible) ensureTabRuntime(tabId);
 		let stopLive: Promise<RpcResponse> | null = null;
 		if (focusChanged) {
-			beginTabRoute(state.activeTabId, id);
+			if (id) beginTabRoute(state.activeTabId, id);
+			else reconcileTabRoute(null, false);
 			// The outgoing tab leaves the foreground role, so its overlays and live
 			// voice must not linger (voice control RPCs route to the focused pane).
 			const ui = useUiStore.getState();
@@ -403,7 +474,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 			groups,
 		);
 		set({ activeTabId: id, groups, split, tabs });
-		if (split) pairFocus.set(pairKey(split), id);
+		if (split && id) pairFocus.set(pairKey(split), id);
 		if (!sameOrder(state.tabs, tabs)) syncTabOrder(tabs);
 		setFocusedSessionRuntime(id);
 		try {
@@ -413,7 +484,8 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					toast({ variant: "error", title: translate("tabs.switchFailed"), message: stopped.error });
 				}
 			}
-			const routed = await routeTabView(id, visible, groups);
+			if (version !== switchVersion) return;
+			const routed = await routeTabView(id ?? "", visible, groups);
 			if (!routed) throw new Error(`Tab ${id} is no longer available`);
 		} catch (error) {
 			if (version !== switchVersion) return;
@@ -426,11 +498,14 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 			toast({ variant: "error", title: translate("tabs.switchFailed"), message: String(error) });
 			const converged = await get().reconcileTabs();
 			if (version !== switchVersion) return;
-			if (converged && get().activeTabId === id) await hydrateTabSession(id);
+			if (id && converged && get().activeTabId === id) await hydrateTabSession(id);
 			return;
 		}
 		if (version !== switchVersion) return;
-		if (focusChanged) settleTabRoute(id);
+		if (focusChanged) {
+			if (id) settleTabRoute(id);
+			else reconcileTabRoute(null, true);
+		}
 		// A freshly spawned sidecar can become ready on the light TAB_STATUS
 		// channel before routing wires its full status channel. In that case no
 		// ready event will replay after routing, so hydrate from the tab's latest
@@ -454,9 +529,23 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 		bundles: new Map(),
 		groups: [],
 		split: null,
+		refreshFolderView: async () => {
+			const { tabs, activeTabId, groups } = get();
+			await showView(targetTab(tabs, activeTabId), groups);
+		},
+		selectFolder: async id => {
+			useUiStore.getState().returnToConversation();
+			if (id === useSessionFolders.getState().active) return;
+			folderVersion++;
+			useSessionFolders.getState().select(id);
+			await get().refreshFolderView();
+		},
 
 		reconcileTabs: async () => {
-			const list = await window.omp.tabs.list().catch(() => null);
+			const [list, launchPath] = await Promise.all([
+				window.omp.tabs.list().catch(() => null),
+				window.omp.sessions?.consumePendingOpen?.().catch(() => null),
+			]);
 			if (!list) {
 				// Pre-tabs main (dev mismatch) or bridge down — the tab strip simply
 				// stays empty and TAB_STATUS pushes rebuild it.
@@ -480,6 +569,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					ensureTabRuntime(info.tabId);
 					return {
 						id: info.tabId,
+						folderTabId: info.folderTabId,
 						cwd: info.cwd || existing?.cwd || "",
 						status: info.status,
 						compacting: info.compacting ?? existing?.compacting ?? false,
@@ -509,12 +599,19 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 				// survive appended at the end.
 				const tabs = [...merged, ...leftovers.values()];
 				const mainActiveTabId = list.find(info => info.active)?.tabId;
-				const activeTabId =
+				let activeTabId =
 					state.activeTabId && tabs.some(tab => tab.id === state.activeTabId)
 						? state.activeTabId
 						: mainActiveTabId && tabs.some(tab => tab.id === mainActiveTabId)
 							? mainActiveTabId
 							: (tabs[0]?.id ?? null);
+				const folders = useSessionFolders.getState();
+				if (folders.folders.length > 0) {
+					const launched = launchPath && tabs.find(tab => tab.sessionPath === launchPath);
+					if (launched) folders.select(bindTab(launched, folders.active, false));
+					else if (!state.activeTabId && list[0]?.windowFolderId) folders.select(list[0].windowFolderId);
+					activeTabId = targetTab(tabs, activeTabId);
+				}
 				// Main holds the window's pairs; each pair is reported by both its tabs.
 				const groups: SplitLayout[] = [];
 				for (const info of list) {
@@ -530,7 +627,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					});
 				}
 				routedGroupsKey = groupsKey(groups);
-				return { tabs, activeTabId, groups, split: groupOf(groups, activeTabId) };
+				return { tabs, activeTabId, groups, split: splitInFolder(activeTabId, groups, tabs) };
 			});
 			const activeTabId = get().activeTabId;
 			setFocusedSessionRuntime(activeTabId);
@@ -544,10 +641,25 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					return false;
 				}
 			}
+			if (get().tabs.length > 0) {
+				reconcileTabRoute(null, false);
+				const routed = await routeTabView("", [], get().groups).catch(() => false);
+				if (!get().activeTabId) reconcileTabRoute(null, routed);
+				return routed;
+			}
 			return true;
 		},
 
 		openTab: async args => {
+			const requestVersion = ++folderVersion;
+			const preferredFolder = args?.folderId ?? useSessionFolders.getState().active;
+			const existing = args?.sessionPath && get().tabs.find(tab => tabFolderKey(tab) === args.sessionPath);
+			if (existing && useSessionFolders.getState().folders.length > 0) {
+				const folder = bindTab(existing, preferredFolder, false);
+				useSessionFolders.getState().select(folder);
+				await showView(existing.id, get().groups);
+				return existing.id;
+			}
 			const runtimeCwd = sessionRuntimeStore<SessionStore>(get().activeTabId, "session")?.getState().cwd;
 			const cwd =
 				args?.cwd ??
@@ -583,12 +695,22 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 			if (result.tabId === null) {
 				const ownerTabId = result.ownerTabId ?? null;
 				if (ownerTabId && get().tabs.some(tab => tab.id === ownerTabId)) {
-					await get().switchTab(ownerTabId);
+					const owner = get().tabs.find(tab => tab.id === ownerTabId);
+					if (owner && useSessionFolders.getState().folders.length > 0) {
+						const folder = bindTab(owner, preferredFolder, false, requestVersion === folderVersion);
+						if (requestVersion === folderVersion) {
+							useSessionFolders.getState().select(folder);
+							await showView(ownerTabId, get().groups);
+						}
+					} else await get().switchTab(ownerTabId);
 					return ownerTabId;
 				}
-				if (args?.sessionPath) {
+				if (args?.sessionPath && requestVersion === folderVersion) {
 					try {
-						await window.omp.sessions.openInNewWindow({ sessionPath: args.sessionPath });
+						await window.omp.sessions.openInNewWindow({
+							sessionPath: args.sessionPath,
+							folderId: preferredFolder,
+						});
 					} catch {
 						// Best-effort focus — the owner window may be mid-teardown.
 					}
@@ -633,7 +755,14 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 				};
 				return { tabs: [...state.tabs, tab] };
 			});
-			await get().switchTab(tabId);
+			const tab = get().tabs.find(entry => entry.id === tabId);
+			if (tab && useSessionFolders.getState().folders.length > 0) {
+				const folder = bindTab(tab, preferredFolder, !args?.sessionPath, requestVersion === folderVersion);
+				if (requestVersion === folderVersion) {
+					useSessionFolders.getState().select(folder);
+					await showView(tabId, get().groups);
+				}
+			} else await get().switchTab(tabId);
 			return tabId;
 		},
 
@@ -646,7 +775,14 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 
 		switchTab: async id => {
 			const state = get();
-			if (id === state.activeTabId) return;
+			const folders = useSessionFolders.getState();
+			if (folders.folders.length > 0) {
+				folderVersion++;
+				const tab = state.tabs.find(entry => entry.id === id);
+				if (tab && !folderTabs(state.tabs, folders).includes(tab)) {
+					folders.select(bindTab(tab, folders.active, false));
+				}
+			}
 			await showView(id, state.groups);
 		},
 
@@ -704,6 +840,20 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 
 		moveTab: (id, targetId, side) => {
 			const state = get();
+			const folders = useSessionFolders.getState();
+			if (folders.folders.length > 0) {
+				const units = tabUnits(folderTabs(state.tabs, folders), state.groups);
+				const from = units.findIndex(unit => unit.tabs.some(tab => tab.id === id));
+				const target = units.find(unit => unit.tabs.some(tab => tab.id === targetId));
+				if (from < 0 || !target || units[from] === target) return;
+				const moving = units.splice(from, 1)[0];
+				units.splice(units.indexOf(target) + (side === "after" ? 1 : 0), 0, moving);
+				folders.order(
+					folders.active,
+					units.flatMap(unit => unit.tabs.map(tabFolderKey)),
+				);
+				return;
+			}
 			const unitOf = (tabId: string) => {
 				const group = groupOf(state.groups, tabId);
 				return group ? [group.firstTabId, group.secondTabId] : [tabId];
@@ -723,9 +873,60 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 			syncTabOrder(tabs);
 		},
 
+		closeFolderTab: async id => {
+			const { tabs, activeTabId } = get();
+			const tab = tabs.find(entry => entry.id === id);
+			if (!tab) return;
+			const folders = useSessionFolders.getState();
+			if (folders.folders.length === 0) return get().closeTab(id);
+			const key = tabFolderKey(tab);
+			const shown = folderTabs(tabs, folders);
+			const index = shown.indexOf(tab);
+			if (index < 0) return;
+			folders.hide(folders.active, key);
+			if (activeTabId === id) {
+				const neighbor = shown[index + 1] ?? shown[index - 1];
+				await showView(neighbor?.id ?? null, get().groups);
+			} else await get().refreshFolderView();
+			await get().releaseUnreferencedTab(id);
+		},
+
+		releaseUnreferencedTab: async id => {
+			const tab = get().tabs.find(entry => entry.id === id);
+			if (!tab) return;
+			const key = tabFolderKey(tab);
+			const current = useSessionFolders.getState();
+			const referenced = folderMembership(current.folders)
+				.get(key)
+				?.some(folder => current.views[folder]?.order.includes(key));
+			const session = sessionRuntimeStore<SessionStore>(id, "session")?.getState();
+			const composer = sessionRuntimeStore<ComposerStore>(id, "composer")?.getState();
+			if (
+				referenced ||
+				tab.worktree ||
+				tab.status === "running" ||
+				tab.status === "starting" ||
+				tab.status === "restarting" ||
+				tab.compacting ||
+				tab.backgroundCompacting ||
+				session?.isStreaming ||
+				session?.isCompacting ||
+				session?.isBackgroundCompacting ||
+				session?.queuedMessageCount ||
+				composer?.draft ||
+				composer?.images.length ||
+				composer?.files.length ||
+				composer?.sending
+			)
+				return;
+			if (folderTabs(get().tabs, current, DEFAULT_FOLDER).some(entry => entry.id === id)) return;
+			await get().closeTab(id);
+		},
+
 		closeTab: async id => {
 			const state = get();
-			if (state.tabs.length <= 1) return;
+			const folders = useSessionFolders.getState();
+			if (state.tabs.length <= 1 && folders.folders.length === 0) return;
 			const index = state.tabs.findIndex(tab => tab.id === id);
 			if (index === -1) return;
 			if (state.split && groupHas(state.split, id)) {
@@ -735,8 +936,12 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 				// Activate a neighbor BEFORE releasing — main's routing needs a live
 				// target and the window keeps painting a real session. Prefer the
 				// right neighbor (it shifts into the closed slot), else the left.
-				const neighbor = state.tabs[index + 1] ?? state.tabs[index - 1];
-				if (neighbor) await get().switchTab(neighbor.id);
+				const remaining = state.tabs.filter(tab => tab.id !== id);
+				const neighbor =
+					folders.folders.length > 0
+						? folderTabs(remaining, folders)[0]
+						: (state.tabs[index + 1] ?? state.tabs[index - 1]);
+				await showView(neighbor?.id ?? null, state.groups);
 			}
 			// A pair in the background loses this tab too; main drops it on release.
 			set(current => {
@@ -744,7 +949,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 				return {
 					tabs: current.tabs.filter(tab => tab.id !== id),
 					groups,
-					split: groupOf(groups, current.activeTabId),
+					split: splitInFolder(current.activeTabId, groups, current.tabs),
 				};
 			});
 			closedTabIds.add(id);
@@ -770,7 +975,8 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					previous.sessionId !== payload.sessionId) ||
 				(previous?.sessionPath !== undefined &&
 					payload.sessionPath !== undefined &&
-					previous.sessionPath !== payload.sessionPath);
+					previous.sessionPath !== payload.sessionPath &&
+					previous.sessionPath !== payload.relocatedFrom);
 			// Rebuild the runtime OUTSIDE the set() updater (deleteSessionRuntime
 			// synchronously fires focus listeners), and immediately re-point focus at
 			// the fresh runtime — otherwise static store access falls through to the
@@ -791,6 +997,7 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 				const index = current.tabs.findIndex(tab => tab.id === payload.tabId);
 				const next: SessionTab = {
 					id: payload.tabId,
+					folderTabId: payload.folderTabId,
 					cwd: payload.cwd || previous?.cwd || "",
 					status: payload.status,
 					compacting: payload.compacting ?? previous?.compacting ?? false,
@@ -817,6 +1024,14 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 					// A turn makes it a tab the user is working in.
 					browsing: payload.status === "running" ? undefined : previous?.browsing,
 				};
+				const folders = useSessionFolders.getState();
+				if (previous && folders.folders.length > 0 && tabFolderKey(previous) !== tabFolderKey(next)) {
+					const sameSession = !previous.sessionPath || previous.sessionPath === payload.relocatedFrom;
+					folders.rebind(tabFolderKey(previous), tabFolderKey(next), sameSession);
+					if (!sameSession && active && !next.sessionPath && folders.active !== DEFAULT_FOLDER) {
+						folders.add([tabFolderKey(next)], [folders.active]);
+					}
+				}
 				if (index === -1) return { tabs: [...current.tabs, next] };
 				const tabs = [...current.tabs];
 				tabs[index] = next;
@@ -862,6 +1077,8 @@ export const useTabsStore = create<TabsStore>()((set, get) => {
 			for (const tab of get().tabs) deleteSessionRuntime(tab.id);
 			closedTabIds.clear();
 			routedGroupsKey = "[]";
+			routedFolder = undefined;
+			requestedFolder = undefined;
 			setFocusedSessionRuntime(null);
 			resetTabRoute();
 			set({ tabs: [], activeTabId: null, bundles: new Map(), groups: [], split: null });
@@ -883,7 +1100,7 @@ function activeUnitIndex(units: readonly TabUnit[], activeTabId: string | null):
 /** ⌃⇥ / ⇧⌃⇥: the next or previous chip of the strip, wrapping around. */
 export function cycleTab(delta: 1 | -1): void {
 	const { tabs, groups, activeTabId, switchTab } = useTabsStore.getState();
-	const units = tabUnits(tabs, groups);
+	const units = tabUnits(folderTabs(tabs, useSessionFolders.getState()), groups);
 	if (units.length < 2) return;
 	const index = Math.max(0, activeUnitIndex(units, activeTabId));
 	const target = units[(index + delta + units.length) % units.length];
@@ -894,7 +1111,7 @@ export function cycleTab(delta: 1 | -1): void {
 /** ⌘1…⌘8 pick that chip of the strip; ⌘9 the last one. */
 export function selectTabAt(position: number): void {
 	const { tabs, groups, activeTabId, switchTab } = useTabsStore.getState();
-	const units = tabUnits(tabs, groups);
+	const units = tabUnits(folderTabs(tabs, useSessionFolders.getState()), groups);
 	const unit = position >= 9 ? units.at(-1) : units[position - 1];
 	if (!unit || unit.tabs.some(tab => tab.id === activeTabId)) return;
 	const tabId = unitFocusTabId(unit);
@@ -905,7 +1122,7 @@ export function selectTabAt(position: number): void {
 export function moveActiveTab(delta: 1 | -1): void {
 	const { tabs, groups, activeTabId, moveTab } = useTabsStore.getState();
 	if (!activeTabId) return;
-	const units = tabUnits(tabs, groups);
+	const units = tabUnits(folderTabs(tabs, useSessionFolders.getState()), groups);
 	const index = activeUnitIndex(units, activeTabId);
 	const neighbor = index < 0 ? undefined : units[index + delta]?.tabs[0];
 	if (neighbor) moveTab(activeTabId, neighbor.id, delta < 0 ? "before" : "after");
@@ -1003,6 +1220,7 @@ export function settleTabPlanApproval(
  * Call once in App.tsx alongside useRpcEvents().
  */
 export function useSessionTabs(): void {
+	useEffect(() => syncSessionFolders(() => void useTabsStore.getState().refreshFolderView()), []);
 	useEffect(() => {
 		void useTabsStore
 			.getState()

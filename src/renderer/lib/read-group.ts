@@ -180,8 +180,3 @@ export function mergeReadGroupEntries(entries: ReadGroupEntry[]): ReadGroupDispl
 	}
 	return rows;
 }
-
-/** Card label: one read renders inline; N reads render the tree header. */
-export function readGroupTitle(entries: ReadGroupEntry[]): string {
-	return entries.length === 1 ? "Read" : `Read (${entries.length})`;
-}

@@ -442,7 +442,10 @@ describe("Sidebar menus and pinned ordering", () => {
 		seedStores();
 		await mount(<Sidebar />);
 
-		await fire(container.querySelector('[aria-label="Search sessions"], [aria-label="搜索会话"]'), "onClick");
+		await fire(
+			container.querySelector('[aria-label="Find a session to open"], [aria-label="查找并打开会话"]'),
+			"onClick",
+		);
 
 		expect(useUiStore.getState().sessionPickerOpen).toBe(true);
 	});
@@ -549,7 +552,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(container.querySelector('[data-workspace-group="/work/empty"]')).toBeNull();
 	});
 
-	it("right-click on a session row opens the 7-item session menu", async () => {
+	it("offers filing even before the first folder exists and pins the chosen session", async () => {
 		const omp = installMockOmp(LIST);
 		seedStores();
 		await mount(<Sidebar />);
@@ -561,13 +564,21 @@ describe("Sidebar menus and pinned ordering", () => {
 		await fire(row as Element, "onContextMenu");
 
 		const labels = menuItemLabels();
-		for (const expected of ["Open", "Open in new window", "Rename", "Pin to top", "Archive", "Select", "Delete"]) {
+		for (const expected of [
+			"Open",
+			"Open in new window",
+			"Add to folders",
+			"Rename",
+			"Pin to top",
+			"Archive",
+			"Select",
+			"Delete",
+		]) {
 			expect(
 				labels.some(label => label.includes(expected)),
 				`missing item: ${expected}`,
 			).toBe(true);
 		}
-		expect(labels).toHaveLength(7);
 
 		const pinItem = [...document.body.querySelectorAll('[role="menu"] button')].find(button =>
 			(button.textContent ?? "").includes("Pin to top"),
@@ -873,7 +884,8 @@ describe("Sidebar menus and pinned ordering", () => {
 
 		// Queued, not executed: the trash click must never reach the hard delete.
 		expect(omp.sessions.delete).not.toHaveBeenCalled();
-		const dialog = document.body.querySelector('[role="dialog"]');
+		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+		const dialog = row.nextElementSibling;
 		expect(dialog?.textContent).toContain("/work/alpha/one");
 		expect(dialog?.textContent).toContain("cannot be undone");
 
@@ -883,7 +895,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(document.body.querySelector('[role="dialog"]')).toBeNull();
 
 		await fire(row.querySelector('[aria-label="Delete session"]') as Element, "onClick");
-		const confirm = [...document.body.querySelectorAll('[role="dialog"] button')].find(
+		const confirm = [...(row.nextElementSibling?.querySelectorAll("button") ?? [])].find(
 			b => (b.textContent ?? "").trim() === "Delete",
 		) as unknown as Element;
 		await fire(confirm, "onClick");
@@ -954,7 +966,7 @@ describe("Sidebar menus and pinned ordering", () => {
 		expect(useSidebarPrefs.getState().pinnedSessions).toEqual([after.path]);
 
 		await fire(rows[0]?.querySelector('[aria-label="Delete session"]') as unknown as Element, "onClick");
-		const confirm = [...document.body.querySelectorAll('[role="dialog"] button')].find(
+		const confirm = [...document.body.querySelectorAll('[role="group"] button')].find(
 			b => (b.textContent ?? "").trim() === "Delete",
 		) as unknown as Element;
 		await fire(confirm, "onClick");

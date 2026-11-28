@@ -280,11 +280,23 @@ export function HubRenderer({ args, result, isError, isPartial, partialResult }:
 						<span className="text-[var(--omp-dim)]">$ </span>
 						{String(spec.application ?? "")} {asArray(spec.args).map(String).join(" ")}
 					</div>
-					{typeof spec.cwd === "string" && <div className="truncate text-[var(--omp-dim)]">cwd: {spec.cwd}</div>}
+					{typeof spec.cwd === "string" && (
+						<div className="truncate text-[var(--omp-dim)]">{t("tools.hub.cwd", { path: spec.cwd })}</div>
+					)}
 					<div className="text-[var(--omp-dim)]">
-						pty: {spec.pty === true ? "on" : "off"} · restart: {String(spec.restart ?? "no")} · persist:{" "}
-						{spec.persist === true ? "on" : "off"}
-						{spec.detached === true ? " · detached" : ""}
+						{t("tools.hub.policy", {
+							pty: t(spec.pty === true ? "settings.effect.on" : "settings.effect.off"),
+							restart:
+								spec.restart === "always"
+									? t("tools.hub.restartAlways")
+									: spec.restart === "on-failure"
+										? t("tools.hub.restartFailed")
+										: spec.restart == null || spec.restart === "no"
+											? t("settings.effect.off")
+											: String(spec.restart),
+							persist: t(spec.persist === true ? "settings.effect.on" : "settings.effect.off"),
+						})}
+						{spec.detached === true && ` · ${t("tools.hub.detached")}`}
 					</div>
 				</div>
 			)}

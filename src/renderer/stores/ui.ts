@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { KEYMAP_DISABLED_PREF, KEYMAP_OVERRIDES_PREF } from "../../shared/hotkeys";
 import type { CustomProviderView, SessionInfo } from "../../shared/ipc-types";
 import type { SidecarRestartProgress } from "../../shared/rpc-types";
+import { composerSizes } from "../lib/composer-size";
 import { effectiveOverrides, type KeymapOverrides, sanitizeDisabled, sanitizeOverrides } from "../lib/keymap";
 import {
 	readPrepaintChatWidth,
@@ -43,6 +44,13 @@ const CLOSED_WORKSPACE_PAGES = {
 	workspaceDirsOpen: false,
 };
 export type WorkspacePageId = keyof typeof CLOSED_WORKSPACE_PAGES | "tasks";
+
+interface ModelRestorePrompt {
+	session: SessionInfo;
+	missingModel: string;
+	originTabId: string | null;
+	originSessionId: string | null;
+}
 
 function workspacePagePatch(page: WorkspacePageId | null): Partial<UiStore> {
 	return {
@@ -186,7 +194,7 @@ interface UiStore {
 	sessionSwitchPrompt: SessionInfo | null;
 	/** Session whose saved model could not be restored on switch; non-null shows
 	 * the ModelRestoreDialog offering to open it with the current model. */
-	modelRestorePrompt: { session: SessionInfo; missingModel: string } | null;
+	modelRestorePrompt: ModelRestorePrompt | null;
 	sidecarError: string | null;
 	/** Crash-loop progress carried by the status behind `sidecarError`: non-null
 	 * while the sidecar is respawning itself, and on the terminal error once the
@@ -197,6 +205,8 @@ interface UiStore {
 	sidecarDismissed: boolean;
 	theme: ThemeMode;
 	fontSize: number;
+	composerRows: number;
+	composerFontScale: number;
 	interfaceFont: string;
 	codeFont: string;
 	/** Application-wide display preferences, independent of a task's terminal configuration. */
@@ -228,6 +238,8 @@ interface UiStore {
 	/** Show the agent's ask form inline in the transcript instead of as a modal (#74). */
 	askInline: boolean;
 	chatImagePopup: boolean;
+	shiftEnterToSend: boolean;
+	externalTextFiles: boolean;
 	/** Expand/collapse-all signal for tool cards (⌃O); `seq` bumps per toggle so cards re-sync their local state. */
 	toolsExpandAll: { expanded: boolean; seq: number };
 	toggleSidebar: () => void;
@@ -346,7 +358,7 @@ interface UiStore {
 	closeSessionInfo: () => void;
 	requestSessionSwitch: (session: SessionInfo) => void;
 	closeSessionSwitch: () => void;
-	requestModelRestore: (prompt: { session: SessionInfo; missingModel: string }) => void;
+	requestModelRestore: (prompt: ModelRestorePrompt) => void;
 	closeModelRestore: () => void;
 	/** Close UI whose data or actions belong to the outgoing tab. */
 	closeSessionOverlays: () => void;
@@ -412,6 +424,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	settingsTab: "capabilities",
 	theme: readPrepaintThemeMode(),
 	fontSize: readPrepaintFontSize(),
+	composerRows: composerSizes.composerRows.initial,
+	composerFontScale: composerSizes.composerFontScale.initial,
 	interfaceFont: readPrepaintFontFamily("interfaceFont"),
 	codeFont: readPrepaintFontFamily("codeFont"),
 	compactDensity: readPrepaintCompactDensity(),
@@ -431,6 +445,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	collapseLargePastes: true,
 	askInline: false,
 	chatImagePopup: true,
+	shiftEnterToSend: false,
+	externalTextFiles: false,
 	toggleSidebar: () => set({ sidebarVisible: !get().sidebarVisible }),
 	// The bare toggle (title bar, shortcut) opens on Overview; links that open the
 	// drawer for a reason (Review, a file, /btw) go through setPanelTab instead.
@@ -614,7 +630,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	openProviderConfig: editProvider => set({ providerConfigOpen: true, providerConfigEdit: editProvider ?? null }),
 	closeProviderConfig: () => set({ providerConfigOpen: false, providerConfigEdit: null }),
 	renameDialogOpen: false,
-	openRenameDialog: () => set({ renameDialogOpen: true }),
+	openRenameDialog: () => set({ ...workspacePagePatch(null), renameDialogOpen: true }),
 	closeRenameDialog: () => set({ renameDialogOpen: false }),
 	worktreeDialog: null,
 	openWorktreeDialog: context => set({ worktreeDialog: context ?? {} }),
@@ -655,7 +671,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 	sessionSwitchPrompt: null as SessionInfo | null,
 	requestSessionSwitch: session => set({ sessionSwitchPrompt: session }),
 	closeSessionSwitch: () => set({ sessionSwitchPrompt: null }),
-	modelRestorePrompt: null as { session: SessionInfo; missingModel: string } | null,
+	modelRestorePrompt: null,
 	requestModelRestore: prompt => set({ modelRestorePrompt: prompt }),
 	closeModelRestore: () => set({ modelRestorePrompt: null }),
 	closeSessionOverlays: () =>

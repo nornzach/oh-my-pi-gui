@@ -9,6 +9,7 @@
 import { Check, RotateCcw, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { IpcWindowToggleStatus } from "../../../shared/ipc-types";
+import { saveGuiPreference } from "../../lib/display-preferences";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import {
@@ -30,6 +31,7 @@ import { useEffectiveKeymapOverrides, useUiStore } from "../../stores/ui";
 import { Button, Input, Kbd, kbdClass } from "../common";
 import { SwitchTrack } from "../common/SwitchTrack";
 import { Section } from "./editors/Section";
+import { SegmentedField } from "./editors/SegmentedField";
 import { SettingsPageIntro } from "./SettingsPageIntro";
 
 interface Recording {
@@ -68,6 +70,9 @@ function Switch({ checked, label, onChange }: { checked: boolean; label: string;
 export function ShortcutsSettingsPage() {
 	const t = useT();
 	const saved = useUiStore(s => s.keymapOverrides);
+	const shiftEnterToSend = useUiStore(s => s.shiftEnterToSend);
+	const saveSendKey = (next: boolean) =>
+		saveGuiPreference("shiftEnterToSend", next, () => useUiStore.setState({ shiftEnterToSend: next }));
 	const disabled = useUiStore(s => s.keymapDisabled);
 	const effective = useEffectiveKeymapOverrides();
 	const setKeymapOverride = useUiStore(s => s.setKeymapOverride);
@@ -135,25 +140,40 @@ export function ShortcutsSettingsPage() {
 		const q = query.trim().toLowerCase();
 		return SHORTCUT_SECTIONS.map(section => ({
 			section,
-			rows: shortcutSectionRows(section).filter(row => {
+			rows: shortcutSectionRows(section, shiftEnterToSend).filter(row => {
 				if (!q) return true;
 				const name = t(row.kind === "entry" ? row.entry.labelKey : row.row.labelKey).toLowerCase();
 				const keys = row.kind === "entry" ? actionChords(row.entry, effective).join(" ") : row.row.keys;
 				return name.includes(q) || keys.toLowerCase().includes(q);
 			}),
 		})).filter(section => section.rows.length > 0);
-	}, [query, t, effective]);
+	}, [query, t, effective, shiftEnterToSend]);
 
 	const conflictText = (conflict: ShortcutConflict) =>
 		t(`shortcuts.conflict.${conflict.reason}`, { action: label(conflict.otherId) });
 
-	const renderBuiltIn = (row: BuiltInShortcut) => (
-		<div className="flex items-center gap-3 px-3 py-2" key={row.labelKey}>
-			<span className="min-w-0 flex-1 text-omp-md text-(--omp-text)">{t(row.labelKey)}</span>
-			<Kbd variant="keycap">{row.keys}</Kbd>
-			<span className="w-[4.75rem] shrink-0 text-right text-omp-xs text-(--omp-dim)">{t("shortcuts.builtIn")}</span>
-		</div>
-	);
+	const renderBuiltIn = (row: BuiltInShortcut) =>
+		row.labelKey === "hotkeys.row.send" ? (
+			<div className="px-3" key={row.labelKey}>
+				<SegmentedField
+					label={t(row.labelKey)}
+					value={shiftEnterToSend ? "shift" : "enter"}
+					options={[
+						{ value: "enter", label: "Enter" },
+						{ value: "shift", label: "Shift+Enter" },
+					]}
+					onChange={key => void saveSendKey(key === "shift")}
+				/>
+			</div>
+		) : (
+			<div className="flex items-center gap-3 px-3 py-2" key={row.labelKey}>
+				<span className="min-w-0 flex-1 text-omp-md text-(--omp-text)">{t(row.labelKey)}</span>
+				<Kbd variant="keycap">{row.keys}</Kbd>
+				<span className="w-[4.75rem] shrink-0 text-right text-omp-xs text-(--omp-dim)">
+					{t("shortcuts.builtIn")}
+				</span>
+			</div>
+		);
 
 	const renderEntry = (entry: ShortcutEntry) => {
 		if (entry.fixed) {
@@ -296,7 +316,8 @@ export function ShortcutsSettingsPage() {
 						<button
 							aria-label={t("common.confirm")}
 							className="flex size-6 items-center justify-center rounded bg-(--omp-tool-error-bg) text-(--omp-error) hover:brightness-110"
-							onClick={() => {
+							onClick={async () => {
+								if (shiftEnterToSend && !(await saveSendKey(false))) return;
 								resetKeymapOverrides();
 								setConfirmingReset(false);
 								setRecording(null);
@@ -319,7 +340,7 @@ export function ShortcutsSettingsPage() {
 					</span>
 				) : (
 					<Button
-						disabled={Object.keys(saved).length === 0 && disabled.length === 0}
+						disabled={!shiftEnterToSend && Object.keys(saved).length === 0 && disabled.length === 0}
 						onClick={() => setConfirmingReset(true)}
 						size="sm"
 						variant="ghost"

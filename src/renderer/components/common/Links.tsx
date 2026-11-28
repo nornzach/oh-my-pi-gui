@@ -7,13 +7,14 @@
 import { type CSSProperties, type ReactNode, useMemo } from "react";
 import type { IpcResolvedPath } from "../../../shared/ipc-types";
 import { isSessionOutputPath } from "../../../shared/session-output";
-import { activateFileLink } from "../../lib/file-actions";
+import { activateFileLink, prefersExternalTextFile } from "../../lib/file-actions";
 import { cx } from "../../lib/format";
 import { useT } from "../../lib/i18n";
 import { type FileTarget, parseFileTarget } from "../../lib/link-targets";
 import { browserPanelAvailable, openLink } from "../../lib/open-link";
 import { useResolvedPath } from "../../lib/path-resolver";
 import { useRuntimeTabId } from "../../stores/session-runtime-context";
+import { useUiStore } from "../../stores/ui";
 import { useFileImagePopup } from "./ImageViewer";
 import { LINK_MODIFIER, showLinkMenu } from "./LinkMenu";
 
@@ -75,6 +76,10 @@ export function FileLink({
 	const folder = resolved?.kind === "directory";
 	const shown = `${resolved?.absolutePath ?? target.path}${target.line ? `:${target.line}` : ""}`;
 	const internal = isSessionOutputPath(target.path);
+	const external = prefersExternalTextFile(
+		target.path,
+		useUiStore(state => state.externalTextFiles),
+	);
 	const popup = useFileImagePopup(internal ? target.path : (resolved?.absolutePath ?? target.path));
 	const open = (modifier: boolean) => {
 		if (!modifier && !folder && (!internal || resolved) && popup.open) void popup.open();
@@ -85,7 +90,7 @@ export function FileLink({
 			<span
 				role="link"
 				tabIndex={0}
-				title={`${shown}\n${t(folder ? "links.folderHint" : "links.fileHint", { mod: LINK_MODIFIER })}`}
+				title={`${shown}\n${t(folder ? "links.folderHint" : external ? "links.openWithDefaultApp" : "links.fileHint", { mod: LINK_MODIFIER })}`}
 				onClick={event => {
 					event.preventDefault();
 					event.stopPropagation();

@@ -31,6 +31,7 @@ import { useModelStore } from "../stores/model";
 import { usePlanApprovalStore } from "../stores/plan-approval";
 import { useQueueStore } from "../stores/queue";
 import { useSessionStore } from "../stores/session";
+import { useSessionFolders } from "../stores/session-folders";
 import { useSubagentsStore } from "../stores/subagents";
 import { type SessionTab, useTabsStore } from "../stores/tabs";
 import { toast } from "../stores/toast";
@@ -83,6 +84,13 @@ export function resetSessionSurface(closeOverlays = true): void {
 
 /** Start a new in-place session and remove the previous surface at the commit boundary. */
 export async function newSessionNow(): Promise<RpcResponse> {
+	if (useSessionFolders.getState().folders.length > 0) {
+		const tabs = useTabsStore.getState();
+		const tab = tabs.tabs.find(entry => entry.id === tabs.activeTabId);
+		const opened = await tabs.openTab({ cwd: tab?.cwd, kind: tab?.kind });
+		if (!opened) throw new Error(translate("tabs.newFailed"));
+		return { type: "response", command: "new_session", success: true };
+	}
 	const runtime = focusedSessionRuntime();
 	const response = await (runtime ? createTabRpc(runtime.command) : window.omp.rpc).newSession();
 	if (!response.success) throw new Error(response.error);
@@ -151,6 +159,12 @@ export async function routeToSessionOwner(owner: IpcSessionOwner, sessionPath: s
  * pre-check is safe to ignore.
  */
 export async function switchSessionNow(session: SessionInfo, model?: SessionModelOverride): Promise<boolean> {
+	if (!model && useSessionFolders.getState().folders.length > 0) {
+		const id = await useTabsStore
+			.getState()
+			.openTab({ cwd: session.cwd, sessionPath: session.path, kind: session.kind ?? "agent" });
+		return id !== null;
+	}
 	const runtime = focusedSessionRuntime();
 	const originStore = runtime ? sessionRuntimeStore<SessionStore>(runtime.tabId, "session")! : useSessionStore;
 	const originSessionId = originStore.getState().sessionId;
@@ -193,7 +207,8 @@ export async function switchSessionNow(session: SessionInfo, model?: SessionMode
 			clearPending();
 			const missingModel = model ? null : parseModelRestoreFailure(response.error);
 			if (missingModel) {
-				useUiStore.getState().requestModelRestore({ session, missingModel });
+				if (stillCurrent() && useTabsStore.getState().activeTabId === originTabId)
+					useUiStore.getState().requestModelRestore({ session, missingModel, originTabId, originSessionId });
 				return false;
 			}
 			// Cross-kind switch guard: refuse agent ↔ chat switches.
@@ -278,6 +293,10 @@ function canBrowseInPlace(tab: SessionTab, session: SessionInfo): boolean {
  */
 export async function openSessionFromSidebar(session: SessionInfo): Promise<void> {
 	const tabs = useTabsStore.getState();
+	if (useSessionFolders.getState().folders.length > 0) {
+		await switchSessionNow(session);
+		return;
+	}
 	const tabId = focusedSessionRuntime()?.tabId ?? tabs.activeTabId;
 	const tab = tabs.tabs.find(candidate => candidate.id === tabId);
 	if (tab && canBrowseInPlace(tab, session)) {
@@ -294,6 +313,10 @@ export async function openSessionFromSidebar(session: SessionInfo): Promise<void
  * Idle sessions switch straight through.
  */
 export function requestSessionSwitch(session: SessionInfo): void {
+	if (useSessionFolders.getState().folders.length > 0) {
+		void switchSessionNow(session);
+		return;
+	}
 	const { isStreaming, isCompacting, isBackgroundCompacting, sessionId } = useSessionStore.getState();
 	if (session.id === sessionId) return;
 	if (isStreaming || isCompacting || isBackgroundCompacting) {

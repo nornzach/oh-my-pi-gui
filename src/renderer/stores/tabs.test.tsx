@@ -37,6 +37,7 @@ import { useModelStore } from "./model";
 import { usePlanApprovalStore } from "./plan-approval";
 import { useQueueStore } from "./queue";
 import { type SessionStore, useSessionStore } from "./session";
+import { folderTabs, useSessionFolders } from "./session-folders";
 import { sessionRuntime, sessionRuntimeStore, setFocusedSessionRuntime } from "./session-runtime-context";
 import { useSubagentsStore } from "./subagents";
 import { ensureTabRuntime } from "./tab-runtime";
@@ -250,6 +251,36 @@ afterEach(() => {
 });
 
 ({ omp, emitTabStatus } = installMockOmp());
+
+it("finishes an older open in the background when a newer session was chosen", async () => {
+	seedTabs();
+	const saved = useSessionFolders.getState();
+	try {
+		useSessionFolders.setState({
+			active: "work",
+			folders: [{ id: "work", name: "Work", parentId: "default", sessions: ["tab:t0", "/later", "/chosen"] }],
+			views: { work: { order: ["tab:t0"], focused: "tab:t0" } },
+		});
+		const delayed = Promise.withResolvers<IpcSpawnTabResult>();
+		omp.tabs.spawn.mockReturnValueOnce(delayed.promise).mockResolvedValueOnce({ tabId: "chosen" });
+		const tabs = useTabsStore.getState();
+		const pending = tabs.openTab({ sessionPath: "/later" });
+		await tabs.openTab({ sessionPath: "/chosen" });
+		delayed.resolve({ tabId: "late" });
+		await pending;
+		await tabs.selectFolder("default");
+		await tabs.selectFolder("work");
+		const current = useTabsStore.getState();
+		expect(current.activeTabId).toBe("chosen");
+		expect(folderTabs(current.tabs, useSessionFolders.getState()).map(tab => tab.id)).toEqual([
+			"t0",
+			"chosen",
+			"late",
+		]);
+	} finally {
+		useSessionFolders.setState(saved);
+	}
+});
 
 describe("tabs store boot reconciliation", () => {
 	it("adopts the window's initial sidecar as tab 0 and never duplicates it", async () => {

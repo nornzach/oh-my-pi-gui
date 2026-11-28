@@ -42,6 +42,16 @@ export function previewFile(path: string, line?: number): void {
 	useUiStore.getState().openFilePreview(path, line);
 }
 
+export function prefersExternalTextFile(path: string, enabled: boolean): boolean {
+	if (!enabled || isSessionOutputPath(path)) return false;
+	const name = path.split(/[\\/]/).pop() ?? "";
+	return (
+		/\.(?:txt|md|mdx|markdown|rst|log|csv|tsv|jsonl?|ya?ml|toml|ini|conf|cfg|xml|tex|diff|patch|sql|css|scss|less|tsx?|jsx|vue|svelte|rs|go|c|cpp|h|hpp|java|kt|swift)$/i.test(
+			name,
+		) || /^(?:readme|license|changelog|authors|notice|dockerfile|makefile)$/i.test(name)
+	);
+}
+
 /**
  * A click on a file link: preview in the app, or with ⌘/Ctrl (and for folders)
  * open with the default app.
@@ -52,7 +62,11 @@ export function activateFileLink(target: FileTarget, resolved: IpcResolvedPath |
 		return;
 	}
 	const path = resolved?.absolutePath ?? target.path;
-	if (modifier || resolved?.kind === "directory") {
+	if (
+		modifier ||
+		resolved?.kind === "directory" ||
+		(resolved?.kind === "file" && prefersExternalTextFile(path, useUiStore.getState().externalTextFiles))
+	) {
 		void openPathExternally(path);
 		return;
 	}

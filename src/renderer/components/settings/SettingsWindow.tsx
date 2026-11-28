@@ -1,3 +1,4 @@
+import { type ComposerSizeKey, composerSizes } from "../../lib/composer-size";
 import {
 	GUI_DISPLAY_BOOL_FIELDS,
 	saveGuiPreference,
@@ -35,7 +36,6 @@ import {
 	Palette,
 	Plus,
 	RefreshCw,
-	RotateCcw,
 	RotateCw,
 	Search,
 	Server,
@@ -74,9 +74,6 @@ import {
 	resetFontSizePreference,
 	saveFontFamilyPreference,
 } from "../../lib/view-preferences";
-import { en } from "../../locales/en";
-import { ru } from "../../locales/ru";
-import { zh } from "../../locales/zh";
 import { openHandoffDialog } from "../../stores/fork-handoff";
 import { useMessagesStore } from "../../stores/messages";
 import { useSessionStore } from "../../stores/session";
@@ -129,6 +126,7 @@ import {
 	type LoadState,
 	MANAGEMENT_TAB_IDS,
 	MCP_TAB_ID,
+	matchesGuiSettingSearch,
 	RESOURCES_TAB_ID,
 	SECURITY_TAB_ID,
 	type SettingsResponseData,
@@ -157,6 +155,57 @@ const SETTINGS_NAV_ICONS: Record<string, typeof SlidersHorizontal> = {
 };
 
 /** One GUI display switch; a row that overrides the Agent setting offers to inherit it again. */
+function ComposerSizeRow({ field }: { field: ComposerSizeKey }) {
+	const t = useT();
+	const value = useUiStore(state => state[field]);
+	const { min, max, step, initial } = composerSizes[field];
+	const label = t(`settings.gui.${field}`);
+	const display = (size: number) => (field === "composerRows" ? `${size}` : `${size}%`);
+	const save = (size: number) => void saveGuiPreference(field, size, () => useUiStore.setState({ [field]: size }));
+	const control =
+		"omp-pressable flex size-7 items-center justify-center rounded-md text-(--omp-muted) hover:bg-(--omp-selected-bg) disabled:opacity-35";
+	return (
+		<div
+			id={`setting-gui-${field}`}
+			className="omp-settings-row flex scroll-mt-4 items-center justify-between gap-4 pt-3"
+		>
+			<span className="text-omp-md font-medium text-(--omp-text)">{label}</span>
+			<div
+				role="group"
+				aria-label={label}
+				className="flex shrink-0 items-center gap-0.5 rounded-lg border border-(--omp-border-muted) p-0.5"
+			>
+				<button
+					type="button"
+					className={control}
+					title={`${label} −${display(step)}`}
+					disabled={value <= min}
+					onClick={() => save(value - step)}
+				>
+					<Minus size={13} />
+				</button>
+				<button
+					type="button"
+					className="omp-pressable min-w-12 rounded-md p-1 font-mono text-omp-sm tabular-nums hover:bg-(--omp-selected-bg)"
+					title={`${t("common.reset")} (${display(initial)})`}
+					onClick={() => save(initial)}
+				>
+					{display(value)}
+				</button>
+				<button
+					type="button"
+					className={control}
+					title={`${label} +${display(step)}`}
+					disabled={value >= max}
+					onClick={() => save(value + step)}
+				>
+					<Plus size={13} />
+				</button>
+			</div>
+		</div>
+	);
+}
+
 function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELDS)[number] }) {
 	const t = useT();
 	const value = useDisplayPreference(field);
@@ -169,31 +218,26 @@ function DisplayPreferenceRow({ field }: { field: (typeof GUI_DISPLAY_BOOL_FIELD
 		return saved;
 	};
 	return (
-		<div id={`setting-gui-${field}`} className="relative flex items-center pr-8">
-			<div className="min-w-0 flex-1">
-				<Toggle
-					className="omp-settings-row"
-					label={t(`settings.display.${field}`)}
-					// The section intro already explains that unset rows read the Agent
-					// setting; only a row that diverges from it needs a marker.
-					description={overridden ? t("settings.display.local") : undefined}
-					checked={value}
-					disabled={saving}
-					onChange={save}
-				/>
-			</div>
+		<div id={`setting-gui-${field}`}>
+			<Toggle
+				className="omp-settings-row"
+				label={t(`settings.display.${field}`)}
+				checked={value}
+				disabled={saving}
+				onChange={save}
+			/>
 			{overridden && (
-				<Button
-					aria-label={t("settings.display.inherit")}
-					title={t("settings.display.inherit")}
-					className="absolute right-0 w-7 !px-0"
-					size="sm"
-					variant="ghost"
-					disabled={saving}
-					onClick={() => void save(null)}
-				>
-					<RotateCcw aria-hidden="true" size={14} />
-				</Button>
+				<div className="flex flex-wrap items-baseline gap-x-2 px-2 text-omp-xs text-(--omp-dim)">
+					<span>{t("settings.display.local")}</span>
+					<button
+						type="button"
+						className="text-(--omp-muted) underline decoration-dotted underline-offset-2 hover:text-(--omp-text) disabled:opacity-50"
+						disabled={saving}
+						onClick={() => void save(null)}
+					>
+						{t("settings.display.inherit")}
+					</button>
+				</div>
 			)}
 		</div>
 	);
@@ -337,6 +381,7 @@ export function SettingsWindow() {
 	const tabRows = useUiStore(state => state.tabRows);
 	const linkOpenMode = useUiStore(state => state.linkOpenMode);
 	const chatImagePopup = useUiStore(state => state.chatImagePopup);
+	const externalTextFiles = useUiStore(state => state.externalTextFiles);
 	const collapseLargePastes = useUiStore(state => state.collapseLargePastes);
 	const askInline = useUiStore(state => state.askInline);
 	const sidecarStatus = useSessionStore(state => state.status);
@@ -814,12 +859,7 @@ export function SettingsWindow() {
 		const q = query.trim().normalize("NFKC").toLowerCase();
 		if (!q) return [];
 		return GUI_SETTING_SEARCH_ITEMS.filter(
-			item =>
-				(item.id !== "configEditor" || window.omp?.platform === "darwin") &&
-				`${item.id} ${en[item.labelKey]} ${zh[item.labelKey]} ${ru[item.labelKey]} ${item.aliases}`
-					.normalize("NFKC")
-					.toLowerCase()
-					.includes(q),
+			item => (item.id !== "configEditor" || window.omp?.platform === "darwin") && matchesGuiSettingSearch(item, q),
 		);
 	}, [query]);
 	const locateSetting = (targetTab: string, id: string) => {
@@ -1387,6 +1427,8 @@ export function SettingsWindow() {
 															</div>
 														</div>
 
+														<ComposerSizeRow field="composerRows" />
+														<ComposerSizeRow field="composerFontScale" />
 														<div id="setting-gui-interfaceFont" className="scroll-mt-4 pt-3">
 															<div className="omp-settings-row grid grid-cols-[minmax(0,1fr)_minmax(8rem,40%)] items-center gap-4">
 																<div className="min-w-0">
@@ -1588,6 +1630,21 @@ export function SettingsWindow() {
 																	},
 																]}
 																value={linkOpenMode}
+															/>
+															<SegmentedField
+																id="setting-gui-externalTextFiles"
+																label={t("settings.gui.textFileOpenMode")}
+																value={externalTextFiles ? "external" : "panel"}
+																options={[
+																	{ value: "panel", label: t("settings.gui.filePanel") },
+																	{ value: "external", label: t("links.openWithDefaultApp") },
+																]}
+																onChange={mode => {
+																	const next = mode === "external";
+																	void saveGuiPreference("externalTextFiles", next, () =>
+																		useUiStore.setState({ externalTextFiles: next }),
+																	);
+																}}
 															/>
 															<div id="setting-gui-chatImagePopup" className="scroll-mt-4">
 																<Toggle

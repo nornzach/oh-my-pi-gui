@@ -5,7 +5,8 @@ import { describeError } from "../../lib/errors";
 import { useT } from "../../lib/i18n";
 import { useTabRpc } from "../../lib/tab-rpc";
 import { useSessionStore } from "../../stores/session";
-import { Button, ConfirmDialog, Input, Spinner, TextArea } from "../common";
+import { Button, Input, Spinner, TextArea } from "../common";
+import { InlineConfirm } from "../common/InlineConfirm";
 import { SwitchTrack } from "../common/SwitchTrack";
 import { SettingsPageIntro } from "./SettingsPageIntro";
 
@@ -65,7 +66,7 @@ export function SshSettingsPage() {
 	const [saving, setSaving] = useState(false);
 	const [testing, setTesting] = useState(false);
 	const [deleting, setDeleting] = useState(false);
-	const [confirmDelete, setConfirmDelete] = useState(false);
+	const [deleteTarget, setDeleteTarget] = useState<RpcSshHostInfo>();
 	const [error, setError] = useState<string>();
 	// A failed read is not the same claim as a form-validation refusal even though
 	// both surface in the same banner; the host list only hides its empty state
@@ -123,6 +124,7 @@ export function SshSettingsPage() {
 	);
 
 	const chooseHost = (host: RpcSshHostInfo) => {
+		setDeleteTarget(undefined);
 		selectionRef.current = { name: host.name, scope: host.scope };
 		setSelected(host);
 		setDraft(toDraft(host));
@@ -131,6 +133,7 @@ export function SshSettingsPage() {
 	};
 
 	const addHost = () => {
+		setDeleteTarget(undefined);
 		selectionRef.current = undefined;
 		setCreating(true);
 		setSelected(undefined);
@@ -211,7 +214,7 @@ export function SshSettingsPage() {
 	};
 
 	const remove = async () => {
-		setConfirmDelete(false);
+		setDeleteTarget(undefined);
 		if (!sidecarReady || !selected?.editable) return;
 		setDeleting(true);
 		try {
@@ -480,7 +483,7 @@ export function SshSettingsPage() {
 								disabled={!sidecarReady || saving || testing || loading}
 								icon={<Trash2 size={12} />}
 								loading={deleting}
-								onClick={() => setConfirmDelete(true)}
+								onClick={() => setDeleteTarget(selected)}
 								size="sm"
 								variant="ghost"
 							/>
@@ -505,6 +508,20 @@ export function SshSettingsPage() {
 						</Button>
 					</div>
 
+					{selected?.editable &&
+						!creating &&
+						sidecarReady &&
+						deleteTarget?.name === selected.name &&
+						deleteTarget.scope === selected.scope && (
+							<InlineConfirm
+								busy={deleting}
+								message={t("ssh.deleteBody", { name: selected.name, target: targetText(selected) })}
+								onCancel={() => setDeleteTarget(undefined)}
+								onConfirm={() => void remove()}
+								title={t("ssh.deleteTitle", { name: selected.name })}
+								warning={t("ssh.deleteWarning")}
+							/>
+						)}
 					{tests[draft.name] && (
 						<div
 							className={`mt-3 rounded-lg border bg-transparent px-3 py-2 ${tests[draft.name].ok ? "border-(--omp-success)" : "border-(--omp-error)"}`}
@@ -526,19 +543,6 @@ export function SshSettingsPage() {
 					)}
 				</aside>
 			</div>
-
-			<ConfirmDialog
-				busy={deleting}
-				message={t("ssh.deleteBody", {
-					name: selected?.name ?? "",
-					target: selected ? targetText(selected) : "",
-				})}
-				onCancel={() => setConfirmDelete(false)}
-				onConfirm={() => void remove()}
-				open={confirmDelete}
-				title={t("ssh.deleteTitle", { name: selected?.name ?? "" })}
-				warning={t("ssh.deleteWarning")}
-			/>
 		</div>
 	);
 }

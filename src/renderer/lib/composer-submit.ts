@@ -71,7 +71,10 @@ function findGuiOnlyBuiltin(message: string, commands: AvailableCommand[]): Avai
 	const command = commands.find(
 		command => command.name.toLowerCase() === name || command.aliases?.some(alias => alias.toLowerCase() === name),
 	);
-	if (GUI_CONFIRMATION_COMMANDS.has(name) && (!command || command.source === "builtin")) {
+	if (
+		(GUI_CONFIRMATION_COMMANDS.has(name) || message.trim().toLowerCase() === "/rename") &&
+		(!command || command.source === "builtin")
+	) {
 		return command ?? { name, source: "builtin", description: name, textModeExecutable: false };
 	}
 	return command?.source === "builtin" && command.textModeExecutable === false ? command : undefined;

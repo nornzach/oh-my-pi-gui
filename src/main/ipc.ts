@@ -631,7 +631,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 					if (!cancelled) sidecarPool.noteSessionFile(issuerTabId, cmd.sessionPath);
 				} else if (cmd.type === "get_state") {
 					const state = response.data as RpcSessionState | undefined;
-					sidecarPool.noteSessionFile(issuerTabId, state?.sessionFile ?? null);
+					sidecarPool.noteSessionFile(issuerTabId, state?.sessionFile ?? null, state?.sessionId);
 					// switch_session re-roots the agent with no main-observable
 					// event; get_state (run by every hydrate) carries the live
 					// cwd. Adopt it so the tab chip tracks the session, and sync
@@ -767,14 +767,11 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 	// window (win.show()+win.focus() — the codebase's focus pattern, see
 	// deep-link.ts/tray.ts) instead of spawning a second sidecar for the same
 	// file; resolves true because the session ends up foregrounded either way.
-	// The session switch is done by the NEW window's renderer on boot (it pulls
-	// pendingSessionPath and runs switch_session + hydrate itself), which avoids
-	// racing the renderer's boot hydration and surfaces failures in that window.
 	ipcMain.handle(IPC_COMMANDS.SESSION_OPEN_NEW_WINDOW, async (event, payload: IpcSessionOpenNewWindowPayload) => {
 		const sessionPath = typeof payload?.sessionPath === "string" ? payload.sessionPath : undefined;
 		if (sessionPath) {
 			const owner = deps.sidecarPool.sessionOwner(sessionPath);
-			if (owner && deps.windowManager.focusWindowById(owner.winId)) return true;
+			if (owner && deps.windowManager.focusWindowById(owner.winId, owner.tabId, payload.folderId)) return true;
 		}
 		const callerCwd = cwdFor(deps, event) ?? deps.initialCwd();
 		const cwd = typeof payload?.cwd === "string" && payload.cwd.length > 0 ? payload.cwd : callerCwd;
@@ -785,9 +782,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		return deps.spawnWindow(cwd, sessionPath, kind) !== null;
 	});
 
-	// Fresh window pulls the session it was opened to display (one-shot). The
-	// renderer performs the actual switch_session + hydrate on boot, which
-	// avoids racing the boot hydration and surfaces failures in that window.
+	// The renderer uses the one-shot launch target to reveal its folder on boot.
 	ipcMain.handle(IPC_COMMANDS.SESSION_CONSUME_PENDING, event => {
 		const win = BrowserWindow.fromWebContents(event.sender);
 		return win ? (deps.windowManager.consumePendingSession(win) ?? null) : null;
@@ -845,7 +840,7 @@ export function registerIpcHandlers(deps: IpcDeps): void {
 		const win = BrowserWindow.fromWebContents(event.sender);
 		if (!win || typeof payload?.focusedTabId !== "string" || !Array.isArray(payload.visibleTabIds)) return false;
 		const groups = Array.isArray(payload.groups) ? payload.groups : undefined;
-		return deps.sidecarPool.setTabView(win, payload.focusedTabId, payload.visibleTabIds, groups);
+		return deps.sidecarPool.setTabView(win, payload.focusedTabId, payload.visibleTabIds, groups, payload.folderId);
 	});
 
 	ipcMain.handle(IPC_COMMANDS.SET_TAB_ORDER, (event, payload: IpcSetTabOrderPayload) => {

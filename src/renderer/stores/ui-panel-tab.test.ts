@@ -6,6 +6,7 @@
  * force the panel open.
  */
 import { afterEach, describe, expect, it } from "vitest";
+import { connectSessionInspector } from "./session-inspector";
 import { useTabsStore } from "./tabs";
 import { useUiStore } from "./ui";
 
@@ -78,6 +79,34 @@ describe("togglePanel", () => {
 			useUiStore.setState({ panelTab: "files" });
 			useUiStore.getState().togglePanel();
 			expect(useUiStore.getState()).toMatchObject({ panelVisible: false, panelTab: "files" });
+		}
+	});
+});
+
+describe("session inspector", () => {
+	it("restores the correct drawer after background session identification and in-place history switches", () => {
+		seedActiveTab("agent");
+		const initial = useTabsStore.getState().tabs[0];
+		const other = { ...initial, id: "other", sessionId: "other" };
+		const first = { ...initial, sessionPath: "/work/first.jsonl", sessionId: "first" };
+		const second = { ...initial, sessionPath: "/work/second.jsonl", sessionId: "second" };
+		const disconnect = connectSessionInspector();
+		try {
+			useUiStore.getState().setPanelTab("browser");
+			useTabsStore.setState({ activeTabId: other.id, tabs: [initial, other] });
+			useTabsStore.setState({ tabs: [first, other] });
+			expect(useUiStore.getState().panelVisible).toBe(false);
+			useTabsStore.setState({ activeTabId: first.id });
+			expect(useUiStore.getState()).toMatchObject({ panelVisible: true, panelTab: "browser" });
+			useTabsStore.setState({ tabs: [second, other] });
+			expect(useUiStore.getState().panelVisible).toBe(false);
+			useUiStore.getState().setPanelTab("files");
+			useTabsStore.setState({ tabs: [first, other] });
+			expect(useUiStore.getState()).toMatchObject({ panelVisible: true, panelTab: "browser" });
+			useTabsStore.setState({ tabs: [second, other] });
+			expect(useUiStore.getState()).toMatchObject({ panelVisible: true, panelTab: "files" });
+		} finally {
+			disconnect();
 		}
 	});
 });

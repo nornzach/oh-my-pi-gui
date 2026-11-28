@@ -385,6 +385,7 @@ export type MenuAction =
 	| "new-session"
 	| "new-tab"
 	| "new-chat-tab"
+	| "reveal-tab"
 	| "close-tab"
 	| "open-project"
 	| "toggle-sidebar"
@@ -434,6 +435,8 @@ export type DeepLinkPayload = { action: "new-session" } | { action: "switch-sess
 
 /** Optional payload carried alongside a MenuAction (approval mode / project cwd). */
 export interface MenuActionPayload {
+	tabId?: string;
+	folderId?: string;
 	approvalMode?: "always-ask" | "always-ask-cached" | "write" | "yolo";
 	cwd?: string;
 }
@@ -945,6 +948,7 @@ export interface IpcFsReadPlanResult {
  */
 export interface IpcSessionOpenNewWindowPayload {
 	sessionPath?: string;
+	folderId?: string;
 	cwd?: string;
 }
 
@@ -1018,6 +1022,8 @@ export interface IpcTabWorktree {
 export interface IpcTabInfo {
 	/** Opaque snowflake id minted by main at acquire. */
 	tabId: string;
+	folderTabId?: string;
+	windowFolderId?: string;
 	cwd: string;
 	status: TabStatus;
 	/** Present on GET_TABS for the tab main currently routes as active. */
@@ -1060,7 +1066,7 @@ export interface IpcTabRetry {
 }
 
 /** TAB_STATUS push payload — a full tab snapshot from any tab, active or background. */
-export type IpcTabStatusPayload = IpcTabInfo;
+export type IpcTabStatusPayload = IpcTabInfo & { relocatedFrom?: string };
 
 /** TERMINAL_FRAME push: one sidecar terminal frame and the tab it belongs to. */
 export interface IpcTerminalFramePayload {
@@ -1205,6 +1211,7 @@ export interface IpcTabGroup {
 
 export interface IpcSetTabViewPayload {
 	focusedTabId: string;
+	folderId?: string;
 	visibleTabIds: string[];
 	/** The window's split pairs; omitted keeps the ones main already has. */
 	groups?: IpcTabGroup[];
@@ -1681,7 +1688,12 @@ export interface OmpApi {
 		/** Move full event forwarding to this tab. False when unknown or foreign. */
 		setActive(tabId: string): Promise<boolean>;
 		/** Set the focused tab plus the one or two tabs rendered by the window, and its split pairs. */
-		setView(focusedTabId: string, visibleTabIds: string[], groups?: IpcTabGroup[]): Promise<boolean>;
+		setView(
+			focusedTabId: string,
+			visibleTabIds: string[],
+			groups?: IpcTabGroup[],
+			folderId?: string,
+		): Promise<boolean>;
 		/** Reorder this window's tabs. False when the window has none. */
 		setOrder(tabIds: string[]): Promise<boolean>;
 		/** The tab/window currently attached to a session file, if any (F-OWN). */
